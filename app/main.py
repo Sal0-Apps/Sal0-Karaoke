@@ -33,7 +33,8 @@ templates = Jinja2Templates(directory="templates")
 state_lock = threading.Lock()
 processing_lock = threading.Lock()
 
-# Estado global da aplicação
+# Estado global da aplicação e persistência em disco
+STATE_FILE = "/data/output/state.json"
 state = {
     "status": "idle",          # idle, processing, done, error
     "step": "",                # Uploading, Extracting audio, Separating vocals, etc.
@@ -44,7 +45,7 @@ state = {
 }
 
 def update_state(status: str, step: str, progress: int, error_message: str = "", result_file: str = None, original_filename: str = None):
-    """Atualiza o estado global da aplicação de forma thread-safe."""
+    """Atualiza o estado global da aplicação de forma thread-safe e persiste no disco."""
     with state_lock:
         state["status"] = status
         state["step"] = step
@@ -53,6 +54,52 @@ def update_state(status: str, step: str, progress: int, error_message: str = "",
         state["result_file"] = result_file
         if original_filename is not None:
             state["original_filename"] = original_filename
+            
+        try:
+            os.makedirs(os.path.dirname(STATE_FILE), exist_ok=True)
+            with open(STATE_FILE, "w", encoding="utf-8") as f:
+                import json
+                json.dump(state, f, indent=4)
+        except Exception as e:
+            logger.error(f"Erro ao salvar estado no disco: {e}")
+
+@app.on_event("startup")
+def startup_event():
+    global state
+    if os.path.exists(STATE_FILE):
+        try:
+            with open(STATE_FILE, "r", encoding="utf-8") as f:
+                import json
+                saved_state = json.load(f)
+                
+                # Se o estado salvo era "processing", significa que o container foi finalizado abruptamente (por exemplo, por falta de RAM)
+                if saved_state.get("status") == "processing":
+                    orig_name = saved_state.get("original_filename", "vídeo")
+                    logger.warning("Detecção de reinicialização abrupta (possível OOM ou queda)!")
+                    
+                    state["status"] = "error"
+                    state["step"] = "Interrupted"
+                    state["progress"] = 0
+                    state["error_message"] = "O servidor foi interrompido inesperadamente (possivelmente ficou sem memória RAM ou o container reiniciou)."
+                    
+                    # Salvar o estado de erro persistente
+                    with open(STATE_FILE, "w", encoding="utf-8") as sf:
+                        json.dump(state, sf, indent=4)
+                    
+                    # Notificar o erro no Telegram
+                    tel_config = load_telegram_config()
+                    token = tel_config.get("telegram_token")
+                    chat_id = tel_config.get("telegram_chat_id")
+                    if token and chat_id:
+                        send_telegram_notification(
+                            token,
+                            chat_id,
+                            f"⚠️ <b>Sal0 karaoke</b>: O servidor foi reiniciado inesperadamente ou ficou sem memória RAM (OOM) enquanto processava <b>{orig_name}</b>!"
+                        )
+                else:
+                    state.update(saved_state)
+        except Exception as e:
+            logger.error(f"Erro ao carregar estado inicial no startup: {e}")
 
 def send_telegram_notification(token: str, chat_id: str, message: str):
     """Envia uma mensagem de notificação para um chat específico via Bot do Telegram."""

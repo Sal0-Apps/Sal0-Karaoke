@@ -15,7 +15,7 @@ def transcribe_vocals(vocals_path: str, model_size: str = "medium") -> list[dict
             model_size, 
             device="cpu", 
             compute_type="int8",             # Reduz uso de RAM pela metade
-            cpu_threads=2,                   # Limita a 2 núcleos para poupar o Home Assistant
+            cpu_threads=4,                   # Usa toda a CPU de 4 núcleos para velocidade máxima
             download_root="/data/output/models/whisper",
             local_files_only=True            # Não baixa arquivos durante a criação do karaoke
         )
