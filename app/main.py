@@ -191,31 +191,40 @@ model_download_status = {
 }
 
 def is_model_downloaded(model_size: str) -> bool:
-    """Verifica se o modelo Whisper já está baixado no servidor."""
-    try:
-        from faster_whisper import WhisperModel
-        # Tenta carregar usando local_files_only=True na CPU
-        WhisperModel(
-            model_size, 
-            device="cpu", 
-            compute_type="int8", 
-            download_root="/data/output/models/whisper",
-            local_files_only=True
-        )
-        return True
-    except Exception:
+    """Verifica de forma ultra leve (no disco) se o modelo Whisper já está baixado no servidor."""
+    repo_id = f"Systran/faster-whisper-{model_size}"
+    folder_name = f"models--{repo_id.replace('/', '--')}"
+    model_dir = os.path.join("/data/output/models/whisper", folder_name)
+    
+    # Se a pasta principal do cache do HuggingFace não existe, não está baixado
+    if not os.path.isdir(model_dir):
         return False
+        
+    # Verifica se há alguma pasta snapshots não vazia contendo o modelo
+    snapshots_dir = os.path.join(model_dir, "snapshots")
+    if os.path.isdir(snapshots_dir):
+        try:
+            subdirs = [os.path.join(snapshots_dir, d) for d in os.listdir(snapshots_dir) if os.path.isdir(os.path.join(snapshots_dir, d))]
+            for s_dir in subdirs:
+                # O model.bin é o arquivo binário essencial do ctranslate2/faster-whisper
+                if os.path.exists(os.path.join(s_dir, "model.bin")):
+                    return True
+        except Exception:
+            return False
+            
+    return False
 
 def download_model_worker(model_size: str):
-    """Worker em background para baixar o modelo Whisper."""
+    """Worker em background para baixar o modelo Whisper e liberar a RAM logo em seguida."""
     try:
         from faster_whisper import WhisperModel
+        import gc
         logger.info(f"Iniciando download do modelo Whisper {model_size}...")
         model_download_status[model_size]["status"] = "downloading"
         model_download_status[model_size]["progress"] = 30
         
-        # Faz o download oficial carregando na CPU e salvando na pasta persistente
-        WhisperModel(
+        # Faz o download oficial
+        model = WhisperModel(
             model_size,
             device="cpu",
             compute_type="int8",
@@ -223,9 +232,13 @@ def download_model_worker(model_size: str):
             local_files_only=False
         )
         
+        # Desaloca imediatamente para liberar os GBs de RAM que foram baixados
+        del model
+        gc.collect()
+        
         model_download_status[model_size]["status"] = "done"
         model_download_status[model_size]["progress"] = 100
-        logger.info(f"Download do modelo Whisper {model_size} concluído com sucesso!")
+        logger.info(f"Download do modelo Whisper {model_size} concluído com sucesso e RAM liberada!")
     except Exception as ex:
         logger.error(f"Erro ao baixar modelo {model_size}: {ex}")
         model_download_status[model_size]["status"] = "error"
