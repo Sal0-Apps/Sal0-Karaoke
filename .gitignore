@@ -1,0 +1,29 @@
+# Python caches
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+
+# Docker volumes locais e dados
+data/
+models/
+torch/
+huggingface/
+whisper/
+
+# Arquivos temporários e uploads
+app/temp/
+app/tmp/
+app/karaoke_uploads/
+*.wav
+*.mp3
+*.m4a
+*.flac
+*.mp4
+*.mkv
+*.avi
+*.ass
+*.png
+*.jpg
+*.jpeg

@@ -1,0 +1,1201 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sal0 karaoke - Gerador Automático de Vídeos</title>
+    <!-- Google Fonts para tipografia premium -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --bg-gradient: linear-gradient(135deg, #0f0c1b 0%, #15102a 50%, #090614 100%);
+            --glass-bg: rgba(255, 255, 255, 0.03);
+            --glass-border: rgba(255, 255, 255, 0.07);
+            --primary: #8b5cf6;
+            --primary-glow: rgba(139, 92, 246, 0.4);
+            --secondary: #3b82f6;
+            --success: #10b981;
+            --success-glow: rgba(16, 185, 129, 0.4);
+            --danger: #ef4444;
+            --text-main: #f3f4f6;
+            --text-muted: #9ca3af;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        body {
+            background: var(--bg-gradient);
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem 1rem;
+            overflow-x: hidden;
+        }
+
+        /* Container Principal */
+        .container {
+            width: 100%;
+            max-width: 750px;
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            border-radius: 24px;
+            padding: 2.5rem;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            position: relative;
+            z-index: 1;
+        }
+
+        /* Efeito de luz decorativo ao fundo */
+        .glow-orb {
+            position: absolute;
+            width: 300px;
+            height: 300px;
+            background: radial-gradient(circle, var(--primary-glow) 0%, rgba(0,0,0,0) 70%);
+            top: -150px;
+            right: -150px;
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        header h1 {
+            font-size: 2.2rem;
+            font-weight: 800;
+            background: linear-gradient(to right, #a78bfa, #60a5fa);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 0.5rem;
+            letter-spacing: -0.5px;
+        }
+
+        header p {
+            color: var(--text-muted);
+            font-size: 0.95rem;
+        }
+
+        /* Formulários e Upload */
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .label {
+            display: block;
+            font-size: 0.85rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            color: var(--text-muted);
+            margin-bottom: 0.6rem;
+        }
+
+        .upload-area {
+            border: 2px dashed var(--glass-border);
+            border-radius: 16px;
+            padding: 2.5rem 1.5rem;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: rgba(255, 255, 255, 0.01);
+            position: relative;
+        }
+
+        .upload-area:hover, .upload-area.dragover {
+            border-color: var(--primary);
+            background: rgba(139, 92, 246, 0.03);
+            box-shadow: 0 0 15px rgba(139, 92, 246, 0.1);
+        }
+
+        .upload-icon {
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+            display: block;
+        }
+
+        .upload-text {
+            font-size: 1rem;
+            font-weight: 600;
+            color: var(--text-main);
+            margin-bottom: 0.25rem;
+        }
+
+        .upload-hint {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+
+        .file-input {
+            display: none;
+        }
+
+        .file-selected-badge {
+            margin-top: 1rem;
+            display: inline-flex;
+            align-items: center;
+            background: rgba(139, 92, 246, 0.15);
+            border: 1px solid rgba(139, 92, 246, 0.3);
+            color: #c084fc;
+            padding: 0.4rem 1rem;
+            border-radius: 99px;
+            font-size: 0.85rem;
+            font-weight: 500;
+        }
+
+        /* Estilo para imagem de fundo opcional */
+        .bg-selector-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: rgba(255, 255, 255, 0.015);
+            border: 1px solid var(--glass-border);
+            border-radius: 14px;
+            padding: 1rem;
+            margin-top: 1rem;
+        }
+
+        .bg-info-text {
+            font-size: 0.9rem;
+        }
+
+        .bg-info-text span {
+            display: block;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-top: 0.1rem;
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--glass-border);
+            color: var(--text-main);
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 500;
+            font-size: 0.85rem;
+            transition: all 0.2s ease;
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        /* Botão Processar Principal */
+        .btn-primary {
+            display: block;
+            width: 100%;
+            background: linear-gradient(90deg, var(--primary) 0%, var(--secondary) 100%);
+            border: none;
+            color: #fff;
+            padding: 1.1rem;
+            font-size: 1.1rem;
+            font-weight: 700;
+            border-radius: 14px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px var(--primary-glow);
+            margin-top: 2rem;
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(139, 92, 246, 0.5);
+        }
+
+        .btn-primary:active:not(:disabled) {
+            transform: translateY(0);
+        }
+
+        .btn-primary:disabled {
+            background: rgba(255, 255, 255, 0.07);
+            color: var(--text-muted);
+            cursor: not-allowed;
+            box-shadow: none;
+        }
+
+        /* Painel de Processamento */
+        .process-card {
+            display: none;
+            border-top: 1px solid var(--glass-border);
+            margin-top: 2rem;
+            padding-top: 2rem;
+        }
+
+        /* Barra de Progresso */
+        .progress-container {
+            margin-bottom: 2rem;
+        }
+
+        .progress-info {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.9rem;
+            font-weight: 600;
+            margin-bottom: 0.6rem;
+        }
+
+        .progress-bar-bg {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 99px;
+            height: 10px;
+            width: 100%;
+            overflow: hidden;
+            border: 1px solid rgba(255,255,255,0.03);
+        }
+
+        .progress-bar-fill {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, var(--primary) 0%, var(--secondary) 100%);
+            border-radius: 99px;
+            transition: width 0.4s cubic-bezier(0.1, 0.8, 0.25, 1);
+            box-shadow: 0 0 10px var(--primary-glow);
+        }
+
+        /* Timeline de Status */
+        .timeline {
+            display: flex;
+            flex-direction: column;
+            gap: 0.8rem;
+            margin-bottom: 2rem;
+        }
+
+        .timeline-step {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            opacity: 0.35;
+            transition: all 0.3s ease;
+        }
+
+        .timeline-step.active {
+            opacity: 1;
+            font-weight: 600;
+            color: #c084fc;
+        }
+
+        .timeline-step.active .step-dot {
+            background: var(--primary);
+            box-shadow: 0 0 12px var(--primary);
+            animation: pulse 1.5s infinite;
+        }
+
+        .timeline-step.completed {
+            opacity: 0.8;
+            color: var(--success);
+        }
+
+        .timeline-step.completed .step-dot {
+            background: var(--success);
+            box-shadow: 0 0 8px var(--success-glow);
+        }
+
+        .step-dot {
+            width: 10px;
+            height: 10px;
+            background: var(--text-muted);
+            border-radius: 50%;
+            transition: all 0.3s ease;
+        }
+
+        .step-name {
+            font-size: 0.95rem;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(139, 92, 246, 0.7); }
+            70% { transform: scale(1.2); box-shadow: 0 0 0 10px rgba(139, 92, 246, 0); }
+            100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(139, 92, 246, 0); }
+        }
+
+        /* Caixa de Erro */
+        .error-card {
+            display: none;
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            border-radius: 12px;
+            padding: 1rem;
+            color: #fca5a5;
+            margin-top: 1.5rem;
+            font-size: 0.9rem;
+            line-height: 1.5;
+        }
+
+        /* Botão Download Final */
+        .download-box {
+            display: none;
+            text-align: center;
+            margin-top: 2rem;
+            padding: 1.5rem;
+            background: rgba(16, 185, 129, 0.05);
+            border: 1px solid rgba(16, 185, 129, 0.2);
+            border-radius: 16px;
+            animation: slideUp 0.5s ease-out;
+        }
+
+        .btn-success {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            background: linear-gradient(90deg, var(--success) 0%, #059669 100%);
+            border: none;
+            color: #fff;
+            padding: 1rem 2.5rem;
+            font-size: 1.1rem;
+            font-weight: 700;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px var(--success-glow);
+            text-decoration: none;
+        }
+
+        .btn-success:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(16, 185, 129, 0.5);
+        }
+
+        .download-title {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: #a7f3d0;
+            margin-bottom: 0.4rem;
+        }
+
+        .download-desc {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin-bottom: 1.2rem;
+        }
+
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(15px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body>
+    <div class="glow-orb"></div>
+    <div class="container">
+        <header>
+            <h1>Sal0 karaoke</h1>
+            <p>Separação de áudio e geração de vídeos de karaoke locais via IA</p>
+        </header>
+
+        <!-- Formulário de Processamento -->
+        <form id="karaokeForm">
+            <!-- Cabeçalho do Card com Título e Botão de Engrenagem (Ajustes) -->
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; position: relative;">
+                <h2 style="margin: 0; font-size: 1.25rem; font-weight: 700; color: var(--text-main); display: flex; align-items: center; gap: 0.4rem;">
+                    <span>🎙️</span> Nova Produção
+                </h2>
+                <button type="button" id="btnToggleAdvanced" style="background: rgba(255, 255, 255, 0.05); border: 1px solid var(--glass-border); padding: 0.4rem 0.8rem; border-radius: 20px; color: #c084fc; font-size: 0.8rem; font-weight: 600; display: flex; align-items: center; gap: 0.35rem; cursor: pointer; transition: all 0.2s ease; outline: none;">
+                    <span style="font-size: 0.95rem;">⚙️</span> Ajustes
+                </button>
+            </div>
+
+            <!-- ÁREA DE MÍDIA (Música e Imagem de Fundo Lado a Lado) -->
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.2rem; margin-top: 0.5rem;">
+                <!-- Bloco 1: Upload do áudio / vídeo principal -->
+                <div class="form-group" style="margin: 0;">
+                    <span class="label">🎵 Música ou Vídeo Original</span>
+                    <div class="upload-area" id="audioUploadArea" style="height: 140px; display: flex; flex-direction: column; justify-content: center; align-items: center; border: 2px dashed rgba(255,255,255,0.15); border-radius: 14px; background: rgba(0,0,0,0.1); cursor: pointer; transition: all 0.2s;">
+                        <span class="upload-icon" style="font-size: 1.8rem; margin-bottom: 0.4rem;">🎵</span>
+                        <p class="upload-text" id="audioText" style="font-size: 0.85rem; margin: 0 0 0.2rem 0; font-weight: 500;">Arraste a música ou clique</p>
+                        <p class="upload-hint" style="font-size: 0.7rem; color: var(--text-muted); margin: 0;">mp3, wav, flac, m4a, mp4, avi...</p>
+                        <input type="file" id="audioFile" name="audio_file" class="file-input" accept=".mp3,.wav,.flac,.m4a,.mp4,.mkv,.avi" required style="display: none;">
+                        <div class="file-selected-badge" id="audioBadge" style="display: none; background: #8b5cf6; color: white; padding: 0.25rem 0.6rem; border-radius: 20px; font-size: 0.75rem; font-weight: 500; margin-top: 0.4rem; max-width: 90%; text-overflow: ellipsis; overflow: hidden; white-space: nowrap;">Nenhum arquivo selecionado</div>
+                    </div>
+                </div>
+
+                <!-- Bloco 2: Upload da imagem de fundo opcional -->
+                <div class="form-group" style="margin: 0;">
+                    <span class="label">🖼️ Imagem de Fundo (Opcional)</span>
+                    <div class="upload-area" id="bgUploadArea" style="height: 140px; display: flex; flex-direction: column; justify-content: center; align-items: center; border: 2px dashed rgba(255,255,255,0.15); border-radius: 14px; background: rgba(0,0,0,0.1); cursor: pointer; transition: all 0.2s;">
+                        <span class="upload-icon" style="font-size: 1.8rem; margin-bottom: 0.4rem;">🖼️</span>
+                        <p class="upload-text" id="bgTextName" style="font-size: 0.85rem; margin: 0 0 0.2rem 0; font-weight: 500;">Padrão: Fundo Preto Sólido</p>
+                        <p class="upload-hint" style="font-size: 0.7rem; color: var(--text-muted); margin: 0;">Clique para escolher imagem</p>
+                        <input type="file" id="bgFile" name="bg_file" class="file-input" accept="image/*" style="display: none;">
+                        <div class="file-selected-badge" id="bgBadge" style="display: none; background: #ec4899; color: white; padding: 0.25rem 0.6rem; border-radius: 20px; font-size: 0.75rem; font-weight: 500; margin-top: 0.4rem; max-width: 90%; text-overflow: ellipsis; overflow: hidden; white-space: nowrap;">Nenhuma imagem selecionada</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Seção de Ajustes Avançados Colapsáveis -->
+            <div id="advancedContent" style="display: none; margin-top: 1.5rem; background: rgba(255, 255, 255, 0.015); border: 1px solid var(--glass-border); border-radius: 14px; padding: 1.2rem;">
+                
+                <!-- Perfis de Configuração -->
+                <div class="form-group" style="border: 1px solid rgba(255,255,255,0.05); border-radius: 10px; padding: 1rem; background: rgba(0,0,0,0.15);">
+                    <span class="label">Perfil de Configuração</span>
+                    <div style="display: flex; gap: 0.8rem; align-items: center; margin-top: 0.5rem; flex-wrap: wrap;">
+                        <select id="profileSelect" class="btn-secondary" style="flex: 1; border: 1px solid var(--glass-border); padding: 0.5rem; background: #141226; color: var(--text-main); border-radius: 8px; cursor: pointer; outline: none; min-width: 150px;">
+                            <!-- Preenchido via Javascript -->
+                        </select>
+                        <input type="text" id="profileNameInput" placeholder="Nome do novo perfil" style="border: 1px solid var(--glass-border); padding: 0.5rem; background: #141226; color: var(--text-main); border-radius: 8px; font-size: 0.85rem; outline: none; min-width: 150px;">
+                        <button type="button" class="btn-secondary" id="btnSaveProfile" style="background: rgba(139, 92, 246, 0.2); border-color: rgba(139, 92, 246, 0.4); color: #c084fc;">Salvar</button>
+                        <button type="button" class="btn-secondary" id="btnDeleteProfile" style="background: rgba(239, 68, 68, 0.1); border-color: rgba(239, 68, 68, 0.3); color: #fca5a5;">Excluir</button>
+                    </div>
+                </div>
+
+                <!-- Seleção do Modelo do Whisper -->
+                <div class="form-group" style="margin-top: 1rem;">
+                    <span class="label">Modelo de Transcrição Whisper</span>
+                    <div class="bg-selector-row" style="margin-top: 0.5rem;">
+                        <div class="bg-info-text">
+                            <span>Escolha a precisão da IA (modelos maiores salvam no cache do servidor):</span>
+                        </div>
+                        <select id="whisperModel" name="whisper_model" class="btn-secondary" style="border: 1px solid var(--glass-border); padding: 0.5rem; background: #141226; color: var(--text-main); border-radius: 8px; cursor: pointer; outline: none; max-width: 250px;">
+                            <option value="medium" selected>Medium (Recomendado - Pré-instalado)</option>
+                            <option value="large-v3">Large v3 (Precisão máxima - Salva no seu servidor)</option>
+                            <option value="large-v2">Large v2 (Excelente precisão - Salva no seu servidor)</option>
+                            <option value="small">Small (Mais rápido / Menos preciso)</option>
+                            <option value="base">Base (Ultra rápido / Pouca precisão)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Gerenciador de Modelos de IA (Download no Servidor) -->
+                <div class="form-group" style="border: 1px solid rgba(255,255,255,0.05); border-radius: 10px; padding: 1rem; background: rgba(0,0,0,0.15); margin-top: 1rem;">
+                    <span class="label">🤖 Gerenciador de Modelos de IA (Cache Local)</span>
+                    <div class="bg-info-text" style="margin-top: 0.3rem; margin-bottom: 0.8rem;">
+                        <span>Para poupar RAM e evitar timeouts, baixe previamente os modelos desejados para o disco do seu servidor:</span>
+                    </div>
+                    <div style="display: grid; gap: 0.8rem;" id="modelsListContainer">
+                        <!-- Preenchido via Javascript -->
+                    </div>
+                </div>
+
+                <!-- Estilização da Legenda -->
+                <div class="form-group" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; border: 1px solid rgba(255,255,255,0.05); border-radius: 10px; padding: 1rem; background: rgba(0,0,0,0.15); margin-top: 1rem;">
+                    <div>
+                        <span class="label" style="margin-bottom: 0.3rem;">Tamanho da Fonte</span>
+                        <input type="number" id="fontSize" name="font_size" value="32" min="16" max="72" class="btn-secondary" style="width: 100%; border: 1px solid var(--glass-border); padding: 0.5rem; background: #141226; color: var(--text-main); border-radius: 8px; outline: none; text-align: center;">
+                    </div>
+                    <div>
+                        <span class="label" style="margin-bottom: 0.3rem;">Cor do Destaque</span>
+                        <div style="display: flex; gap: 0.5rem; align-items: center;">
+                            <input type="color" id="textColor" name="text_color" value="#00FFFF" style="border: 1px solid var(--glass-border); background: none; border-radius: 8px; width: 45px; height: 36px; padding: 2px; cursor: pointer;">
+                            <span id="colorHexText" style="font-size: 0.85rem; color: var(--text-muted);">#00FFFF</span>
+                        </div>
+                    </div>
+                    <div>
+                        <span class="label" style="margin-bottom: 0.3rem;">Posição do Texto</span>
+                        <select id="textPosition" name="text_position" class="btn-secondary" style="width: 100%; border: 1px solid var(--glass-border); padding: 0.5rem; background: #141226; color: var(--text-main); border-radius: 8px; outline: none; cursor: pointer;">
+                            <option value="bottom" selected>Inferior (Padrão)</option>
+                            <option value="middle">Centro</option>
+                            <option value="top">Superior</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Notificações no Telegram (Configuração Global) -->
+                <div class="form-group" style="border: 1px solid rgba(255,255,255,0.05); border-radius: 10px; padding: 1rem; background: rgba(0,0,0,0.15); margin-top: 1rem;">
+                    <span class="label">Telegram Bot (Notificações e Envio de Vídeo)</span>
+                    
+                    <!-- Badge de Status Configurado -->
+                    <div id="telegramStatusBadge" style="display: none; align-items: center; justify-content: space-between; background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.2); padding: 0.6rem 1rem; border-radius: 8px; margin-top: 0.5rem;">
+                        <span style="color: #a7f3d0; font-size: 0.85rem; font-weight: 500;">✓ Bot do Telegram Ativo e Configurado</span>
+                        <button type="button" class="btn-secondary" id="btnEditTelegram" style="font-size: 0.75rem; padding: 0.3rem 0.6rem; border-color: rgba(255,255,255,0.15); background: transparent; cursor: pointer;">✏️ Alterar</button>
+                    </div>
+                    
+                    <!-- Campos de Edição do Telegram -->
+                    <div id="telegramFields" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-top: 0.5rem;">
+                        <div>
+                            <span style="font-size: 0.75rem; color: var(--text-muted); display: block; margin-bottom: 0.2rem;">Token do Bot</span>
+                            <input type="text" id="telegramToken" placeholder="Ex: 123456:ABC..." style="width: 100%; border: 1px solid var(--glass-border); padding: 0.5rem 0.8rem; background: #141226; color: var(--text-main); border-radius: 8px; font-size: 0.85rem; outline: none;">
+                        </div>
+                        <div>
+                            <span style="font-size: 0.75rem; color: var(--text-muted); display: block; margin-bottom: 0.2rem;">ID do Chat / Grupo</span>
+                            <div style="display: flex; gap: 0.5rem;">
+                                <input type="text" id="telegramChatId" placeholder="Ex: -100123456789" style="flex: 1; border: 1px solid var(--glass-border); padding: 0.5rem 0.8rem; background: #141226; color: var(--text-main); border-radius: 8px; font-size: 0.85rem; outline: none;">
+                                <button type="button" class="btn-secondary" id="btnSaveTelegram" style="background: rgba(16, 185, 129, 0.2); border-color: rgba(16, 185, 129, 0.4); color: #a7f3d0; font-size: 0.85rem;">Salvar</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Botão Submit -->
+            <button type="submit" class="btn-primary" id="btnSubmit" style="margin-top: 1.5rem;">🎬 Criar Vídeo Karaoke</button>
+        </form>
+
+        <!-- Painel de Status / Progresso -->
+        <div class="process-card" id="processCard">
+            <div class="progress-container">
+                <div class="progress-info">
+                    <span id="statusMessage">Iniciando processamento...</span>
+                    <span id="progressPercent">0%</span>
+                </div>
+                <div class="progress-bar-bg">
+                    <div class="progress-bar-fill" id="progressBarFill"></div>
+                </div>
+            </div>
+
+            <!-- Linha de Etapas do Pipeline -->
+            <div class="timeline" id="timeline">
+                <div class="timeline-step" id="step-Uploading">
+                    <div class="step-dot"></div>
+                    <span class="step-name">Carregando arquivo (Uploading)</span>
+                </div>
+                <div class="timeline-step" id="step-Extracting">
+                    <div class="step-dot"></div>
+                    <span class="step-name">Extraindo áudio (Extracting audio)</span>
+                </div>
+                <div class="timeline-step" id="step-Separating">
+                    <div class="step-dot"></div>
+                    <span class="step-name">Separando vocais do instrumental (Separating vocals)</span>
+                </div>
+                <div class="timeline-step" id="step-Transcribing">
+                    <div class="step-dot"></div>
+                    <span class="step-name">Transcrevendo voz (Transcribing vocals)</span>
+                </div>
+                <div class="timeline-step" id="step-Subtitles">
+                    <div class="step-dot"></div>
+                    <span class="step-name">Gerando sincronização de legenda (Generating subtitles)</span>
+                </div>
+                <div class="timeline-step" id="step-Rendering">
+                    <div class="step-dot"></div>
+                    <span class="step-name">Renderizando vídeo final (Rendering final video)</span>
+                </div>
+                <div class="timeline-step" id="step-Cleaning">
+                    <div class="step-dot"></div>
+                    <span class="step-name">Limpando arquivos temporários (Cleaning temporary files)</span>
+                </div>
+                <div class="timeline-step" id="step-Done">
+                    <div class="step-dot"></div>
+                    <span class="step-name">Concluído (Done)</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Erro no Processamento -->
+        <div class="error-card" id="errorCard"></div>
+
+        <!-- Botão Download -->
+        <div class="download-box" id="downloadBox">
+            <p class="download-title">🎉 Seu Karaoke está pronto!</p>
+            <p class="download-desc">O vídeo foi gerado em alta definição com áudio instrumental e legenda sincronizada.</p>
+            <a href="/api/download" class="btn-success" id="btnDownload" download>
+                <span>⬇️</span> Baixar Vídeo MP4
+            </a>
+        </div>
+    </div>
+
+    <script>
+        const audioUploadArea = document.getElementById('audioUploadArea');
+        const audioFile = document.getElementById('audioFile');
+        const audioText = document.getElementById('audioText');
+        const audioBadge = document.getElementById('audioBadge');
+        
+        const bgUploadArea = document.getElementById('bgUploadArea');
+        const bgFile = document.getElementById('bgFile');
+        const bgTextName = document.getElementById('bgTextName');
+        const bgBadge = document.getElementById('bgBadge');
+        
+        const form = document.getElementById('karaokeForm');
+        const btnSubmit = document.getElementById('btnSubmit');
+        const processCard = document.getElementById('processCard');
+        const progressBarFill = document.getElementById('progressBarFill');
+        const progressPercent = document.getElementById('progressPercent');
+        const statusMessage = document.getElementById('statusMessage');
+        const errorCard = document.getElementById('errorCard');
+        const downloadBox = document.getElementById('downloadBox');
+
+        // Etapas mapeadas para IDs CSS
+        const stepsMap = {
+            "Uploading": "step-Uploading",
+            "Extracting audio": "step-Extracting",
+            "Separating vocals": "step-Separating",
+            "Transcribing vocals": "step-Transcribing",
+            "Generating subtitles": "step-Subtitles",
+            "Rendering final video": "step-Rendering",
+            "Cleaning temporary files": "step-Cleaning",
+            "Done": "step-Done"
+        };
+
+        // Eventos Drag and Drop para arquivo de áudio/vídeo
+        ['dragenter', 'dragover'].forEach(eventName => {
+            audioUploadArea.addEventListener(eventName, (e) => {
+                e.preventDefault();
+                audioUploadArea.classList.add('dragover');
+            }, false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            audioUploadArea.addEventListener(eventName, (e) => {
+                e.preventDefault();
+                audioUploadArea.classList.remove('dragover');
+            }, false);
+        });
+
+        audioUploadArea.addEventListener('drop', (e) => {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+            if (files.length) {
+                audioFile.files = files;
+                updateAudioBadge(files[0].name);
+            }
+        });
+
+        audioUploadArea.addEventListener('click', () => {
+            audioFile.click();
+        });
+
+        audioFile.addEventListener('change', () => {
+            if (audioFile.files.length) {
+                updateAudioBadge(audioFile.files[0].name);
+            }
+        });
+
+        function updateAudioBadge(filename) {
+            audioText.innerText = "Arquivo selecionado:";
+            audioBadge.innerText = filename;
+            audioBadge.style.display = "inline-flex";
+        }
+
+        // Eventos Drag and Drop para imagem de fundo
+        ['dragenter', 'dragover'].forEach(eventName => {
+            bgUploadArea.addEventListener(eventName, (e) => {
+                e.preventDefault();
+                bgUploadArea.classList.add('dragover');
+            }, false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            bgUploadArea.addEventListener(eventName, (e) => {
+                e.preventDefault();
+                bgUploadArea.classList.remove('dragover');
+            }, false);
+        });
+
+        bgUploadArea.addEventListener('drop', (e) => {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+            if (files.length) {
+                bgFile.files = files;
+                updateBgBadge(files[0].name);
+            }
+        });
+
+        bgUploadArea.addEventListener('click', () => {
+            bgFile.click();
+        });
+
+        bgFile.addEventListener('change', () => {
+            if (bgFile.files.length) {
+                updateBgBadge(bgFile.files[0].name);
+            } else {
+                bgTextName.innerText = "Padrão: Fundo Preto Sólido";
+                bgBadge.style.display = "none";
+            }
+        });
+
+        function updateBgBadge(filename) {
+            bgTextName.innerText = "Imagem selecionada:";
+            bgBadge.innerText = filename;
+            bgBadge.style.display = "inline-flex";
+        }
+
+        // Envio do formulário via AJAX
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            // Ocultar elementos de estado anterior
+            errorCard.style.display = "none";
+            downloadBox.style.display = "none";
+            
+            // Desativar botão e formulário
+            btnSubmit.disabled = true;
+            
+            // Exibir painel de progresso
+            processCard.style.display = "block";
+            resetTimeline();
+            updateStepActive("Uploading");
+            
+            const formData = new FormData();
+            formData.append('audio_file', audioFile.files[0]);
+            if (bgFile.files.length) {
+                formData.append('bg_file', bgFile.files[0]);
+            }
+            formData.append('whisper_model', document.getElementById('whisperModel').value);
+            formData.append('font_size', document.getElementById('fontSize').value);
+            formData.append('text_color', document.getElementById('textColor').value);
+            formData.append('text_position', document.getElementById('textPosition').value);
+            
+            try {
+                const response = await fetch('/api/process', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                if (!response.ok) {
+                    const errData = await response.json();
+                    throw new Error(errData.detail || "Erro ao iniciar processamento.");
+                }
+                
+                // Iniciar Polling de Status
+                startPolling();
+                
+            } catch (err) {
+                showError(err.message);
+            }
+        });
+
+        let pollingInterval = null;
+
+        function startPolling() {
+            if (pollingInterval) clearInterval(pollingInterval);
+            
+            pollingInterval = setInterval(async () => {
+                try {
+                    const res = await fetch('/api/status');
+                    if (!res.ok) throw new Error("Erro ao consultar status.");
+                    
+                    const data = await res.json();
+                    
+                    // Atualizar barra de progresso
+                    progressBarFill.style.width = `${data.progress}%`;
+                    progressPercent.innerText = `${data.progress}%`;
+                    
+                    if (data.step) {
+                        statusMessage.innerText = getStepLabel(data.step);
+                        updateTimeline(data.step);
+                    }
+                    
+                    if (data.status === "done") {
+                        clearInterval(pollingInterval);
+                        statusMessage.innerText = "Processamento concluído com sucesso!";
+                        progressBarFill.style.width = "100%";
+                        progressPercent.innerText = "100%";
+                        updateTimeline("Done");
+                        
+                        // Exibir download
+                        downloadBox.style.display = "block";
+                        btnSubmit.disabled = false;
+                    } else if (data.status === "error") {
+                        clearInterval(pollingInterval);
+                        showError(data.error_message || "Ocorreu um erro inesperado durante o processamento.");
+                    }
+                    
+                } catch (e) {
+                    console.error(e);
+                }
+            }, 1000);
+        }
+
+        // Sincronizar o input color com a string hex
+        const textColor = document.getElementById('textColor');
+        const colorHexText = document.getElementById('colorHexText');
+        textColor.addEventListener('input', () => {
+            colorHexText.innerText = textColor.value.toUpperCase();
+        });
+
+        // Alternador (Toggle) do Painel de Configurações Avançadas
+        const btnToggleAdvanced = document.getElementById('btnToggleAdvanced');
+        const advancedContent = document.getElementById('advancedContent');
+        
+        btnToggleAdvanced.addEventListener('click', () => {
+            if (advancedContent.style.display === "none" || advancedContent.style.display === "") {
+                advancedContent.style.display = "block";
+                btnToggleAdvanced.style.background = "rgba(139, 92, 246, 0.2)";
+                btnToggleAdvanced.style.borderColor = "rgba(139, 92, 246, 0.4)";
+            } else {
+                advancedContent.style.display = "none";
+                btnToggleAdvanced.style.background = "rgba(255, 255, 255, 0.05)";
+                btnToggleAdvanced.style.borderColor = "var(--glass-border)";
+            }
+        });
+
+        // Lógica de Perfis de Uso (Removida referência a Telegram individual)
+        const profileSelect = document.getElementById('profileSelect');
+        const profileNameInput = document.getElementById('profileNameInput');
+        const btnSaveProfile = document.getElementById('btnSaveProfile');
+        const btnDeleteProfile = document.getElementById('btnDeleteProfile');
+        
+        let allProfiles = {};
+        
+        async function fetchProfiles() {
+            try {
+                const res = await fetch('/api/profiles');
+                if (!res.ok) throw new Error("Erro ao obter perfis do servidor.");
+                allProfiles = await res.json();
+                
+                const selectedVal = profileSelect.value;
+                profileSelect.innerHTML = "";
+                
+                Object.keys(allProfiles).forEach(name => {
+                    const opt = document.createElement('option');
+                    opt.value = name;
+                    opt.innerText = name;
+                    profileSelect.appendChild(opt);
+                });
+                
+                if (selectedVal && allProfiles[selectedVal]) {
+                    profileSelect.value = selectedVal;
+                } else if (profileSelect.options.length) {
+                    profileSelect.selectedIndex = 0;
+                    applyProfile(profileSelect.value);
+                }
+            } catch (err) {
+                console.error("Falha ao sincronizar perfis:", err);
+            }
+        }
+        
+        function applyProfile(profileName) {
+            const prof = allProfiles[profileName];
+            if (!prof) return;
+            
+            document.getElementById('whisperModel').value = prof.whisper_model;
+            document.getElementById('fontSize').value = prof.font_size;
+            document.getElementById('textColor').value = prof.text_color;
+            document.getElementById('colorHexText').innerText = prof.text_color.toUpperCase();
+            document.getElementById('textPosition').value = prof.text_position;
+        }
+        
+        profileSelect.addEventListener('change', () => {
+            applyProfile(profileSelect.value);
+        });
+        
+        btnSaveProfile.addEventListener('click', async () => {
+            const name = profileNameInput.value.trim();
+            if (!name) {
+                alert("Por favor, digite o nome do perfil que deseja salvar.");
+                return;
+            }
+            
+            const payload = {
+                name: name,
+                whisper_model: document.getElementById('whisperModel').value,
+                font_size: parseInt(document.getElementById('fontSize').value) || 32,
+                text_color: document.getElementById('textColor').value,
+                text_position: document.getElementById('textPosition').value,
+                telegram_token: "",
+                telegram_chat_id: ""
+            };
+            
+            try {
+                const res = await fetch('/api/profiles', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                
+                if (!res.ok) {
+                    const errData = await res.json();
+                    throw new Error(errData.detail || "Erro ao salvar perfil.");
+                }
+                
+                profileNameInput.value = "";
+                await fetchProfiles();
+                profileSelect.value = name;
+                applyProfile(name);
+                alert(`Perfil '${name}' salvo com sucesso!`);
+            } catch (err) {
+                alert(`Erro ao salvar perfil: ${err.message}`);
+            }
+        });
+        
+        btnDeleteProfile.addEventListener('click', async () => {
+            const name = profileSelect.value;
+            if (!name) return;
+            
+            if (name === "Padrão") {
+                alert("O perfil 'Padrão' não pode ser excluído.");
+                return;
+            }
+            
+            if (!confirm(`Deseja realmente excluir o perfil '${name}'?`)) {
+                return;
+            }
+            
+            try {
+                const res = await fetch(`/api/profiles/${encodeURIComponent(name)}`, {
+                    method: 'DELETE'
+                });
+                
+                if (!res.ok) {
+                    const errData = await res.json();
+                    throw new Error(errData.detail || "Erro ao excluir.");
+                }
+                
+                alert(`Perfil '${name}' excluído com sucesso.`);
+                profileSelect.value = "Padrão";
+                await fetchProfiles();
+            } catch (err) {
+                alert(`Erro ao excluir perfil: ${err.message}`);
+            }
+        });
+
+        // Lógica de Configuração do Telegram Global
+        const telegramToken = document.getElementById('telegramToken');
+        const telegramChatId = document.getElementById('telegramChatId');
+        const btnSaveTelegram = document.getElementById('btnSaveTelegram');
+        const telegramStatusBadge = document.getElementById('telegramStatusBadge');
+        const telegramFields = document.getElementById('telegramFields');
+        const btnEditTelegram = document.getElementById('btnEditTelegram');
+        
+        async function fetchTelegramConfig() {
+            try {
+                const res = await fetch('/api/telegram');
+                if (res.ok) {
+                    const data = await res.json();
+                    telegramToken.value = data.telegram_token || "";
+                    telegramChatId.value = data.telegram_chat_id || "";
+                    
+                    // Se estiver configurado, oculta os inputs e exibe o badge de ativo
+                    if (data.telegram_token && data.telegram_chat_id) {
+                        telegramStatusBadge.style.display = "flex";
+                        telegramFields.style.display = "none";
+                    } else {
+                        telegramStatusBadge.style.display = "none";
+                        telegramFields.style.display = "grid";
+                    }
+                }
+            } catch (err) {
+                console.error("Erro ao carregar configurações do Telegram:", err);
+            }
+        }
+        
+        btnEditTelegram.addEventListener('click', () => {
+            telegramStatusBadge.style.display = "none";
+            telegramFields.style.display = "grid";
+        });
+        
+        btnSaveTelegram.addEventListener('click', async () => {
+            const token = telegramToken.value.trim();
+            const chatId = telegramChatId.value.trim();
+            
+            const payload = {
+                telegram_token: token,
+                telegram_chat_id: chatId
+            };
+            
+            try {
+                const res = await fetch('/api/telegram', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                
+                if (!res.ok) throw new Error("Erro ao salvar configuração do Telegram.");
+                
+                alert("Configurações do Telegram salvas globalmente!");
+                
+                // Se salvou credenciais válidas, oculta e mostra o badge de ativo
+                if (token && chatId) {
+                    telegramStatusBadge.style.display = "flex";
+                    telegramFields.style.display = "none";
+                } else {
+                    telegramStatusBadge.style.display = "none";
+                    telegramFields.style.display = "grid";
+                }
+            } catch (err) {
+                alert(`Erro ao salvar: ${err.message}`);
+            }
+        });
+
+        // Verificar status inicial do servidor (sincronização multi-navegador)
+        async function checkCurrentStatus() {
+            try {
+                const res = await fetch('/api/status');
+                if (!res.ok) throw new Error("Erro ao consultar status.");
+                const data = await res.json();
+                
+                if (data.status === "processing") {
+                    btnSubmit.disabled = true;
+                    processCard.style.display = "block";
+                    statusMessage.innerText = getStepLabel(data.step);
+                    progressBarFill.style.width = `${data.progress}%`;
+                    progressPercent.innerText = `${data.progress}%`;
+                    updateTimeline(data.step);
+                    
+                    // Iniciar polling automático no navegador aberto
+                    startPolling();
+                } else if (data.status === "done") {
+                    if (data.result_file) {
+                        downloadBox.style.display = "block";
+                    }
+                }
+            } catch (e) {
+                console.error("Erro ao verificar status concorrente:", e);
+            }
+        }
+        
+        // Lógica de consulta e download dos Modelos de IA Whisper no Servidor
+        async function fetchModelsStatus() {
+            try {
+                const res = await fetch('/api/models');
+                if (!res.ok) throw new Error("Erro ao obter status dos modelos.");
+                const data = await res.json();
+                
+                const container = document.getElementById('modelsListContainer');
+                if (!container) return;
+                
+                container.innerHTML = "";
+                
+                const friendlyNames = {
+                    "base": "Base (Mais Leve - ~140MB)",
+                    "small": "Small (Leve - ~460MB)",
+                    "medium": "Medium (Recomendado - ~1.5GB)",
+                    "large-v2": "Large v2 (Muito Preciso - ~3GB)",
+                    "large-v3": "Large v3 (Precisão Máxima - ~3GB)"
+                };
+                
+                Object.keys(data).forEach(size => {
+                    const modelInfo = data[size];
+                    const row = document.createElement('div');
+                    row.style.display = "flex";
+                    row.style.alignItems = "center";
+                    row.style.justifyContent = "space-between";
+                    row.style.background = "rgba(0,0,0,0.2)";
+                    row.style.padding = "0.5rem 0.8rem";
+                    row.style.borderRadius = "8px";
+                    row.style.flexWrap = "wrap";
+                    row.style.gap = "0.5rem";
+                    
+                    const nameSpan = document.createElement('span');
+                    nameSpan.style.fontSize = "0.85rem";
+                    nameSpan.style.fontWeight = "500";
+                    nameSpan.style.color = "var(--text-main)";
+                    nameSpan.innerText = friendlyNames[size] || size;
+                    
+                    const actionContainer = document.createElement('div');
+                    actionContainer.style.display = "flex";
+                    actionContainer.style.alignItems = "center";
+                    actionContainer.style.gap = "0.8rem";
+                    
+                    if (modelInfo.status === "done") {
+                        const badge = document.createElement('span');
+                        badge.style.color = "#10b981";
+                        badge.style.fontSize = "0.8rem";
+                        badge.style.fontWeight = "600";
+                        badge.innerText = "✓ Baixado no Servidor";
+                        actionContainer.appendChild(badge);
+                    } else if (modelInfo.status === "downloading") {
+                        const prog = document.createElement('span');
+                        prog.style.color = "#c084fc";
+                        prog.style.fontSize = "0.8rem";
+                        prog.style.fontWeight = "600";
+                        prog.innerText = `⏳ Baixando (${modelInfo.progress}%)`;
+                        actionContainer.appendChild(prog);
+                    } else {
+                        const btn = document.createElement('button');
+                        btn.type = "button";
+                        btn.className = "btn-secondary";
+                        btn.style.fontSize = "0.75rem";
+                        btn.style.padding = "0.3rem 0.6rem";
+                        btn.style.borderColor = "rgba(139, 92, 246, 0.4)";
+                        btn.style.background = "rgba(139, 92, 246, 0.15)";
+                        btn.style.color = "#c084fc";
+                        btn.style.cursor = "pointer";
+                        btn.innerText = "⬇️ Baixar";
+                        btn.addEventListener('click', () => triggerModelDownload(size));
+                        actionContainer.appendChild(btn);
+                    }
+                    
+                    row.appendChild(nameSpan);
+                    row.appendChild(actionContainer);
+                    container.appendChild(row);
+                });
+            } catch (err) {
+                console.error("Erro ao sincronizar status dos modelos:", err);
+            }
+        }
+        
+        async function triggerModelDownload(modelSize) {
+            try {
+                const res = await fetch('/api/models/download', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ model_size: modelSize })
+                });
+                if (!res.ok) {
+                    const errData = await res.json();
+                    throw new Error(errData.detail || "Erro ao iniciar download.");
+                }
+                await fetchModelsStatus();
+            } catch (err) {
+                alert(`Erro ao iniciar download: ${err.message}`);
+            }
+        }
+        
+        // Inicializações ao abrir a página
+        window.addEventListener('DOMContentLoaded', async () => {
+            await fetchTelegramConfig();
+            await fetchProfiles();
+            await fetchModelsStatus();
+            await checkCurrentStatus();
+            
+            // Polling periódico do status dos modelos de IA
+            setInterval(fetchModelsStatus, 5000);
+        });
+
+        function getStepLabel(step) {
+            switch(step) {
+                case "Uploading": return "Enviando arquivo...";
+                case "Extracting audio": return "Extraindo faixa de áudio...";
+                case "Separating vocals": return "Separando vocais do instrumental (esta etapa pode demorar alguns minutos)...";
+                case "Transcribing vocals": return "Transcrevendo voz com Whisper (esta etapa pode demorar)...";
+                case "Generating subtitles": return "Criando marcações de tempo e legenda karaoke...";
+                case "Rendering final video": return "Renderizando vídeo final via FFmpeg...";
+                case "Cleaning temporary files": return "Limpando arquivos temporários e finalizando...";
+                case "Done": return "Pronto!";
+                default: return "Processando...";
+            }
+        }
+
+        function resetTimeline() {
+            Object.values(stepsMap).forEach(id => {
+                const el = document.getElementById(id);
+                el.className = "timeline-step";
+            });
+        }
+
+        function updateStepActive(activeStep) {
+            const activeId = stepsMap[activeStep];
+            let passedActive = false;
+            
+            Object.keys(stepsMap).forEach(step => {
+                const id = stepsMap[step];
+                const el = document.getElementById(id);
+                
+                if (step === activeStep) {
+                    el.className = "timeline-step active";
+                    passedActive = true;
+                } else if (!passedActive) {
+                    el.className = "timeline-step completed";
+                } else {
+                    el.className = "timeline-step";
+                }
+            });
+        }
+
+        function updateTimeline(currentStep) {
+            updateStepActive(currentStep);
+        }
+
+        function showError(message) {
+            errorCard.innerText = `Erro: ${message}`;
+            errorCard.style.display = "block";
+            btnSubmit.disabled = false;
+            if (pollingInterval) clearInterval(pollingInterval);
+        }
+    </script>
+</body>
+</html>

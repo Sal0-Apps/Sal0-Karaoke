@@ -1,0 +1,12 @@
+services:
+  karaoke-app:
+    build:
+      context: ./app
+      dockerfile: Dockerfile
+    container_name: karaoke-app
+    ports:
+      - "7885:7860"
+    volumes:
+      - ./data/input:/data/input
+      - ./data/output:/data/output
+    restart: unless-stopped
