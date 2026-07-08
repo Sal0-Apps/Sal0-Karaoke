@@ -72,8 +72,25 @@ def separate_vocals(audio_path: str, temp_output_dir: str) -> tuple[str, str]:
         env["TORCH_HOME"] = "/data/output/models/torch"
         env["HF_HOME"] = "/data/output/models/huggingface"
         
-        # Executar o Demucs
-        result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, check=True, env=env)
+        # Executar o Demucs com streaming de logs em tempo real
+        logger.info(f"Executando Demucs: {' '.join(cmd)}")
+        process = subprocess.Popen(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            env=env
+        )
+        
+        for line in process.stdout:
+            line_str = line.strip()
+            if line_str:
+                logger.info(f"[Demucs] {line_str}")
+                
+        process.wait()
+        if process.returncode != 0:
+            raise RuntimeError(f"Demucs falhou com código de retorno {process.returncode}")
+            
         logger.info("Separação do Demucs concluída com sucesso.")
         
         # Caminhos dos arquivos de saída gerados pelo Demucs
@@ -88,6 +105,6 @@ def separate_vocals(audio_path: str, temp_output_dir: str) -> tuple[str, str]:
             
         return str(vocals_path), str(instrumental_path)
         
-    except subprocess.CalledProcessError as e:
-        logger.error(f"Erro ao executar o Demucs: {e.stderr}")
-        raise RuntimeError(f"Demucs falhou: {e.stderr}")
+    except Exception as e:
+        logger.error(f"Erro ao executar o Demucs: {e}")
+        raise RuntimeError(f"Demucs falhou: {e}")

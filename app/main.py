@@ -297,6 +297,7 @@ class ProfileModel(BaseModel):
     words_per_line: int = 0
     max_chars_line: int = 40
     break_on_punctuation: bool = True
+    background_mode: str = "image"
 
 def load_profiles() -> dict:
     """Carrega os perfis do arquivo JSON ou inicializa com valores padrão se não existir."""
@@ -311,7 +312,8 @@ def load_profiles() -> dict:
             "subtitle_mode": "syllable",
             "words_per_line": 0,
             "max_chars_line": 40,
-            "break_on_punctuation": True
+            "break_on_punctuation": True,
+            "background_mode": "image"
         }
     }
     
@@ -340,6 +342,8 @@ def load_profiles() -> dict:
                     p_data["max_chars_line"] = 40
                 if "break_on_punctuation" not in p_data:
                     p_data["break_on_punctuation"] = True
+                if "background_mode" not in p_data:
+                    p_data["background_mode"] = "image"
             return profiles
     except Exception as e:
         logger.error(f"Erro ao carregar arquivo de perfis: {e}")
@@ -364,7 +368,8 @@ def save_profile(profile: ProfileModel):
         "subtitle_mode": profile.subtitle_mode,
         "words_per_line": profile.words_per_line,
         "max_chars_line": profile.max_chars_line,
-        "break_on_punctuation": profile.break_on_punctuation
+        "break_on_punctuation": profile.break_on_punctuation,
+        "background_mode": profile.background_mode
     }
     try:
         with open(PROFILES_FILE, "w", encoding="utf-8") as f:
@@ -416,7 +421,8 @@ def process_karaoke(
     subtitle_mode: str = Form("syllable"),
     words_per_line: int = Form(0),
     max_chars_line: int = Form(40),
-    break_on_punctuation: bool = Form(True)
+    break_on_punctuation: bool = Form(True),
+    background_mode: str = Form("image")
 ):
     """
     Recebe os arquivos enviados, valida a concorrência e inicia o pipeline em segundo plano.
@@ -465,7 +471,8 @@ def process_karaoke(
         subtitle_mode,
         words_per_line,
         max_chars_line,
-        break_on_punctuation
+        break_on_punctuation,
+        background_mode
     )
     
     return {"status": "processing"}
@@ -499,7 +506,8 @@ def run_pipeline(
     subtitle_mode: str = "syllable",
     words_per_line: int = 0,
     max_chars_line: int = 40,
-    break_on_punctuation: bool = True
+    break_on_punctuation: bool = True,
+    background_mode: str = "image"
 ):
     """Pipeline principal de processamento sequencial."""
     # Obter o lock de processamento exclusivo (segurança de job único)
@@ -582,7 +590,9 @@ def run_pipeline(
                 instrumental_path=instrumental_wav,
                 ass_path=ass_path,
                 output_mp4_path=final_mp4_path,
-                background_image_path=input_bg_path
+                background_image_path=input_bg_path,
+                original_video_path=input_audio_path,
+                background_mode=background_mode
             )
             
             # Salvar opcionalmente a legenda ASS final gerada junto com o MP4

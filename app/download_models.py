@@ -75,4 +75,26 @@ try:
 except Exception as e:
     print(f"Aviso ao limpar diretórios de teste: {e}")
 
+# 5. Baixar imagens de paisagem padrão para backup offline
+print("3/3: Baixando imagens de paisagem padrão para backup offline...")
+bg_dir = "default_backgrounds"
+os.makedirs(bg_dir, exist_ok=True)
+landscape_urls = [
+    "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c5/Moraine_Lake_17092005.jpg/1280px-Moraine_Lake_17092005.jpg",
+    "https://upload.wikimedia.org/wikipedia/commons/thumb/3/35/Neckarhalde_T%C3%BCbingen_Ganzaufnahme.jpg/1280px-Neckarhalde_T%C3%BCbingen_Ganzaufnahme.jpg",
+    "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e0/Fuji_from_Motoshu_2004-11-16.jpg/1280px-Fuji_from_Motoshu_2004-11-16.jpg",
+    "https://upload.wikimedia.org/wikipedia/commons/thumb/c/ca/Loch_Lomond_from_Duncryne.jpg/1280px-Loch_Lomond_from_Duncryne.jpg",
+    "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a2/Val_di_Funes_panorama_April_2017.jpg/1280px-Val_di_Funes_panorama_April_2017.jpg"
+]
+import urllib.request
+for idx, url in enumerate(landscape_urls):
+    dest = os.path.join(bg_dir, f"landscape_{idx+1}.jpg")
+    if not os.path.exists(dest):
+        try:
+            print(f"Baixando imagem {idx+1} de {len(landscape_urls)}...")
+            urllib.request.urlretrieve(url, dest)
+            print(f"Imagem {idx+1} salva em {dest}")
+        except Exception as e:
+            print(f"Aviso ao baixar imagem {idx+1}: {e}")
+
 print("=== FINALIZADA CONFIGURAÇÃO DOS MODELOS IA ===")

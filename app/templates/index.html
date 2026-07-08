@@ -470,6 +470,22 @@
                     </div>
                 </div>
 
+                <!-- Configuração de Fundo do Vídeo -->
+                <div class="form-group" style="margin-top: 1rem;">
+                    <span class="label">Plano de Fundo do Vídeo</span>
+                    <div class="bg-selector-row" style="margin-top: 0.5rem;">
+                        <div class="bg-info-text">
+                            <span>Defina o que será exibido como fundo do vídeo de karaoke:</span>
+                        </div>
+                        <select id="backgroundMode" name="background_mode" class="btn-secondary" style="border: 1px solid var(--glass-border); padding: 0.5rem; background: #141226; color: var(--text-main); border-radius: 8px; cursor: pointer; outline: none; max-width: 320px;">
+                            <option value="random_landscape" selected>Paisagem Aleatória (Padrão)</option>
+                            <option value="image">Imagem de Fundo Enviada (Se carregada)</option>
+                            <option value="original_video">Usar Vídeo Original (Se enviar vídeo)</option>
+                            <option value="solid_black">Fundo Preto Sólido</option>
+                        </select>
+                    </div>
+                </div>
+
                 <!-- Gerenciador de Modelos de IA (Download no Servidor) -->
                 <div class="form-group" style="border: 1px solid rgba(255,255,255,0.05); border-radius: 10px; padding: 1rem; background: rgba(0,0,0,0.15); margin-top: 1rem;">
                     <span class="label">🤖 Gerenciador de Modelos de IA (Cache Local)</span>
@@ -767,6 +783,7 @@
             formData.append('words_per_line', document.getElementById('wordsPerLine').value);
             formData.append('max_chars_line', document.getElementById('maxCharsLine').value);
             formData.append('break_on_punctuation', document.getElementById('breakOnPunctuation').value);
+            formData.append('background_mode', document.getElementById('backgroundMode').value);
             
             try {
                 const response = await fetch('/api/process', {
@@ -904,6 +921,7 @@
             if (prof.break_on_punctuation !== undefined) {
                 document.getElementById('breakOnPunctuation').value = prof.break_on_punctuation ? "true" : "false";
             }
+            if (prof.background_mode) document.getElementById('backgroundMode').value = prof.background_mode;
         }
         
         profileSelect.addEventListener('change', () => {
@@ -928,7 +946,8 @@
                 subtitle_mode: document.getElementById('subtitleMode').value,
                 words_per_line: parseInt(document.getElementById('wordsPerLine').value) || 0,
                 max_chars_line: parseInt(document.getElementById('maxCharsLine').value) || 0,
-                break_on_punctuation: document.getElementById('breakOnPunctuation').value === "true"
+                break_on_punctuation: document.getElementById('breakOnPunctuation').value === "true",
+                background_mode: document.getElementById('backgroundMode').value
             };
             
             try {
