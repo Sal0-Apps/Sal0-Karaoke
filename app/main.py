@@ -293,6 +293,10 @@ class ProfileModel(BaseModel):
     text_position: str
     telegram_token: str = ""
     telegram_chat_id: str = ""
+    subtitle_mode: str = "syllable"
+    words_per_line: int = 0
+    max_chars_line: int = 40
+    break_on_punctuation: bool = True
 
 def load_profiles() -> dict:
     """Carrega os perfis do arquivo JSON ou inicializa com valores padrão se não existir."""
@@ -303,9 +307,14 @@ def load_profiles() -> dict:
             "text_color": "#00FFFF",
             "text_position": "bottom",
             "telegram_token": "",
-            "telegram_chat_id": ""
+            "telegram_chat_id": "",
+            "subtitle_mode": "syllable",
+            "words_per_line": 0,
+            "max_chars_line": 40,
+            "break_on_punctuation": True
         }
     }
+    
     if not os.path.exists(PROFILES_FILE):
         try:
             os.makedirs(os.path.dirname(PROFILES_FILE), exist_ok=True)
@@ -320,7 +329,18 @@ def load_profiles() -> dict:
     try:
         with open(PROFILES_FILE, "r", encoding="utf-8") as f:
             import json
-            return json.load(f)
+            profiles = json.load(f)
+            # Garantir retrocompatibilidade preenchendo campos ausentes
+            for p_name, p_data in profiles.items():
+                if "subtitle_mode" not in p_data:
+                    p_data["subtitle_mode"] = "syllable"
+                if "words_per_line" not in p_data:
+                    p_data["words_per_line"] = 0
+                if "max_chars_line" not in p_data:
+                    p_data["max_chars_line"] = 40
+                if "break_on_punctuation" not in p_data:
+                    p_data["break_on_punctuation"] = True
+            return profiles
     except Exception as e:
         logger.error(f"Erro ao carregar arquivo de perfis: {e}")
         return default_profiles
@@ -340,7 +360,11 @@ def save_profile(profile: ProfileModel):
         "text_color": profile.text_color,
         "text_position": profile.text_position,
         "telegram_token": profile.telegram_token,
-        "telegram_chat_id": profile.telegram_chat_id
+        "telegram_chat_id": profile.telegram_chat_id,
+        "subtitle_mode": profile.subtitle_mode,
+        "words_per_line": profile.words_per_line,
+        "max_chars_line": profile.max_chars_line,
+        "break_on_punctuation": profile.break_on_punctuation
     }
     try:
         with open(PROFILES_FILE, "w", encoding="utf-8") as f:
@@ -388,7 +412,11 @@ def process_karaoke(
     whisper_model: str = Form("medium"),
     font_size: int = Form(32),
     text_color: str = Form("#00FFFF"),
-    text_position: str = Form("bottom")
+    text_position: str = Form("bottom"),
+    subtitle_mode: str = Form("syllable"),
+    words_per_line: int = Form(0),
+    max_chars_line: int = Form(40),
+    break_on_punctuation: bool = Form(True)
 ):
     """
     Recebe os arquivos enviados, valida a concorrência e inicia o pipeline em segundo plano.
@@ -433,7 +461,11 @@ def process_karaoke(
         whisper_model,
         font_size,
         text_color,
-        text_position
+        text_position,
+        subtitle_mode,
+        words_per_line,
+        max_chars_line,
+        break_on_punctuation
     )
     
     return {"status": "processing"}
@@ -463,7 +495,11 @@ def run_pipeline(
     whisper_model: str = "medium",
     font_size: int = 32,
     text_color: str = "#00FFFF",
-    text_position: str = "bottom"
+    text_position: str = "bottom",
+    subtitle_mode: str = "syllable",
+    words_per_line: int = 0,
+    max_chars_line: int = 40,
+    break_on_punctuation: bool = True
 ):
     """Pipeline principal de processamento sequencial."""
     # Obter o lock de processamento exclusivo (segurança de job único)
@@ -532,7 +568,11 @@ def run_pipeline(
                 output_ass_path=ass_path,
                 font_size=font_size,
                 text_color_hex=text_color,
-                text_position=text_position
+                text_position=text_position,
+                subtitle_mode=subtitle_mode,
+                words_per_line=words_per_line,
+                max_chars_line=max_chars_line,
+                break_on_punctuation=break_on_punctuation
             )
             
             # Passo 5: Renderizar o vídeo final

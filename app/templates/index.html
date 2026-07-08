@@ -504,6 +504,32 @@
                     </div>
                 </div>
 
+                <!-- Configurações de Comportamento e Quebra de Legenda -->
+                <div class="form-group" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; border: 1px solid rgba(255,255,255,0.05); border-radius: 10px; padding: 1rem; background: rgba(0,0,0,0.15); margin-top: 1rem;">
+                    <div>
+                        <span class="label" style="margin-bottom: 0.3rem;">Tipo de Legenda</span>
+                        <select id="subtitleMode" name="subtitle_mode" class="btn-secondary" style="width: 100%; border: 1px solid var(--glass-border); padding: 0.5rem; background: #141226; color: var(--text-main); border-radius: 8px; outline: none; cursor: pointer;">
+                            <option value="syllable" selected>Seguir Sílabas (Karaoke)</option>
+                            <option value="phrase">Frases Sincronizadas (Comum)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <span class="label" style="margin-bottom: 0.3rem;">Palavras por Linha</span>
+                        <input type="number" id="wordsPerLine" name="words_per_line" value="0" min="0" max="30" class="btn-secondary" style="width: 100%; border: 1px solid var(--glass-border); padding: 0.5rem; background: #141226; color: var(--text-main); border-radius: 8px; outline: none; text-align: center;" title="Use 0 para sem limite">
+                    </div>
+                    <div>
+                        <span class="label" style="margin-bottom: 0.3rem;">Máx. Caracteres</span>
+                        <input type="number" id="maxCharsLine" name="max_chars_line" value="40" min="0" max="100" class="btn-secondary" style="width: 100%; border: 1px solid var(--glass-border); padding: 0.5rem; background: #141226; color: var(--text-main); border-radius: 8px; outline: none; text-align: center;" title="Use 0 para sem limite">
+                    </div>
+                    <div>
+                        <span class="label" style="margin-bottom: 0.3rem;">Quebrar em Pontuação</span>
+                        <select id="breakOnPunctuation" name="break_on_punctuation" class="btn-secondary" style="width: 100%; border: 1px solid var(--glass-border); padding: 0.5rem; background: #141226; color: var(--text-main); border-radius: 8px; outline: none; cursor: pointer;">
+                            <option value="true" selected>Sim</option>
+                            <option value="false">Não</option>
+                        </select>
+                    </div>
+                </div>
+
                 <!-- Notificações no Telegram (Configuração Global) -->
                 <div class="form-group" style="border: 1px solid rgba(255,255,255,0.05); border-radius: 10px; padding: 1rem; background: rgba(0,0,0,0.15); margin-top: 1rem;">
                     <span class="label">Telegram Bot (Notificações e Envio de Vídeo)</span>
@@ -737,6 +763,10 @@
             formData.append('font_size', document.getElementById('fontSize').value);
             formData.append('text_color', document.getElementById('textColor').value);
             formData.append('text_position', document.getElementById('textPosition').value);
+            formData.append('subtitle_mode', document.getElementById('subtitleMode').value);
+            formData.append('words_per_line', document.getElementById('wordsPerLine').value);
+            formData.append('max_chars_line', document.getElementById('maxCharsLine').value);
+            formData.append('break_on_punctuation', document.getElementById('breakOnPunctuation').value);
             
             try {
                 const response = await fetch('/api/process', {
@@ -866,6 +896,14 @@
             document.getElementById('textColor').value = prof.text_color;
             document.getElementById('colorHexText').innerText = prof.text_color.toUpperCase();
             document.getElementById('textPosition').value = prof.text_position;
+            
+            // Novos campos de legenda
+            if (prof.subtitle_mode) document.getElementById('subtitleMode').value = prof.subtitle_mode;
+            if (prof.words_per_line !== undefined) document.getElementById('wordsPerLine').value = prof.words_per_line;
+            if (prof.max_chars_line !== undefined) document.getElementById('maxCharsLine').value = prof.max_chars_line;
+            if (prof.break_on_punctuation !== undefined) {
+                document.getElementById('breakOnPunctuation').value = prof.break_on_punctuation ? "true" : "false";
+            }
         }
         
         profileSelect.addEventListener('change', () => {
@@ -886,7 +924,11 @@
                 text_color: document.getElementById('textColor').value,
                 text_position: document.getElementById('textPosition').value,
                 telegram_token: "",
-                telegram_chat_id: ""
+                telegram_chat_id: "",
+                subtitle_mode: document.getElementById('subtitleMode').value,
+                words_per_line: parseInt(document.getElementById('wordsPerLine').value) || 0,
+                max_chars_line: parseInt(document.getElementById('maxCharsLine').value) || 0,
+                break_on_punctuation: document.getElementById('breakOnPunctuation').value === "true"
             };
             
             try {
