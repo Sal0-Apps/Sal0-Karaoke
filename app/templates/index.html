@@ -924,8 +924,19 @@
             if (prof.background_mode) document.getElementById('backgroundMode').value = prof.background_mode;
         }
         
-        profileSelect.addEventListener('change', () => {
-            applyProfile(profileSelect.value);
+        profileSelect.addEventListener('change', async () => {
+            const profileName = profileSelect.value;
+            applyProfile(profileName);
+            // Salvar no servidor como o último perfil ativo
+            try {
+                await fetch('/api/last_profile', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ last_profile: profileName })
+                });
+            } catch (e) {
+                console.error("Erro ao persistir último perfil:", e);
+            }
         });
         
         btnSaveProfile.addEventListener('click', async () => {
@@ -961,6 +972,15 @@
                     const errData = await res.json();
                     throw new Error(errData.detail || "Erro ao salvar perfil.");
                 }
+                
+                // Salvar como o último perfil ativo
+                try {
+                    await fetch('/api/last_profile', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ last_profile: name })
+                    });
+                } catch (e) {}
                 
                 profileNameInput.value = "";
                 await fetchProfiles();
@@ -1200,11 +1220,32 @@
         window.addEventListener('DOMContentLoaded', async () => {
             await fetchTelegramConfig();
             await fetchProfiles();
+            
+            // Recuperar o último perfil utilizado
+            try {
+                const lastRes = await fetch('/api/last_profile');
+                if (lastRes.ok) {
+                    const lastData = await lastRes.json();
+                    if (lastData.last_profile && allProfiles[lastData.last_profile]) {
+                        profileSelect.value = lastData.last_profile;
+                        applyProfile(lastData.last_profile);
+                    }
+                }
+            } catch (e) {
+                console.error("Erro ao carregar último perfil:", e);
+            }
+            
             await fetchModelsStatus();
             await checkCurrentStatus();
             
             // Polling periódico do status dos modelos de IA
             setInterval(fetchModelsStatus, 5000);
+            
+            // Polling de sincronização em segundo plano para múltiplos dispositivos (3 segundos)
+            setInterval(async () => {
+                if (pollingInterval) return; // Se já estiver ativamente processando/polling no dispositivo, pula
+                await checkCurrentStatus();
+            }, 3000);
         });
 
         function getStepLabel(step) {

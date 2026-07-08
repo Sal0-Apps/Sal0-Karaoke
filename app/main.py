@@ -396,6 +396,32 @@ def delete_profile(name: str):
             raise HTTPException(status_code=500, detail=f"Erro ao salvar arquivo após exclusão: {e}")
     raise HTTPException(status_code=404, detail="Perfil de uso não encontrado.")
 
+LAST_PROFILE_FILE = "/data/output/last_profile.json"
+
+@app.get("/api/last_profile")
+def get_last_profile():
+    """Retorna o nome do último perfil utilizado."""
+    if os.path.exists(LAST_PROFILE_FILE):
+        try:
+            with open(LAST_PROFILE_FILE, "r", encoding="utf-8") as f:
+                import json
+                return json.load(f)
+        except Exception:
+            pass
+    return {"last_profile": "Padrão"}
+
+@app.post("/api/last_profile")
+def save_last_profile(data: dict):
+    """Salva o nome do último perfil utilizado."""
+    try:
+        os.makedirs(os.path.dirname(LAST_PROFILE_FILE), exist_ok=True)
+        with open(LAST_PROFILE_FILE, "w", encoding="utf-8") as f:
+            import json
+            json.dump(data, f, indent=4, ensure_ascii=False)
+        return {"status": "success"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro ao salvar último perfil: {e}")
+
 @app.get("/", response_class=HTMLResponse)
 def read_index():
     """Serve a interface gráfica web da aplicação."""

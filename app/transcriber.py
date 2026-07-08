@@ -15,7 +15,7 @@ def transcribe_vocals(vocals_path: str, model_size: str = "medium") -> list[dict
             model_size, 
             device="cpu", 
             compute_type="int8",             # Reduz uso de RAM pela metade
-            cpu_threads=4,                   # Usa toda a CPU de 4 núcleos para velocidade máxima
+            cpu_threads=3,                   # Mantém 1 núcleo livre para o FastAPI responder à web sem lentidão
             download_root="/data/output/models/whisper",
             local_files_only=True            # Não baixa arquivos durante a criação do karaoke
         )

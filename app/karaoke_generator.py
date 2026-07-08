@@ -78,6 +78,13 @@ def split_and_wrap_segments(
             if break_on_punctuation and i < len(words) - 1:
                 if clean_word and clean_word[-1] in (',', '.', '?', '!', ';', ':', '(', ')'):
                     should_break = True
+            
+            # 4. Quebra por silêncio/pausa maior entre palavras (ex: pausa de voz > 0.5s)
+            if i < len(words) - 1:
+                next_w = words[i+1]
+                gap = next_w["start"] - w_info["end"]
+                if gap >= 0.5:
+                    should_break = True
                     
             if should_break and i < len(words) - 1:
                 chunks.append(current_chunk)
@@ -100,6 +107,89 @@ def split_and_wrap_segments(
                 "words": chunk
             })
             
+    return new_segments
+
+def insert_instrumental_breaks(segments: list[dict]) -> list[dict]:
+    """
+    Insere avisos visuais de 'Instrumental' e contagens regressivas (3, 2, 1)
+    quando houver pausas (gaps) maiores ou iguais a 3 segundos entre os versos ou na introdução.
+    """
+    if not segments:
+        return []
+        
+    new_segments = []
+    
+    # 1. Tratar a introdução da música se ela for longa (>= 3 segundos)
+    first_start = segments[0]["start"]
+    if first_start >= 3.0:
+        if first_start > 3.0:
+            new_segments.append({
+                "start": 0.0,
+                "end": first_start - 3.0,
+                "text": "🎸 Instrumental",
+                "words": []
+            })
+        new_segments.append({
+            "start": max(0.0, first_start - 3.0),
+            "end": max(0.0, first_start - 2.0),
+            "text": "🎸 Instrumental (3)",
+            "words": []
+        })
+        new_segments.append({
+            "start": max(0.0, first_start - 2.0),
+            "end": max(0.0, first_start - 1.0),
+            "text": "🎸 Instrumental (2)",
+            "words": []
+        })
+        new_segments.append({
+            "start": max(0.0, first_start - 1.0),
+            "end": first_start,
+            "text": "🎸 Instrumental (1)",
+            "words": []
+        })
+        
+    # 2. Tratar os intervalos entre todos os versos
+    for idx in range(len(segments)):
+        curr_seg = segments[idx]
+        new_segments.append(curr_seg)
+        
+        if idx < len(segments) - 1:
+            next_seg = segments[idx + 1]
+            gap_duration = next_seg["start"] - curr_seg["end"]
+            
+            if gap_duration >= 3.0:
+                gap_start = curr_seg["end"]
+                gap_end = next_seg["start"]
+                
+                # Inserir o rótulo puramente instrumental se houver espaço
+                if gap_duration > 3.0:
+                    new_segments.append({
+                        "start": gap_start,
+                        "end": gap_end - 3.0,
+                        "text": "🎸 Instrumental",
+                        "words": []
+                    })
+                    
+                # Inserir a contagem regressiva nos últimos 3 segundos antes do próximo verso
+                new_segments.append({
+                    "start": gap_end - 3.0,
+                    "end": gap_end - 2.0,
+                    "text": "🎸 Instrumental (3)",
+                    "words": []
+                })
+                new_segments.append({
+                    "start": gap_end - 2.0,
+                    "end": gap_end - 1.0,
+                    "text": "🎸 Instrumental (2)",
+                    "words": []
+                })
+                new_segments.append({
+                    "start": gap_end - 1.0,
+                    "end": gap_end,
+                    "text": "🎸 Instrumental (1)",
+                    "words": []
+                })
+                
     return new_segments
 
 def generate_ass_karaoke(
@@ -128,6 +218,20 @@ def generate_ass_karaoke(
         max_chars_line=max_chars_line,
         break_on_punctuation=break_on_punctuation
     )
+    
+    # 2. Inserir pausas instrumentais e contagem regressiva para gaps >= 3 segundos
+    segments = insert_instrumental_breaks(segments)
+    
+    # 3. Estender a exibição dos versos até 0.3 segundos antes do início do próximo
+    for idx in range(len(segments) - 1):
+        curr = segments[idx]
+        nxt = segments[idx + 1]
+        
+        # Só estender se o próximo segmento NÃO for instrumental/contagem regressiva e se o atual for letra
+        if "Instrumental" not in nxt["text"] and "🎸" not in nxt["text"] and "Instrumental" not in curr["text"] and "🎸" not in curr["text"]:
+            gap = nxt["start"] - curr["end"]
+            if gap > 0.3:
+                curr["end"] = nxt["start"] - 0.3
     
     # 2. Determinar o alinhamento ASS (2 = base centro, 5 = meio centro, 8 = topo centro)
     alignment = 2
@@ -169,8 +273,8 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         start_time_str = format_time(seg["start"])
         end_time_str = format_time(seg["end"])
         
-        if subtitle_mode == "phrase":
-            # Legenda comum, sem tags de karaoke
+        if subtitle_mode == "phrase" or not seg.get("words"):
+            # Legenda comum (estática) ou instrumental (que não possui mapeamento de palavras)
             line = f"Dialogue: 0,{start_time_str},{end_time_str},Default,,0,0,0,,{seg['text']}\n"
         else:
             # Modo Karaoke (segue sílabas)
