@@ -298,6 +298,9 @@ class ProfileModel(BaseModel):
     max_chars_line: int = 40
     break_on_punctuation: bool = True
     background_mode: str = "image"
+    show_instrumental: bool = True
+    transcribe_source: str = "vocals"
+    show_next_line_preview: bool = False
 
 def load_profiles() -> dict:
     """Carrega os perfis do arquivo JSON ou inicializa com valores padrão se não existir."""
@@ -313,7 +316,10 @@ def load_profiles() -> dict:
             "words_per_line": 0,
             "max_chars_line": 40,
             "break_on_punctuation": True,
-            "background_mode": "image"
+            "background_mode": "image",
+            "show_instrumental": True,
+            "transcribe_source": "vocals",
+            "show_next_line_preview": False
         }
     }
     
@@ -344,6 +350,12 @@ def load_profiles() -> dict:
                     p_data["break_on_punctuation"] = True
                 if "background_mode" not in p_data:
                     p_data["background_mode"] = "image"
+                if "show_instrumental" not in p_data:
+                    p_data["show_instrumental"] = True
+                if "transcribe_source" not in p_data:
+                    p_data["transcribe_source"] = "vocals"
+                if "show_next_line_preview" not in p_data:
+                    p_data["show_next_line_preview"] = False
             return profiles
     except Exception as e:
         logger.error(f"Erro ao carregar arquivo de perfis: {e}")
@@ -369,7 +381,10 @@ def save_profile(profile: ProfileModel):
         "words_per_line": profile.words_per_line,
         "max_chars_line": profile.max_chars_line,
         "break_on_punctuation": profile.break_on_punctuation,
-        "background_mode": profile.background_mode
+        "background_mode": profile.background_mode,
+        "show_instrumental": profile.show_instrumental,
+        "transcribe_source": profile.transcribe_source,
+        "show_next_line_preview": profile.show_next_line_preview
     }
     try:
         with open(PROFILES_FILE, "w", encoding="utf-8") as f:
@@ -448,7 +463,10 @@ def process_karaoke(
     words_per_line: int = Form(0),
     max_chars_line: int = Form(40),
     break_on_punctuation: bool = Form(True),
-    background_mode: str = Form("image")
+    background_mode: str = Form("image"),
+    show_instrumental: bool = Form(True),
+    transcribe_source: str = Form("vocals"),
+    show_next_line_preview: bool = Form(False)
 ):
     """
     Recebe os arquivos enviados, valida a concorrência e inicia o pipeline em segundo plano.
@@ -498,7 +516,10 @@ def process_karaoke(
         words_per_line,
         max_chars_line,
         break_on_punctuation,
-        background_mode
+        background_mode,
+        show_instrumental,
+        transcribe_source,
+        show_next_line_preview
     )
     
     return {"status": "processing"}
@@ -533,7 +554,10 @@ def run_pipeline(
     words_per_line: int = 0,
     max_chars_line: int = 40,
     break_on_punctuation: bool = True,
-    background_mode: str = "image"
+    background_mode: str = "image",
+    show_instrumental: bool = True,
+    transcribe_source: str = "vocals",
+    show_next_line_preview: bool = False
 ):
     """Pipeline principal de processamento sequencial."""
     # Obter o lock de processamento exclusivo (segurança de job único)
@@ -588,7 +612,11 @@ def run_pipeline(
             # Passo 3: Transcrever vocais com Whisper selecionado
             update_state("processing", "Transcribing vocals", 70)
             send_telegram_notification(telegram_token, telegram_chat_id, f"✍️ <b>Sal0 karaoke</b>: Transcrevendo voz ({whisper_model}) (70%)")
-            segments = transcribe_vocals(vocals_wav, model_size=whisper_model)
+            
+            # Escolher a fonte de áudio para a transcrição (voz isolada ou áudio completo com instrumental)
+            transcribe_audio = vocals_wav if transcribe_source == "vocals" else converted_wav
+            logger.info(f"Fonte de transcrição escolhida: {transcribe_audio} (Modo: {transcribe_source})")
+            segments = transcribe_vocals(transcribe_audio, model_size=whisper_model)
             
             if not segments:
                 raise ValueError("Nenhum vocal detectado ou transcrição vazia.")
@@ -606,7 +634,9 @@ def run_pipeline(
                 subtitle_mode=subtitle_mode,
                 words_per_line=words_per_line,
                 max_chars_line=max_chars_line,
-                break_on_punctuation=break_on_punctuation
+                break_on_punctuation=break_on_punctuation,
+                show_instrumental=show_instrumental,
+                show_next_line_preview=show_next_line_preview
             )
             
             # Passo 5: Renderizar o vídeo final

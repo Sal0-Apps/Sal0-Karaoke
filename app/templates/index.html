@@ -546,6 +546,31 @@
                     </div>
                 </div>
 
+                <!-- Novas Opções de Sincronismo e Pré-visualização -->
+                <div class="form-group" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; border: 1px solid rgba(255,255,255,0.05); border-radius: 10px; padding: 1rem; background: rgba(0,0,0,0.15); margin-top: 1rem;">
+                    <div>
+                        <span class="label" style="margin-bottom: 0.3rem;">🎸 Instrumental nas Pausas</span>
+                        <select id="showInstrumental" name="show_instrumental" class="btn-secondary" style="width: 100%; border: 1px solid var(--glass-border); padding: 0.5rem; background: #141226; color: var(--text-main); border-radius: 8px; outline: none; cursor: pointer;">
+                            <option value="true" selected>Sim (Padrão)</option>
+                            <option value="false">Não</option>
+                        </select>
+                    </div>
+                    <div>
+                        <span class="label" style="margin-bottom: 0.3rem;">🎙️ Fonte de Transcrição</span>
+                        <select id="transcribeSource" name="transcribe_source" class="btn-secondary" style="width: 100%; border: 1px solid var(--glass-border); padding: 0.5rem; background: #141226; color: var(--text-main); border-radius: 8px; outline: none; cursor: pointer;" title="Escolha se deseja transcrever usando a voz isolada ou a música completa (com instrumental)">
+                            <option value="vocals" selected>Voz Isolada (Recomendado)</option>
+                            <option value="original">Música Completa (Original)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <span class="label" style="margin-bottom: 0.3rem;">👁️ Pré-visualizar Próxima Linha</span>
+                        <select id="showNextLinePreview" name="show_next_line_preview" class="btn-secondary" style="width: 100%; border: 1px solid var(--glass-border); padding: 0.5rem; background: #141226; color: var(--text-main); border-radius: 8px; outline: none; cursor: pointer;">
+                            <option value="false" selected>Não (Padrão)</option>
+                            <option value="true">Sim (Ofuscada)</option>
+                        </select>
+                    </div>
+                </div>
+
                 <!-- Notificações no Telegram (Configuração Global) -->
                 <div class="form-group" style="border: 1px solid rgba(255,255,255,0.05); border-radius: 10px; padding: 1rem; background: rgba(0,0,0,0.15); margin-top: 1rem;">
                     <span class="label">Telegram Bot (Notificações e Envio de Vídeo)</span>
@@ -784,6 +809,9 @@
             formData.append('max_chars_line', document.getElementById('maxCharsLine').value);
             formData.append('break_on_punctuation', document.getElementById('breakOnPunctuation').value);
             formData.append('background_mode', document.getElementById('backgroundMode').value);
+            formData.append('show_instrumental', document.getElementById('showInstrumental').value);
+            formData.append('transcribe_source', document.getElementById('transcribeSource').value);
+            formData.append('show_next_line_preview', document.getElementById('showNextLinePreview').value);
             
             try {
                 const response = await fetch('/api/process', {
@@ -922,6 +950,15 @@
                 document.getElementById('breakOnPunctuation').value = prof.break_on_punctuation ? "true" : "false";
             }
             if (prof.background_mode) document.getElementById('backgroundMode').value = prof.background_mode;
+            if (prof.show_instrumental !== undefined) {
+                document.getElementById('showInstrumental').value = prof.show_instrumental ? "true" : "false";
+            }
+            if (prof.transcribe_source) {
+                document.getElementById('transcribeSource').value = prof.transcribe_source;
+            }
+            if (prof.show_next_line_preview !== undefined) {
+                document.getElementById('showNextLinePreview').value = prof.show_next_line_preview ? "true" : "false";
+            }
         }
         
         profileSelect.addEventListener('change', async () => {
@@ -958,7 +995,10 @@
                 words_per_line: parseInt(document.getElementById('wordsPerLine').value) || 0,
                 max_chars_line: parseInt(document.getElementById('maxCharsLine').value) || 0,
                 break_on_punctuation: document.getElementById('breakOnPunctuation').value === "true",
-                background_mode: document.getElementById('backgroundMode').value
+                background_mode: document.getElementById('backgroundMode').value,
+                show_instrumental: document.getElementById('showInstrumental').value === "true",
+                transcribe_source: document.getElementById('transcribeSource').value,
+                show_next_line_preview: document.getElementById('showNextLinePreview').value === "true"
             };
             
             try {
