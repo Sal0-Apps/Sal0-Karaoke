@@ -5,6 +5,8 @@ import logging
 import tempfile
 import threading
 import requests
+import re
+import difflib
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException, BackgroundTasks
 from fastapi.responses import HTMLResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -90,6 +92,139 @@ def update_segment_words(original_seg: dict, new_text: str) -> dict:
         original_seg["words"] = new_words
         
     return original_seg
+
+def clean_word(w: str) -> str:
+    # Remove pontuações e converte para minúsculas
+    return re.sub(r'[^\w]', '', w).lower()
+
+def align_lyrics(official_lyrics_text: str, transcribed_segments: list[dict]) -> list[dict]:
+    # 1. Separar a letra oficial em linhas e palavras, preservando a estrutura
+    raw_lines = official_lyrics_text.strip().split('\n')
+    official_structure = []
+    official_words_flat = [] # Lista flat de (word_text, line_index, word_index_in_line)
+    
+    for line_idx, line in enumerate(raw_lines):
+        line = line.strip()
+        if not line:
+            continue
+        words = line.split()
+        official_structure.append({
+            "text": line,
+            "words": words,
+            "aligned_words": [] # Preenchido depois com {"word": ..., "start": ..., "end": ...}
+        })
+        for word_idx, w in enumerate(words):
+            official_words_flat.append({
+                "text": w,
+                "clean": clean_word(w),
+                "line_idx": len(official_structure) - 1,
+                "word_idx": word_idx
+            })
+            
+    if not official_structure:
+        return transcribed_segments # Fallback se a letra enviada for vazia
+        
+    # 2. Extrair todas as palavras transcritas pelo Whisper em uma única lista flat
+    transcribed_words_flat = []
+    for seg in transcribed_segments:
+        for w_info in seg.get("words", []):
+            transcribed_words_flat.append({
+                "text": w_info["word"],
+                "clean": clean_word(w_info["word"]),
+                "start": w_info["start"],
+                "end": w_info["end"]
+            })
+            
+    if not transcribed_words_flat:
+        return transcribed_segments # Fallback se Whisper não transcreveu nada
+        
+    # 3. Alinhamento de sequências com difflib
+    official_clean_list = [w["clean"] for w in official_words_flat]
+    transcribed_clean_list = [w["clean"] for w in transcribed_words_flat]
+    
+    matcher = difflib.SequenceMatcher(None, official_clean_list, transcribed_clean_list)
+    matching_blocks = matcher.get_matching_blocks()
+    
+    # Mapeamento resultante das palavras oficiais para seus timestamps
+    aligned_timestamps = [None] * len(official_words_flat)
+    
+    for block in matching_blocks:
+        off_start = block.a
+        trans_start = block.b
+        size = block.size
+        for i in range(size):
+            off_idx = off_start + i
+            trans_idx = trans_start + i
+            if off_idx < len(official_words_flat) and trans_idx < len(transcribed_words_flat):
+                aligned_timestamps[off_idx] = {
+                    "start": transcribed_words_flat[trans_idx]["start"],
+                    "end": transcribed_words_flat[trans_idx]["end"]
+                }
+                
+    # 4. Preencher timestamps das palavras não alinhadas (interpolação/extrapolação)
+    last_known_end = 0.0
+    for i in range(len(official_words_flat)):
+        if aligned_timestamps[i] is not None:
+            last_known_end = aligned_timestamps[i]["end"]
+            continue
+            
+        # Tentar achar a próxima palavra conhecida para interpolar
+        next_known_idx = -1
+        for j in range(i + 1, len(official_words_flat)):
+            if aligned_timestamps[j] is not None:
+                next_known_idx = j
+                break
+                
+        if next_known_idx != -1:
+            next_known_start = aligned_timestamps[next_known_idx]["start"]
+            gap = next_known_start - last_known_end
+            num_words = next_known_idx - i + 1
+            step = gap / num_words
+            
+            word_start = last_known_end + step * (i - (next_known_idx - num_words))
+            word_end = word_start + step
+            aligned_timestamps[i] = {
+                "start": word_start,
+                "end": word_end
+            }
+        else:
+            word_start = last_known_end + 0.1
+            word_end = word_start + 0.35
+            aligned_timestamps[i] = {
+                "start": word_start,
+                "end": word_end
+            }
+            last_known_end = word_end
+            
+    # 5. Reconstruir a estrutura dos segmentos com os timestamps alinhados
+    for idx, w_flat in enumerate(official_words_flat):
+        l_idx = w_flat["line_idx"]
+        time_info = aligned_timestamps[idx]
+        
+        word_text = w_flat["text"]
+        if w_flat["word_idx"] < len(official_structure[l_idx]["words"]) - 1:
+            word_text += " "
+            
+        official_structure[l_idx]["aligned_words"].append({
+            "word": word_text,
+            "start": time_info["start"],
+            "end": time_info["end"]
+        })
+        
+    # 6. Converter a estrutura oficial de volta para o formato de segmentos
+    new_segments = []
+    for l_info in official_structure:
+        aligned_words = l_info["aligned_words"]
+        if not aligned_words:
+            continue
+        new_segments.append({
+            "start": aligned_words[0]["start"],
+            "end": aligned_words[-1]["end"],
+            "text": l_info["text"],
+            "words": aligned_words
+        })
+        
+    return new_segments
 
 def update_state(status: str, step: str, progress: int, error_message: str = "", result_file: str = None, original_filename: str = None):
     """Atualiza o estado global da aplicação de forma thread-safe e persiste no disco."""
@@ -700,7 +835,12 @@ def run_pipeline(
             
             if not segments:
                 raise ValueError("Nenhum vocal detectado ou transcrição vazia.")
-            
+                
+            # Se o usuário forneceu a letra oficial, alinhar os tempos obtidos pelo Whisper com a letra oficial
+            if lyrics_text and lyrics_text.strip():
+                logger.info("Aplicando alinhamento forçado local com a letra oficial fornecida...")
+                segments = align_lyrics(lyrics_text, segments)
+                
             # --- NOVO: Passo de Pausa e Correção de Legendas (se ativado pelo usuário) ---
             if enable_correction:
                 global segments_to_edit, correction_event

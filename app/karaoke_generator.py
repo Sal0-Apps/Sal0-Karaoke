@@ -126,25 +126,25 @@ def insert_instrumental_breaks(segments: list[dict]) -> list[dict]:
             new_segments.append({
                 "start": 0.0,
                 "end": first_start - 3.0,
-                "text": "🎸 Instrumental",
+                "text": "Instrumental",
                 "words": []
             })
         new_segments.append({
             "start": max(0.0, first_start - 3.0),
             "end": max(0.0, first_start - 2.0),
-            "text": "🎸 Instrumental (3)",
+            "text": "Instrumental (3)",
             "words": []
         })
         new_segments.append({
             "start": max(0.0, first_start - 2.0),
             "end": max(0.0, first_start - 1.0),
-            "text": "🎸 Instrumental (2)",
+            "text": "Instrumental (2)",
             "words": []
         })
         new_segments.append({
             "start": max(0.0, first_start - 1.0),
             "end": first_start,
-            "text": "🎸 Instrumental (1)",
+            "text": "Instrumental (1)",
             "words": []
         })
         
@@ -166,7 +166,7 @@ def insert_instrumental_breaks(segments: list[dict]) -> list[dict]:
                     new_segments.append({
                         "start": gap_start,
                         "end": gap_end - 3.0,
-                        "text": "🎸 Instrumental",
+                        "text": "Instrumental",
                         "words": []
                     })
                     
@@ -174,19 +174,19 @@ def insert_instrumental_breaks(segments: list[dict]) -> list[dict]:
                 new_segments.append({
                     "start": gap_end - 3.0,
                     "end": gap_end - 2.0,
-                    "text": "🎸 Instrumental (3)",
+                    "text": "Instrumental (3)",
                     "words": []
                 })
                 new_segments.append({
                     "start": gap_end - 2.0,
                     "end": gap_end - 1.0,
-                    "text": "🎸 Instrumental (2)",
+                    "text": "Instrumental (2)",
                     "words": []
                 })
                 new_segments.append({
                     "start": gap_end - 1.0,
                     "end": gap_end,
-                    "text": "🎸 Instrumental (1)",
+                    "text": "Instrumental (1)",
                     "words": []
                 })
                 
@@ -229,7 +229,7 @@ def generate_ass_karaoke(
     for idx in range(len(segments) - 1):
         curr = segments[idx]
         nxt = segments[idx + 1]
-        if "Instrumental" not in nxt["text"] and "🎸" not in nxt["text"] and "Instrumental" not in curr["text"] and "🎸" not in curr["text"]:
+        if "Instrumental" not in nxt["text"] and "Instrumental" not in curr["text"]:
             gap = nxt["start"] - curr["end"]
             if gap > 0.3:
                 curr["end"] = nxt["start"] - 0.3
@@ -343,7 +343,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         if show_next_line_preview and idx < len(segments) - 1:
             next_seg = segments[idx + 1]
             # Apenas exibe a próxima linha se ela for uma linha de letra (ignora instrumental e contagens)
-            if "Instrumental" not in next_seg["text"] and "🎸" not in next_seg["text"]:
+            if "Instrumental" not in next_seg["text"]:
                 preview_line = f"Dialogue: 0,{start_time_str},{end_time_str},NextLine,,0,0,0,,{next_seg['text']}\n"
                 lines.append(preview_line)
         

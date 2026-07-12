@@ -28,19 +28,11 @@ def transcribe_vocals(vocals_path: str, model_size: str = "medium", initial_prom
     
     logger.info(f"Iniciando transcrição de vocais para o arquivo: {vocals_path}")
     
-    # Executar transcrição com timestamps em nível de palavra e filtro VAD ajustado para canto
+    # Executar transcrição padrão estável com timestamps em nível de palavra
     segments, info = model.transcribe(
         vocals_path,
         word_timestamps=True,
         beam_size=5,
-        vad_filter=True,                     # Ativa o VAD (Voice Activity Detection) para remover silêncios
-        vad_parameters=dict(
-            min_silence_duration_ms=300,     # Pausas curtas (300ms) cortam o verso de forma limpa
-            speech_pad_ms=100,               # Padding baixo (100ms) para evitar que o final de um verso cole no início do outro
-            min_speech_duration_ms=100       # Aceita trechos cantados muito curtos
-        ),
-        condition_on_previous_text=False,    # Evita que o Whisper alucine ou repita versos em partes instrumentais
-        no_speech_threshold=0.5,
         initial_prompt=initial_prompt        # Letras oficiais para guiar o Whisper
     )
     
