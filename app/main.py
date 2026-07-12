@@ -98,33 +98,34 @@ def clean_word(w: str) -> str:
     return re.sub(r'[^\w]', '', w).lower()
 
 def align_lyrics(official_lyrics_text: str, transcribed_segments: list[dict]) -> list[dict]:
-    # 1. Separar a letra oficial em linhas e palavras, preservando a estrutura
+    # 1. Separar a letra oficial em linhas e palavras
     raw_lines = official_lyrics_text.strip().split('\n')
-    official_structure = []
-    official_words_flat = [] # Lista flat de (word_text, line_index, word_index_in_line)
+    official_lines = []
+    official_words_flat = [] # Lista flat para correspondência global de sequências
     
     for line_idx, line in enumerate(raw_lines):
         line = line.strip()
         if not line:
             continue
         words = line.split()
-        official_structure.append({
+        line_data = {
             "text": line,
             "words": words,
-            "aligned_words": [] # Preenchido depois com {"word": ..., "start": ..., "end": ...}
-        })
+            "word_times": [None] * len(words) # Armazenará {"start": ..., "end": ...} para cada palavra
+        }
+        official_lines.append(line_data)
         for word_idx, w in enumerate(words):
             official_words_flat.append({
                 "text": w,
                 "clean": clean_word(w),
-                "line_idx": len(official_structure) - 1,
+                "line_ref": line_data,
                 "word_idx": word_idx
             })
             
-    if not official_structure:
-        return transcribed_segments # Fallback se a letra enviada for vazia
+    if not official_lines:
+        return transcribed_segments
         
-    # 2. Extrair todas as palavras transcritas pelo Whisper em uma única lista flat
+    # 2. Obter palavras transcritas pelo Whisper com seus timestamps
     transcribed_words_flat = []
     for seg in transcribed_segments:
         for w_info in seg.get("words", []):
@@ -136,18 +137,16 @@ def align_lyrics(official_lyrics_text: str, transcribed_segments: list[dict]) ->
             })
             
     if not transcribed_words_flat:
-        return transcribed_segments # Fallback se Whisper não transcreveu nada
+        return transcribed_segments
         
-    # 3. Alinhamento de sequências com difflib
-    official_clean_list = [w["clean"] for w in official_words_flat]
-    transcribed_clean_list = [w["clean"] for w in transcribed_words_flat]
+    # 3. Alinhamento de sequências global usando difflib
+    off_clean_list = [w["clean"] for w in official_words_flat]
+    trans_clean_list = [w["clean"] for w in transcribed_words_flat]
     
-    matcher = difflib.SequenceMatcher(None, official_clean_list, transcribed_clean_list)
+    matcher = difflib.SequenceMatcher(None, off_clean_list, trans_clean_list)
     matching_blocks = matcher.get_matching_blocks()
     
-    # Mapeamento resultante das palavras oficiais para seus timestamps
-    aligned_timestamps = [None] * len(official_words_flat)
-    
+    # Preencher correspondências diretas nos objetos de tempo das palavras das linhas
     for block in matching_blocks:
         off_start = block.a
         trans_start = block.b
@@ -156,74 +155,124 @@ def align_lyrics(official_lyrics_text: str, transcribed_segments: list[dict]) ->
             off_idx = off_start + i
             trans_idx = trans_start + i
             if off_idx < len(official_words_flat) and trans_idx < len(transcribed_words_flat):
-                aligned_timestamps[off_idx] = {
+                w_flat = official_words_flat[off_idx]
+                w_flat["line_ref"]["word_times"][w_flat["word_idx"]] = {
                     "start": transcribed_words_flat[trans_idx]["start"],
                     "end": transcribed_words_flat[trans_idx]["end"]
                 }
                 
-    # 4. Preencher timestamps das palavras não alinhadas (interpolação/extrapolação)
-    last_known_end = 0.0
-    for i in range(len(official_words_flat)):
-        if aligned_timestamps[i] is not None:
-            last_known_end = aligned_timestamps[i]["end"]
+    # 4. Ajustar tempos locais de palavras dentro de cada linha
+    for line_data in official_lines:
+        times = line_data["word_times"]
+        n_words = len(times)
+        
+        known_indices = [idx for idx, t in enumerate(times) if t is not None]
+        
+        if not known_indices:
             continue
             
-        # Tentar achar a próxima palavra conhecida para interpolar
-        next_known_idx = -1
-        for j in range(i + 1, len(official_words_flat)):
-            if aligned_timestamps[j] is not None:
-                next_known_idx = j
+        # Interpolação de palavras intermediárias não alinhadas
+        for k in range(len(known_indices) - 1):
+            idx_start = known_indices[k]
+            idx_end = known_indices[k + 1]
+            if idx_end - idx_start > 1:
+                t_start = times[idx_start]["end"]
+                t_end = times[idx_end]["start"]
+                gap = t_end - t_start
+                num_gaps = idx_end - idx_start
+                step = gap / num_gaps if gap > 0 else 0.05
+                for i in range(idx_start + 1, idx_end):
+                    w_start = t_start + step * (i - idx_start - 1)
+                    w_end = w_start + step
+                    times[i] = {"start": w_start, "end": w_end}
+                    
+        # Extrapolação para trás para palavras não alinhadas no início da linha
+        first_known = known_indices[0]
+        if first_known > 0:
+            first_start = times[first_known]["start"]
+            for i in range(first_known - 1, -1, -1):
+                w_end = times[i + 1]["start"]
+                w_start = w_end - 0.35
+                times[i] = {"start": w_start, "end": w_end}
+                
+        # Extrapolação para frente para palavras não alinhadas no final da linha
+        last_known = known_indices[-1]
+        if last_known < n_words - 1:
+            last_end = times[last_known]["end"]
+            for i in range(last_known + 1, n_words):
+                w_start = times[i - 1]["end"]
+                w_end = w_start + 0.35
+                times[i] = {"start": w_start, "end": w_end}
+                
+    # 5. Resolver linhas inteiras que não foram alinhadas de forma alguma
+    for l_idx, line_data in enumerate(official_lines):
+        times = line_data["word_times"]
+        if any(t is not None for t in times):
+            continue
+            
+        # Achar o tempo final da linha anterior conhecida
+        prev_line_end = 0.0
+        for prev_idx in range(l_idx - 1, -1, -1):
+            prev_times = [t for t in official_lines[prev_idx]["word_times"] if t is not None]
+            if prev_times:
+                prev_line_end = prev_times[-1]["end"]
                 break
                 
-        if next_known_idx != -1:
-            next_known_start = aligned_timestamps[next_known_idx]["start"]
-            gap = next_known_start - last_known_end
-            num_words = next_known_idx - i + 1
-            step = gap / num_words
-            
-            word_start = last_known_end + step * (i - (next_known_idx - num_words))
-            word_end = word_start + step
-            aligned_timestamps[i] = {
-                "start": word_start,
-                "end": word_end
-            }
+        # Achar o tempo inicial da próxima linha conhecida
+        next_line_start = None
+        for next_idx in range(l_idx + 1, len(official_lines)):
+            next_times = [t for t in official_lines[next_idx]["word_times"] if t is not None]
+            if next_times:
+                next_line_start = next_times[0]["start"]
+                break
+                
+        n_words = len(line_data["words"])
+        default_line_dur = n_words * 0.35
+        
+        if next_line_start is not None:
+            # Posiciona 1.5s antes do início da próxima linha conhecida
+            line_end = next_line_start - 1.5
+            line_start = line_end - default_line_dur
+            if line_start < prev_line_end + 1.0:
+                line_start = prev_line_end + 1.0
+                line_end = line_start + default_line_dur
         else:
-            word_start = last_known_end + 0.1
-            word_end = word_start + 0.35
-            aligned_timestamps[i] = {
-                "start": word_start,
-                "end": word_end
-            }
-            last_known_end = word_end
+            line_start = prev_line_end + 2.0
+            line_end = line_start + default_line_dur
             
-    # 5. Reconstruir a estrutura dos segmentos com os timestamps alinhados
-    for idx, w_flat in enumerate(official_words_flat):
-        l_idx = w_flat["line_idx"]
-        time_info = aligned_timestamps[idx]
-        
-        word_text = w_flat["text"]
-        if w_flat["word_idx"] < len(official_structure[l_idx]["words"]) - 1:
-            word_text += " "
-            
-        official_structure[l_idx]["aligned_words"].append({
-            "word": word_text,
-            "start": time_info["start"],
-            "end": time_info["end"]
-        })
-        
-    # 6. Converter a estrutura oficial de volta para o formato de segmentos
+        step = (line_end - line_start) / n_words
+        for i in range(n_words):
+            w_start = line_start + i * step
+            w_end = w_start + step
+            times[i] = {"start": w_start, "end": w_end}
+
+    # 6. Reconstruir a estrutura final de segmentos com segurança de tempos crescentes
     new_segments = []
-    for l_info in official_structure:
-        aligned_words = l_info["aligned_words"]
-        if not aligned_words:
-            continue
-        new_segments.append({
-            "start": aligned_words[0]["start"],
-            "end": aligned_words[-1]["end"],
-            "text": l_info["text"],
-            "words": aligned_words
-        })
-        
+    for line_data in official_lines:
+        aligned_words = []
+        for word_idx, word_text in enumerate(line_data["words"]):
+            time_info = line_data["word_times"][word_idx]
+            
+            w_start = max(0.0, time_info["start"])
+            w_end = max(w_start + 0.05, time_info["end"])
+            
+            if word_idx < len(line_data["words"]) - 1:
+                word_text += " "
+                
+            aligned_words.append({
+                "word": word_text,
+                "start": w_start,
+                "end": w_end
+            })
+            
+        if aligned_words:
+            new_segments.append({
+                "start": aligned_words[0]["start"],
+                "end": aligned_words[-1]["end"],
+                "text": line_data["text"],
+                "words": aligned_words
+            })
+            
     return new_segments
 
 def update_state(status: str, step: str, progress: int, error_message: str = "", result_file: str = None, original_filename: str = None):
