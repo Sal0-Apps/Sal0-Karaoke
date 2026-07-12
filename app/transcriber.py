@@ -4,7 +4,7 @@ from faster_whisper import WhisperModel
 
 logger = logging.getLogger("karaoke")
 
-def transcribe_vocals(vocals_path: str, model_size: str = "medium") -> list[dict]:
+def transcribe_vocals(vocals_path: str, model_size: str = "medium", initial_prompt: str = None) -> list[dict]:
     """
     Transcreve a faixa de vocais usando o Whisper selecionado.
     Retorna uma lista de segmentos estruturados contendo palavras e timestamps.
@@ -40,7 +40,8 @@ def transcribe_vocals(vocals_path: str, model_size: str = "medium") -> list[dict
             min_speech_duration_ms=100       # Aceita trechos cantados muito curtos
         ),
         condition_on_previous_text=False,    # Evita que o Whisper alucine ou repita versos em partes instrumentais
-        no_speech_threshold=0.5
+        no_speech_threshold=0.5,
+        initial_prompt=initial_prompt        # Letras oficiais para guiar o Whisper
     )
     
     logger.info(

@@ -437,6 +437,17 @@
                 </div>
             </div>
 
+            <!-- Letra Oficial da Música (Opcional) para orientar o Whisper -->
+            <div class="form-group" style="margin-top: 1.2rem;">
+                <span class="label" style="display: flex; align-items: center; gap: 0.35rem;">
+                    <span>📝</span> Letra Oficial da Música (Opcional)
+                </span>
+                <div class="bg-info-text" style="margin-bottom: 0.4rem;">
+                    <span>Cole a letra aqui para guiar o Whisper a transcrever com 100% de precisão gramatical e quebras corretas.</span>
+                </div>
+                <textarea id="lyricsText" name="lyrics_text" placeholder="Cole a letra oficial aqui..." style="width: 100%; min-height: 100px; border: 1px solid var(--glass-border); padding: 0.7rem 0.9rem; background: rgba(0,0,0,0.15); color: var(--text-main); border-radius: 12px; outline: none; font-size: 0.9rem; font-family: inherit; resize: vertical; box-shadow: inset 0 2px 4px rgba(0,0,0,0.25);"></textarea>
+            </div>
+
             <!-- Seção de Ajustes Avançados Colapsáveis -->
             <div id="advancedContent" style="display: none; margin-top: 1.5rem; background: rgba(255, 255, 255, 0.015); border: 1px solid var(--glass-border); border-radius: 14px; padding: 1.2rem;">
                 
@@ -651,6 +662,23 @@
             </div>
         </div>
 
+        <!-- Painel de Correção / Edição de Legenda (Pausa Intermediária) -->
+        <div id="correctionCard" style="display: none; background: rgba(30, 27, 57, 0.85); border: 1px solid var(--glass-border); padding: 1.5rem; border-radius: 14px; margin-top: 1.5rem; box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37); backdrop-filter: blur(8px);">
+            <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
+                <span style="font-size: 1.3rem;">✍️</span>
+                <h3 style="margin: 0; font-size: 1.1rem; font-weight: 700; color: var(--text-main);">Revisão & Correção da Legenda</h3>
+            </div>
+            <p style="color: var(--text-muted); font-size: 0.82rem; margin: 0 0 1rem 0; line-height: 1.4;">
+                A IA transcreveu a música. Por favor, revise as estrofes abaixo, corrija eventuais erros ortográficos e clique em "Salvar e Continuar" para renderizar o vídeo final.
+            </p>
+            <div id="correctionList" style="max-height: 380px; overflow-y: auto; display: flex; flex-direction: column; gap: 0.75rem; margin-bottom: 1.2rem; padding-right: 0.5rem; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05); padding: 0.8rem; background: rgba(0,0,0,0.25);">
+                <!-- Linhas geradas dinamicamente via JS -->
+            </div>
+            <button type="button" id="btnContinueProcess" class="btn-success" style="width: 100%; font-weight: 600; padding: 0.75rem 1rem; font-size: 0.95rem; cursor: pointer; border-radius: 10px;">
+                💾 Salvar e Continuar Renderização
+            </button>
+        </div>
+
         <!-- Erro no Processamento -->
         <div class="error-card" id="errorCard"></div>
 
@@ -662,7 +690,22 @@
                 <span>⬇️</span> Baixar Vídeo MP4
             </a>
         </div>
-    </div>
+        </div>
+
+        <!-- Popup / Modal de Confirmação para Revisar Legendas -->
+        <div id="correctionConfirmModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 9999; align-items: center; justify-content: center; backdrop-filter: blur(5px);">
+            <div style="background: rgba(30, 27, 57, 0.95); border: 1px solid var(--glass-border); padding: 1.8rem; border-radius: 16px; max-width: 420px; width: 90%; text-align: center; box-shadow: 0 10px 40px rgba(0,0,0,0.5);">
+                <span style="font-size: 2.2rem; display: block; margin-bottom: 0.8rem;">✍️</span>
+                <h3 style="color: var(--text-main); margin-bottom: 0.6rem; font-size: 1.25rem;">Revisão de Legenda</h3>
+                <p style="color: var(--text-muted); font-size: 0.85rem; line-height: 1.5; margin-bottom: 1.5rem;">
+                    Você gostaria de pausar o processamento para revisar e corrigir a letra da legenda antes da renderização final do vídeo?
+                </p>
+                <div style="display: flex; gap: 0.8rem; justify-content: center;">
+                    <button type="button" id="btnConfirmNo" class="btn-secondary" style="flex: 1; padding: 0.65rem; border-color: rgba(255,255,255,0.1); cursor: pointer; border-radius: 8px;">Não, gerar direto</button>
+                    <button type="button" id="btnConfirmYes" class="btn-primary" style="flex: 1; padding: 0.65rem; cursor: pointer; border-radius: 8px;">Sim, quero revisar</button>
+                </div>
+            </div>
+        </div>
 
     <script>
         const audioUploadArea = document.getElementById('audioUploadArea');
@@ -780,12 +823,31 @@
         }
 
         // Envio do formulário via AJAX
-        form.addEventListener('submit', async (e) => {
+        form.addEventListener('submit', (e) => {
             e.preventDefault();
             
             // Ocultar elementos de estado anterior
             errorCard.style.display = "none";
             downloadBox.style.display = "none";
+            document.getElementById('correctionCard').style.display = "none";
+            
+            // Abrir popup de confirmação de revisão de legenda
+            const modal = document.getElementById('correctionConfirmModal');
+            modal.style.display = "flex";
+        });
+        
+        // Listener para os botões do modal de confirmação
+        document.getElementById('btnConfirmYes').addEventListener('click', () => {
+            submitProcessForm(true);
+        });
+        
+        document.getElementById('btnConfirmNo').addEventListener('click', () => {
+            submitProcessForm(false);
+        });
+        
+        async function submitProcessForm(enableCorrection) {
+            // Ocultar modal
+            document.getElementById('correctionConfirmModal').style.display = "none";
             
             // Desativar botão e formulário
             btnSubmit.disabled = true;
@@ -812,6 +874,8 @@
             formData.append('show_instrumental', document.getElementById('showInstrumental').value);
             formData.append('transcribe_source', document.getElementById('transcribeSource').value);
             formData.append('show_next_line_preview', document.getElementById('showNextLinePreview').value);
+            formData.append('lyrics_text', document.getElementById('lyricsText').value);
+            formData.append('enable_correction', enableCorrection ? "true" : "false");
             
             try {
                 const response = await fetch('/api/process', {
@@ -830,7 +894,7 @@
             } catch (err) {
                 showError(err.message);
             }
-        });
+        }
 
         let pollingInterval = null;
 
@@ -855,6 +919,7 @@
                     
                     if (data.status === "done") {
                         clearInterval(pollingInterval);
+                        pollingInterval = null;
                         statusMessage.innerText = "Processamento concluído com sucesso!";
                         progressBarFill.style.width = "100%";
                         progressPercent.innerText = "100%";
@@ -863,8 +928,16 @@
                         // Exibir download
                         downloadBox.style.display = "block";
                         btnSubmit.disabled = false;
+                        document.getElementById('correctionCard').style.display = "none";
+                    } else if (data.status === "waiting_for_user_correction") {
+                        clearInterval(pollingInterval);
+                        pollingInterval = null;
+                        
+                        processCard.style.display = "none";
+                        loadCorrectionPanel();
                     } else if (data.status === "error") {
                         clearInterval(pollingInterval);
+                        pollingInterval = null;
                         showError(data.error_message || "Ocorreu um erro inesperado durante o processamento.");
                     }
                     
@@ -1141,6 +1214,7 @@
                 if (data.status === "processing") {
                     btnSubmit.disabled = true;
                     processCard.style.display = "block";
+                    document.getElementById('correctionCard').style.display = "none";
                     statusMessage.innerText = getStepLabel(data.step);
                     progressBarFill.style.width = `${data.progress}%`;
                     progressPercent.innerText = `${data.progress}%`;
@@ -1148,15 +1222,128 @@
                     
                     // Iniciar polling automático no navegador aberto
                     startPolling();
+                } else if (data.status === "waiting_for_user_correction") {
+                    btnSubmit.disabled = true;
+                    processCard.style.display = "none";
+                    loadCorrectionPanel();
                 } else if (data.status === "done") {
+                    btnSubmit.disabled = false;
+                    processCard.style.display = "none";
+                    document.getElementById('correctionCard').style.display = "none";
                     if (data.result_file) {
                         downloadBox.style.display = "block";
                     }
+                } else {
+                    btnSubmit.disabled = false;
+                    processCard.style.display = "none";
+                    document.getElementById('correctionCard').style.display = "none";
                 }
             } catch (e) {
                 console.error("Erro ao verificar status concorrente:", e);
             }
         }
+        
+        let isShowingCorrection = false;
+
+        async function loadCorrectionPanel() {
+            if (isShowingCorrection) return;
+            isShowingCorrection = true;
+            
+            try {
+                const res = await fetch('/api/segments_to_edit');
+                if (!res.ok) throw new Error("Falha ao obter legendas para correção.");
+                
+                const segments = await res.json();
+                const container = document.getElementById('correctionList');
+                container.innerHTML = "";
+                
+                segments.forEach((seg, idx) => {
+                    const row = document.createElement('div');
+                    row.style.display = "flex";
+                    row.style.flexDirection = "column";
+                    row.style.gap = "0.25rem";
+                    row.style.marginBottom = "0.5rem";
+                    
+                    const timeLabel = document.createElement('span');
+                    timeLabel.style.fontSize = "0.75rem";
+                    timeLabel.style.color = "var(--text-muted)";
+                    timeLabel.innerText = `Frase ${idx + 1} [${formatTimeLabel(seg.start)} -> ${formatTimeLabel(seg.end)}]`;
+                    
+                    const input = document.createElement('input');
+                    input.type = "text";
+                    input.className = "segment-edit-input";
+                    input.value = seg.text;
+                    input.style.width = "100%";
+                    input.style.border = "1px solid var(--glass-border)";
+                    input.style.padding = "0.5rem 0.8rem";
+                    input.style.background = "#141226";
+                    input.style.color = "var(--text-main)";
+                    input.style.borderRadius = "8px";
+                    input.style.outline = "none";
+                    
+                    row.appendChild(timeLabel);
+                    row.appendChild(input);
+                    container.appendChild(row);
+                });
+                
+                document.getElementById('correctionCard').style.display = "block";
+            } catch (err) {
+                console.error(err);
+                alert("Erro ao carregar legenda para correção: " + err.message);
+                isShowingCorrection = false;
+            }
+        }
+        
+        function formatTimeLabel(seconds) {
+            const mins = Math.floor(seconds / 60);
+            const secs = Math.floor(seconds % 60);
+            const ms = Math.floor((seconds % 1) * 100);
+            return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}.${ms.toString().padStart(2, '0')}`;
+        }
+
+        document.getElementById('btnContinueProcess').addEventListener('click', async () => {
+            const inputs = document.querySelectorAll('.segment-edit-input');
+            const texts = [];
+            inputs.forEach(input => {
+                texts.push(input.value);
+            });
+            
+            const btn = document.getElementById('btnContinueProcess');
+            btn.disabled = true;
+            btn.innerText = "💾 Enviando correções...";
+            
+            try {
+                const res = await fetch('/api/continue_process', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ texts: texts })
+                });
+                
+                if (!res.ok) {
+                    const err = await res.json();
+                    throw new Error(err.detail || "Erro ao prosseguir.");
+                }
+                
+                // Ocultar card de correção
+                document.getElementById('correctionCard').style.display = "none";
+                isShowingCorrection = false;
+                
+                // Re-habilitar botão
+                btn.disabled = false;
+                btn.innerText = "💾 Salvar e Continuar Renderização";
+                
+                // Exibir painel de progresso novamente
+                processCard.style.display = "block";
+                
+                // Reiniciar o Polling rápido de status
+                startPolling();
+                
+            } catch (err) {
+                alert("Erro ao continuar: " + err.message);
+                btn.disabled = false;
+                btn.innerText = "💾 Salvar e Continuar Renderização";
+            }
+        });
         
         // Lógica de consulta e download dos Modelos de IA Whisper no Servidor
         async function fetchModelsStatus() {

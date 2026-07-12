@@ -44,6 +44,53 @@ state = {
     "original_filename": "final"
 }
 
+# Evento global para pausar e continuar o processamento (revisão de legenda)
+correction_event = threading.Event()
+segments_to_edit = []
+
+def update_segment_words(original_seg: dict, new_text: str) -> dict:
+    new_text = new_text.strip()
+    original_seg["text"] = new_text
+    
+    # Dividir o texto editado em palavras
+    new_words_list = new_text.split()
+    orig_words = original_seg.get("words", [])
+    
+    if not new_words_list:
+        original_seg["words"] = []
+        return original_seg
+        
+    # Se o número de palavras for o mesmo, apenas substitui o texto mantendo os timestamps
+    if len(new_words_list) == len(orig_words):
+        for idx, word_txt in enumerate(new_words_list):
+            orig_word = orig_words[idx]["word"]
+            # Tentar manter o mesmo espaçamento lateral (leading/trailing spaces)
+            leading_spaces = len(orig_word) - len(orig_word.lstrip(' '))
+            trailing_spaces = len(orig_word.lstrip(' ')) - len(orig_word.strip(' '))
+            orig_words[idx]["word"] = " " * leading_spaces + word_txt + " " * trailing_spaces
+    else:
+        # Se o número de palavras mudou, redistribuímos a duração igualmente
+        start_time = original_seg["start"]
+        end_time = original_seg["end"]
+        total_dur = end_time - start_time
+        if total_dur <= 0:
+            total_dur = 1.0
+        word_dur = total_dur / len(new_words_list)
+        
+        new_words = []
+        for idx, word_txt in enumerate(new_words_list):
+            w_start = start_time + idx * word_dur
+            w_end = w_start + word_dur
+            word_val = word_txt + " " if idx < len(new_words_list) - 1 else word_txt
+            new_words.append({
+                "word": word_val,
+                "start": w_start,
+                "end": w_end
+            })
+        original_seg["words"] = new_words
+        
+    return original_seg
+
 def update_state(status: str, step: str, progress: int, error_message: str = "", result_file: str = None, original_filename: str = None):
     """Atualiza o estado global da aplicação de forma thread-safe e persiste no disco."""
     with state_lock:
@@ -437,6 +484,33 @@ def save_last_profile(data: dict):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erro ao salvar último perfil: {e}")
 
+class ContinueProcessModel(BaseModel):
+    texts: list[str]
+
+@app.get("/api/segments_to_edit")
+def get_segments_to_edit():
+    global segments_to_edit
+    return segments_to_edit
+
+@app.post("/api/continue_process")
+def continue_process(data: ContinueProcessModel):
+    global segments_to_edit, correction_event
+    if not segments_to_edit:
+        raise HTTPException(status_code=400, detail="Nenhum processamento aguardando correção.")
+        
+    if len(data.texts) != len(segments_to_edit):
+        raise HTTPException(status_code=400, detail="A quantidade de linhas enviadas não corresponde aos segmentos originais.")
+        
+    # Atualizar os segmentos com o texto corrigido
+    updated = []
+    for idx, text in enumerate(data.texts):
+        orig_seg = segments_to_edit[idx]
+        updated.append(update_segment_words(orig_seg, text))
+        
+    segments_to_edit = updated
+    correction_event.set()
+    return {"status": "success"}
+
 @app.get("/", response_class=HTMLResponse)
 def read_index():
     """Serve a interface gráfica web da aplicação."""
@@ -466,7 +540,9 @@ def process_karaoke(
     background_mode: str = Form("image"),
     show_instrumental: bool = Form(True),
     transcribe_source: str = Form("vocals"),
-    show_next_line_preview: bool = Form(False)
+    show_next_line_preview: bool = Form(False),
+    lyrics_text: str = Form(None),
+    enable_correction: bool = Form(True)
 ):
     """
     Recebe os arquivos enviados, valida a concorrência e inicia o pipeline em segundo plano.
@@ -519,7 +595,9 @@ def process_karaoke(
         background_mode,
         show_instrumental,
         transcribe_source,
-        show_next_line_preview
+        show_next_line_preview,
+        lyrics_text,
+        enable_correction
     )
     
     return {"status": "processing"}
@@ -557,7 +635,9 @@ def run_pipeline(
     background_mode: str = "image",
     show_instrumental: bool = True,
     transcribe_source: str = "vocals",
-    show_next_line_preview: bool = False
+    show_next_line_preview: bool = False,
+    lyrics_text: str = None,
+    enable_correction: bool = True
 ):
     """Pipeline principal de processamento sequencial."""
     # Obter o lock de processamento exclusivo (segurança de job único)
@@ -616,10 +696,33 @@ def run_pipeline(
             # Escolher a fonte de áudio para a transcrição (voz isolada ou áudio completo com instrumental)
             transcribe_audio = vocals_wav if transcribe_source == "vocals" else converted_wav
             logger.info(f"Fonte de transcrição escolhida: {transcribe_audio} (Modo: {transcribe_source})")
-            segments = transcribe_vocals(transcribe_audio, model_size=whisper_model)
+            segments = transcribe_vocals(transcribe_audio, model_size=whisper_model, initial_prompt=lyrics_text)
             
             if not segments:
                 raise ValueError("Nenhum vocal detectado ou transcrição vazia.")
+            
+            # --- NOVO: Passo de Pausa e Correção de Legendas (se ativado pelo usuário) ---
+            if enable_correction:
+                global segments_to_edit, correction_event
+                segments_to_edit = segments
+                correction_event.clear()
+                
+                update_state("waiting_for_user_correction", "Correction", 75)
+                
+                # Notificação Telegram para o usuário entrar no app e editar
+                send_telegram_notification(
+                    telegram_token, 
+                    telegram_chat_id, 
+                    f"⚠️ <b>Sal0 karaoke</b>: A transcrição de <b>{orig_name}</b> está pronta para correção! "
+                    "Entre no aplicativo web para revisar/corrigir a legenda e continuar a renderização."
+                )
+                
+                logger.info("Aguardando o usuário corrigir as legendas na interface web...")
+                # Bloqueia a thread até o usuário enviar as correções pelo endpoint /api/continue_process
+                correction_event.wait()
+                
+                logger.info("Retomando o processamento com as legendas corrigidas.")
+                segments = segments_to_edit
             
             # Passo 4: Gerar legendas ASS com efeitos de karaoke
             update_state("processing", "Generating subtitles", 80)
