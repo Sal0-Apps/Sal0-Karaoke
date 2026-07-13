@@ -37,7 +37,7 @@ def extract_audio(input_path: str, output_wav_path: str) -> str:
         output_wav_path
     ]
     
-    import app.process_manager as pm
+    import process_manager as pm
     pm.check_cancelled()
     try:
         process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
@@ -77,7 +77,7 @@ def separate_vocals(audio_path: str, temp_output_dir: str) -> tuple[str, str]:
         audio_path
     ]
     
-    import app.process_manager as pm
+    import process_manager as pm
     pm.check_cancelled()
     try:
         # Configurar variáveis de ambiente para salvar modelos do PyTorch/Demucs no disco persistente

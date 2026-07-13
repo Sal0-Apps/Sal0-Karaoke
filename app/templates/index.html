@@ -400,14 +400,20 @@
 
         <!-- Formulário de Processamento -->
         <form id="karaokeForm">
-            <!-- Cabeçalho do Card com Título e Botão de Engrenagem (Ajustes) -->
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; position: relative;">
+            <!-- Cabeçalho do Card com Título, Seletor de Perfil Rápido e Botão de Engrenagem (Ajustes) -->
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; position: relative; gap: 0.8rem; flex-wrap: wrap;">
                 <h2 style="margin: 0; font-size: 1.25rem; font-weight: 700; color: var(--text-main); display: flex; align-items: center; gap: 0.4rem;">
                     <span>🎙️</span> Nova Produção
                 </h2>
-                <button type="button" id="btnToggleAdvanced" style="background: rgba(255, 255, 255, 0.05); border: 1px solid var(--glass-border); padding: 0.4rem 0.8rem; border-radius: 20px; color: #c084fc; font-size: 0.8rem; font-weight: 600; display: flex; align-items: center; gap: 0.35rem; cursor: pointer; transition: all 0.2s ease; outline: none;">
-                    <span style="font-size: 0.95rem;">⚙️</span> Ajustes
-                </button>
+                <div style="display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap;">
+                    <span style="font-size: 0.8rem; color: var(--text-muted); font-weight: 500;">Perfil:</span>
+                    <select id="profileSelect" class="btn-secondary" style="border: 1px solid var(--glass-border); padding: 0.4rem 0.8rem; background: #141226; color: var(--text-main); border-radius: 20px; cursor: pointer; outline: none; font-size: 0.8rem; font-weight: 600;">
+                        <!-- Preenchido via Javascript -->
+                    </select>
+                    <button type="button" id="btnToggleAdvanced" style="background: rgba(255, 255, 255, 0.05); border: 1px solid var(--glass-border); padding: 0.4rem 0.8rem; border-radius: 20px; color: #c084fc; font-size: 0.8rem; font-weight: 600; display: flex; align-items: center; gap: 0.35rem; cursor: pointer; transition: all 0.2s ease; outline: none;">
+                        <span style="font-size: 0.95rem;">⚙️</span> Ajustes
+                    </button>
+                </div>
             </div>
 
             <!-- ÁREA DE MÍDIA (Música e Imagem de Fundo Lado a Lado) -->
@@ -453,14 +459,11 @@
                 
                 <!-- Perfis de Configuração -->
                 <div class="form-group" style="border: 1px solid rgba(255,255,255,0.05); border-radius: 10px; padding: 1rem; background: rgba(0,0,0,0.15);">
-                    <span class="label">Perfil de Configuração</span>
+                    <span class="label">Salvar ou Excluir Perfil Atual</span>
                     <div style="display: flex; gap: 0.8rem; align-items: center; margin-top: 0.5rem; flex-wrap: wrap;">
-                        <select id="profileSelect" class="btn-secondary" style="flex: 1; border: 1px solid var(--glass-border); padding: 0.5rem; background: #141226; color: var(--text-main); border-radius: 8px; cursor: pointer; outline: none; min-width: 150px;">
-                            <!-- Preenchido via Javascript -->
-                        </select>
-                        <input type="text" id="profileNameInput" placeholder="Nome do novo perfil" style="border: 1px solid var(--glass-border); padding: 0.5rem; background: #141226; color: var(--text-main); border-radius: 8px; font-size: 0.85rem; outline: none; min-width: 150px;">
-                        <button type="button" class="btn-secondary" id="btnSaveProfile" style="background: rgba(139, 92, 246, 0.2); border-color: rgba(139, 92, 246, 0.4); color: #c084fc;">Salvar</button>
-                        <button type="button" class="btn-secondary" id="btnDeleteProfile" style="background: rgba(239, 68, 68, 0.1); border-color: rgba(239, 68, 68, 0.3); color: #fca5a5;">Excluir</button>
+                        <input type="text" id="profileNameInput" placeholder="Nome do perfil" style="flex: 1; border: 1px solid var(--glass-border); padding: 0.5rem; background: #141226; color: var(--text-main); border-radius: 8px; font-size: 0.85rem; outline: none; min-width: 150px;">
+                        <button type="button" class="btn-secondary" id="btnSaveProfile" style="background: rgba(139, 92, 246, 0.2); border-color: rgba(139, 92, 246, 0.4); color: #c084fc; font-weight: 500;">💾 Salvar</button>
+                        <button type="button" class="btn-secondary" id="btnDeleteProfile" style="background: rgba(239, 68, 68, 0.1); border-color: rgba(239, 68, 68, 0.3); color: #fca5a5; font-weight: 500;">🗑️ Excluir</button>
                     </div>
                 </div>
 

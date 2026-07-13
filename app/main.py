@@ -702,7 +702,7 @@ def continue_process(data: ContinueProcessModel):
 
 @app.post("/api/cancel")
 def cancel_process():
-    import app.process_manager as pm
+    import process_manager as pm
     logger.info("Solicitação de cancelamento de tarefa recebida do usuário.")
     
     # 1. Definir o flag de cancelamento
@@ -885,7 +885,7 @@ def run_pipeline(
         orig_name = state.get("original_filename", "final")
         
     try:
-        import app.process_manager as pm
+        import process_manager as pm
         pm.cancel_event.clear()
         pm.clear_active_process()
         

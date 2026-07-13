@@ -41,7 +41,7 @@ def get_random_default_background() -> str:
 
 def run_ffmpeg_with_logging(cmd: list[str], env: dict = None) -> bool:
     """Executa o FFmpeg transmitindo a saída em tempo real para os logs do container."""
-    import app.process_manager as pm
+    import process_manager as pm
     pm.check_cancelled()
     try:
         logger.info(f"Executando FFmpeg: {' '.join(cmd)}")
