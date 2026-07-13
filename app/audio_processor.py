@@ -37,13 +37,24 @@ def extract_audio(input_path: str, output_wav_path: str) -> str:
         output_wav_path
     ]
     
+    import app.process_manager as pm
+    pm.check_cancelled()
     try:
-        result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, check=True)
+        process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        pm.set_active_process(process)
+        stdout, stderr = process.communicate()
+        pm.clear_active_process()
+        pm.check_cancelled()
+        
+        if process.returncode != 0:
+            raise RuntimeError(f"FFmpeg falhou: {stderr}")
+            
         logger.info("Extração de áudio concluída com sucesso via FFmpeg.")
         return output_wav_path
-    except subprocess.CalledProcessError as e:
-        logger.error(f"Erro no FFmpeg ao extrair áudio: {e.stderr}")
-        raise RuntimeError(f"FFmpeg falhou: {e.stderr}")
+    except Exception as e:
+        pm.clear_active_process()
+        logger.error(f"Erro no FFmpeg ao extrair áudio: {e}")
+        raise
 
 def separate_vocals(audio_path: str, temp_output_dir: str) -> tuple[str, str]:
     """Usa Demucs em modo CPU para separar o áudio em vocais e instrumental (no_vocals)."""
@@ -66,6 +77,8 @@ def separate_vocals(audio_path: str, temp_output_dir: str) -> tuple[str, str]:
         audio_path
     ]
     
+    import app.process_manager as pm
+    pm.check_cancelled()
     try:
         # Configurar variáveis de ambiente para salvar modelos do PyTorch/Demucs no disco persistente
         env = os.environ.copy()
@@ -81,13 +94,20 @@ def separate_vocals(audio_path: str, temp_output_dir: str) -> tuple[str, str]:
             text=True,
             env=env
         )
+        pm.set_active_process(process)
         
         for line in process.stdout:
+            if pm.cancel_event.is_set():
+                process.terminate()
+                break
             line_str = line.strip()
             if line_str:
                 logger.info(f"[Demucs] {line_str}")
                 
         process.wait()
+        pm.clear_active_process()
+        pm.check_cancelled()
+        
         if process.returncode != 0:
             raise RuntimeError(f"Demucs falhou com código de retorno {process.returncode}")
             

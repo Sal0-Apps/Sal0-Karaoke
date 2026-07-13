@@ -580,6 +580,13 @@
                             <option value="true">Sim (Ofuscada)</option>
                         </select>
                     </div>
+                    <div>
+                        <span class="label" style="margin-bottom: 0.3rem;">📝 Letra Visível no Início</span>
+                        <select id="keepFirstLineVisible" name="keep_first_line_visible" class="btn-secondary" style="width: 100%; border: 1px solid var(--glass-border); padding: 0.5rem; background: #141226; color: var(--text-main); border-radius: 8px; outline: none; cursor: pointer;" title="Exibe a primeira linha da letra estática logo na introdução até começar a cantar">
+                            <option value="false" selected>Não (Padrão)</option>
+                            <option value="true">Sim</option>
+                        </select>
+                    </div>
                 </div>
 
                 <!-- Notificações no Telegram (Configuração Global) -->
@@ -623,6 +630,13 @@
                 <div class="progress-bar-bg">
                     <div class="progress-bar-fill" id="progressBarFill"></div>
                 </div>
+            </div>
+
+            <!-- Botão de Cancelamento de Processamento -->
+            <div style="display: flex; justify-content: center; margin-top: 1.2rem; margin-bottom: 0.2rem;">
+                <button type="button" class="btn-cancel-task btn-secondary" style="background: rgba(239, 68, 68, 0.12); border-color: rgba(239, 68, 68, 0.25); color: #fca5a5; font-size: 0.8rem; font-weight: 600; padding: 0.45rem 1rem; border-radius: 8px; cursor: pointer; transition: all 0.2s; outline: none;">
+                    🛑 Cancelar Processamento
+                </button>
             </div>
 
             <!-- Linha de Etapas do Pipeline -->
@@ -674,9 +688,14 @@
             <div id="correctionList" style="max-height: 380px; overflow-y: auto; display: flex; flex-direction: column; gap: 0.75rem; margin-bottom: 1.2rem; padding-right: 0.5rem; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05); padding: 0.8rem; background: rgba(0,0,0,0.25);">
                 <!-- Linhas geradas dinamicamente via JS -->
             </div>
-            <button type="button" id="btnContinueProcess" class="btn-success" style="width: 100%; font-weight: 600; padding: 0.75rem 1rem; font-size: 0.95rem; cursor: pointer; border-radius: 10px;">
-                💾 Salvar e Continuar Renderização
-            </button>
+            <div style="display: flex; gap: 0.8rem;">
+                <button type="button" class="btn-cancel-task btn-secondary" style="flex: 1; background: rgba(239, 68, 68, 0.1); border-color: rgba(239, 68, 68, 0.2); color: #fca5a5; font-size: 0.9rem; font-weight: 600; padding: 0.75rem 1rem; border-radius: 10px; cursor: pointer; outline: none;">
+                    🛑 Cancelar
+                </button>
+                <button type="button" id="btnContinueProcess" class="btn-success" style="flex: 2; font-weight: 600; padding: 0.75rem 1rem; font-size: 0.95rem; cursor: pointer; border-radius: 10px; outline: none;">
+                    💾 Salvar e Continuar
+                </button>
+            </div>
         </div>
 
         <!-- Erro no Processamento -->
@@ -876,6 +895,7 @@
             formData.append('show_next_line_preview', document.getElementById('showNextLinePreview').value);
             formData.append('lyrics_text', document.getElementById('lyricsText').value);
             formData.append('enable_correction', enableCorrection ? "true" : "false");
+            formData.append('keep_first_line_visible', document.getElementById('keepFirstLineVisible').value);
             
             try {
                 const response = await fetch('/api/process', {
@@ -1032,11 +1052,17 @@
             if (prof.show_next_line_preview !== undefined) {
                 document.getElementById('showNextLinePreview').value = prof.show_next_line_preview ? "true" : "false";
             }
+            if (prof.keep_first_line_visible !== undefined) {
+                document.getElementById('keepFirstLineVisible').value = prof.keep_first_line_visible ? "true" : "false";
+            }
         }
         
         profileSelect.addEventListener('change', async () => {
             const profileName = profileSelect.value;
             applyProfile(profileName);
+            // Preencher o input de nome com o perfil atual para facilitar a edição/sobrescrita
+            profileNameInput.value = profileName;
+            
             // Salvar no servidor como o último perfil ativo
             try {
                 await fetch('/api/last_profile', {
@@ -1050,7 +1076,11 @@
         });
         
         btnSaveProfile.addEventListener('click', async () => {
-            const name = profileNameInput.value.trim();
+            let name = profileNameInput.value.trim();
+            if (!name) {
+                // Se o campo de texto estiver vazio, atualiza/sobrescreve o perfil selecionado
+                name = profileSelect.value;
+            }
             if (!name) {
                 alert("Por favor, digite o nome do perfil que deseja salvar.");
                 return;
@@ -1071,7 +1101,8 @@
                 background_mode: document.getElementById('backgroundMode').value,
                 show_instrumental: document.getElementById('showInstrumental').value === "true",
                 transcribe_source: document.getElementById('transcribeSource').value,
-                show_next_line_preview: document.getElementById('showNextLinePreview').value === "true"
+                show_next_line_preview: document.getElementById('showNextLinePreview').value === "true",
+                keep_first_line_visible: document.getElementById('keepFirstLineVisible').value === "true"
             };
             
             try {
@@ -1343,6 +1374,39 @@
                 btn.disabled = false;
                 btn.innerText = "💾 Salvar e Continuar Renderização";
             }
+        });
+        
+        // Cancelar processamento ativo
+        document.querySelectorAll('.btn-cancel-task').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                if (!confirm("Deseja realmente cancelar a produção deste vídeo de karaoke?")) return;
+                
+                try {
+                    const res = await fetch('/api/cancel', { method: 'POST' });
+                    if (!res.ok) throw new Error("Erro ao enviar comando de cancelamento.");
+                    
+                    const data = await res.json();
+                    alert(data.message || "Processamento cancelado.");
+                    
+                    // Parar o polling
+                    if (pollingInterval) {
+                        clearInterval(pollingInterval);
+                        pollingInterval = null;
+                    }
+                    
+                    // Resetar e ocultar painéis
+                    document.getElementById('processCard').style.display = "none";
+                    document.getElementById('correctionCard').style.display = "none";
+                    document.getElementById('errorCard').style.display = "none";
+                    btnSubmit.disabled = false;
+                    isShowingCorrection = false;
+                    
+                    // Atualizar o status geral
+                    checkCurrentStatus();
+                } catch (e) {
+                    alert("Erro ao tentar cancelar: " + e.message);
+                }
+            });
         });
         
         // Lógica de consulta e download dos Modelos de IA Whisper no Servidor

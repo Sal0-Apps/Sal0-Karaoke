@@ -41,6 +41,8 @@ def get_random_default_background() -> str:
 
 def run_ffmpeg_with_logging(cmd: list[str], env: dict = None) -> bool:
     """Executa o FFmpeg transmitindo a saída em tempo real para os logs do container."""
+    import app.process_manager as pm
+    pm.check_cancelled()
     try:
         logger.info(f"Executando FFmpeg: {' '.join(cmd)}")
         process = subprocess.Popen(
@@ -50,19 +52,27 @@ def run_ffmpeg_with_logging(cmd: list[str], env: dict = None) -> bool:
             text=True,
             env=env
         )
+        pm.set_active_process(process)
         
         # Ler a saída linha a linha
         for line in process.stdout:
+            if pm.cancel_event.is_set():
+                process.terminate()
+                break
             line_str = line.strip()
             # Filtrar logs repetitivos de frame para evitar inundação de logs, mantendo alertas de erro
             if "frame=" in line_str or "size=" in line_str or "time=" in line_str or "speed=" in line_str or "Error" in line_str:
                 logger.info(f"[FFmpeg] {line_str}")
         
         process.wait()
+        pm.clear_active_process()
+        pm.check_cancelled()
+        
         if process.returncode != 0:
             raise RuntimeError(f"FFmpeg falhou com código de retorno {process.returncode}")
         return True
     except Exception as e:
+        pm.clear_active_process()
         logger.error(f"Exceção ao rodar FFmpeg: {e}")
         raise
 

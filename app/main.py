@@ -532,6 +532,7 @@ class ProfileModel(BaseModel):
     show_instrumental: bool = True
     transcribe_source: str = "vocals"
     show_next_line_preview: bool = False
+    keep_first_line_visible: bool = False
 
 def load_profiles() -> dict:
     """Carrega os perfis do arquivo JSON ou inicializa com valores padrão se não existir."""
@@ -550,7 +551,8 @@ def load_profiles() -> dict:
             "background_mode": "image",
             "show_instrumental": True,
             "transcribe_source": "vocals",
-            "show_next_line_preview": False
+            "show_next_line_preview": False,
+            "keep_first_line_visible": False
         }
     }
     
@@ -587,6 +589,8 @@ def load_profiles() -> dict:
                     p_data["transcribe_source"] = "vocals"
                 if "show_next_line_preview" not in p_data:
                     p_data["show_next_line_preview"] = False
+                if "keep_first_line_visible" not in p_data:
+                    p_data["keep_first_line_visible"] = False
             return profiles
     except Exception as e:
         logger.error(f"Erro ao carregar arquivo de perfis: {e}")
@@ -615,7 +619,8 @@ def save_profile(profile: ProfileModel):
         "background_mode": profile.background_mode,
         "show_instrumental": profile.show_instrumental,
         "transcribe_source": profile.transcribe_source,
-        "show_next_line_preview": profile.show_next_line_preview
+        "show_next_line_preview": profile.show_next_line_preview,
+        "keep_first_line_visible": profile.keep_first_line_visible
     }
     try:
         with open(PROFILES_FILE, "w", encoding="utf-8") as f:
@@ -695,6 +700,45 @@ def continue_process(data: ContinueProcessModel):
     correction_event.set()
     return {"status": "success"}
 
+@app.post("/api/cancel")
+def cancel_process():
+    import app.process_manager as pm
+    logger.info("Solicitação de cancelamento de tarefa recebida do usuário.")
+    
+    # 1. Definir o flag de cancelamento
+    pm.cancel_event.set()
+    
+    # 2. Matar o subprocesso ativo (FFmpeg ou Demucs) se existir
+    with pm.process_kill_lock:
+        if pm.active_process:
+            try:
+                logger.info(f"Finalizando subprocesso ativo (PID {pm.active_process.pid})...")
+                pm.active_process.terminate()
+                pm.active_process.wait(timeout=2.0)
+            except Exception as e:
+                logger.warning(f"Erro ao encerrar subprocesso de forma limpa: {e}. Forçando encerramento...")
+                try:
+                    pm.active_process.kill()
+                except Exception:
+                    pass
+            pm.active_process = None
+            
+    # 3. Forçar a liberação do evento de correção para desbloquear a thread se estiver pausada
+    global correction_event
+    correction_event.set()
+    
+    # 4. Atualizar o estado do servidor para idle
+    update_state("idle", "Idle", 0, error_message="Cancelado pelo usuário.")
+    
+    # 5. Liberar o lock de processamento
+    if processing_lock.locked():
+        try:
+            processing_lock.release()
+        except Exception:
+            pass
+            
+    return {"status": "success", "message": "Processamento cancelado com sucesso."}
+
 @app.get("/", response_class=HTMLResponse)
 def read_index():
     """Serve a interface gráfica web da aplicação."""
@@ -726,7 +770,8 @@ def process_karaoke(
     transcribe_source: str = Form("vocals"),
     show_next_line_preview: bool = Form(False),
     lyrics_text: str = Form(None),
-    enable_correction: bool = Form(True)
+    enable_correction: bool = Form(True),
+    keep_first_line_visible: bool = Form(False)
 ):
     """
     Recebe os arquivos enviados, valida a concorrência e inicia o pipeline em segundo plano.
@@ -781,7 +826,8 @@ def process_karaoke(
         transcribe_source,
         show_next_line_preview,
         lyrics_text,
-        enable_correction
+        enable_correction,
+        keep_first_line_visible
     )
     
     return {"status": "processing"}
@@ -821,7 +867,8 @@ def run_pipeline(
     transcribe_source: str = "vocals",
     show_next_line_preview: bool = False,
     lyrics_text: str = None,
-    enable_correction: bool = True
+    enable_correction: bool = True,
+    keep_first_line_visible: bool = False
 ):
     """Pipeline principal de processamento sequencial."""
     # Obter o lock de processamento exclusivo (segurança de job único)
@@ -838,6 +885,10 @@ def run_pipeline(
         orig_name = state.get("original_filename", "final")
         
     try:
+        import app.process_manager as pm
+        pm.cancel_event.clear()
+        pm.clear_active_process()
+        
         # Notificação Telegram: Apenas início resumido
         send_telegram_notification(
             telegram_token, 
@@ -858,29 +909,110 @@ def run_pipeline(
         if os.path.exists(final_ass_path):
             os.remove(final_ass_path)
 
+        # Configurar diretório de cache persistente
+        cache_dir = "/data/cache"
+        os.makedirs(cache_dir, exist_ok=True)
+        cache_meta_file = os.path.join(cache_dir, "cache_meta.json")
+        
+        # Tentar ler metadados do cache anterior
+        cached_meta = {}
+        if os.path.exists(cache_meta_file):
+            try:
+                with open(cache_meta_file, "r", encoding="utf-8") as f:
+                    import json
+                    cached_meta = json.load(f)
+            except Exception:
+                pass
+                
+        # Verificar se a música sendo processada agora é DIFERENTE da do cache
+        # Se for diferente, apagamos todo o conteúdo do cache para começar do zero!
+        if cached_meta.get("original_filename") != orig_name:
+            logger.info("Nova música detectada. Limpando o cache de processamento anterior...")
+            for f_name in os.listdir(cache_dir):
+                f_path = os.path.join(cache_dir, f_name)
+                try:
+                    if os.path.isfile(f_path):
+                        os.remove(f_path)
+                    elif os.path.isdir(f_path):
+                        shutil.rmtree(f_path)
+                except Exception as e:
+                    logger.error(f"Erro ao limpar cache para arquivo {f_name}: {e}")
+            cached_meta = {"original_filename": orig_name}
+            with open(cache_meta_file, "w", encoding="utf-8") as f:
+                import json
+                json.dump(cached_meta, f, indent=4)
+
         # Criar diretório temporário para todo o processamento intermediário (Demucs, Whisper, ASS)
         with tempfile.TemporaryDirectory() as tmpdir:
             logger.info(f"Diretório de trabalho temporário criado: {tmpdir}")
             
             # Passo 1: Extrair / Converter áudio para WAV PCM
-            update_state("processing", "Extracting audio", 15)
-            send_telegram_notification(telegram_token, telegram_chat_id, "🎵 <b>Sal0 karaoke</b>: Extraindo áudio (15%)")
-            converted_wav = os.path.join(tmpdir, "original_converted.wav")
-            extract_audio(input_audio_path, converted_wav)
+            converted_wav = os.path.join(cache_dir, "original_converted.wav")
+            if os.path.exists(converted_wav):
+                logger.info("Aproveitando áudio extraído do cache.")
+                update_state("processing", "Extracting audio (cached)", 15)
+            else:
+                pm.check_cancelled()
+                update_state("processing", "Extracting audio", 15)
+                send_telegram_notification(telegram_token, telegram_chat_id, "🎵 <b>Sal0 karaoke</b>: Extraindo áudio (15%)")
+                extract_audio(input_audio_path, converted_wav)
+            
+            pm.check_cancelled()
             
             # Passo 2: Separar vocais e instrumental via Demucs
-            update_state("processing", "Separating vocals", 40)
-            send_telegram_notification(telegram_token, telegram_chat_id, "✂️ <b>Sal0 karaoke</b>: Separando áudio (40%)")
-            vocals_wav, instrumental_wav = separate_vocals(converted_wav, tmpdir)
+            vocals_wav = os.path.join(cache_dir, "vocals.wav")
+            instrumental_wav = os.path.join(cache_dir, "instrumental.wav")
+            
+            if os.path.exists(vocals_wav) and os.path.exists(instrumental_wav):
+                logger.info("Aproveitando áudio separado pelo Demucs do cache.")
+                update_state("processing", "Separating vocals (cached)", 40)
+            else:
+                pm.check_cancelled()
+                update_state("processing", "Separating vocals", 40)
+                send_telegram_notification(telegram_token, telegram_chat_id, "✂️ <b>Sal0 karaoke</b>: Separando áudio (40%)")
+                with tempfile.TemporaryDirectory() as demucs_tmp:
+                    v_tmp, i_tmp = separate_vocals(converted_wav, demucs_tmp)
+                    shutil.move(v_tmp, vocals_wav)
+                    shutil.move(i_tmp, instrumental_wav)
+                    
+            pm.check_cancelled()
             
             # Passo 3: Transcrever vocais com Whisper selecionado
-            update_state("processing", "Transcribing vocals", 70)
-            send_telegram_notification(telegram_token, telegram_chat_id, f"✍️ <b>Sal0 karaoke</b>: Transcrevendo voz ({whisper_model}) (70%)")
+            segments = None
+            segments_cache_file = os.path.join(cache_dir, "transcribed_segments.json")
             
-            # Escolher a fonte de áudio para a transcrição (voz isolada ou áudio completo com instrumental)
-            transcribe_audio = vocals_wav if transcribe_source == "vocals" else converted_wav
-            logger.info(f"Fonte de transcrição escolhida: {transcribe_audio} (Modo: {transcribe_source})")
-            segments = transcribe_vocals(transcribe_audio, model_size=whisper_model, initial_prompt=lyrics_text)
+            if (os.path.exists(segments_cache_file) and 
+                cached_meta.get("transcribe_source") == transcribe_source and 
+                cached_meta.get("whisper_model") == whisper_model):
+                try:
+                    with open(segments_cache_file, "r", encoding="utf-8") as f:
+                        import json
+                        segments = json.load(f)
+                    logger.info("Aproveitando transcrição do Whisper do cache.")
+                    update_state("processing", "Transcribing vocals (cached)", 70)
+                except Exception as e:
+                    logger.error(f"Erro ao ler cache de segmentos transcritos: {e}")
+                    
+            if segments is None:
+                pm.check_cancelled()
+                update_state("processing", "Transcribing vocals", 70)
+                send_telegram_notification(telegram_token, telegram_chat_id, f"✍️ <b>Sal0 karaoke</b>: Transcrevendo voz ({whisper_model}) (70%)")
+                
+                transcribe_audio = vocals_wav if transcribe_source == "vocals" else converted_wav
+                logger.info(f"Fonte de transcrição escolhida: {transcribe_audio} (Modo: {transcribe_source})")
+                segments = transcribe_vocals(transcribe_audio, model_size=whisper_model, initial_prompt=lyrics_text)
+                
+                if segments:
+                    with open(segments_cache_file, "w", encoding="utf-8") as f:
+                        import json
+                        json.dump(segments, f, indent=4)
+                    cached_meta["transcribe_source"] = transcribe_source
+                    cached_meta["whisper_model"] = whisper_model
+                    with open(cache_meta_file, "w", encoding="utf-8") as f:
+                        import json
+                        json.dump(cached_meta, f, indent=4)
+            
+            pm.check_cancelled()
             
             if not segments:
                 raise ValueError("Nenhum vocal detectado ou transcrição vazia.")
@@ -890,6 +1022,8 @@ def run_pipeline(
                 logger.info("Aplicando alinhamento forçado local com a letra oficial fornecida...")
                 segments = align_lyrics(lyrics_text, segments)
                 
+            pm.check_cancelled()
+            
             # --- NOVO: Passo de Pausa e Correção de Legendas (se ativado pelo usuário) ---
             if enable_correction:
                 global segments_to_edit, correction_event
@@ -908,10 +1042,19 @@ def run_pipeline(
                 
                 logger.info("Aguardando o usuário corrigir as legendas na interface web...")
                 # Bloqueia a thread até o usuário enviar as correções pelo endpoint /api/continue_process
-                correction_event.wait()
+                while not correction_event.is_set():
+                    pm.check_cancelled()
+                    correction_event.wait(timeout=1.0)
                 
                 logger.info("Retomando o processamento com as legendas corrigidas.")
                 segments = segments_to_edit
+                
+                # Salvar os segmentos corrigidos também no cache, para não perder o trabalho se refazer!
+                with open(segments_cache_file, "w", encoding="utf-8") as f:
+                    import json
+                    json.dump(segments, f, indent=4)
+            
+            pm.check_cancelled()
             
             # Passo 4: Gerar legendas ASS com efeitos de karaoke
             update_state("processing", "Generating subtitles", 80)
@@ -928,8 +1071,11 @@ def run_pipeline(
                 max_chars_line=max_chars_line,
                 break_on_punctuation=break_on_punctuation,
                 show_instrumental=show_instrumental,
-                show_next_line_preview=show_next_line_preview
+                show_next_line_preview=show_next_line_preview,
+                keep_first_line_visible=keep_first_line_visible
             )
+            
+            pm.check_cancelled()
             
             # Passo 5: Renderizar o vídeo final
             update_state("processing", "Rendering final video", 95)
@@ -942,6 +1088,8 @@ def run_pipeline(
                 original_video_path=input_audio_path,
                 background_mode=background_mode
             )
+            
+            pm.check_cancelled()
             
             # Salvar opcionalmente a legenda ASS final gerada junto com o MP4
             shutil.copy(ass_path, final_ass_path)
@@ -973,12 +1121,16 @@ def run_pipeline(
             
     except Exception as e:
         logger.exception("Ocorreu um erro catastrófico durante o processamento do pipeline.")
-        update_state("error", "Error", 0, error_message=str(e))
-        send_telegram_notification(
-            telegram_token, 
-            telegram_chat_id, 
-            f"❌ <b>Sal0 karaoke</b>: Falha ao processar <b>{orig_name}</b>. Erro: {e}"
-        )
+        # Se foi cancelado cooperativamente, salvar estado correspondente
+        if "Cancelado pelo usuário" in str(e):
+            update_state("idle", "Idle", 0, error_message="Processamento cancelado pelo usuário.")
+        else:
+            update_state("error", "Error", 0, error_message=str(e))
+            send_telegram_notification(
+                telegram_token, 
+                telegram_chat_id, 
+                f"❌ <b>Sal0 karaoke</b>: Falha ao processar <b>{orig_name}</b>. Erro: {e}"
+            )
         
         # Limpar arquivos de upload em caso de erro
         try:

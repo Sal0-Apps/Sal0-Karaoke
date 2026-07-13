@@ -203,7 +203,8 @@ def generate_ass_karaoke(
     max_chars_line: int = 40,
     break_on_punctuation: bool = True,
     show_instrumental: bool = True,
-    show_next_line_preview: bool = False
+    show_next_line_preview: bool = False,
+    keep_first_line_visible: bool = False
 ):
     """
     Gera um arquivo de legenda ASS customizado.
@@ -283,6 +284,19 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 
     lines = [ass_header]
     
+    # Se configurado para manter a primeira linha visível desde o início do vídeo sem coloração (para introdução)
+    if keep_first_line_visible and segments:
+        first_lyrics_seg = None
+        for seg in segments:
+            if "Instrumental" not in seg["text"]:
+                first_lyrics_seg = seg
+                break
+        if first_lyrics_seg and first_lyrics_seg["start"] > 0.0:
+            start_str = format_time(0.0)
+            end_str = format_time(first_lyrics_seg["start"])
+            clean_text = first_lyrics_seg["text"]
+            lines.append(f"Dialogue: 0,{start_str},{end_str},Default,,0,0,0,,{clean_text}\n")
+            
     for idx, seg in enumerate(segments):
         start_time_str = format_time(seg["start"])
         end_time_str = format_time(seg["end"])
