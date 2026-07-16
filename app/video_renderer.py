@@ -112,7 +112,11 @@ def render_karaoke_video(
     elif background_mode == "random_landscape":
         final_bg_image = get_random_default_background()
         if not final_bg_image:
-            logger.info("Nenhuma imagem de paisagem disponível no cache. Usando fundo preto sólido.")
+            if background_image_path and os.path.exists(background_image_path):
+                logger.info("Nenhuma imagem de paisagem disponível. Usando imagem de plano de fundo enviada.")
+                final_bg_image = background_image_path
+            else:
+                logger.info("Nenhuma imagem de paisagem disponível no cache. Usando fundo preto sólido.")
     elif background_mode == "solid_black":
         # Mantém final_bg_image = None
         pass

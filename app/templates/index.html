@@ -753,9 +753,9 @@
                 <p style="color: var(--text-muted); font-size: 0.85rem; line-height: 1.5; margin-bottom: 1.8rem;">
                     Gostaria de pausar o processamento para revisar, editar tempos e ajustar as estrofes antes de renderizar o vídeo final?
                 </p>
-                <div style="display: flex; gap: 0.8rem; justify-content: center;">
-                    <button type="button" id="btnConfirmNo" class="btn-secondary" style="flex: 1; padding: 0.65rem 1rem; border: 1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.02); cursor: pointer; border-radius: 8px; color: var(--text-main); font-weight: 500; font-size: 0.85rem;">Não, gerar direto</button>
-                    <button type="button" id="btnConfirmYes" class="btn-primary" style="flex: 1; padding: 0.65rem 1rem; cursor: pointer; border-radius: 8px; font-weight: 600; font-size: 0.85rem;">Sim, quero revisar</button>
+                <div style="display: flex; gap: 0.8rem; justify-content: center; width: 100%;">
+                    <button type="button" id="btnConfirmNo" style="flex: 1; height: 38px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.03); cursor: pointer; border-radius: 8px; color: var(--text-main); font-weight: 500; font-size: 0.85rem; transition: background 0.2s; outline: none; margin: 0;">Não, gerar direto</button>
+                    <button type="button" id="btnConfirmYes" style="flex: 1; height: 38px; display: inline-flex; align-items: center; justify-content: center; border: none; background: linear-gradient(90deg, var(--primary) 0%, var(--secondary) 100%); cursor: pointer; border-radius: 8px; color: #fff; font-weight: 600; font-size: 0.85rem; transition: transform 0.2s; outline: none; box-shadow: 0 4px 12px var(--primary-glow); margin: 0;">Sim, quero revisar</button>
                 </div>
             </div>
         </div>
@@ -853,6 +853,7 @@
             if (files.length) {
                 bgFile.files = files;
                 updateBgBadge(files[0].name);
+                document.getElementById('backgroundMode').value = 'image';
             }
         });
 
@@ -863,6 +864,7 @@
         bgFile.addEventListener('change', () => {
             if (bgFile.files.length) {
                 updateBgBadge(bgFile.files[0].name);
+                document.getElementById('backgroundMode').value = 'image';
             } else {
                 bgTextName.innerText = "Padrão: Fundo Preto Sólido";
                 bgBadge.style.display = "none";
@@ -1315,6 +1317,31 @@
         let isShowingCorrection = false;
         let currentSegments = [];
 
+        function secondsToTimeString(seconds) {
+            if (isNaN(seconds) || seconds < 0) return "00:00.00";
+            const mins = Math.floor(seconds / 60);
+            const secs = Math.floor(seconds % 60);
+            const ms = Math.round((seconds % 1) * 100);
+            return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}.${ms.toString().padStart(2, '0')}`;
+        }
+        
+        function timeStringToSeconds(timeStr) {
+            if (!timeStr) return 0;
+            const parts = timeStr.trim().split(':');
+            if (parts.length === 2) {
+                const mins = parseFloat(parts[0]) || 0;
+                const secs = parseFloat(parts[1]) || 0;
+                return mins * 60 + secs;
+            } else if (parts.length === 3) {
+                const hrs = parseFloat(parts[0]) || 0;
+                const mins = parseFloat(parts[1]) || 0;
+                const secs = parseFloat(parts[2]) || 0;
+                return hrs * 3600 + mins * 60 + secs;
+            } else {
+                return parseFloat(timeStr) || 0;
+            }
+        }
+
         function updatePreview(text) {
             const previewText = document.getElementById('previewSubtitleText');
             const previewMock = document.getElementById('previewVideoMock');
@@ -1415,14 +1442,13 @@
                 const startLabel = document.createElement('span');
                 startLabel.style.fontSize = "0.68rem";
                 startLabel.style.color = "var(--text-muted)";
-                startLabel.innerText = "Início (s)";
+                startLabel.innerText = "Início (Min:Seg)";
                 startLabel.style.display = "block";
                 
                 const startInput = document.createElement('input');
-                startInput.type = "number";
-                startInput.step = "0.01";
-                startInput.min = "0";
-                startInput.value = seg.start.toFixed(2);
+                startInput.type = "text";
+                startInput.value = secondsToTimeString(seg.start);
+                startInput.placeholder = "00:00.00";
                 startInput.style.width = "100%";
                 startInput.style.border = "1px solid var(--glass-border)";
                 startInput.style.padding = "0.3rem 0.5rem";
@@ -1431,8 +1457,15 @@
                 startInput.style.borderRadius = "6px";
                 startInput.style.outline = "none";
                 startInput.style.fontSize = "0.8rem";
+                
                 startInput.addEventListener('input', () => {
-                    seg.start = parseFloat(startInput.value) || 0;
+                    seg.start = timeStringToSeconds(startInput.value);
+                    updatePreview();
+                });
+                startInput.addEventListener('change', () => {
+                    const secs = timeStringToSeconds(startInput.value);
+                    seg.start = secs;
+                    startInput.value = secondsToTimeString(secs);
                     updatePreview();
                 });
                 
@@ -1444,14 +1477,13 @@
                 const endLabel = document.createElement('span');
                 endLabel.style.fontSize = "0.68rem";
                 endLabel.style.color = "var(--text-muted)";
-                endLabel.innerText = "Fim (s)";
+                endLabel.innerText = "Fim (Min:Seg)";
                 endLabel.style.display = "block";
                 
                 const endInput = document.createElement('input');
-                endInput.type = "number";
-                endInput.step = "0.01";
-                endInput.min = "0";
-                endInput.value = seg.end.toFixed(2);
+                endInput.type = "text";
+                endInput.value = secondsToTimeString(seg.end);
+                endInput.placeholder = "00:00.00";
                 endInput.style.width = "100%";
                 endInput.style.border = "1px solid var(--glass-border)";
                 endInput.style.padding = "0.3rem 0.5rem";
@@ -1460,8 +1492,15 @@
                 endInput.style.borderRadius = "6px";
                 endInput.style.outline = "none";
                 endInput.style.fontSize = "0.8rem";
+                
                 endInput.addEventListener('input', () => {
-                    seg.end = parseFloat(endInput.value) || 0;
+                    seg.end = timeStringToSeconds(endInput.value);
+                    updatePreview();
+                });
+                endInput.addEventListener('change', () => {
+                    const secs = timeStringToSeconds(endInput.value);
+                    seg.end = secs;
+                    endInput.value = secondsToTimeString(secs);
                     updatePreview();
                 });
                 
@@ -1702,31 +1741,46 @@
                 if (res.ok) {
                     const data = await res.json();
                     const audioInput = document.getElementById('audioFile');
+                    const bgInput = document.getElementById('bgFile');
                     
                     if (data.has_cache) {
                         hasServerCache = true;
                         audioInput.removeAttribute('required');
                         
-                        audioText.innerText = "Música atual no servidor:";
-                        audioBadge.innerText = data.audio_filename + " (No Servidor)";
-                        audioBadge.style.display = "inline-flex";
+                        // Atualizar áudio apenas se não houver arquivo local selecionado
+                        if (audioInput.files.length === 0) {
+                            audioText.innerText = "Música atual no servidor:";
+                            audioBadge.innerText = data.audio_filename + " (No Servidor)";
+                            audioBadge.style.display = "inline-flex";
+                        }
                         
-                        if (data.bg_filename) {
-                            bgTextName.innerText = "Fundo atual no servidor:";
-                            bgBadge.innerText = data.bg_filename + " (No Servidor)";
-                            bgBadge.style.display = "inline-flex";
+                        // Atualizar background apenas se não houver arquivo local selecionado
+                        if (bgInput.files.length === 0) {
+                            if (data.bg_filename) {
+                                bgTextName.innerText = "Fundo atual no servidor:";
+                                bgBadge.innerText = data.bg_filename + " (No Servidor)";
+                                bgBadge.style.display = "inline-flex";
+                            } else {
+                                bgTextName.innerText = "Padrão: Fundo Preto Sólido";
+                                bgBadge.innerText = "";
+                                bgBadge.style.display = "none";
+                            }
                         }
                     } else {
                         hasServerCache = false;
                         audioInput.setAttribute('required', 'true');
                         
-                        audioText.innerText = "Arraste a música ou clique";
-                        audioBadge.innerText = "";
-                        audioBadge.style.display = "none";
+                        if (audioInput.files.length === 0) {
+                            audioText.innerText = "Arraste a música ou clique";
+                            audioBadge.innerText = "";
+                            audioBadge.style.display = "none";
+                        }
                         
-                        bgTextName.innerText = "Padrão: Fundo Preto Sólido";
-                        bgBadge.innerText = "";
-                        bgBadge.style.display = "none";
+                        if (bgInput.files.length === 0) {
+                            bgTextName.innerText = "Padrão: Fundo Preto Sólido";
+                            bgBadge.innerText = "";
+                            bgBadge.style.display = "none";
+                        }
                     }
                 }
             } catch (e) {

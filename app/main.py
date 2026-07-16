@@ -890,12 +890,36 @@ def process_karaoke(
                 detail="Os arquivos de cache correspondentes não foram encontrados no servidor. Por favor, faça o upload da música."
             )
             
-        input_bg_path = None
-        if cached_meta.get("has_bg"):
-            bg_ext = cached_meta.get("bg_ext")
+        if bg_file and bg_file.filename:
+            # Remover background antigo
+            if cached_meta.get("has_bg"):
+                old_ext = cached_meta.get("bg_ext", "")
+                old_bg_path = os.path.join(cache_dir, f"original_bg{old_ext}")
+                if os.path.exists(old_bg_path):
+                    try:
+                        os.remove(old_bg_path)
+                    except Exception:
+                        pass
+            
+            bg_ext = os.path.splitext(bg_file.filename)[1]
             input_bg_path = os.path.join(cache_dir, f"original_bg{bg_ext}")
-            if not os.path.exists(input_bg_path):
-                input_bg_path = None
+            logger.info(f"Salvando nova imagem de fundo para o cache existente em: {input_bg_path}")
+            with open(input_bg_path, "wb") as f:
+                shutil.copyfileobj(bg_file.file, f)
+            
+            cached_meta["has_bg"] = True
+            cached_meta["bg_ext"] = bg_ext
+            cached_meta["bg_filename"] = bg_file.filename
+            with open(cache_meta_file, "w", encoding="utf-8") as f:
+                import json
+                json.dump(cached_meta, f, indent=4)
+        else:
+            input_bg_path = None
+            if cached_meta.get("has_bg"):
+                bg_ext = cached_meta.get("bg_ext")
+                input_bg_path = os.path.join(cache_dir, f"original_bg{bg_ext}")
+                if not os.path.exists(input_bg_path):
+                    input_bg_path = None
     else:
         orig_name = os.path.splitext(audio_file.filename)[0]
         audio_ext = os.path.splitext(audio_file.filename)[1]
