@@ -681,22 +681,53 @@
 
         <!-- Painel de Correção / Edição de Legenda (Pausa Intermediária) -->
         <div id="correctionCard" style="display: none; background: rgba(30, 27, 57, 0.85); border: 1px solid var(--glass-border); padding: 1.5rem; border-radius: 14px; margin-top: 1.5rem; box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37); backdrop-filter: blur(8px);">
-            <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
+            <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.8rem;">
                 <span style="font-size: 1.3rem;">✍️</span>
-                <h3 style="margin: 0; font-size: 1.1rem; font-weight: 700; color: var(--text-main);">Revisão & Correção da Legenda</h3>
+                <h3 style="margin: 0; font-size: 1.1rem; font-weight: 700; color: var(--text-main);">Revisão & Edição Avançada da Legenda</h3>
             </div>
-            <p style="color: var(--text-muted); font-size: 0.82rem; margin: 0 0 1rem 0; line-height: 1.4;">
-                A IA transcreveu a música. Por favor, revise as estrofes abaixo, corrija eventuais erros ortográficos e clique em "Salvar e Continuar" para renderizar o vídeo final.
-            </p>
-            <div id="correctionList" style="max-height: 380px; overflow-y: auto; display: flex; flex-direction: column; gap: 0.75rem; margin-bottom: 1.2rem; padding-right: 0.5rem; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05); padding: 0.8rem; background: rgba(0,0,0,0.25);">
-                <!-- Linhas geradas dinamicamente via JS -->
+            
+            <!-- Grid de Duas Colunas: Live Preview e Lista de Estrofes -->
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.5rem; margin-bottom: 1.5rem;">
+                
+                <!-- Coluna A: Mockup Live Preview -->
+                <div style="display: flex; flex-direction: column; gap: 0.8rem;">
+                    <span style="font-size: 0.82rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">👁️ Pré-visualização ao Vivo</span>
+                    
+                    <!-- Container Mockup 16:9 -->
+                    <div id="previewVideoMock" style="position: relative; width: 100%; aspect-ratio: 16/9; background: #000; border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; padding: 1.5rem; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.5);">
+                        <!-- Linha de Pré-visualização de Legenda -->
+                        <div id="previewSubtitleText" style="text-align: center; line-height: 1.2; text-shadow: 2px 2px 0px #000, -2px -2px 0px #000, 2px -2px 0px #000, -2px 2px 0px #000; font-weight: 700; width: 95%; overflow: hidden; text-overflow: ellipsis; white-space: normal; word-wrap: break-word;">
+                            Selecione ou edite uma linha...
+                        </div>
+                    </div>
+                    
+                    <div style="font-size: 0.72rem; color: var(--text-muted); line-height: 1.4; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.04); padding: 0.8rem; border-radius: 8px;">
+                        💡 O preview acima atualiza em tempo real conforme você edita o texto, o tamanho da fonte, a cor do destaque ou a posição do texto nas Configurações Avançadas.
+                    </div>
+                </div>
+                
+                <!-- Coluna B: Lista de Estrofes e Ações -->
+                <div style="display: flex; flex-direction: column;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                        <span style="font-size: 0.82rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">🎼 Estrofes & Cronometragem</span>
+                        <button type="button" id="btnAddSegment" class="btn-secondary" style="font-size: 0.75rem; padding: 0.3rem 0.6rem; border-color: rgba(255,255,255,0.15); background: rgba(255,255,255,0.03); cursor: pointer; border-radius: 6px; outline: none;">
+                            ➕ Adicionar Linha
+                        </button>
+                    </div>
+                    
+                    <div id="correctionList" style="max-height: 280px; overflow-y: auto; display: flex; flex-direction: column; gap: 0.75rem; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05); padding: 0.8rem; background: rgba(0,0,0,0.25);">
+                        <!-- Blocos de estrofes gerados via JS -->
+                    </div>
+                </div>
             </div>
-            <div style="display: flex; gap: 0.8rem;">
-                <button type="button" class="btn-cancel-task btn-secondary" style="flex: 1; background: rgba(239, 68, 68, 0.1); border-color: rgba(239, 68, 68, 0.2); color: #fca5a5; font-size: 0.9rem; font-weight: 600; padding: 0.75rem 1rem; border-radius: 10px; cursor: pointer; outline: none;">
-                    🛑 Cancelar
+
+            <!-- Botões Inferiores do Painel de Correção -->
+            <div style="display: flex; gap: 0.8rem; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 1.2rem;">
+                <button type="button" class="btn-cancel-task btn-secondary" style="flex: 1; background: rgba(239, 68, 68, 0.08); border: 1px solid rgba(239, 68, 68, 0.25); color: #fca5a5; font-size: 0.9rem; font-weight: 600; padding: 0.65rem 1rem; border-radius: 8px; cursor: pointer; outline: none; transition: all 0.2s;">
+                    🛑 Cancelar Produção
                 </button>
-                <button type="button" id="btnContinueProcess" class="btn-success" style="flex: 2; font-weight: 600; padding: 0.75rem 1rem; font-size: 0.95rem; cursor: pointer; border-radius: 10px; outline: none;">
-                    💾 Salvar e Continuar
+                <button type="button" id="btnContinueProcess" class="btn-success" style="flex: 1; font-weight: 600; padding: 0.65rem 1rem; font-size: 0.9rem; cursor: pointer; border-radius: 8px; outline: none; border: 1px solid rgba(16, 185, 129, 0.3); transition: all 0.2s;">
+                    💾 Salvar e Renderizar
                 </button>
             </div>
         </div>
@@ -715,16 +746,16 @@
         </div>
 
         <!-- Popup / Modal de Confirmação para Revisar Legendas -->
-        <div id="correctionConfirmModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 9999; align-items: center; justify-content: center; backdrop-filter: blur(5px);">
-            <div style="background: rgba(30, 27, 57, 0.95); border: 1px solid var(--glass-border); padding: 1.8rem; border-radius: 16px; max-width: 420px; width: 90%; text-align: center; box-shadow: 0 10px 40px rgba(0,0,0,0.5);">
+        <div id="correctionConfirmModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.65); z-index: 9999; align-items: center; justify-content: center; backdrop-filter: blur(4px);">
+            <div style="background: rgba(30, 27, 57, 0.98); border: 1px solid var(--glass-border); padding: 2rem; border-radius: 16px; max-width: 420px; width: 90%; text-align: center; box-shadow: 0 12px 48px rgba(0,0,0,0.65);">
                 <span style="font-size: 2.2rem; display: block; margin-bottom: 0.8rem;">✍️</span>
-                <h3 style="color: var(--text-main); margin-bottom: 0.6rem; font-size: 1.25rem;">Revisão de Legenda</h3>
-                <p style="color: var(--text-muted); font-size: 0.85rem; line-height: 1.5; margin-bottom: 1.5rem;">
-                    Você gostaria de pausar o processamento para revisar e corrigir a letra da legenda antes da renderização final do vídeo?
+                <h3 style="color: var(--text-main); margin-bottom: 0.6rem; font-size: 1.25rem; font-weight: 700;">Revisão de Legenda</h3>
+                <p style="color: var(--text-muted); font-size: 0.85rem; line-height: 1.5; margin-bottom: 1.8rem;">
+                    Gostaria de pausar o processamento para revisar, editar tempos e ajustar as estrofes antes de renderizar o vídeo final?
                 </p>
                 <div style="display: flex; gap: 0.8rem; justify-content: center;">
-                    <button type="button" id="btnConfirmNo" class="btn-secondary" style="flex: 1; padding: 0.65rem; border-color: rgba(255,255,255,0.1); cursor: pointer; border-radius: 8px;">Não, gerar direto</button>
-                    <button type="button" id="btnConfirmYes" class="btn-primary" style="flex: 1; padding: 0.65rem; cursor: pointer; border-radius: 8px;">Sim, quero revisar</button>
+                    <button type="button" id="btnConfirmNo" class="btn-secondary" style="flex: 1; padding: 0.65rem 1rem; border: 1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.02); cursor: pointer; border-radius: 8px; color: var(--text-main); font-weight: 500; font-size: 0.85rem;">Não, gerar direto</button>
+                    <button type="button" id="btnConfirmYes" class="btn-primary" style="flex: 1; padding: 0.65rem 1rem; cursor: pointer; border-radius: 8px; font-weight: 600; font-size: 0.85rem;">Sim, quero revisar</button>
                 </div>
             </div>
         </div>
@@ -880,7 +911,9 @@
             updateStepActive("Uploading");
             
             const formData = new FormData();
-            formData.append('audio_file', audioFile.files[0]);
+            if (audioFile.files.length) {
+                formData.append('audio_file', audioFile.files[0]);
+            }
             if (bgFile.files.length) {
                 formData.append('bg_file', bgFile.files[0]);
             }
@@ -1267,10 +1300,12 @@
                     if (data.result_file) {
                         downloadBox.style.display = "block";
                     }
+                    checkCache();
                 } else {
                     btnSubmit.disabled = false;
                     processCard.style.display = "none";
                     document.getElementById('correctionCard').style.display = "none";
+                    checkCache();
                 }
             } catch (e) {
                 console.error("Erro ao verificar status concorrente:", e);
@@ -1278,6 +1313,36 @@
         }
         
         let isShowingCorrection = false;
+        let currentSegments = [];
+
+        function updatePreview(text) {
+            const previewText = document.getElementById('previewSubtitleText');
+            const previewMock = document.getElementById('previewVideoMock');
+            if (!previewText || !previewMock) return;
+            
+            if (text !== undefined) {
+                previewText.innerText = text;
+            }
+            
+            const fontSize = parseInt(document.getElementById('fontSize').value) || 32;
+            const textColor = document.getElementById('textColor').value;
+            const textPosition = document.getElementById('textPosition').value;
+            
+            previewText.style.fontSize = `${fontSize * 0.45}px`;
+            previewText.style.color = textColor;
+            
+            if (textPosition === "top") {
+                previewMock.style.justifyContent = "flex-start";
+            } else if (textPosition === "middle") {
+                previewMock.style.justifyContent = "center";
+            } else {
+                previewMock.style.justifyContent = "flex-end";
+            }
+        }
+
+        document.getElementById('fontSize').addEventListener('input', () => updatePreview());
+        document.getElementById('textColor').addEventListener('input', () => updatePreview());
+        document.getElementById('textPosition').addEventListener('change', () => updatePreview());
 
         async function loadCorrectionPanel() {
             if (isShowingCorrection) return;
@@ -1287,39 +1352,8 @@
                 const res = await fetch('/api/segments_to_edit');
                 if (!res.ok) throw new Error("Falha ao obter legendas para correção.");
                 
-                const segments = await res.json();
-                const container = document.getElementById('correctionList');
-                container.innerHTML = "";
-                
-                segments.forEach((seg, idx) => {
-                    const row = document.createElement('div');
-                    row.style.display = "flex";
-                    row.style.flexDirection = "column";
-                    row.style.gap = "0.25rem";
-                    row.style.marginBottom = "0.5rem";
-                    
-                    const timeLabel = document.createElement('span');
-                    timeLabel.style.fontSize = "0.75rem";
-                    timeLabel.style.color = "var(--text-muted)";
-                    timeLabel.innerText = `Frase ${idx + 1} [${formatTimeLabel(seg.start)} -> ${formatTimeLabel(seg.end)}]`;
-                    
-                    const input = document.createElement('input');
-                    input.type = "text";
-                    input.className = "segment-edit-input";
-                    input.value = seg.text;
-                    input.style.width = "100%";
-                    input.style.border = "1px solid var(--glass-border)";
-                    input.style.padding = "0.5rem 0.8rem";
-                    input.style.background = "#141226";
-                    input.style.color = "var(--text-main)";
-                    input.style.borderRadius = "8px";
-                    input.style.outline = "none";
-                    
-                    row.appendChild(timeLabel);
-                    row.appendChild(input);
-                    container.appendChild(row);
-                });
-                
+                currentSegments = await res.json();
+                renderSegments();
                 document.getElementById('correctionCard').style.display = "block";
             } catch (err) {
                 console.error(err);
@@ -1327,30 +1361,185 @@
                 isShowingCorrection = false;
             }
         }
-        
-        function formatTimeLabel(seconds) {
-            const mins = Math.floor(seconds / 60);
-            const secs = Math.floor(seconds % 60);
-            const ms = Math.floor((seconds % 1) * 100);
-            return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}.${ms.toString().padStart(2, '0')}`;
-        }
 
-        document.getElementById('btnContinueProcess').addEventListener('click', async () => {
-            const inputs = document.querySelectorAll('.segment-edit-input');
-            const texts = [];
-            inputs.forEach(input => {
-                texts.push(input.value);
+        function renderSegments() {
+            const container = document.getElementById('correctionList');
+            container.innerHTML = "";
+            
+            currentSegments.forEach((seg, idx) => {
+                const card = document.createElement('div');
+                card.style.display = "flex";
+                card.style.flexDirection = "column";
+                card.style.gap = "0.4rem";
+                card.style.background = "rgba(255,255,255,0.02)";
+                card.style.border = "1px solid rgba(255,255,255,0.06)";
+                card.style.padding = "0.75rem";
+                card.style.borderRadius = "8px";
+                card.style.position = "relative";
+                
+                const headerRow = document.createElement('div');
+                headerRow.style.display = "flex";
+                headerRow.style.justifyContent = "space-between";
+                headerRow.style.alignItems = "center";
+                
+                const title = document.createElement('span');
+                title.style.fontSize = "0.75rem";
+                title.style.fontWeight = "600";
+                title.style.color = "var(--primary)";
+                title.innerText = `ESTROFE ${idx + 1}`;
+                
+                const btnDelete = document.createElement('button');
+                btnDelete.type = "button";
+                btnDelete.innerHTML = "🗑️";
+                btnDelete.style.background = "none";
+                btnDelete.style.border = "none";
+                btnDelete.style.cursor = "pointer";
+                btnDelete.style.fontSize = "0.85rem";
+                btnDelete.title = "Excluir Linha";
+                btnDelete.addEventListener('click', () => {
+                    currentSegments.splice(idx, 1);
+                    renderSegments();
+                    updatePreview();
+                });
+                
+                headerRow.appendChild(title);
+                headerRow.appendChild(btnDelete);
+                card.appendChild(headerRow);
+                
+                const timeRow = document.createElement('div');
+                timeRow.style.display = "flex";
+                timeRow.style.gap = "0.5rem";
+                
+                const startGroup = document.createElement('div');
+                startGroup.style.flex = "1";
+                const startLabel = document.createElement('span');
+                startLabel.style.fontSize = "0.68rem";
+                startLabel.style.color = "var(--text-muted)";
+                startLabel.innerText = "Início (s)";
+                startLabel.style.display = "block";
+                
+                const startInput = document.createElement('input');
+                startInput.type = "number";
+                startInput.step = "0.01";
+                startInput.min = "0";
+                startInput.value = seg.start.toFixed(2);
+                startInput.style.width = "100%";
+                startInput.style.border = "1px solid var(--glass-border)";
+                startInput.style.padding = "0.3rem 0.5rem";
+                startInput.style.background = "#141226";
+                startInput.style.color = "var(--text-main)";
+                startInput.style.borderRadius = "6px";
+                startInput.style.outline = "none";
+                startInput.style.fontSize = "0.8rem";
+                startInput.addEventListener('input', () => {
+                    seg.start = parseFloat(startInput.value) || 0;
+                    updatePreview();
+                });
+                
+                startGroup.appendChild(startLabel);
+                startGroup.appendChild(startInput);
+                
+                const endGroup = document.createElement('div');
+                endGroup.style.flex = "1";
+                const endLabel = document.createElement('span');
+                endLabel.style.fontSize = "0.68rem";
+                endLabel.style.color = "var(--text-muted)";
+                endLabel.innerText = "Fim (s)";
+                endLabel.style.display = "block";
+                
+                const endInput = document.createElement('input');
+                endInput.type = "number";
+                endInput.step = "0.01";
+                endInput.min = "0";
+                endInput.value = seg.end.toFixed(2);
+                endInput.style.width = "100%";
+                endInput.style.border = "1px solid var(--glass-border)";
+                endInput.style.padding = "0.3rem 0.5rem";
+                endInput.style.background = "#141226";
+                endInput.style.color = "var(--text-main)";
+                endInput.style.borderRadius = "6px";
+                endInput.style.outline = "none";
+                endInput.style.fontSize = "0.8rem";
+                endInput.addEventListener('input', () => {
+                    seg.end = parseFloat(endInput.value) || 0;
+                    updatePreview();
+                });
+                
+                endGroup.appendChild(endLabel);
+                endGroup.appendChild(endInput);
+                
+                timeRow.appendChild(startGroup);
+                timeRow.appendChild(endGroup);
+                card.appendChild(timeRow);
+                
+                const textInput = document.createElement('input');
+                textInput.type = "text";
+                textInput.value = seg.text;
+                textInput.placeholder = "Texto da legenda...";
+                textInput.style.width = "100%";
+                textInput.style.border = "1px solid var(--glass-border)";
+                textInput.style.padding = "0.4rem 0.6rem";
+                textInput.style.background = "#141226";
+                textInput.style.color = "var(--text-main)";
+                textInput.style.borderRadius = "6px";
+                textInput.style.outline = "none";
+                textInput.style.fontSize = "0.85rem";
+                
+                textInput.addEventListener('input', () => {
+                    seg.text = textInput.value;
+                    updatePreview(seg.text);
+                });
+                textInput.addEventListener('focus', () => {
+                    updatePreview(seg.text);
+                });
+                
+                card.appendChild(textInput);
+                container.appendChild(card);
             });
             
+            if (currentSegments.length > 0) {
+                updatePreview(currentSegments[0].text);
+            } else {
+                updatePreview("Nenhuma linha de legenda disponível.");
+            }
+        }
+
+        document.getElementById('btnAddSegment').addEventListener('click', () => {
+            let lastEnd = 0.0;
+            if (currentSegments.length > 0) {
+                lastEnd = currentSegments[currentSegments.length - 1].end;
+            }
+            
+            currentSegments.push({
+                start: lastEnd + 1.0,
+                end: lastEnd + 4.0,
+                text: "Nova estrofe",
+                words: []
+            });
+            
+            renderSegments();
+            
+            const container = document.getElementById('correctionList');
+            container.scrollTop = container.scrollHeight;
+            
+            const cards = container.querySelectorAll('div');
+            if (cards.length > 0) {
+                const lastCard = cards[cards.length - 1];
+                const input = lastCard.querySelector('input[type="text"]');
+                if (input) input.focus();
+            }
+        });
+
+        document.getElementById('btnContinueProcess').addEventListener('click', async () => {
             const btn = document.getElementById('btnContinueProcess');
             btn.disabled = true;
-            btn.innerText = "💾 Enviando correções...";
+            btn.innerText = "💾 Salvando & Renderizando...";
             
             try {
                 const res = await fetch('/api/continue_process', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ texts: texts })
+                    body: JSON.stringify({ segments: currentSegments })
                 });
                 
                 if (!res.ok) {
@@ -1358,24 +1547,19 @@
                     throw new Error(err.detail || "Erro ao prosseguir.");
                 }
                 
-                // Ocultar card de correção
                 document.getElementById('correctionCard').style.display = "none";
                 isShowingCorrection = false;
                 
-                // Re-habilitar botão
                 btn.disabled = false;
-                btn.innerText = "💾 Salvar e Continuar Renderização";
+                btn.innerText = "💾 Salvar e Renderizar";
                 
-                // Exibir painel de progresso novamente
                 processCard.style.display = "block";
-                
-                // Reiniciar o Polling rápido de status
                 startPolling();
                 
             } catch (err) {
                 alert("Erro ao continuar: " + err.message);
                 btn.disabled = false;
-                btn.innerText = "💾 Salvar e Continuar Renderização";
+                btn.innerText = "💾 Salvar e Renderizar";
             }
         });
         
@@ -1510,6 +1694,46 @@
             }
         }
         
+        let hasServerCache = false;
+        
+        async function checkCache() {
+            try {
+                const res = await fetch('/api/cache_info');
+                if (res.ok) {
+                    const data = await res.json();
+                    const audioInput = document.getElementById('audioFile');
+                    
+                    if (data.has_cache) {
+                        hasServerCache = true;
+                        audioInput.removeAttribute('required');
+                        
+                        audioText.innerText = "Música atual no servidor:";
+                        audioBadge.innerText = data.audio_filename + " (No Servidor)";
+                        audioBadge.style.display = "inline-flex";
+                        
+                        if (data.bg_filename) {
+                            bgTextName.innerText = "Fundo atual no servidor:";
+                            bgBadge.innerText = data.bg_filename + " (No Servidor)";
+                            bgBadge.style.display = "inline-flex";
+                        }
+                    } else {
+                        hasServerCache = false;
+                        audioInput.setAttribute('required', 'true');
+                        
+                        audioText.innerText = "Arraste a música ou clique";
+                        audioBadge.innerText = "";
+                        audioBadge.style.display = "none";
+                        
+                        bgTextName.innerText = "Padrão: Fundo Preto Sólido";
+                        bgBadge.innerText = "";
+                        bgBadge.style.display = "none";
+                    }
+                }
+            } catch (e) {
+                console.error("Erro ao carregar cache do servidor:", e);
+            }
+        }
+        
         // Inicializações ao abrir a página
         window.addEventListener('DOMContentLoaded', async () => {
             await fetchTelegramConfig();
@@ -1529,6 +1753,7 @@
                 console.error("Erro ao carregar último perfil:", e);
             }
             
+            await checkCache();
             await fetchModelsStatus();
             await checkCurrentStatus();
             

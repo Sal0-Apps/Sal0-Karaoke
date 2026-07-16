@@ -673,8 +673,46 @@ def save_last_profile(data: dict):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erro ao salvar último perfil: {e}")
 
+class EditWordModel(BaseModel):
+    word: str
+    start: float
+    end: float
+
+class EditSegmentModel(BaseModel):
+    start: float
+    end: float
+    text: str
+    words: list[EditWordModel] = None
+
 class ContinueProcessModel(BaseModel):
-    texts: list[str]
+    segments: list[EditSegmentModel]
+
+@app.get("/api/cache_info")
+def get_cache_info():
+    cache_dir = "/data/cache"
+    cache_meta_file = os.path.join(cache_dir, "cache_meta.json")
+    if os.path.exists(cache_meta_file):
+        try:
+            with open(cache_meta_file, "r", encoding="utf-8") as f:
+                import json
+                meta = json.load(f)
+            input_ext = meta.get("input_ext", "")
+            has_audio = os.path.exists(os.path.join(cache_dir, f"original_input{input_ext}"))
+            
+            bg_filename = None
+            if meta.get("has_bg"):
+                bg_ext = meta.get("bg_ext", "")
+                if os.path.exists(os.path.join(cache_dir, f"original_bg{bg_ext}")):
+                    bg_filename = meta.get("bg_filename")
+            
+            return {
+                "has_cache": has_audio,
+                "audio_filename": meta.get("audio_filename", "Áudio Atual"),
+                "bg_filename": bg_filename
+            }
+        except Exception:
+            pass
+    return {"has_cache": False, "audio_filename": None, "bg_filename": None}
 
 @app.get("/api/segments_to_edit")
 def get_segments_to_edit():
@@ -687,16 +725,54 @@ def continue_process(data: ContinueProcessModel):
     if not segments_to_edit:
         raise HTTPException(status_code=400, detail="Nenhum processamento aguardando correção.")
         
-    if len(data.texts) != len(segments_to_edit):
-        raise HTTPException(status_code=400, detail="A quantidade de linhas enviadas não corresponde aos segmentos originais.")
+    updated_segments = []
+    for s in data.segments:
+        seg_text = s.text.strip()
+        words_list = seg_text.split()
         
-    # Atualizar os segmentos com o texto corrigido
-    updated = []
-    for idx, text in enumerate(data.texts):
-        orig_seg = segments_to_edit[idx]
-        updated.append(update_segment_words(orig_seg, text))
+        orig_words = []
+        if s.words:
+            orig_words = [{"word": w.word, "start": w.start, "end": w.end} for w in s.words]
+            
+        if len(orig_words) == len(words_list):
+            orig_dur = s.words[-1].end - s.words[0].start if len(s.words) > 0 else 0
+            new_dur = s.end - s.start
+            if orig_dur > 0 and new_dur > 0:
+                scale = new_dur / orig_dur
+                t0 = s.words[0].start
+                for w in orig_words:
+                    w["start"] = s.start + (w["start"] - t0) * scale
+                    w["end"] = s.start + (w["end"] - t0) * scale
+            for idx, word_txt in enumerate(words_list):
+                orig_w = orig_words[idx]["word"]
+                leading_spaces = len(orig_w) - len(orig_w.lstrip(' '))
+                trailing_spaces = len(orig_w.lstrip(' ')) - len(orig_w.strip(' '))
+                orig_words[idx]["word"] = " " * leading_spaces + word_txt + " " * trailing_spaces
+            words = orig_words
+        else:
+            total_dur = s.end - s.start
+            if total_dur <= 0:
+                total_dur = 1.0
+            word_dur = total_dur / len(words_list)
+            words = []
+            for idx, word_txt in enumerate(words_list):
+                w_start = s.start + idx * word_dur
+                w_end = w_start + word_dur
+                word_val = word_txt + " " if idx < len(words_list) - 1 else word_txt
+                words.append({
+                    "word": word_val,
+                    "start": w_start,
+                    "end": w_end
+                })
+                
+        updated_segments.append({
+            "start": s.start,
+            "end": s.end,
+            "text": seg_text,
+            "words": words
+        })
         
-    segments_to_edit = updated
+    segments_to_edit = updated_segments
     correction_event.set()
     return {"status": "success"}
 
@@ -755,7 +831,7 @@ def get_status():
 @app.post("/api/process")
 def process_karaoke(
     background_tasks: BackgroundTasks,
-    audio_file: UploadFile = File(...),
+    audio_file: UploadFile = File(None),
     bg_file: UploadFile = File(None),
     whisper_model: str = Form("medium"),
     font_size: int = Form(32),
@@ -783,31 +859,91 @@ def process_karaoke(
             detail="O servidor está ocupado processando outro vídeo. Por favor, aguarde alguns minutos."
         )
 
-    # 2. Resetar e preparar o estado para processamento
-    orig_name = os.path.splitext(audio_file.filename)[0]
-    update_state("processing", "Uploading", 5, original_filename=orig_name)
-    
-    # Criar uma pasta segura para uploads temporários no diretório /tmp do SO
-    upload_dir = os.path.join(tempfile.gettempdir(), "karaoke_uploads")
-    os.makedirs(upload_dir, exist_ok=True)
-    
-    # Salvar arquivo de áudio/vídeo enviado
-    audio_ext = os.path.splitext(audio_file.filename)[1]
-    input_audio_path = os.path.join(upload_dir, f"{uuid.uuid4()}{audio_ext}")
-    
-    logger.info(f"Salvando arquivo de áudio carregado em: {input_audio_path}")
-    with open(input_audio_path, "wb") as f:
-        shutil.copyfileobj(audio_file.file, f)
+    cache_dir = "/data/cache"
+    os.makedirs(cache_dir, exist_ok=True)
+    cache_meta_file = os.path.join(cache_dir, "cache_meta.json")
+
+    # 2. Determinar se usaremos arquivos enviados ou o cache
+    if not audio_file:
+        cached_meta = {}
+        if os.path.exists(cache_meta_file):
+            try:
+                with open(cache_meta_file, "r", encoding="utf-8") as f:
+                    import json
+                    cached_meta = json.load(f)
+            except Exception:
+                pass
         
-    # Salvar imagem de fundo se foi enviada
-    input_bg_path = None
-    if bg_file and bg_file.filename:
-        bg_ext = os.path.splitext(bg_file.filename)[1]
-        input_bg_path = os.path.join(upload_dir, f"{uuid.uuid4()}{bg_ext}")
-        logger.info(f"Salvando imagem de fundo carregada em: {input_bg_path}")
-        with open(input_bg_path, "wb") as f:
-            shutil.copyfileobj(bg_file.file, f)
+        orig_name = cached_meta.get("original_filename")
+        input_ext = cached_meta.get("input_ext")
+        
+        if not orig_name or not input_ext:
+            raise HTTPException(
+                status_code=400,
+                detail="Nenhum arquivo enviado e nenhum cache disponível no servidor. Por favor, envie uma música."
+            )
             
+        input_audio_path = os.path.join(cache_dir, f"original_input{input_ext}")
+        if not os.path.exists(input_audio_path):
+            raise HTTPException(
+                status_code=400,
+                detail="Os arquivos de cache correspondentes não foram encontrados no servidor. Por favor, faça o upload da música."
+            )
+            
+        input_bg_path = None
+        if cached_meta.get("has_bg"):
+            bg_ext = cached_meta.get("bg_ext")
+            input_bg_path = os.path.join(cache_dir, f"original_bg{bg_ext}")
+            if not os.path.exists(input_bg_path):
+                input_bg_path = None
+    else:
+        orig_name = os.path.splitext(audio_file.filename)[0]
+        audio_ext = os.path.splitext(audio_file.filename)[1]
+        
+        logger.info("Novo upload recebido. Limpando cache anterior...")
+        for f_name in os.listdir(cache_dir):
+            f_path = os.path.join(cache_dir, f_name)
+            try:
+                if os.path.isfile(f_path):
+                    os.remove(f_path)
+                elif os.path.isdir(f_path):
+                    shutil.rmtree(f_path)
+            except Exception as e:
+                logger.error(f"Erro ao limpar arquivo do cache {f_name}: {e}")
+
+        input_audio_path = os.path.join(cache_dir, f"original_input{audio_ext}")
+        logger.info(f"Salvando novo arquivo de áudio carregado em: {input_audio_path}")
+        with open(input_audio_path, "wb") as f:
+            shutil.copyfileobj(audio_file.file, f)
+            
+        input_bg_path = None
+        has_bg = False
+        bg_ext = None
+        bg_filename = None
+        
+        if bg_file and bg_file.filename:
+            bg_ext = os.path.splitext(bg_file.filename)[1]
+            bg_filename = bg_file.filename
+            input_bg_path = os.path.join(cache_dir, f"original_bg{bg_ext}")
+            logger.info(f"Salvando imagem de fundo carregada em: {input_bg_path}")
+            with open(input_bg_path, "wb") as f:
+                shutil.copyfileobj(bg_file.file, f)
+            has_bg = True
+            
+        cached_meta = {
+            "original_filename": orig_name,
+            "audio_filename": audio_file.filename,
+            "input_ext": audio_ext,
+            "has_bg": has_bg,
+            "bg_ext": bg_ext,
+            "bg_filename": bg_filename
+        }
+        with open(cache_meta_file, "w", encoding="utf-8") as f:
+            import json
+            json.dump(cached_meta, f, indent=4)
+
+    update_state("processing", "Uploading", 5, original_filename=orig_name)
+        
     # 3. Adicionar tarefa na fila de execução de segundo plano síncrona
     background_tasks.add_task(
         run_pipeline, 
@@ -829,8 +965,6 @@ def process_karaoke(
         enable_correction,
         keep_first_line_visible
     )
-    
-    return {"status": "processing"}
     
     return {"status": "processing"}
 
@@ -1094,15 +1228,9 @@ def run_pipeline(
             # Salvar opcionalmente a legenda ASS final gerada junto com o MP4
             shutil.copy(ass_path, final_ass_path)
             
-            # Passo 6: Limpar arquivos de upload de entrada
+            # Passo 6: Limpar arquivos temporários (não removemos os uploads do cache)
             update_state("processing", "Cleaning temporary files", 98)
-            try:
-                if os.path.exists(input_audio_path):
-                    os.remove(input_audio_path)
-                if input_bg_path and os.path.exists(input_bg_path):
-                    os.remove(input_bg_path)
-            except Exception as ex:
-                logger.warning(f"Falha ao deletar arquivos originais carregados: {ex}")
+            logger.info("Preservando arquivos de entrada no cache para futuros reprocessamentos.")
 
             # Processamento local CONCLUÍDO na UI!
             update_state("done", "Done", 100, result_file=final_mp4_path)
@@ -1132,14 +1260,8 @@ def run_pipeline(
                 f"❌ <b>Sal0 karaoke</b>: Falha ao processar <b>{orig_name}</b>. Erro: {e}"
             )
         
-        # Limpar arquivos de upload em caso de erro
-        try:
-            if os.path.exists(input_audio_path):
-                os.remove(input_audio_path)
-            if input_bg_path and os.path.exists(input_bg_path):
-                os.remove(input_bg_path)
-        except Exception as ex:
-            logger.error(f"Erro ao limpar arquivos de upload após erro: {ex}")
+        # Preservamos os arquivos de entrada no cache mesmo após erro
+        logger.info("Preservando arquivos de entrada no cache após erro para permitir repetições.")
             
     finally:
         # Liberar o processador de forma segura caso ainda esteja bloqueado
