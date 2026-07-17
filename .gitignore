@@ -27,3 +27,6 @@ app/karaoke_uploads/
 *.png
 *.jpg
 *.jpeg
+
+# Permitir o favicon oficial
+!app/templates/favicon.png
