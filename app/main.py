@@ -82,16 +82,19 @@ def download_youtube(url: str, cache_dir: str) -> tuple[str, str]:
     """Baixa o melhor vídeo/áudio do YouTube usando yt-dlp e retorna o caminho do arquivo e o título."""
     import yt_dlp
     ydl_opts = {
-        'format': 'bestvideo[height<=1080]+bestaudio/best',
+        'format': 'bestvideo[ext=mp4][height<=1080]+bestaudio[ext=m4a]/best[ext=mp4][height<=1080]/bestvideo[height<=1080]+bestaudio/best[height<=1080]/best',
         'outtmpl': os.path.join(cache_dir, 'original_input.%(ext)s'),
+        'merge_output_format': 'mp4',
+        'remux_video': 'mp4',
         'quiet': True,
         'no_warnings': True,
     }
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(url, download=True)
-        ext = info.get('ext', 'mp4')
         title = info.get('title', 'YouTube Video')
-        file_path = os.path.join(cache_dir, f'original_input.{ext}')
+        
+        # O arquivo final será .mp4 devido ao merge e remux
+        file_path = os.path.join(cache_dir, 'original_input.mp4')
         if not os.path.exists(file_path):
             for f in os.listdir(cache_dir):
                 if f.startswith("original_input."):

@@ -33,6 +33,13 @@
             -webkit-font-smoothing: antialiased;
         }
 
+        html, body {
+            overflow-x: hidden;
+            max-width: 100%;
+            margin: 0;
+            padding: 0;
+        }
+
         body {
             background: var(--bg-gradient);
             color: var(--text-main);
@@ -41,7 +48,6 @@
             align-items: center;
             justify-content: center;
             padding: 2rem 1rem;
-            overflow-x: hidden;
         }
 
         /* Container Principal */
@@ -471,6 +477,15 @@
             }
             header p {
                 font-size: 0.75rem !important;
+            }
+            .tab-btn {
+                font-size: 0.76rem !important;
+                padding: 0.6rem 0.3rem !important;
+                gap: 0.25rem !important;
+            }
+            .tabs-nav {
+                max-width: 100% !important;
+                flex-basis: 100% !important;
             }
         }
     </style>
