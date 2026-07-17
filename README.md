@@ -37,11 +37,11 @@ services:
 O aplicativo segue um esquema de versionamento estruturado. Você pode escolher a tag da imagem no seu `docker-compose.yml` de acordo com a sua preferência:
 
 * `latest`: Atualizações contínuas contendo as últimas correções e novidades desenvolvidas. (Recomendado para uso do desenvolvedor principal).
-* `1.0`: Versão estável inicial contendo o sistema de cache avançado, edição milimétrica de legendas em formato `Minutos:Segundos`, auto-seleção inteligente de fundo, failsafe de tela preta e novo controle de acesso local com contas de usuário.
+* `1.1`: Versão estável inicial contendo o sistema de cache avançado, edição milimétrica de legendas em formato `Minutos:Segundos`, auto-seleção inteligente de fundo, failsafe de tela preta e novo controle de acesso local com contas de usuário.
 * `1.5` (Próxima): Versão planejada com otimizações adicionais de renderização e novos efeitos visuais de legenda.
 
 Para travar em uma versão estável específica, basta alterar a linha `image` do compose, por exemplo:
-`image: ghcr.io/sal0-apps/sal0-karaoke:1.0`
+`image: ghcr.io/sal0-apps/sal0-karaoke:1.1`
 
 ---
 

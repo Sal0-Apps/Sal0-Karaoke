@@ -7,3 +7,11 @@ services:
     volumes:
       - ./data:/data
     restart: unless-stopped
+
+x-casaos:
+  author: "Sal0"
+  category: "Media"
+  icon: "https://raw.githubusercontent.com/Sal0-Apps/Sal0-Karaoke/main/app/templates/favicon.png"
+  title: "Sal0 Karaoke"
+  port_map: "7885"
+  overview: "Gerador Automático de Vídeos de Karaoke locais via IA com separação de áudio e sincronização automática."

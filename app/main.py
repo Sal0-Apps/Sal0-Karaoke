@@ -33,6 +33,60 @@ app = FastAPI(title="Karaoke Maker", description="Pipeline local para geração 
 # Diretório para templates
 templates = Jinja2Templates(directory="templates")
 
+# --- SISTEMA DE AUTENTICAÇÃO LOCAL ---
+USERS_FILE = "/data/users.json"
+SESSIONS_FILE = "/data/sessions.json"
+
+def load_users():
+    if not os.path.exists(USERS_FILE):
+        return {}
+    try:
+        with open(USERS_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+def save_users(users):
+    try:
+        os.makedirs(os.path.dirname(USERS_FILE), exist_ok=True)
+        with open(USERS_FILE, "w", encoding="utf-8") as f:
+            json.dump(users, f, indent=4)
+    except Exception as e:
+        logger.error(f"Erro ao salvar usuários: {e}")
+
+def load_sessions():
+    if not os.path.exists(SESSIONS_FILE):
+        return {}
+    try:
+        with open(SESSIONS_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+def save_sessions(sessions):
+    try:
+        os.makedirs(os.path.dirname(SESSIONS_FILE), exist_ok=True)
+        with open(SESSIONS_FILE, "w", encoding="utf-8") as f:
+            json.dump(sessions, f, indent=4)
+    except Exception as e:
+        logger.error(f"Erro ao salvar sessões: {e}")
+
+def get_current_user(x_session_token: str = Header(None)):
+    users = load_users()
+    if not users:
+        # Modo Setup: Sem usuários criados ainda
+        return {"username": "setup_mode", "role": "setup"}
+    
+    if not x_session_token:
+        raise HTTPException(status_code=401, detail="Sessão não fornecida.")
+        
+    sessions = load_sessions()
+    session = sessions.get(x_session_token)
+    if not session:
+        raise HTTPException(status_code=401, detail="Sessão inválida ou expirada.")
+        
+    return session
+
 # Locks para controle thread-safe e prevenção de processamentos concorrentes
 state_lock = threading.Lock()
 processing_lock = threading.Lock()
@@ -675,59 +729,7 @@ def save_last_profile(data: dict):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erro ao salvar último perfil: {e}")
 
-# --- SISTEMA DE AUTENTICAÇÃO LOCAL ---
-USERS_FILE = "/data/users.json"
-SESSIONS_FILE = "/data/sessions.json"
 
-def load_users():
-    if not os.path.exists(USERS_FILE):
-        return {}
-    try:
-        with open(USERS_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except Exception:
-        return {}
-
-def save_users(users):
-    try:
-        os.makedirs(os.path.dirname(USERS_FILE), exist_ok=True)
-        with open(USERS_FILE, "w", encoding="utf-8") as f:
-            json.dump(users, f, indent=4)
-    except Exception as e:
-        logger.error(f"Erro ao salvar usuários: {e}")
-
-def load_sessions():
-    if not os.path.exists(SESSIONS_FILE):
-        return {}
-    try:
-        with open(SESSIONS_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except Exception:
-        return {}
-
-def save_sessions(sessions):
-    try:
-        os.makedirs(os.path.dirname(SESSIONS_FILE), exist_ok=True)
-        with open(SESSIONS_FILE, "w", encoding="utf-8") as f:
-            json.dump(sessions, f, indent=4)
-    except Exception as e:
-        logger.error(f"Erro ao salvar sessões: {e}")
-
-def get_current_user(x_session_token: str = Header(None)):
-    users = load_users()
-    if not users:
-        # Modo Setup: Sem usuários criados ainda
-        return {"username": "setup_mode", "role": "setup"}
-    
-    if not x_session_token:
-        raise HTTPException(status_code=401, detail="Sessão não fornecida.")
-        
-    sessions = load_sessions()
-    session = sessions.get(x_session_token)
-    if not session:
-        raise HTTPException(status_code=401, detail="Sessão inválida ou expirada.")
-        
-    return session
 
 @app.get("/favicon.png")
 def get_favicon():
