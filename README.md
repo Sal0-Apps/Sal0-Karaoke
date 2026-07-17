@@ -15,7 +15,7 @@ Você pode executar o aplicativo de forma 100% automatizada e sem precisar compi
 ```yaml
 services:
   karaoke-app:
-    image: ghcr.io/victors4l0/karaoke-app:latest
+    image: ghcr.io/sal0-apps/sal0-karaoke:latest
     container_name: karaoke-app
     ports:
       - "7885:7860"
@@ -41,7 +41,7 @@ O aplicativo segue um esquema de versionamento estruturado. Você pode escolher 
 * `1.5` (Próxima): Versão planejada com otimizações adicionais de renderização e novos efeitos visuais de legenda.
 
 Para travar em uma versão estável específica, basta alterar a linha `image` do compose, por exemplo:
-`image: ghcr.io/victors4l0/karaoke-app:1.0`
+`image: ghcr.io/sal0-apps/sal0-karaoke:1.0`
 
 ---
 
