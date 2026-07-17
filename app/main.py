@@ -733,7 +733,7 @@ def save_last_profile(data: dict):
 
 @app.get("/favicon.png")
 def get_favicon():
-    fav_path = "/app/templates/favicon.png"
+    fav_path = os.path.join(os.path.dirname(__file__), "templates", "favicon.png")
     if os.path.exists(fav_path):
         return FileResponse(fav_path)
     return HTMLResponse(status_code=404)
