@@ -501,6 +501,9 @@ def save_telegram_config(config: TelegramModel):
 class ModelDownloadRequest(BaseModel):
     model_size: str
 
+class YouTubePresetModel(BaseModel):
+    youtube_url: str
+
 model_download_status = {
     "base": {"status": "idle", "progress": 0, "error": None},
     "small": {"status": "idle", "progress": 0, "error": None},
@@ -600,6 +603,76 @@ def start_model_download(req: ModelDownloadRequest, current_user: dict = Depends
     ).start()
     
     return {"message": f"Download do modelo {model_size} iniciado."}
+
+def run_youtube_download_bg(url: str):
+    cache_dir = "/data/cache"
+    os.makedirs(cache_dir, exist_ok=True)
+    cache_meta_file = os.path.join(cache_dir, "cache_meta.json")
+    
+    # Carregar configuração global do Telegram do arquivo json
+    tele_config = load_telegram_config()
+    telegram_token = tele_config.get("telegram_token", "")
+    telegram_chat_id = tele_config.get("telegram_chat_id", "")
+    
+    try:
+        update_state("processing", "Downloading YouTube", 5, original_filename="Baixando do YouTube...")
+        
+        send_telegram_notification(
+            telegram_token,
+            telegram_chat_id,
+            f"🌐 <b>Sal0 Karaokê</b>: Iniciando download do YouTube de <b>{url}</b>..."
+        )
+        
+        input_audio_path, title = download_youtube(url, cache_dir)
+        ext = os.path.splitext(input_audio_path)[1]
+        
+        cached_meta = {
+            "youtube_url": url,
+            "original_filename": title,
+            "audio_filename": title + ext,
+            "input_ext": ext,
+            "has_bg": False,
+            "bg_ext": None,
+            "bg_filename": None,
+            "lyrics_text": ""
+        }
+        with open(cache_meta_file, "w", encoding="utf-8") as f:
+            json.dump(cached_meta, f, indent=4)
+            
+        send_telegram_notification(
+            telegram_token,
+            telegram_chat_id,
+            f"📥 <b>Sal0 Karaokê</b>: Download concluído! <b>{title}</b>"
+        )
+        
+        update_state("idle", "Idle", 0, original_filename=title)
+        
+    except Exception as e:
+        logger.error(f"Erro no download do YouTube em background: {e}")
+        update_state("error", "Error", 0, error_message=f"Falha ao baixar vídeo do YouTube: {e}")
+        send_telegram_notification(
+            telegram_token,
+            telegram_chat_id,
+            f"❌ <b>Sal0 Karaokê</b>: Falha ao baixar vídeo do YouTube. Erro: {e}"
+        )
+
+@app.post("/api/download-youtube-preset")
+def download_youtube_preset(
+    data: YouTubePresetModel,
+    current_user: dict = Depends(get_current_user)
+):
+    if processing_lock.locked():
+        raise HTTPException(
+            status_code=429,
+            detail="O servidor está ocupado processando outro vídeo. Por favor, aguarde alguns minutos."
+        )
+        
+    url = data.youtube_url.strip()
+    if not url:
+        raise HTTPException(status_code=400, detail="URL do YouTube vazia.")
+        
+    threading.Thread(target=run_youtube_download_bg, args=(url,), daemon=True).start()
+    return {"status": "started"}
 
 # Gerenciamento de Perfis de Uso Persistentes em JSON
 PROFILES_FILE = "/data/output/profiles.json"
@@ -1248,21 +1321,24 @@ def process_karaoke(
 
     # 2. Determinar se usaremos arquivos enviados, biblioteca, YouTube ou cache
     if youtube_url and youtube_url.strip():
-        # Limpar cache de processamento anterior
-        logger.info("Novo processamento do YouTube solicitado. Limpando o cache anterior...")
-        for f_name in os.listdir(cache_dir):
-            f_path = os.path.join(cache_dir, f_name)
-            try:
-                if os.path.isfile(f_path):
-                    os.remove(f_path)
-                elif os.path.isdir(f_path):
-                    shutil.rmtree(f_path)
-            except Exception as e:
-                logger.error(f"Erro ao limpar arquivo do cache {f_name}: {e}")
-
+        # Verificar se já baixamos essa exata URL no cache
+        already_downloaded = False
         orig_name = "Baixando do YouTube..."
         input_audio_path = os.path.join(cache_dir, "original_input.mp4")
-        
+        if os.path.exists(cache_meta_file):
+            try:
+                with open(cache_meta_file, "r", encoding="utf-8") as f:
+                    meta = json.load(f)
+                    if meta.get("youtube_url") == youtube_url.strip():
+                        ext = meta.get("input_ext", ".mp4")
+                        orig_file = os.path.join(cache_dir, f"original_input{ext}")
+                        if os.path.exists(orig_file):
+                            already_downloaded = True
+                            orig_name = meta.get("original_filename", "YouTube Video")
+                            input_audio_path = orig_file
+            except Exception:
+                pass
+                
         input_bg_path = None
         has_bg = False
         bg_ext = None
@@ -1283,18 +1359,47 @@ def process_karaoke(
             input_bg_path = os.path.join(cache_dir, f"original_bg{bg_ext}")
             shutil.copy2(os.path.join(LIBRARY_DIR, "photos", library_bg), input_bg_path)
             has_bg = True
+            
+        if not already_downloaded:
+            # Limpar cache de processamento anterior
+            logger.info("Novo processamento do YouTube solicitado. Limpando o cache anterior...")
+            for f_name in os.listdir(cache_dir):
+                if f_name.startswith("original_bg"):
+                    continue
+                f_path = os.path.join(cache_dir, f_name)
+                try:
+                    if os.path.isfile(f_path):
+                        os.remove(f_path)
+                    elif os.path.isdir(f_path):
+                        shutil.rmtree(f_path)
+                except Exception as e:
+                    logger.error(f"Erro ao limpar arquivo do cache {f_name}: {e}")
 
-        cached_meta = {
-            "original_filename": orig_name,
-            "audio_filename": "YouTube Download",
-            "input_ext": ".mp4",
-            "has_bg": has_bg,
-            "bg_ext": bg_ext,
-            "bg_filename": bg_filename,
-            "lyrics_text": lyrics_text or ""
-        }
-        with open(cache_meta_file, "w", encoding="utf-8") as f:
-            json.dump(cached_meta, f, indent=4)
+            cached_meta = {
+                "youtube_url": youtube_url.strip(),
+                "original_filename": orig_name,
+                "audio_filename": "YouTube Download",
+                "input_ext": ".mp4",
+                "has_bg": has_bg,
+                "bg_ext": bg_ext,
+                "bg_filename": bg_filename,
+                "lyrics_text": lyrics_text or ""
+            }
+            with open(cache_meta_file, "w", encoding="utf-8") as f:
+                json.dump(cached_meta, f, indent=4)
+        else:
+            # Manter metadados mas atualizar background e letra
+            try:
+                with open(cache_meta_file, "r", encoding="utf-8") as f:
+                    cached_meta = json.load(f)
+                cached_meta["has_bg"] = has_bg
+                cached_meta["bg_ext"] = bg_ext
+                cached_meta["bg_filename"] = bg_filename
+                cached_meta["lyrics_text"] = lyrics_text or ""
+                with open(cache_meta_file, "w", encoding="utf-8") as f:
+                    json.dump(cached_meta, f, indent=4)
+            except Exception:
+                pass
 
     elif library_audio:
         lib_audio_path = os.path.join(LIBRARY_DIR, "videos", library_audio)
@@ -1602,37 +1707,56 @@ def run_pipeline(
             except Exception:
                 pass
 
-        # Se for link do YouTube, realiza o download agora em background
+        # Se for link do YouTube, realiza o download agora em background (se já não estiver no cache)
         if youtube_url and youtube_url.strip():
-            pm.check_cancelled()
-            update_state("processing", "Downloading YouTube", 5)
-            send_telegram_notification(
-                telegram_token, 
-                telegram_chat_id, 
-                f"🌐 <b>Sal0 Karaokê</b>: Iniciando download do YouTube..."
-            )
-            
-            try:
-                input_audio_path, title = download_youtube(youtube_url, cache_dir)
-                orig_name = title
-                update_state("processing", "Extracting audio", 15, original_filename=orig_name)
-                
-                ext = os.path.splitext(input_audio_path)[1]
-                cached_meta["original_filename"] = orig_name
-                cached_meta["audio_filename"] = orig_name + ext
-                cached_meta["input_ext"] = ext
-                with open(cache_meta_file, "w", encoding="utf-8") as f:
-                    import json
-                    json.dump(cached_meta, f, indent=4)
-                    
+            already_downloaded = False
+            if os.path.exists(cache_meta_file):
+                try:
+                    with open(cache_meta_file, "r", encoding="utf-8") as f:
+                        meta = json.load(f)
+                        if meta.get("youtube_url") == youtube_url.strip():
+                            ext = meta.get("input_ext", ".mp4")
+                            orig_file = os.path.join(cache_dir, f"original_input{ext}")
+                            if os.path.exists(orig_file):
+                                already_downloaded = True
+                                input_audio_path = orig_file
+                                orig_name = meta.get("original_filename", "YouTube Video")
+                except Exception:
+                    pass
+
+            if not already_downloaded:
+                pm.check_cancelled()
+                update_state("processing", "Downloading YouTube", 5)
                 send_telegram_notification(
                     telegram_token, 
                     telegram_chat_id, 
-                    f"📥 <b>Sal0 Karaokê</b>: Download concluído! <b>{orig_name}</b>"
+                    f"🌐 <b>Sal0 Karaokê</b>: Iniciando download do YouTube..."
                 )
-            except Exception as e:
-                logger.error(f"Erro ao baixar do YouTube: {e}")
-                raise RuntimeError(f"Falha ao baixar vídeo do YouTube: {e}")
+                
+                try:
+                    input_audio_path, title = download_youtube(youtube_url, cache_dir)
+                    orig_name = title
+                    update_state("processing", "Extracting audio", 15, original_filename=orig_name)
+                    
+                    ext = os.path.splitext(input_audio_path)[1]
+                    cached_meta["youtube_url"] = youtube_url
+                    cached_meta["original_filename"] = orig_name
+                    cached_meta["audio_filename"] = orig_name + ext
+                    cached_meta["input_ext"] = ext
+                    with open(cache_meta_file, "w", encoding="utf-8") as f:
+                        import json
+                        json.dump(cached_meta, f, indent=4)
+                        
+                    send_telegram_notification(
+                        telegram_token, 
+                        telegram_chat_id, 
+                        f"📥 <b>Sal0 Karaokê</b>: Download concluído! <b>{orig_name}</b>"
+                    )
+                except Exception as e:
+                    logger.error(f"Erro ao baixar do YouTube: {e}")
+                    raise RuntimeError(f"Falha ao baixar vídeo do YouTube: {e}")
+            else:
+                logger.info("Reaproveitando download do YouTube do cache.")
                 
         # Verificar se a música sendo processada agora é DIFERENTE da do cache
         # Se for diferente, apagamos todo o conteúdo do cache para começar do zero!

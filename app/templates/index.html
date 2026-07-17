@@ -521,6 +521,8 @@
 
             <!-- ÁREA DE MÍDIA (Música e Imagem de Fundo Lado a Lado) -->
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.2rem; margin-top: 0.5rem;">
+                
+                <!-- Coluna 1: Música ou Vídeo Original -->
                 <div class="form-group" style="margin: 0; display: flex; flex-direction: column;">
                     <span class="label">🎵 Música ou Vídeo Original</span>
                     <div style="display: flex; gap: 0.3rem; margin-top: 0.3rem; margin-bottom: 0.4rem;">
@@ -530,23 +532,32 @@
                     </div>
                     
                     <div id="audioUploadContainer">
-                        <div class="upload-area" id="audioUploadArea" style="height: 140px; display: flex; flex-direction: column; justify-content: center; align-items: center; border: 2px dashed rgba(255,255,255,0.15); border-radius: 14px; background: rgba(0,0,0,0.1); cursor: pointer; transition: all 0.2s;">
-                            <span class="upload-icon" style="font-size: 1.8rem; margin-bottom: 0.4rem;">🎵</span>
-                            <p class="upload-text" id="audioText" style="font-size: 0.85rem; margin: 0 0 0.2rem 0; font-weight: 500;">Arraste a música ou clique</p>
-                            <p class="upload-hint" style="font-size: 0.7rem; color: var(--text-muted); margin: 0;">mp3, wav, flac, m4a, mp4, avi...</p>
+                        <div class="upload-area" id="audioUploadArea" style="height: 105px; display: flex; flex-direction: column; justify-content: center; align-items: center; border: 2px dashed rgba(255,255,255,0.15); border-radius: 14px; background: rgba(0,0,0,0.1); cursor: pointer; transition: all 0.2s;">
+                            <span class="upload-icon" style="font-size: 1.5rem; margin-bottom: 0.2rem;">🎵</span>
+                            <p class="upload-text" id="audioText" style="font-size: 0.8rem; margin: 0 0 0.1rem 0; font-weight: 500;">Arraste a música ou clique</p>
+                            <p class="upload-hint" style="font-size: 0.65rem; color: var(--text-muted); margin: 0;">mp3, wav, flac, m4a, mp4...</p>
                             <input type="file" id="audioFile" name="audio_file" class="file-input" accept=".mp3,.wav,.flac,.m4a,.mp4,.mkv,.avi" required style="display: none;">
-                            <div class="file-selected-badge" id="audioBadge" style="display: none; background: #8b5cf6; color: white; padding: 0.25rem 0.6rem; border-radius: 20px; font-size: 0.75rem; font-weight: 500; margin-top: 0.4rem; max-width: 90%; text-overflow: ellipsis; overflow: hidden; white-space: nowrap;">Nenhum arquivo selecionado</div>
+                            <div class="file-selected-badge" id="audioBadge" style="display: none; background: #8b5cf6; color: white; padding: 0.2rem 0.5rem; border-radius: 20px; font-size: 0.7rem; font-weight: 500; margin-top: 0.3rem; max-width: 90%; text-overflow: ellipsis; overflow: hidden; white-space: nowrap;">Nenhum arquivo selecionado</div>
                         </div>
                     </div>
                     
                     <div id="audioYoutubeContainer" style="display: none;">
-                        <input type="text" id="youtubeUrl" name="youtube_url" placeholder="Cole a URL do YouTube (ex: https://youtube.com/watch?v=...)" style="width: 100%; border: 1px solid var(--glass-border); padding: 0.75rem 0.9rem; background: rgba(0,0,0,0.15); color: var(--text-main); border-radius: 12px; font-size: 0.85rem; outline: none; box-shadow: inset 0 2px 4px rgba(0,0,0,0.25);">
+                        <div style="display: flex; flex-direction: column; gap: 0.4rem;">
+                            <input type="text" id="youtubeUrl" name="youtube_url" placeholder="Cole a URL do YouTube (ex: https://...)" style="width: 100%; border: 1px solid var(--glass-border); padding: 0.6rem 0.8rem; background: rgba(0,0,0,0.15); color: var(--text-main); border-radius: 10px; font-size: 0.8rem; outline: none; box-shadow: inset 0 2px 4px rgba(0,0,0,0.25);">
+                            <button type="button" id="btnDownloadYoutube" class="btn-primary" style="font-size: 0.78rem; padding: 0.5rem; font-weight: 700; width: 100%; display: flex; align-items: center; justify-content: center; gap: 0.35rem; border: none; cursor: pointer;">
+                                <span>📥</span> Baixar do YouTube
+                            </button>
+                        </div>
                     </div>
                     
                     <div id="audioLibraryContainer" style="display: none;">
-                        <select id="libraryAudioSelect" name="library_audio" class="btn-secondary" style="width: 100%; border: 1px solid var(--glass-border); padding: 0.75rem 0.9rem; background: #141226; color: var(--text-main); border-radius: 12px; font-size: 0.85rem; cursor: pointer; outline: none;">
+                        <select id="libraryAudioSelect" name="library_audio" class="btn-secondary" style="width: 100%; border: 1px solid var(--glass-border); padding: 0.6rem 0.8rem; background: #141226; color: var(--text-main); border-radius: 10px; font-size: 0.8rem; cursor: pointer; outline: none;">
                             <option value="">Selecione uma música da biblioteca...</option>
-                                   <!-- Bloco 2: Upload da imagem/vídeo de fundo opcional -->
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Coluna 2: Imagem ou Vídeo de Fundo (Opcional) -->
                 <div class="form-group" style="margin: 0; display: flex; flex-direction: column;">
                     <span class="label">🖼️ Imagem ou Vídeo de Fundo (Opcional)</span>
                     <div style="display: flex; gap: 0.3rem; margin-top: 0.3rem; margin-bottom: 0.4rem;">
@@ -555,25 +566,25 @@
                     </div>
                     
                     <div id="bgUploadContainer">
-                        <div class="upload-area" id="bgUploadArea" style="height: 140px; display: flex; flex-direction: column; justify-content: center; align-items: center; border: 2px dashed rgba(255,255,255,0.15); border-radius: 14px; background: rgba(0,0,0,0.1); cursor: pointer; transition: all 0.2s;">
-                            <span class="upload-icon" style="font-size: 1.8rem; margin-bottom: 0.4rem;">🖼️</span>
-                            <p class="upload-text" id="bgTextName" style="font-size: 0.85rem; margin: 0 0 0.2rem 0; font-weight: 500;">Padrão: Fundo Preto Sólido</p>
-                            <p class="upload-hint" style="font-size: 0.7rem; color: var(--text-muted); margin: 0;">Clique para escolher imagem ou vídeo</p>
+                        <div class="upload-area" id="bgUploadArea" style="height: 105px; display: flex; flex-direction: column; justify-content: center; align-items: center; border: 2px dashed rgba(255,255,255,0.15); border-radius: 14px; background: rgba(0,0,0,0.1); cursor: pointer; transition: all 0.2s;">
+                            <span class="upload-icon" style="font-size: 1.5rem; margin-bottom: 0.2rem;">🖼️</span>
+                            <p class="upload-text" id="bgTextName" style="font-size: 0.8rem; margin: 0 0 0.1rem 0; font-weight: 500;">Arraste o fundo ou clique</p>
+                            <p class="upload-hint" style="font-size: 0.65rem; color: var(--text-muted); margin: 0;">Imagem ou vídeo</p>
                             <input type="file" id="bgFile" name="bg_file" class="file-input" accept="image/*,video/*" style="display: none;">
-                            <div class="file-selected-badge" id="bgBadge" style="display: none; background: #ec4899; color: white; padding: 0.25rem 0.6rem; border-radius: 20px; font-size: 0.75rem; font-weight: 500; margin-top: 0.4rem; max-width: 90%; text-overflow: ellipsis; overflow: hidden; white-space: nowrap;">Nenhum arquivo selecionado</div>
+                            <div class="file-selected-badge" id="bgBadge" style="display: none; background: #ec4899; color: white; padding: 0.2rem 0.5rem; border-radius: 20px; font-size: 0.7rem; font-weight: 500; margin-top: 0.3rem; max-width: 90%; text-overflow: ellipsis; overflow: hidden; white-space: nowrap;">Nenhum arquivo selecionado</div>
                         </div>
                     </div>
                     
                     <div id="bgLibraryContainer" style="display: none;">
-                        <select id="libraryBgSelect" name="library_bg" class="btn-secondary" style="width: 100%; border: 1px solid var(--glass-border); padding: 0.75rem 0.9rem; background: #141226; color: var(--text-main); border-radius: 12px; font-size: 0.85rem; cursor: pointer; outline: none;">
+                        <select id="libraryBgSelect" name="library_bg" class="btn-secondary" style="width: 100%; border: 1px solid var(--glass-border); padding: 0.6rem 0.8rem; background: #141226; color: var(--text-main); border-radius: 10px; font-size: 0.8rem; cursor: pointer; outline: none;">
                             <option value="">Selecione um fundo da biblioteca...</option>
                         </select>
                     </div>
 
-                    <!-- Modo de Exibição do Fundo do Vídeo (Acessível Diretamente) -->
+                    <!-- Modo de Exibição do Fundo do Vídeo -->
                     <div style="margin-top: 0.6rem;">
                         <span class="label" style="font-size: 0.72rem; color: var(--text-muted); margin-bottom: 0.25rem;">Exibição no Vídeo</span>
-                        <select id="backgroundMode" name="background_mode" class="btn-secondary" style="width: 100%; border: 1px solid var(--glass-border); padding: 0.55rem 0.75rem; background: #141226; color: var(--text-main); border-radius: 10px; font-size: 0.82rem; cursor: pointer; outline: none; font-weight: 600;">
+                        <select id="backgroundMode" name="background_mode" class="btn-secondary" style="width: 100%; border: 1px solid var(--glass-border); padding: 0.55rem 0.75rem; background: #141226; color: var(--text-main); border-radius: 10px; font-size: 0.8rem; cursor: pointer; outline: none; font-weight: 600;">
                             <option value="random_landscape" selected>🏞️ Paisagem Aleatória (Padrão)</option>
                             <option value="image">🖼️ Usar Fundo Enviado/Biblioteca</option>
                             <option value="original_video">🎥 Usar Vídeo Original (Música)</option>
@@ -593,7 +604,7 @@
                     <input type="checkbox" id="onlyRemoveVocals" name="only_remove_vocals" style="cursor: pointer; width: 16px; height: 16px;">
                     <label for="onlyRemoveVocals" style="font-size: 0.78rem; color: #f472b6; font-weight: 600; cursor: pointer; user-select: none;">🎤 Apenas remover voz do cantor do vídeo original (pular legendagem/Whisper)</label>
                 </div>
-
+            </div>
 
             <!-- Letra Oficial da Música (Opcional) para orientar o Whisper -->
             <div class="form-group" style="margin-top: 1.2rem;">
@@ -935,21 +946,25 @@
             <div style="background: rgba(30, 27, 57, 0.4); border: 1px solid var(--glass-border); padding: 1.2rem; border-radius: 12px; display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem;">
                 <div>
                     <h4 style="margin: 0 0 0.5rem 0; font-size: 0.9rem; color: var(--text-main); font-weight: 700;">📥 Adicionar Música/Vídeo à Biblioteca</h4>
-                    <form id="libAudioUploadForm" style="display: flex; gap: 0.5rem;">
+                    <form id="libAudioUploadForm" style="display: flex; flex-direction: column; gap: 0.4rem;">
+                        <div class="upload-area" id="libAudioUploadArea" style="height: 80px; display: flex; flex-direction: column; justify-content: center; align-items: center; border: 2px dashed rgba(255,255,255,0.15); border-radius: 10px; background: rgba(0,0,0,0.1); cursor: pointer; transition: all 0.2s;">
+                            <span style="font-size: 1.2rem;">🎵</span>
+                            <span id="libAudioFileName" style="font-size: 0.75rem; color: var(--text-muted); font-weight: 500; text-align: center; max-width: 90%; text-overflow: ellipsis; overflow: hidden; white-space: nowrap;">Arraste a música ou clique</span>
+                        </div>
                         <input type="file" id="libAudioFile" accept=".mp3,.wav,.flac,.m4a,.mp4,.mkv,.avi" style="display: none;">
-                        <button type="button" id="btnLibAudioSelect" class="btn-secondary" style="flex: 1; font-size: 0.8rem; padding: 0.5rem;">📁 Escolher Arquivo</button>
-                        <button type="submit" id="btnLibAudioUpload" class="btn-primary" style="font-size: 0.8rem; padding: 0.5rem; display: none;">⬆️ Enviar</button>
+                        <button type="submit" id="btnLibAudioUpload" class="btn-primary" style="font-size: 0.8rem; padding: 0.5rem; display: none;">⬆️ Enviar Música</button>
                     </form>
-                    <span id="libAudioFileName" style="font-size: 0.72rem; color: var(--text-muted); margin-top: 0.3rem; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Nenhum arquivo selecionado</span>
                 </div>
                 <div>
-                    <h4 style="margin: 0 0 0.5rem 0; font-size: 0.9rem; color: var(--text-main); font-weight: 700;">📥 Adicionar Fundo (Imagem/Vídeo) à Biblioteca</h4>
-                    <form id="libBgUploadForm" style="display: flex; gap: 0.5rem;">
+                    <h4 style="margin: 0 0 0.5rem 0; font-size: 0.9rem; color: var(--text-main); font-weight: 700;">📥 Adicionar Fundo (Imagem/Vídeo)</h4>
+                    <form id="libBgUploadForm" style="display: flex; flex-direction: column; gap: 0.4rem;">
+                        <div class="upload-area" id="libBgUploadArea" style="height: 80px; display: flex; flex-direction: column; justify-content: center; align-items: center; border: 2px dashed rgba(255,255,255,0.15); border-radius: 10px; background: rgba(0,0,0,0.1); cursor: pointer; transition: all 0.2s;">
+                            <span style="font-size: 1.2rem;">🖼️</span>
+                            <span id="libBgFileName" style="font-size: 0.75rem; color: var(--text-muted); font-weight: 500; text-align: center; max-width: 90%; text-overflow: ellipsis; overflow: hidden; white-space: nowrap;">Arraste o fundo ou clique</span>
+                        </div>
                         <input type="file" id="libBgFile" accept="image/*,video/*" style="display: none;">
-                        <button type="button" id="btnLibBgSelect" class="btn-secondary" style="flex: 1; font-size: 0.8rem; padding: 0.5rem;">📁 Escolher Arquivo</button>
-                        <button type="submit" id="btnLibBgUpload" class="btn-primary" style="font-size: 0.8rem; padding: 0.5rem; display: none;">⬆️ Enviar</button>
+                        <button type="submit" id="btnLibBgUpload" class="btn-primary" style="font-size: 0.8rem; padding: 0.5rem; display: none;">⬆️ Enviar Fundo</button>
                     </form>
-                    <span id="libBgFileName" style="font-size: 0.72rem; color: var(--text-muted); margin-top: 0.3rem; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Nenhum arquivo selecionado</span>
                 </div>
             </div>
 
@@ -1578,6 +1593,16 @@
                         clearInterval(pollingInterval);
                         pollingInterval = null;
                         showError(data.error_message || "Ocorreu um erro inesperado durante o processamento.");
+                        btnDownloadYoutube.disabled = false;
+                        btnDownloadYoutube.innerHTML = '<span>📥</span> Baixar do YouTube';
+                    } else if (data.status === "idle") {
+                        clearInterval(pollingInterval);
+                        pollingInterval = null;
+                        processCard.style.display = "none";
+                        btnSubmit.disabled = false;
+                        btnDownloadYoutube.disabled = false;
+                        btnDownloadYoutube.innerHTML = '<span>📥</span> Baixar do YouTube';
+                        checkCache();
                     }
                     
                 } catch (e) {
@@ -1866,6 +1891,13 @@
                 
                 if (data.status === "processing") {
                     btnSubmit.disabled = true;
+                    if (data.step === "Downloading YouTube") {
+                        btnDownloadYoutube.disabled = true;
+                        btnDownloadYoutube.innerHTML = '<span>⏳</span> Baixando...';
+                    } else {
+                        btnDownloadYoutube.disabled = false;
+                        btnDownloadYoutube.innerHTML = '<span>📥</span> Baixar do YouTube';
+                    }
                     processCard.style.display = "block";
                     document.getElementById('correctionCard').style.display = "none";
                     statusMessage.innerText = getStepLabel(data.step);
@@ -1877,10 +1909,14 @@
                     startPolling();
                 } else if (data.status === "waiting_for_user_correction") {
                     btnSubmit.disabled = true;
+                    btnDownloadYoutube.disabled = false;
+                    btnDownloadYoutube.innerHTML = '<span>📥</span> Baixar do YouTube';
                     processCard.style.display = "none";
                     loadCorrectionPanel();
                 } else if (data.status === "done") {
                     btnSubmit.disabled = false;
+                    btnDownloadYoutube.disabled = false;
+                    btnDownloadYoutube.innerHTML = '<span>📥</span> Baixar do YouTube';
                     processCard.style.display = "none";
                     document.getElementById('correctionCard').style.display = "none";
                     if (data.result_file) {
@@ -1889,6 +1925,8 @@
                     checkCache();
                 } else {
                     btnSubmit.disabled = false;
+                    btnDownloadYoutube.disabled = false;
+                    btnDownloadYoutube.innerHTML = '<span>📥</span> Baixar do YouTube';
                     processCard.style.display = "none";
                     document.getElementById('correctionCard').style.display = "none";
                     checkCache();
@@ -2442,6 +2480,7 @@
 
         function getStepLabel(step) {
             switch(step) {
+                case "Downloading YouTube": return "Baixando vídeo do YouTube (esta etapa pode demorar)...";
                 case "Uploading": return "Enviando arquivo...";
                 case "Extracting audio": return "Extraindo faixa de áudio...";
                 case "Separating vocals": return "Separando vocais do instrumental (esta etapa pode demorar alguns minutos)...";
@@ -2462,7 +2501,11 @@
         }
 
         function updateStepActive(activeStep) {
-            const activeId = stepsMap[activeStep];
+            let mappedStep = activeStep;
+            if (activeStep === "Downloading YouTube") {
+                mappedStep = "Uploading";
+            }
+            const activeId = stepsMap[mappedStep];
             let passedActive = false;
             
             Object.keys(stepsMap).forEach(step => {
@@ -2548,6 +2591,48 @@
             document.getElementById('audioFile').removeAttribute('required');
             document.getElementById('youtubeUrl').setAttribute('required', 'true');
             document.getElementById('libraryAudioSelect').removeAttribute('required');
+        });
+
+        const btnDownloadYoutube = document.getElementById('btnDownloadYoutube');
+        btnDownloadYoutube.addEventListener('click', async () => {
+            const youtubeUrlInput = document.getElementById('youtubeUrl');
+            const url = youtubeUrlInput.value.trim();
+            if (!url) {
+                alert("Por favor, cole uma URL válida do YouTube.");
+                return;
+            }
+            
+            errorCard.style.display = "none";
+            downloadBox.style.display = "none";
+            document.getElementById('correctionCard').style.display = "none";
+            
+            btnDownloadYoutube.disabled = true;
+            btnDownloadYoutube.innerHTML = '<span>⏳</span> Baixando...';
+            
+            processCard.style.display = "block";
+            resetTimeline();
+            updateStepActive("Downloading YouTube");
+            statusMessage.innerText = "Iniciando download do YouTube...";
+            
+            try {
+                const res = await authFetch('/api/download-youtube-preset', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ youtube_url: url })
+                });
+                
+                if (!res.ok) {
+                    const errData = await res.json();
+                    throw new Error(errData.detail || "Erro ao iniciar download do YouTube.");
+                }
+                
+                startPolling();
+                
+            } catch (err) {
+                showError(err.message);
+                btnDownloadYoutube.disabled = false;
+                btnDownloadYoutube.innerHTML = '<span>📥</span> Baixar do YouTube';
+            }
         });
 
         btnAudioModeLibrary.addEventListener('click', () => {
@@ -2742,18 +2827,41 @@
 
         // Envio direto de arquivos da aba Biblioteca
         const libAudioFile = document.getElementById('libAudioFile');
-        const btnLibAudioSelect = document.getElementById('btnLibAudioSelect');
+        const libAudioUploadArea = document.getElementById('libAudioUploadArea');
         const btnLibAudioUpload = document.getElementById('btnLibAudioUpload');
         const libAudioFileName = document.getElementById('libAudioFileName');
 
-        btnLibAudioSelect.addEventListener('click', () => libAudioFile.click());
+        libAudioUploadArea.addEventListener('click', () => libAudioFile.click());
         libAudioFile.addEventListener('change', () => {
             if (libAudioFile.files.length) {
                 libAudioFileName.innerText = libAudioFile.files[0].name;
                 btnLibAudioUpload.style.display = 'inline-block';
             } else {
-                libAudioFileName.innerText = "Nenhum arquivo selecionado";
+                libAudioFileName.innerText = "Arraste a música ou clique";
                 btnLibAudioUpload.style.display = 'none';
+            }
+        });
+
+        // Drag events para Biblioteca Audio
+        ['dragenter', 'dragover'].forEach(eventName => {
+            libAudioUploadArea.addEventListener(eventName, (e) => {
+                e.preventDefault();
+                libAudioUploadArea.classList.add('dragover');
+            }, false);
+        });
+        ['dragleave', 'drop'].forEach(eventName => {
+            libAudioUploadArea.addEventListener(eventName, (e) => {
+                e.preventDefault();
+                libAudioUploadArea.classList.remove('dragover');
+            }, false);
+        });
+        libAudioUploadArea.addEventListener('drop', (e) => {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+            if (files.length) {
+                libAudioFile.files = files;
+                libAudioFileName.innerText = files[0].name;
+                btnLibAudioUpload.style.display = 'inline-block';
             }
         });
 
@@ -2777,7 +2885,7 @@
                 
                 alert("Música adicionada à biblioteca com sucesso!");
                 libAudioFile.value = '';
-                libAudioFileName.innerText = "Nenhum arquivo selecionado";
+                libAudioFileName.innerText = "Arraste a música ou clique";
                 btnLibAudioUpload.style.display = 'none';
                 loadLibrary();
                 loadLibraryOptions();
@@ -2785,23 +2893,46 @@
                 alert(err.message);
             } finally {
                 btnLibAudioUpload.disabled = false;
-                btnLibAudioUpload.innerText = "⬆️ Enviar";
+                btnLibAudioUpload.innerText = "⬆️ Enviar Música";
             }
         });
 
         const libBgFile = document.getElementById('libBgFile');
-        const btnLibBgSelect = document.getElementById('btnLibBgSelect');
+        const libBgUploadArea = document.getElementById('libBgUploadArea');
         const btnLibBgUpload = document.getElementById('btnLibBgUpload');
         const libBgFileName = document.getElementById('libBgFileName');
 
-        btnLibBgSelect.addEventListener('click', () => libBgFile.click());
+        libBgUploadArea.addEventListener('click', () => libBgFile.click());
         libBgFile.addEventListener('change', () => {
             if (libBgFile.files.length) {
                 libBgFileName.innerText = libBgFile.files[0].name;
                 btnLibBgUpload.style.display = 'inline-block';
             } else {
-                libBgFileName.innerText = "Nenhum arquivo selecionado";
+                libBgFileName.innerText = "Arraste o fundo ou clique";
                 btnLibBgUpload.style.display = 'none';
+            }
+        });
+
+        // Drag events para Biblioteca Fundo
+        ['dragenter', 'dragover'].forEach(eventName => {
+            libBgUploadArea.addEventListener(eventName, (e) => {
+                e.preventDefault();
+                libBgUploadArea.classList.add('dragover');
+            }, false);
+        });
+        ['dragleave', 'drop'].forEach(eventName => {
+            libBgUploadArea.addEventListener(eventName, (e) => {
+                e.preventDefault();
+                libBgUploadArea.classList.remove('dragover');
+            }, false);
+        });
+        libBgUploadArea.addEventListener('drop', (e) => {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+            if (files.length) {
+                libBgFile.files = files;
+                libBgFileName.innerText = files[0].name;
+                btnLibBgUpload.style.display = 'inline-block';
             }
         });
 
@@ -2825,7 +2956,7 @@
                 
                 alert("Fundo adicionado à biblioteca com sucesso!");
                 libBgFile.value = '';
-                libBgFileName.innerText = "Nenhum arquivo selecionado";
+                libBgFileName.innerText = "Arraste o fundo ou clique";
                 btnLibBgUpload.style.display = 'none';
                 loadLibrary();
                 loadLibraryOptions();
