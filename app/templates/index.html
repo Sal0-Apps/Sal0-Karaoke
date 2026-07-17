@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sal0 karaoke - Gerador Automático de Vídeos</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
     <!-- Google Fonts para tipografia premium -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -393,25 +394,34 @@
 <body>
     <div class="glow-orb"></div>
     <div class="container">
-        <header>
-            <h1>Sal0 karaoke</h1>
-            <p>Separação de áudio e geração de vídeos de karaoke locais via IA</p>
+        <header style="display: flex; align-items: center; justify-content: center; gap: 0.9rem; margin-bottom: 2rem;">
+            <img src="/favicon.png" alt="Microfone" style="width: 48px; height: 48px; border-radius: 50%; box-shadow: 0 0 15px var(--primary-glow); border: 1px solid rgba(255,255,255,0.1);">
+            <div style="text-align: left;">
+                <h1 style="margin: 0; display: flex; align-items: center; gap: 0.5rem; font-size: 1.8rem;">Sal0 karaoke <span style="font-size: 0.75rem; font-weight: 700; padding: 0.15rem 0.5rem; background: rgba(139, 92, 246, 0.2); border: 1px solid rgba(139, 92, 246, 0.4); border-radius: 12px; color: #c084fc; vertical-align: middle;">v1.0</span></h1>
+                <p style="margin: 0; font-size: 0.85rem; color: var(--text-muted);">Separação de áudio e geração de vídeos de karaoke locais via IA</p>
+            </div>
         </header>
 
         <!-- Formulário de Processamento -->
         <form id="karaokeForm">
-            <!-- Cabeçalho do Card com Título, Seletor de Perfil Rápido e Botão de Engrenagem (Ajustes) -->
+            <!-- Cabeçalho do Card com Título, Seletor de Perfil Rápido e Botões de Controle -->
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; position: relative; gap: 0.8rem; flex-wrap: wrap;">
                 <h2 style="margin: 0; font-size: 1.25rem; font-weight: 700; color: var(--text-main); display: flex; align-items: center; gap: 0.4rem;">
                     <span>🎙️</span> Nova Produção
                 </h2>
-                <div style="display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap;">
+                <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
                     <span style="font-size: 0.8rem; color: var(--text-muted); font-weight: 500;">Perfil:</span>
                     <select id="profileSelect" class="btn-secondary" style="border: 1px solid var(--glass-border); padding: 0.4rem 0.8rem; background: #141226; color: var(--text-main); border-radius: 20px; cursor: pointer; outline: none; font-size: 0.8rem; font-weight: 600;">
                         <!-- Preenchido via Javascript -->
                     </select>
                     <button type="button" id="btnToggleAdvanced" style="background: rgba(255, 255, 255, 0.05); border: 1px solid var(--glass-border); padding: 0.4rem 0.8rem; border-radius: 20px; color: #c084fc; font-size: 0.8rem; font-weight: 600; display: flex; align-items: center; gap: 0.35rem; cursor: pointer; transition: all 0.2s ease; outline: none;">
                         <span style="font-size: 0.95rem;">⚙️</span> Ajustes
+                    </button>
+                    <button type="button" id="btnOpenHelp" style="background: rgba(255, 255, 255, 0.05); border: 1px solid var(--glass-border); padding: 0.4rem 0.8rem; border-radius: 20px; color: #60a5fa; font-size: 0.8rem; font-weight: 600; display: flex; align-items: center; gap: 0.35rem; cursor: pointer; transition: all 0.2s ease; outline: none;">
+                        <span style="font-size: 0.95rem;">📖</span> Manual
+                    </button>
+                    <button type="button" id="btnLogout" style="background: rgba(255, 255, 255, 0.05); border: 1px solid var(--glass-border); padding: 0.4rem 0.8rem; border-radius: 20px; color: #fca5a5; font-size: 0.8rem; font-weight: 600; display: flex; align-items: center; gap: 0.35rem; cursor: pointer; transition: all 0.2s ease; outline: none;">
+                        <span style="font-size: 0.95rem;">🚪</span> Sair
                     </button>
                 </div>
             </div>
@@ -617,6 +627,35 @@
                         </div>
                     </div>
                 </div>
+
+                <!-- Gerenciamento de Usuários (Visível apenas para Administradores) -->
+                <div id="userManagementSection" style="display: none; border: 1px solid rgba(255,255,255,0.05); border-radius: 10px; padding: 1rem; background: rgba(0,0,0,0.15); margin-top: 1rem;">
+                    <span class="label" style="display: flex; align-items: center; gap: 0.3rem;">👤 Gerenciamento de Contas Locais</span>
+                    <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.8rem;">
+                        Como administrador, você pode criar e gerenciar perfis de login para outros usuários acessarem este servidor.
+                    </div>
+                    
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 0.8rem; margin-bottom: 1rem; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 1rem;">
+                        <div>
+                            <span style="font-size: 0.7rem; color: var(--text-muted); display: block; margin-bottom: 0.2rem;">Nome do Usuário</span>
+                            <input type="text" id="newUsername" placeholder="Ex: maria" style="width: 100%; border: 1px solid var(--glass-border); padding: 0.4rem 0.6rem; background: #141226; color: var(--text-main); border-radius: 6px; font-size: 0.8rem; outline: none;">
+                        </div>
+                        <div>
+                            <span style="font-size: 0.7rem; color: var(--text-muted); display: block; margin-bottom: 0.2rem;">Senha</span>
+                            <input type="password" id="newPassword" placeholder="Sua senha" style="width: 100%; border: 1px solid var(--glass-border); padding: 0.4rem 0.6rem; background: #141226; color: var(--text-main); border-radius: 6px; font-size: 0.8rem; outline: none;">
+                        </div>
+                        <div style="display: flex; align-items: flex-end;">
+                            <button type="button" class="btn-secondary" id="btnCreateUser" style="width: 100%; background: rgba(139, 92, 246, 0.2); border-color: rgba(139, 92, 246, 0.4); color: #c084fc; font-weight: 500; font-size: 0.8rem; padding: 0.4rem;">➕ Adicionar</button>
+                        </div>
+                    </div>
+
+                    <div>
+                        <span style="font-size: 0.75rem; color: var(--text-muted); display: block; margin-bottom: 0.5rem; font-weight: 600;">Usuários Cadastrados</span>
+                        <div id="usersListContainer" style="display: flex; flex-direction: column; gap: 0.5rem; max-height: 150px; overflow-y: auto;">
+                            <!-- Inserido dinamicamente via JS -->
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <!-- Botão Submit -->
@@ -760,7 +799,331 @@
             </div>
         </div>
 
+        <!-- Modal do Manual / Ajuda -->
+        <div id="helpModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 99999; align-items: center; justify-content: center; backdrop-filter: blur(5px);">
+            <div style="background: rgba(30, 27, 57, 0.98); border: 1px solid var(--glass-border); padding: 2rem; border-radius: 16px; max-width: 600px; width: 90%; max-height: 85vh; display: flex; flex-direction: column; box-shadow: 0 12px 48px rgba(0,0,0,0.65);">
+                <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 0.8rem; margin-bottom: 1rem;">
+                    <h3 style="color: var(--text-main); margin: 0; font-size: 1.3rem; font-weight: 700; display: flex; align-items: center; gap: 0.5rem;">📖 Manual de Instruções</h3>
+                    <button type="button" id="btnCloseHelp" style="background: none; border: none; color: var(--text-muted); font-size: 1.5rem; cursor: pointer; line-height: 1;">&times;</button>
+                </div>
+                
+                <div style="overflow-y: auto; flex: 1; padding-right: 0.5rem; font-size: 0.88rem; line-height: 1.6; color: var(--text-main);">
+                    <h4 style="color: #60a5fa; margin-top: 0.5rem; margin-bottom: 0.3rem;">1. Fluxo de Trabalho do Karaoke</h4>
+                    <p style="margin-bottom: 0.8rem; color: var(--text-muted);">Envie um arquivo de música ou vídeo. Se desejar, faça upload de uma imagem de fundo (opcional) ou cole a letra oficial para guiar o Whisper a transcrever com 100% de precisão gramatical. Ao clicar em "Criar Vídeo", a IA executará a separação de vocais, transcrição e alinhamento de tempos.</p>
+                    
+                    <h4 style="color: #60a5fa; margin-top: 1rem; margin-bottom: 0.3rem;">2. Persistência de Cache e Substituição</h4>
+                    <p style="margin-bottom: 0.8rem; color: var(--text-muted);">Apenas a <b>última música processada</b> fica salva em cache no servidor. Isso permite reprocessar o mesmo áudio com diferentes ajustes visuais instantaneamente, sem precisar reenviar o arquivo. Ao carregar um arquivo novo, o cache anterior é descartado automaticamente.</p>
+                    
+                    <h4 style="color: #60a5fa; margin-top: 1rem; margin-bottom: 0.3rem;">3. Edição de Legendas em Minutos:Segundos</h4>
+                    <p style="margin-bottom: 0.8rem; color: var(--text-muted);">Na tela de correção de legenda, os tempos de início e fim são exibidos no formato <b><code>MM:SS.cc</code></b> (ex: <code>01:30.50</code> para 1 minuto, 30 segundos e 50 centésimos). Você pode alterar a minutagem diretamente; o sistema recalcula e escala os tempos palavra por palavra no vídeo final de forma proporcional.</p>
+
+                    <h4 style="color: #60a5fa; margin-top: 1rem; margin-bottom: 0.3rem;">4. Estáticas no Início (Letra Visível)</h4>
+                    <p style="margin-bottom: 0.8rem; color: var(--text-muted);">Ative "Letra Visível no Início" nas configurações avançadas para que a primeira linha da letra permaneça estática na tela durante a introdução instrumental da música, surgindo bem antes do cantor iniciar a voz.</p>
+                    
+                    <h4 style="color: #60a5fa; margin-top: 1rem; margin-bottom: 0.3rem;">5. Integração com Telegram Bot</h4>
+                    <p style="margin-bottom: 0.8rem; color: var(--text-muted);">Preencha o Token do Bot e ID do Chat para receber o progresso detalhado de renderização e **receber o vídeo MP4 final diretamente** no seu canal ou grupo do Telegram assim que concluído.</p>
+                </div>
+                
+                <button type="button" id="btnHelpDismiss" class="btn-success" style="margin-top: 1.2rem; width: 100%; padding: 0.7rem; border-radius: 8px; font-weight: 600; cursor: pointer; outline: none; border: 1px solid rgba(16, 185, 129, 0.3);">Entendi</button>
+            </div>
+        </div>
+
+        <!-- Overlay de Login / Configuração do Admin (Bloqueio de Tela) -->
+        <div id="authOverlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(10, 8, 20, 0.85); z-index: 999999; align-items: center; justify-content: center; backdrop-filter: blur(12px);">
+            <!-- Card de Login -->
+            <div id="loginCard" style="display: none; background: rgba(30, 27, 57, 0.95); border: 1px solid var(--glass-border); padding: 2.2rem; border-radius: 20px; max-width: 400px; width: 90%; box-shadow: 0 15px 50px rgba(0,0,0,0.65); animation: slideUp 0.3s ease-out;">
+                <div style="text-align: center; margin-bottom: 1.5rem;">
+                    <img src="/favicon.png" alt="Logo" style="width: 56px; height: 56px; border-radius: 50%; box-shadow: 0 0 20px var(--primary-glow); margin-bottom: 0.8rem; border: 1px solid rgba(255,255,255,0.15);">
+                    <h3 style="color: var(--text-main); font-size: 1.4rem; font-weight: 800; margin-bottom: 0.3rem;">Sal0 Karaoke</h3>
+                    <p style="color: var(--text-muted); font-size: 0.85rem;">Faça login para acessar o servidor de karaoke</p>
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 1rem;">
+                    <div>
+                        <label style="font-size: 0.75rem; color: var(--text-muted); display: block; margin-bottom: 0.3rem; font-weight: 600;">Nome de Usuário</label>
+                        <input type="text" id="loginUsername" placeholder="Usuário" style="width: 100%; border: 1px solid var(--glass-border); padding: 0.65rem 0.9rem; background: #141226; color: var(--text-main); border-radius: 10px; font-size: 0.9rem; outline: none;">
+                    </div>
+                    <div>
+                        <label style="font-size: 0.75rem; color: var(--text-muted); display: block; margin-bottom: 0.3rem; font-weight: 600;">Senha</label>
+                        <input type="password" id="loginPassword" placeholder="Sua senha" style="width: 100%; border: 1px solid var(--glass-border); padding: 0.65rem 0.9rem; background: #141226; color: var(--text-main); border-radius: 10px; font-size: 0.9rem; outline: none;">
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 0.5rem; margin-top: 0.2rem;">
+                        <input type="checkbox" id="loginRemember" checked style="cursor: pointer; width: 15px; height: 15px;">
+                        <label for="loginRemember" style="font-size: 0.8rem; color: var(--text-muted); cursor: pointer; user-select: none;">Permanecer conectado neste dispositivo</label>
+                    </div>
+                    <button type="button" id="btnLoginSubmit" class="btn-primary" style="margin-top: 1rem; width: 100%; padding: 0.8rem; border-radius: 10px; font-weight: 700; font-size: 0.95rem; border: none;">Entrar</button>
+                </div>
+            </div>
+
+            <!-- Card de Configuração Inicial do Administrador -->
+            <div id="setupCard" style="display: none; background: rgba(30, 27, 57, 0.95); border: 1px solid var(--glass-border); padding: 2.2rem; border-radius: 20px; max-width: 400px; width: 90%; box-shadow: 0 15px 50px rgba(0,0,0,0.65); animation: slideUp 0.3s ease-out;">
+                <div style="text-align: center; margin-bottom: 1.5rem;">
+                    <span style="font-size: 2.5rem; display: block; margin-bottom: 0.5rem;">👑</span>
+                    <h3 style="color: var(--text-main); font-size: 1.35rem; font-weight: 800; margin-bottom: 0.3rem;">Configuração Inicial</h3>
+                    <p style="color: var(--text-muted); font-size: 0.82rem;">Crie a conta de administrador local para o aplicativo</p>
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 1rem;">
+                    <div>
+                        <label style="font-size: 0.75rem; color: var(--text-muted); display: block; margin-bottom: 0.3rem; font-weight: 600;">Usuário Administrador</label>
+                        <input type="text" id="setupUsername" placeholder="Ex: admin" style="width: 100%; border: 1px solid var(--glass-border); padding: 0.65rem 0.9rem; background: #141226; color: var(--text-main); border-radius: 10px; font-size: 0.9rem; outline: none;">
+                    </div>
+                    <div>
+                        <label style="font-size: 0.75rem; color: var(--text-muted); display: block; margin-bottom: 0.3rem; font-weight: 600;">Senha do Admin</label>
+                        <input type="password" id="setupPassword" placeholder="Sua senha forte" style="width: 100%; border: 1px solid var(--glass-border); padding: 0.65rem 0.9rem; background: #141226; color: var(--text-main); border-radius: 10px; font-size: 0.9rem; outline: none;">
+                    </div>
+                    <div>
+                        <label style="font-size: 0.75rem; color: var(--text-muted); display: block; margin-bottom: 0.3rem; font-weight: 600;">Confirmar Senha</label>
+                        <input type="password" id="setupPasswordConfirm" placeholder="Confirme sua senha" style="width: 100%; border: 1px solid var(--glass-border); padding: 0.65rem 0.9rem; background: #141226; color: var(--text-main); border-radius: 10px; font-size: 0.9rem; outline: none;">
+                    </div>
+                    <button type="button" id="btnSetupSubmit" class="btn-success" style="margin-top: 1rem; width: 100%; padding: 0.8rem; border-radius: 10px; font-weight: 700; font-size: 0.95rem; cursor: pointer; outline: none; border: 1px solid rgba(16, 185, 129, 0.3);">Criar Conta & Fazer Login</button>
+                </div>
+            </div>
+        </div>
+
     <script>
+        // --- SISTEMA DE SESSÃO E AUTENTICAÇÃO ---
+        async function authFetch(url, options = {}) {
+            const token = localStorage.getItem('auth_token');
+            if (!options.headers) {
+                options.headers = {};
+            }
+            if (token) {
+                options.headers['X-Session-Token'] = token;
+            }
+            if (options.body && typeof options.body === 'string' && !options.headers['Content-Type']) {
+                options.headers['Content-Type'] = 'application/json';
+            }
+            
+            const res = await fetch(url, options);
+            if (res.status === 401 && url !== '/api/auth_status') {
+                localStorage.removeItem('auth_token');
+                checkAuth();
+                throw new Error("Sessão expirada. Por favor, faça login novamente.");
+            }
+            return res;
+        }
+
+        async function checkAuth() {
+            try {
+                const token = localStorage.getItem('auth_token');
+                const headers = {};
+                if (token) {
+                    headers['X-Session-Token'] = token;
+                }
+                const res = await fetch('/api/auth_status', { headers });
+                if (!res.ok) throw new Error("Erro de conexão com o servidor.");
+                const data = await res.json();
+                
+                const overlay = document.getElementById('authOverlay');
+                const loginCard = document.getElementById('loginCard');
+                const setupCard = document.getElementById('setupCard');
+                
+                if (data.status === "setup") {
+                    overlay.style.display = "flex";
+                    setupCard.style.display = "block";
+                    loginCard.style.display = "none";
+                } else if (data.status === "login") {
+                    overlay.style.display = "flex";
+                    setupCard.style.display = "none";
+                    loginCard.style.display = "block";
+                } else if (data.status === "authenticated") {
+                    overlay.style.display = "none";
+                    setupCard.style.display = "none";
+                    loginCard.style.display = "none";
+                    
+                    const userSec = document.getElementById('userManagementSection');
+                    if (data.role === "admin") {
+                        userSec.style.display = "block";
+                        loadUsersList();
+                    } else {
+                        userSec.style.display = "none";
+                    }
+                }
+            } catch (err) {
+                console.error("Erro na verificação de autenticação:", err);
+            }
+        }
+
+        async function loadUsersList() {
+            try {
+                const res = await authFetch('/api/users');
+                if (!res.ok) return;
+                const users = await res.json();
+                const container = document.getElementById('usersListContainer');
+                container.innerHTML = "";
+                
+                users.forEach(u => {
+                    const row = document.createElement('div');
+                    row.style.display = "flex";
+                    row.style.justifyContent = "space-between";
+                    row.style.alignItems = "center";
+                    row.style.padding = "0.4rem 0.6rem";
+                    row.style.background = "rgba(255,255,255,0.02)";
+                    row.style.border = "1px solid rgba(255,255,255,0.05)";
+                    row.style.borderRadius = "6px";
+                    row.style.marginBottom = "0.3rem";
+                    
+                    const text = document.createElement('span');
+                    text.style.fontSize = "0.8rem";
+                    text.style.color = "var(--text-main)";
+                    text.innerText = `${u.username} (${u.role})`;
+                    
+                    row.appendChild(text);
+                    
+                    const btnDel = document.createElement('button');
+                    btnDel.type = "button";
+                    btnDel.innerHTML = "🗑️";
+                    btnDel.style.background = "none";
+                    btnDel.style.border = "none";
+                    btnDel.style.cursor = "pointer";
+                    btnDel.style.fontSize = "0.8rem";
+                    btnDel.style.padding = "0";
+                    btnDel.style.color = "var(--danger)";
+                    btnDel.addEventListener('click', async () => {
+                        if (!confirm(`Deseja realmente remover o usuário "${u.username}"?`)) return;
+                        try {
+                            const delRes = await authFetch(`/api/users/${u.username}`, { method: 'DELETE' });
+                            if (delRes.ok) {
+                                loadUsersList();
+                            } else {
+                                const err = await delRes.json();
+                                alert(err.detail || "Erro ao deletar.");
+                            }
+                        } catch (e) {
+                            alert(e.message);
+                        }
+                    });
+                    row.appendChild(btnDel);
+                    container.appendChild(row);
+                });
+            } catch (err) {
+                console.error("Erro ao carregar usuários:", err);
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            checkAuth();
+            
+            // Setup do Admin
+            document.getElementById('btnSetupSubmit').addEventListener('click', async () => {
+                const username = document.getElementById('setupUsername').value.trim();
+                const password = document.getElementById('setupPassword').value;
+                const confirm = document.getElementById('setupPasswordConfirm').value;
+                
+                if (!username || !password) {
+                    alert("Usuário e senha são obrigatórios!");
+                    return;
+                }
+                if (password !== confirm) {
+                    alert("As senhas não coincidem!");
+                    return;
+                }
+                
+                try {
+                    const res = await fetch('/api/setup_admin', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ username, password })
+                    });
+                    if (!res.ok) {
+                        const err = await res.json();
+                        throw new Error(err.detail || "Falha no setup.");
+                    }
+                    const data = await res.json();
+                    localStorage.setItem('auth_token', data.token);
+                    await checkAuth();
+                    
+                    await fetchProfiles();
+                    await checkCache();
+                    await checkCurrentStatus();
+                } catch (err) {
+                    alert(err.message);
+                }
+            });
+            
+            // Login
+            document.getElementById('btnLoginSubmit').addEventListener('click', async () => {
+                const username = document.getElementById('loginUsername').value.trim();
+                const password = document.getElementById('loginPassword').value;
+                
+                if (!username || !password) {
+                    alert("Usuário e senha são obrigatórios!");
+                    return;
+                }
+                
+                try {
+                    const res = await fetch('/api/login', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ username, password })
+                    });
+                    if (!res.ok) {
+                        const err = await res.json();
+                        throw new Error(err.detail || "Falha no login.");
+                    }
+                    const data = await res.json();
+                    localStorage.setItem('auth_token', data.token);
+                    await checkAuth();
+                    
+                    await fetchProfiles();
+                    await checkCache();
+                    await checkCurrentStatus();
+                } catch (err) {
+                    alert(err.message);
+                }
+            });
+            
+            // Logout
+            document.getElementById('btnLogout').addEventListener('click', async () => {
+                if (!confirm("Deseja realmente sair?")) return;
+                try {
+                    await authFetch('/api/logout', { method: 'POST' });
+                } catch (e) {}
+                localStorage.removeItem('auth_token');
+                location.reload();
+            });
+
+            // Criar Novo Usuário
+            document.getElementById('btnCreateUser').addEventListener('click', async () => {
+                const username = document.getElementById('newUsername').value.trim();
+                const password = document.getElementById('newPassword').value;
+                
+                if (!username || !password) {
+                    alert("Usuário e senha são obrigatórios!");
+                    return;
+                }
+                
+                try {
+                    const res = await authFetch('/api/create_user', {
+                        method: 'POST',
+                        body: JSON.stringify({ username, password, role: "user" })
+                    });
+                    if (res.ok) {
+                        document.getElementById('newUsername').value = "";
+                        document.getElementById('newPassword').value = "";
+                        loadUsersList();
+                    } else {
+                        const err = await res.json();
+                        alert(err.detail || "Erro ao criar usuário.");
+                    }
+                } catch (err) {
+                    alert(err.message);
+                }
+            });
+
+            // Modal de Ajuda / Manual
+            document.getElementById('btnOpenHelp').addEventListener('click', () => {
+                document.getElementById('helpModal').style.display = "flex";
+            });
+            
+            document.getElementById('btnCloseHelp').addEventListener('click', () => {
+                document.getElementById('helpModal').style.display = "none";
+            });
+            
+            document.getElementById('btnHelpDismiss').addEventListener('click', () => {
+                document.getElementById('helpModal').style.display = "none";
+            });
+        });
+
         const audioUploadArea = document.getElementById('audioUploadArea');
         const audioFile = document.getElementById('audioFile');
         const audioText = document.getElementById('audioText');
@@ -936,7 +1299,7 @@
             formData.append('keep_first_line_visible', document.getElementById('keepFirstLineVisible').value);
             
             try {
-                const response = await fetch('/api/process', {
+                const response = await authFetch('/api/process', {
                     method: 'POST',
                     body: formData
                 });
@@ -961,7 +1324,7 @@
             
             pollingInterval = setInterval(async () => {
                 try {
-                    const res = await fetch('/api/status');
+                    const res = await authFetch('/api/status');
                     if (!res.ok) throw new Error("Erro ao consultar status.");
                     
                     const data = await res.json();
@@ -1038,7 +1401,7 @@
         
         async function fetchProfiles() {
             try {
-                const res = await fetch('/api/profiles');
+                const res = await authFetch('/api/profiles');
                 if (!res.ok) throw new Error("Erro ao obter perfis do servidor.");
                 allProfiles = await res.json();
                 
@@ -1103,7 +1466,7 @@
             
             // Salvar no servidor como o último perfil ativo
             try {
-                await fetch('/api/last_profile', {
+                await authFetch('/api/last_profile', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ last_profile: profileName })
@@ -1144,7 +1507,7 @@
             };
             
             try {
-                const res = await fetch('/api/profiles', {
+                const res = await authFetch('/api/profiles', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload)
@@ -1157,7 +1520,7 @@
                 
                 // Salvar como o último perfil ativo
                 try {
-                    await fetch('/api/last_profile', {
+                    await authFetch('/api/last_profile', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ last_profile: name })
@@ -1188,7 +1551,7 @@
             }
             
             try {
-                const res = await fetch(`/api/profiles/${encodeURIComponent(name)}`, {
+                const res = await authFetch(`/api/profiles/${encodeURIComponent(name)}`, {
                     method: 'DELETE'
                 });
                 
@@ -1215,7 +1578,7 @@
         
         async function fetchTelegramConfig() {
             try {
-                const res = await fetch('/api/telegram');
+                const res = await authFetch('/api/telegram');
                 if (res.ok) {
                     const data = await res.json();
                     telegramToken.value = data.telegram_token || "";
@@ -1250,7 +1613,7 @@
             };
             
             try {
-                const res = await fetch('/api/telegram', {
+                const res = await authFetch('/api/telegram', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload)
@@ -1276,7 +1639,7 @@
         // Verificar status inicial do servidor (sincronização multi-navegador)
         async function checkCurrentStatus() {
             try {
-                const res = await fetch('/api/status');
+                const res = await authFetch('/api/status');
                 if (!res.ok) throw new Error("Erro ao consultar status.");
                 const data = await res.json();
                 
@@ -1376,7 +1739,7 @@
             isShowingCorrection = true;
             
             try {
-                const res = await fetch('/api/segments_to_edit');
+                const res = await authFetch('/api/segments_to_edit');
                 if (!res.ok) throw new Error("Falha ao obter legendas para correção.");
                 
                 currentSegments = await res.json();
@@ -1575,7 +1938,7 @@
             btn.innerText = "💾 Salvando & Renderizando...";
             
             try {
-                const res = await fetch('/api/continue_process', {
+                const res = await authFetch('/api/continue_process', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ segments: currentSegments })
@@ -1608,7 +1971,7 @@
                 if (!confirm("Deseja realmente cancelar a produção deste vídeo de karaoke?")) return;
                 
                 try {
-                    const res = await fetch('/api/cancel', { method: 'POST' });
+                    const res = await authFetch('/api/cancel', { method: 'POST' });
                     if (!res.ok) throw new Error("Erro ao enviar comando de cancelamento.");
                     
                     const data = await res.json();
@@ -1638,7 +2001,7 @@
         // Lógica de consulta e download dos Modelos de IA Whisper no Servidor
         async function fetchModelsStatus() {
             try {
-                const res = await fetch('/api/models');
+                const res = await authFetch('/api/models');
                 if (!res.ok) throw new Error("Erro ao obter status dos modelos.");
                 const data = await res.json();
                 
@@ -1718,7 +2081,7 @@
         
         async function triggerModelDownload(modelSize) {
             try {
-                const res = await fetch('/api/models/download', {
+                const res = await authFetch('/api/models/download', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ model_size: modelSize })
@@ -1737,7 +2100,7 @@
         
         async function checkCache() {
             try {
-                const res = await fetch('/api/cache_info');
+                const res = await authFetch('/api/cache_info');
                 if (res.ok) {
                     const data = await res.json();
                     const audioInput = document.getElementById('audioFile');
@@ -1795,7 +2158,7 @@
             
             // Recuperar o último perfil utilizado
             try {
-                const lastRes = await fetch('/api/last_profile');
+                const lastRes = await authFetch('/api/last_profile');
                 if (lastRes.ok) {
                     const lastData = await lastRes.json();
                     if (lastData.last_profile && allProfiles[lastData.last_profile]) {

@@ -7,7 +7,9 @@ import threading
 import requests
 import re
 import difflib
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException, BackgroundTasks
+import json
+import hashlib
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException, BackgroundTasks, Header, Depends
 from fastapi.responses import HTMLResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -477,7 +479,7 @@ def download_model_worker(model_size: str):
         model_download_status[model_size]["progress"] = 0
 
 @app.get("/api/models")
-def get_models_status():
+def get_models_status(current_user: dict = Depends(get_current_user)):
     """Retorna o status de download de todos os modelos de IA."""
     result = {}
     for size in model_download_status.keys():
@@ -492,7 +494,7 @@ def get_models_status():
     return result
 
 @app.post("/api/models/download")
-def start_model_download(req: ModelDownloadRequest):
+def start_model_download(req: ModelDownloadRequest, current_user: dict = Depends(get_current_user)):
     """Dispara o download do modelo Whisper selecionado em background."""
     model_size = req.model_size
     if model_size not in model_download_status:
@@ -597,12 +599,12 @@ def load_profiles() -> dict:
         return default_profiles
 
 @app.get("/api/profiles")
-def get_profiles():
+def get_profiles(current_user: dict = Depends(get_current_user)):
     """Retorna todos os perfis salvos."""
     return load_profiles()
 
 @app.post("/api/profiles")
-def save_profile(profile: ProfileModel):
+def save_profile(profile: ProfileModel, current_user: dict = Depends(get_current_user)):
     """Salva ou atualiza um perfil de uso."""
     profiles = load_profiles()
     profiles[profile.name] = {
@@ -631,7 +633,7 @@ def save_profile(profile: ProfileModel):
         raise HTTPException(status_code=500, detail=f"Erro ao salvar perfil em disco: {e}")
 
 @app.delete("/api/profiles/{name}")
-def delete_profile(name: str):
+def delete_profile(name: str, current_user: dict = Depends(get_current_user)):
     """Remove um perfil de uso."""
     if name == "Padrão":
         raise HTTPException(status_code=400, detail="O perfil 'Padrão' não pode ser excluído.")
@@ -650,7 +652,7 @@ def delete_profile(name: str):
 LAST_PROFILE_FILE = "/data/output/last_profile.json"
 
 @app.get("/api/last_profile")
-def get_last_profile():
+def get_last_profile(current_user: dict = Depends(get_current_user)):
     """Retorna o nome do último perfil utilizado."""
     if os.path.exists(LAST_PROFILE_FILE):
         try:
@@ -673,6 +675,193 @@ def save_last_profile(data: dict):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erro ao salvar último perfil: {e}")
 
+# --- SISTEMA DE AUTENTICAÇÃO LOCAL ---
+USERS_FILE = "/data/users.json"
+SESSIONS_FILE = "/data/sessions.json"
+
+def load_users():
+    if not os.path.exists(USERS_FILE):
+        return {}
+    try:
+        with open(USERS_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+def save_users(users):
+    try:
+        os.makedirs(os.path.dirname(USERS_FILE), exist_ok=True)
+        with open(USERS_FILE, "w", encoding="utf-8") as f:
+            json.dump(users, f, indent=4)
+    except Exception as e:
+        logger.error(f"Erro ao salvar usuários: {e}")
+
+def load_sessions():
+    if not os.path.exists(SESSIONS_FILE):
+        return {}
+    try:
+        with open(SESSIONS_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+def save_sessions(sessions):
+    try:
+        os.makedirs(os.path.dirname(SESSIONS_FILE), exist_ok=True)
+        with open(SESSIONS_FILE, "w", encoding="utf-8") as f:
+            json.dump(sessions, f, indent=4)
+    except Exception as e:
+        logger.error(f"Erro ao salvar sessões: {e}")
+
+def get_current_user(x_session_token: str = Header(None)):
+    users = load_users()
+    if not users:
+        # Modo Setup: Sem usuários criados ainda
+        return {"username": "setup_mode", "role": "setup"}
+    
+    if not x_session_token:
+        raise HTTPException(status_code=401, detail="Sessão não fornecida.")
+        
+    sessions = load_sessions()
+    session = sessions.get(x_session_token)
+    if not session:
+        raise HTTPException(status_code=401, detail="Sessão inválida ou expirada.")
+        
+    return session
+
+@app.get("/favicon.png")
+def get_favicon():
+    fav_path = "/app/templates/favicon.png"
+    if os.path.exists(fav_path):
+        return FileResponse(fav_path)
+    return HTMLResponse(status_code=404)
+
+@app.get("/api/auth_status")
+def auth_status(x_session_token: str = Header(None)):
+    users = load_users()
+    if not users:
+        return {"status": "setup"}
+    if not x_session_token:
+        return {"status": "login"}
+    sessions = load_sessions()
+    session = sessions.get(x_session_token)
+    if not session:
+        return {"status": "login"}
+    return {
+        "status": "authenticated",
+        "username": session.get("username"),
+        "role": session.get("role")
+    }
+
+@app.post("/api/setup_admin")
+def setup_admin(data: dict):
+    users = load_users()
+    if users:
+        raise HTTPException(status_code=400, detail="O administrador já foi configurado.")
+        
+    username = data.get("username", "").strip()
+    password = data.get("password", "")
+    
+    if not username or not password:
+        raise HTTPException(status_code=400, detail="Usuário e senha são obrigatórios.")
+        
+    pw_hash = hashlib.sha256(password.encode("utf-8")).hexdigest()
+    users[username] = {
+        "password_hash": pw_hash,
+        "role": "admin"
+    }
+    save_users(users)
+    
+    token = str(uuid.uuid4())
+    sessions = load_sessions()
+    sessions[token] = {
+        "username": username,
+        "role": "admin"
+    }
+    save_sessions(sessions)
+    
+    return {"status": "success", "token": token, "username": username, "role": "admin"}
+
+@app.post("/api/login")
+def login(data: dict):
+    users = load_users()
+    username = data.get("username", "").strip()
+    password = data.get("password", "")
+    
+    if not username or not password:
+        raise HTTPException(status_code=400, detail="Usuário e senha são obrigatórios.")
+        
+    user = users.get(username)
+    if not user:
+        raise HTTPException(status_code=401, detail="Usuário ou senha incorretos.")
+        
+    pw_hash = hashlib.sha256(password.encode("utf-8")).hexdigest()
+    if user.get("password_hash") != pw_hash:
+        raise HTTPException(status_code=401, detail="Usuário ou senha incorretos.")
+        
+    token = str(uuid.uuid4())
+    sessions = load_sessions()
+    sessions[token] = {
+        "username": username,
+        "role": user.get("role", "user")
+    }
+    save_sessions(sessions)
+    
+    return {"status": "success", "token": token, "username": username, "role": user.get("role", "user")}
+
+@app.post("/api/logout")
+def logout(x_session_token: str = Header(None)):
+    if x_session_token:
+        sessions = load_sessions()
+        if x_session_token in sessions:
+            del sessions[x_session_token]
+            save_sessions(sessions)
+    return {"status": "success"}
+
+@app.get("/api/users")
+def get_users(current_user: dict = Depends(get_current_user)):
+    if current_user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Apenas administradores podem gerenciar usuários.")
+    users = load_users()
+    return [{"username": u, "role": info.get("role")} for u, info in users.items()]
+
+@app.post("/api/create_user")
+def create_user(data: dict, current_user: dict = Depends(get_current_user)):
+    if current_user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Apenas administradores podem criar usuários.")
+        
+    username = data.get("username", "").strip()
+    password = data.get("password", "")
+    role = data.get("role", "user")
+    
+    if not username or not password:
+        raise HTTPException(status_code=400, detail="Usuário e senha são obrigatórios.")
+        
+    users = load_users()
+    if username in users:
+        raise HTTPException(status_code=400, detail="Este usuário já existe.")
+        
+    pw_hash = hashlib.sha256(password.encode("utf-8")).hexdigest()
+    users[username] = {
+        "password_hash": pw_hash,
+        "role": role
+    }
+    save_users(users)
+    return {"status": "success"}
+
+@app.delete("/api/users/{username}")
+def delete_user(username: str, current_user: dict = Depends(get_current_user)):
+    if current_user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Apenas administradores podem gerenciar usuários.")
+    if username == current_user.get("username"):
+        raise HTTPException(status_code=400, detail="Você não pode excluir a si mesmo.")
+    users = load_users()
+    if username in users:
+        del users[username]
+        save_users(users)
+        return {"status": "success"}
+    raise HTTPException(status_code=404, detail="Usuário não encontrado.")
+
 class EditWordModel(BaseModel):
     word: str
     start: float
@@ -688,7 +877,7 @@ class ContinueProcessModel(BaseModel):
     segments: list[EditSegmentModel]
 
 @app.get("/api/cache_info")
-def get_cache_info():
+def get_cache_info(current_user: dict = Depends(get_current_user)):
     cache_dir = "/data/cache"
     cache_meta_file = os.path.join(cache_dir, "cache_meta.json")
     if os.path.exists(cache_meta_file):
@@ -715,12 +904,12 @@ def get_cache_info():
     return {"has_cache": False, "audio_filename": None, "bg_filename": None}
 
 @app.get("/api/segments_to_edit")
-def get_segments_to_edit():
+def get_segments_to_edit(current_user: dict = Depends(get_current_user)):
     global segments_to_edit
     return segments_to_edit
 
 @app.post("/api/continue_process")
-def continue_process(data: ContinueProcessModel):
+def continue_process(data: ContinueProcessModel, current_user: dict = Depends(get_current_user)):
     global segments_to_edit, correction_event
     if not segments_to_edit:
         raise HTTPException(status_code=400, detail="Nenhum processamento aguardando correção.")
@@ -777,7 +966,7 @@ def continue_process(data: ContinueProcessModel):
     return {"status": "success"}
 
 @app.post("/api/cancel")
-def cancel_process():
+def cancel_process(current_user: dict = Depends(get_current_user)):
     import process_manager as pm
     logger.info("Solicitação de cancelamento de tarefa recebida do usuário.")
     
@@ -823,7 +1012,7 @@ def read_index():
     return templates.TemplateResponse("index.html", {"request": {}})
 
 @app.get("/api/status")
-def get_status():
+def get_status(current_user: dict = Depends(get_current_user)):
     """Retorna o progresso atual do pipeline para pooling da interface web."""
     with state_lock:
         return state
@@ -831,6 +1020,7 @@ def get_status():
 @app.post("/api/process")
 def process_karaoke(
     background_tasks: BackgroundTasks,
+    current_user: dict = Depends(get_current_user),
     audio_file: UploadFile = File(None),
     bg_file: UploadFile = File(None),
     whisper_model: str = Form("medium"),
@@ -1296,7 +1486,7 @@ def run_pipeline(
                 pass
 
 @app.get("/api/download")
-def download_file():
+def download_file(current_user: dict = Depends(get_current_user)):
     """Endpoint para baixar o arquivo final de vídeo karaoke."""
     file_path = "/data/output/final_karaoke.mp4"
     if not os.path.exists(file_path):
