@@ -85,7 +85,7 @@ def render_karaoke_video(
     background_mode: str = "image"
 ) -> str:
     """
-    Renderiza o vídeo final de karaoke em formato MP4.
+    Renderiza o vídeo final de Karaokê em formato MP4.
     Suporta fundo de imagem estática, vídeo original, paisagem aleatória ou cor preta sólida.
     """
     logger.info(f"Iniciando a renderização do vídeo final via FFmpeg. Modo de Fundo: {background_mode}")
@@ -99,7 +99,10 @@ def render_karaoke_video(
         
     logger.info(f"Duração do áudio instrumental: {duration:.2f} segundos.")
     
-    subtitles_filter = f"subtitles='{ass_path}'"
+    if ass_path and os.path.exists(ass_path):
+        subtitles_filter = f"subtitles='{ass_path}'"
+    else:
+        subtitles_filter = None
     
     # Decidir o arquivo de imagem/vídeo de fundo com base no modo selecionado
     final_bg_image = None
@@ -128,11 +131,17 @@ def render_karaoke_video(
             final_bg_image = get_random_default_background()
 
     # Filtro comum de redimensionamento e padding de vídeo para caber em 1280x720
-    video_filters = (
-        f"scale=1280:720:force_original_aspect_ratio=decrease,"
-        f"pad=1280:720:(ow-iw)/2:(oh-ih)/2,"
-        f"{subtitles_filter}"
-    )
+    if subtitles_filter:
+        video_filters = (
+            f"scale=1280:720:force_original_aspect_ratio=decrease,"
+            f"pad=1280:720:(ow-iw)/2:(oh-ih)/2,"
+            f"{subtitles_filter}"
+        )
+    else:
+        video_filters = (
+            f"scale=1280:720:force_original_aspect_ratio=decrease,"
+            f"pad=1280:720:(ow-iw)/2:(oh-ih)/2"
+        )
 
     if use_original_video:
         logger.info(f"Configurando vídeo original como fundo: {original_video_path}")
@@ -153,22 +162,43 @@ def render_karaoke_video(
             output_mp4_path
         ]
     elif final_bg_image:
-        logger.info(f"Configurando imagem de plano de fundo: {final_bg_image}")
-        cmd = [
-            "ffmpeg",
-            "-y",
-            "-loop", "1",
-            "-i", final_bg_image,
-            "-i", instrumental_path,
-            "-vf", video_filters,
-            "-c:v", "libx264",
-            "-preset", "ultrafast",
-            "-pix_fmt", "yuv420p",
-            "-c:a", "aac",
-            "-b:a", "192k",
-            "-t", f"{duration:.3f}",
-            output_mp4_path
-        ]
+        bg_is_video = check_has_video(final_bg_image)
+        if bg_is_video:
+            logger.info(f"Configurando vídeo de plano de fundo em loop: {final_bg_image}")
+            cmd = [
+                "ffmpeg",
+                "-y",
+                "-stream_loop", "-1",
+                "-i", final_bg_image,
+                "-i", instrumental_path,
+                "-map", "0:v:0",
+                "-map", "1:a:0",
+                "-vf", video_filters,
+                "-c:v", "libx264",
+                "-preset", "ultrafast",
+                "-pix_fmt", "yuv420p",
+                "-c:a", "aac",
+                "-b:a", "192k",
+                "-t", f"{duration:.3f}",
+                output_mp4_path
+            ]
+        else:
+            logger.info(f"Configurando imagem de plano de fundo: {final_bg_image}")
+            cmd = [
+                "ffmpeg",
+                "-y",
+                "-loop", "1",
+                "-i", final_bg_image,
+                "-i", instrumental_path,
+                "-vf", video_filters,
+                "-c:v", "libx264",
+                "-preset", "ultrafast",
+                "-pix_fmt", "yuv420p",
+                "-c:a", "aac",
+                "-b:a", "192k",
+                "-t", f"{duration:.3f}",
+                output_mp4_path
+            ]
     else:
         logger.info("Configurando fundo preto sólido.")
         cmd = [
@@ -177,7 +207,10 @@ def render_karaoke_video(
             "-f", "lavfi",
             "-i", f"color=c=black:s=1280x720:r=25:d={duration:.3f}",
             "-i", instrumental_path,
-            "-vf", subtitles_filter,
+        ]
+        if subtitles_filter:
+            cmd.extend(["-vf", subtitles_filter])
+        cmd.extend([
             "-c:v", "libx264",
             "-preset", "ultrafast",
             "-pix_fmt", "yuv420p",
@@ -185,7 +218,7 @@ def render_karaoke_video(
             "-b:a", "192k",
             "-shortest",
             output_mp4_path
-        ]
+        ])
         
     try:
         run_ffmpeg_with_logging(cmd)

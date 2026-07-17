@@ -9,7 +9,7 @@ import re
 import difflib
 import json
 import hashlib
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException, BackgroundTasks, Header, Depends
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException, BackgroundTasks, Header, Depends, Query
 from fastapi.responses import HTMLResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -19,16 +19,16 @@ from pydantic import BaseModel
 from audio_processor import extract_audio, separate_vocals
 from transcriber import transcribe_vocals
 from karaoke_generator import generate_ass_karaoke
-from video_renderer import render_karaoke_video
+from video_renderer import render_karaoke_video, check_has_video
 
 # Configurar logs
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
 )
-logger = logging.getLogger("karaoke")
+logger = logging.getLogger("karaokê")
 
-app = FastAPI(title="Karaoke Maker", description="Pipeline local para geração de vídeos de karaoke")
+app = FastAPI(title="Karaokê Maker", description="Pipeline local para geração de vídeos de karaokê")
 
 # Diretório para templates
 templates = Jinja2Templates(directory="templates")
@@ -71,17 +71,46 @@ def save_sessions(sessions):
     except Exception as e:
         logger.error(f"Erro ao salvar sessões: {e}")
 
-def get_current_user(x_session_token: str = Header(None)):
+def hash_password(password: str, salt: str = None) -> tuple[str, str]:
+    if not salt:
+        import os
+        salt = os.urandom(16).hex()
+    dk = hashlib.pbkdf2_hmac('sha256', password.encode('utf-8'), bytes.fromhex(salt), 100000)
+    return dk.hex(), salt
+
+def download_youtube(url: str, cache_dir: str) -> tuple[str, str]:
+    """Baixa o melhor vídeo/áudio do YouTube usando yt-dlp e retorna o caminho do arquivo e o título."""
+    import yt_dlp
+    ydl_opts = {
+        'format': 'best[height<=720]/best',
+        'outtmpl': os.path.join(cache_dir, 'original_input.%(ext)s'),
+        'quiet': True,
+        'no_warnings': True,
+    }
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        info = ydl.extract_info(url, download=True)
+        ext = info.get('ext', 'mp4')
+        title = info.get('title', 'YouTube Video')
+        file_path = os.path.join(cache_dir, f'original_input.{ext}')
+        if not os.path.exists(file_path):
+            for f in os.listdir(cache_dir):
+                if f.startswith("original_input."):
+                    file_path = os.path.join(cache_dir, f)
+                    break
+        return file_path, title
+
+def get_current_user(x_session_token: str = Header(None), token: str = Query(None)):
     users = load_users()
     if not users:
         # Modo Setup: Sem usuários criados ainda
         return {"username": "setup_mode", "role": "setup"}
     
-    if not x_session_token:
+    active_token = x_session_token or token
+    if not active_token:
         raise HTTPException(status_code=401, detail="Sessão não fornecida.")
         
     sessions = load_sessions()
-    session = sessions.get(x_session_token)
+    session = sessions.get(active_token)
     if not session:
         raise HTTPException(status_code=401, detail="Sessão inválida ou expirada.")
         
@@ -353,6 +382,9 @@ def update_state(status: str, step: str, progress: int, error_message: str = "",
 @app.on_event("startup")
 def startup_event():
     global state
+    # Garantir diretórios da biblioteca
+    for folder in ["videos", "photos", "history"]:
+        os.makedirs(f"/data/library/{folder}", exist_ok=True)
     if os.path.exists(STATE_FILE):
         try:
             with open(STATE_FILE, "r", encoding="utf-8") as f:
@@ -381,7 +413,7 @@ def startup_event():
                         send_telegram_notification(
                             token,
                             chat_id,
-                            f"⚠️ <b>Sal0 karaoke</b>: O servidor foi reiniciado inesperadamente ou ficou sem memória RAM (OOM) enquanto processava <b>{orig_name}</b>!"
+                            f"⚠️ <b>Sal0 Karaokê</b>: O servidor foi reiniciado inesperadamente ou ficou sem memória RAM (OOM) enquanto processava <b>{orig_name}</b>!"
                         )
                 else:
                     state.update(saved_state)
@@ -420,11 +452,11 @@ def send_telegram_video(token: str, chat_id: str, video_path: str, caption: str 
             # Timeout longo para upload (90 segundos)
             response = requests.post(url, data=data, files=files, timeout=90)
             if response.status_code == 200:
-                logger.info("Vídeo de karaoke enviado com sucesso para o Telegram.")
+                logger.info("Vídeo de karaokê enviado com sucesso para o Telegram.")
             else:
                 logger.error(f"Erro do Telegram ao enviar vídeo: {response.text}")
     except Exception as e:
-        logger.error(f"Falha ao enviar vídeo de karaoke para o Telegram: {e}")
+        logger.error(f"Falha ao enviar vídeo de karaokê para o Telegram: {e}")
 
 # Gerenciamento de Configurações Globais do Telegram
 TELEGRAM_FILE = "/data/output/telegram.json"
@@ -767,9 +799,10 @@ def setup_admin(data: dict):
     if not username or not password:
         raise HTTPException(status_code=400, detail="Usuário e senha são obrigatórios.")
         
-    pw_hash = hashlib.sha256(password.encode("utf-8")).hexdigest()
+    pw_hash, salt = hash_password(password)
     users[username] = {
         "password_hash": pw_hash,
+        "salt": salt,
         "role": "admin"
     }
     save_users(users)
@@ -797,9 +830,25 @@ def login(data: dict):
     if not user:
         raise HTTPException(status_code=401, detail="Usuário ou senha incorretos.")
         
-    pw_hash = hashlib.sha256(password.encode("utf-8")).hexdigest()
-    if user.get("password_hash") != pw_hash:
-        raise HTTPException(status_code=401, detail="Usuário ou senha incorretos.")
+    # Lógica de migração automática do SHA-256 legado para PBKDF2
+    salt = user.get("salt")
+    if not salt:
+        # Tentar validar usando o sha256 simples antigo
+        legacy_hash = hashlib.sha256(password.encode("utf-8")).hexdigest()
+        if user.get("password_hash") != legacy_hash:
+            raise HTTPException(status_code=401, detail="Usuário ou senha incorretos.")
+        # Se validado com sucesso, migramos imediatamente!
+        pw_hash, new_salt = hash_password(password)
+        user["password_hash"] = pw_hash
+        user["salt"] = new_salt
+        users[username] = user
+        save_users(users)
+        logger.info(f"Usuário {username} migrado com sucesso para criptografia PBKDF2.")
+    else:
+        # Validar usando PBKDF2 com o salt correspondente
+        check_hash, _ = hash_password(password, salt=salt)
+        if user.get("password_hash") != check_hash:
+            raise HTTPException(status_code=401, detail="Usuário ou senha incorretos.")
         
     token = str(uuid.uuid4())
     sessions = load_sessions()
@@ -843,9 +892,10 @@ def create_user(data: dict, current_user: dict = Depends(get_current_user)):
     if username in users:
         raise HTTPException(status_code=400, detail="Este usuário já existe.")
         
-    pw_hash = hashlib.sha256(password.encode("utf-8")).hexdigest()
+    pw_hash, salt = hash_password(password)
     users[username] = {
         "password_hash": pw_hash,
+        "salt": salt,
         "role": role
     }
     save_users(users)
@@ -863,6 +913,106 @@ def delete_user(username: str, current_user: dict = Depends(get_current_user)):
         save_users(users)
         return {"status": "success"}
     raise HTTPException(status_code=404, detail="Usuário não encontrado.")
+
+# --- SISTEMA DE BIBLIOTECA & HISTÓRICO ---
+LIBRARY_DIR = "/data/library"
+
+@app.get("/api/library")
+def get_library_files(current_user: dict = Depends(get_current_user)):
+    """Retorna as listas de arquivos disponíveis na biblioteca (videos, photos, history)."""
+    result = {"videos": [], "photos": [], "history": []}
+    for section in ["videos", "photos", "history"]:
+        path = os.path.join(LIBRARY_DIR, section)
+        if os.path.exists(path):
+            try:
+                files = sorted(os.listdir(path))
+                result[section] = [f for f in files if os.path.isfile(os.path.join(path, f)) and not f.startswith('.')]
+            except Exception as e:
+                logger.error(f"Erro ao listar biblioteca {section}: {e}")
+    return result
+
+@app.post("/api/library/upload")
+def upload_to_library(
+    section: str = Form(...),
+    file: UploadFile = File(...),
+    current_user: dict = Depends(get_current_user)
+):
+    """Realiza o upload direto de um arquivo para uma seção específica da biblioteca."""
+    if section not in ["videos", "photos"]:
+        raise HTTPException(status_code=400, detail="Seção de biblioteca inválida.")
+    
+    target_dir = os.path.join(LIBRARY_DIR, section)
+    os.makedirs(target_dir, exist_ok=True)
+    
+    safe_name = os.path.basename(file.filename)
+    dest_path = os.path.join(target_dir, safe_name)
+    
+    try:
+        with open(dest_path, "wb") as f:
+            shutil.copyfileobj(file.file, f)
+        logger.info(f"Arquivo {safe_name} adicionado à biblioteca {section}.")
+        return {"status": "success", "filename": safe_name}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro ao salvar arquivo na biblioteca: {e}")
+
+@app.post("/api/library/save_history")
+def save_to_history(data: dict, current_user: dict = Depends(get_current_user)):
+    """Salva a produção final (final_karaoke.mp4) no histórico permanente com nome customizado."""
+    title = data.get("title", "").strip()
+    if not title:
+        raise HTTPException(status_code=400, detail="O título é obrigatório.")
+    
+    safe_title = re.sub(r'[\\/*?:"<>|]', "", title)
+    if not safe_title.lower().endswith(".mp4"):
+        safe_title += ".mp4"
+        
+    final_mp4 = "/data/output/final_karaoke.mp4"
+    if not os.path.exists(final_mp4):
+        raise HTTPException(status_code=400, detail="Nenhum vídeo finalizado encontrado para salvar no histórico.")
+        
+    dest_dir = os.path.join(LIBRARY_DIR, "history")
+    os.makedirs(dest_dir, exist_ok=True)
+    dest_path = os.path.join(dest_dir, safe_title)
+    
+    try:
+        shutil.copy2(final_mp4, dest_path)
+        logger.info(f"Vídeo de karaokê salvo no histórico: {safe_title}")
+        return {"status": "success", "filename": safe_title}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro ao salvar vídeo no histórico: {e}")
+
+@app.delete("/api/library/{section}/{filename}")
+def delete_from_library(section: str, filename: str, current_user: dict = Depends(get_current_user)):
+    """Exclui fisicamente um arquivo da biblioteca."""
+    if section not in ["videos", "photos", "history"]:
+        raise HTTPException(status_code=400, detail="Seção inválida.")
+        
+    safe_filename = os.path.basename(filename)
+    file_path = os.path.join(LIBRARY_DIR, section, safe_filename)
+    
+    if os.path.exists(file_path):
+        try:
+            os.remove(file_path)
+            logger.info(f"Arquivo {safe_filename} excluído da biblioteca {section}.")
+            return {"status": "success"}
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Erro ao remover arquivo: {e}")
+            
+    raise HTTPException(status_code=404, detail="Arquivo não encontrado na biblioteca.")
+
+@app.get("/api/library/download/{section}/{filename}")
+def download_from_library(section: str, filename: str, current_user: dict = Depends(get_current_user)):
+    """Faz o download de um arquivo da biblioteca."""
+    if section not in ["videos", "photos", "history"]:
+        raise HTTPException(status_code=400, detail="Seção inválida.")
+        
+    safe_filename = os.path.basename(filename)
+    file_path = os.path.join(LIBRARY_DIR, section, safe_filename)
+    
+    if os.path.exists(file_path):
+        return FileResponse(file_path, filename=safe_filename)
+        
+    raise HTTPException(status_code=404, detail="Arquivo não encontrado na biblioteca.")
 
 class EditWordModel(BaseModel):
     word: str
@@ -891,19 +1041,55 @@ def get_cache_info(current_user: dict = Depends(get_current_user)):
             has_audio = os.path.exists(os.path.join(cache_dir, f"original_input{input_ext}"))
             
             bg_filename = None
+            bg_is_video = False
             if meta.get("has_bg"):
                 bg_ext = meta.get("bg_ext", "")
                 if os.path.exists(os.path.join(cache_dir, f"original_bg{bg_ext}")):
                     bg_filename = meta.get("bg_filename")
+                    if bg_ext.lower() in [".mp4", ".webm", ".mov", ".mkv", ".avi"]:
+                        bg_is_video = True
             
             return {
                 "has_cache": has_audio,
                 "audio_filename": meta.get("audio_filename", "Áudio Atual"),
-                "bg_filename": bg_filename
+                "bg_filename": bg_filename,
+                "lyrics_text": meta.get("lyrics_text", ""),
+                "bg_is_video": bg_is_video
             }
         except Exception:
             pass
-    return {"has_cache": False, "audio_filename": None, "bg_filename": None}
+    return {"has_cache": False, "audio_filename": None, "bg_filename": None, "lyrics_text": "", "bg_is_video": False}
+
+@app.get("/api/cache/background")
+def get_cached_background(current_user: dict = Depends(get_current_user)):
+    """Serve o arquivo de background em cache (imagem ou vídeo) ou uma paisagem padrão como fallback."""
+    cache_dir = "/data/cache"
+    cache_meta_file = os.path.join(cache_dir, "cache_meta.json")
+    if os.path.exists(cache_meta_file):
+        try:
+            with open(cache_meta_file, "r", encoding="utf-8") as f:
+                meta = json.load(f)
+            if meta.get("has_bg"):
+                bg_ext = meta.get("bg_ext", "")
+                bg_path = os.path.join(cache_dir, f"original_bg{bg_ext}")
+                if os.path.exists(bg_path):
+                    media_type = "image/jpeg"
+                    if bg_ext.lower() in [".png"]:
+                        media_type = "image/png"
+                    elif bg_ext.lower() in [".gif"]:
+                        media_type = "image/gif"
+                    elif bg_ext.lower() in [".mp4", ".mov", ".mkv", ".webm", ".avi"]:
+                        media_type = "video/mp4"
+                    return FileResponse(bg_path, media_type=media_type)
+        except Exception:
+            pass
+            
+    # Fallback para paisagem aleatória
+    default_bg = get_random_default_background()
+    if default_bg and os.path.exists(default_bg):
+        return FileResponse(default_bg, media_type="image/jpeg")
+    
+    raise HTTPException(status_code=404, detail="Nenhum plano de fundo disponível em cache.")
 
 @app.get("/api/segments_to_edit")
 def get_segments_to_edit(current_user: dict = Depends(get_current_user)):
@@ -1039,7 +1225,12 @@ def process_karaoke(
     show_next_line_preview: bool = Form(False),
     lyrics_text: str = Form(None),
     enable_correction: bool = Form(True),
-    keep_first_line_visible: bool = Form(False)
+    keep_first_line_visible: bool = Form(False),
+    youtube_url: str = Form(None),
+    library_audio: str = Form(None),
+    library_bg: str = Form(None),
+    save_to_library: bool = Form(False),
+    only_remove_vocals: bool = Form(False)
 ):
     """
     Recebe os arquivos enviados, valida a concorrência e inicia o pipeline em segundo plano.
@@ -1055,64 +1246,112 @@ def process_karaoke(
     os.makedirs(cache_dir, exist_ok=True)
     cache_meta_file = os.path.join(cache_dir, "cache_meta.json")
 
-    # 2. Determinar se usaremos arquivos enviados ou o cache
-    if not audio_file:
-        cached_meta = {}
-        if os.path.exists(cache_meta_file):
+    # 2. Determinar se usaremos arquivos enviados, biblioteca, YouTube ou cache
+    if youtube_url and youtube_url.strip():
+        # Limpar cache de processamento anterior
+        logger.info("Novo processamento do YouTube solicitado. Limpando o cache anterior...")
+        for f_name in os.listdir(cache_dir):
+            f_path = os.path.join(cache_dir, f_name)
             try:
-                with open(cache_meta_file, "r", encoding="utf-8") as f:
-                    import json
-                    cached_meta = json.load(f)
-            except Exception:
-                pass
+                if os.path.isfile(f_path):
+                    os.remove(f_path)
+                elif os.path.isdir(f_path):
+                    shutil.rmtree(f_path)
+            except Exception as e:
+                logger.error(f"Erro ao limpar arquivo do cache {f_name}: {e}")
+
+        orig_name = "Baixando do YouTube..."
+        input_audio_path = os.path.join(cache_dir, "original_input.mp4")
         
-        orig_name = cached_meta.get("original_filename")
-        input_ext = cached_meta.get("input_ext")
+        input_bg_path = None
+        has_bg = False
+        bg_ext = None
+        bg_filename = None
         
-        if not orig_name or not input_ext:
-            raise HTTPException(
-                status_code=400,
-                detail="Nenhum arquivo enviado e nenhum cache disponível no servidor. Por favor, envie uma música."
-            )
-            
-        input_audio_path = os.path.join(cache_dir, f"original_input{input_ext}")
-        if not os.path.exists(input_audio_path):
-            raise HTTPException(
-                status_code=400,
-                detail="Os arquivos de cache correspondentes não foram encontrados no servidor. Por favor, faça o upload da música."
-            )
-            
         if bg_file and bg_file.filename:
-            # Remover background antigo
-            if cached_meta.get("has_bg"):
-                old_ext = cached_meta.get("bg_ext", "")
-                old_bg_path = os.path.join(cache_dir, f"original_bg{old_ext}")
-                if os.path.exists(old_bg_path):
-                    try:
-                        os.remove(old_bg_path)
-                    except Exception:
-                        pass
-            
             bg_ext = os.path.splitext(bg_file.filename)[1]
+            bg_filename = bg_file.filename
             input_bg_path = os.path.join(cache_dir, f"original_bg{bg_ext}")
-            logger.info(f"Salvando nova imagem de fundo para o cache existente em: {input_bg_path}")
             with open(input_bg_path, "wb") as f:
                 shutil.copyfileobj(bg_file.file, f)
+            has_bg = True
+            if save_to_library:
+                shutil.copy2(input_bg_path, os.path.join(LIBRARY_DIR, "photos", bg_filename))
+        elif library_bg:
+            bg_ext = os.path.splitext(library_bg)[1]
+            bg_filename = library_bg
+            input_bg_path = os.path.join(cache_dir, f"original_bg{bg_ext}")
+            shutil.copy2(os.path.join(LIBRARY_DIR, "photos", library_bg), input_bg_path)
+            has_bg = True
+
+        cached_meta = {
+            "original_filename": orig_name,
+            "audio_filename": "YouTube Download",
+            "input_ext": ".mp4",
+            "has_bg": has_bg,
+            "bg_ext": bg_ext,
+            "bg_filename": bg_filename,
+            "lyrics_text": lyrics_text or ""
+        }
+        with open(cache_meta_file, "w", encoding="utf-8") as f:
+            json.dump(cached_meta, f, indent=4)
+
+    elif library_audio:
+        lib_audio_path = os.path.join(LIBRARY_DIR, "videos", library_audio)
+        if not os.path.exists(lib_audio_path):
+            raise HTTPException(status_code=400, detail="Arquivo não encontrado na biblioteca de áudio.")
             
-            cached_meta["has_bg"] = True
-            cached_meta["bg_ext"] = bg_ext
-            cached_meta["bg_filename"] = bg_file.filename
-            with open(cache_meta_file, "w", encoding="utf-8") as f:
-                import json
-                json.dump(cached_meta, f, indent=4)
-        else:
-            input_bg_path = None
-            if cached_meta.get("has_bg"):
-                bg_ext = cached_meta.get("bg_ext")
-                input_bg_path = os.path.join(cache_dir, f"original_bg{bg_ext}")
-                if not os.path.exists(input_bg_path):
-                    input_bg_path = None
-    else:
+        orig_name = os.path.splitext(library_audio)[0]
+        audio_ext = os.path.splitext(library_audio)[1]
+        
+        logger.info("Nova música da biblioteca selecionada. Limpando cache anterior...")
+        for f_name in os.listdir(cache_dir):
+            f_path = os.path.join(cache_dir, f_name)
+            try:
+                if os.path.isfile(f_path):
+                    os.remove(f_path)
+                elif os.path.isdir(f_path):
+                    shutil.rmtree(f_path)
+            except Exception as e:
+                logger.error(f"Erro ao limpar cache: {e}")
+                
+        input_audio_path = os.path.join(cache_dir, f"original_input{audio_ext}")
+        shutil.copy2(lib_audio_path, input_audio_path)
+        
+        input_bg_path = None
+        has_bg = False
+        bg_ext = None
+        bg_filename = None
+        
+        if bg_file and bg_file.filename:
+            bg_ext = os.path.splitext(bg_file.filename)[1]
+            bg_filename = bg_file.filename
+            input_bg_path = os.path.join(cache_dir, f"original_bg{bg_ext}")
+            with open(input_bg_path, "wb") as f:
+                shutil.copyfileobj(bg_file.file, f)
+            has_bg = True
+            if save_to_library:
+                shutil.copy2(input_bg_path, os.path.join(LIBRARY_DIR, "photos", bg_filename))
+        elif library_bg:
+            bg_ext = os.path.splitext(library_bg)[1]
+            bg_filename = library_bg
+            input_bg_path = os.path.join(cache_dir, f"original_bg{bg_ext}")
+            shutil.copy2(os.path.join(LIBRARY_DIR, "photos", library_bg), input_bg_path)
+            has_bg = True
+
+        cached_meta = {
+            "original_filename": orig_name,
+            "audio_filename": library_audio,
+            "input_ext": audio_ext,
+            "has_bg": has_bg,
+            "bg_ext": bg_ext,
+            "bg_filename": bg_filename,
+            "lyrics_text": lyrics_text or ""
+        }
+        with open(cache_meta_file, "w", encoding="utf-8") as f:
+            json.dump(cached_meta, f, indent=4)
+
+    elif audio_file:
         orig_name = os.path.splitext(audio_file.filename)[0]
         audio_ext = os.path.splitext(audio_file.filename)[1]
         
@@ -1125,12 +1364,14 @@ def process_karaoke(
                 elif os.path.isdir(f_path):
                     shutil.rmtree(f_path)
             except Exception as e:
-                logger.error(f"Erro ao limpar arquivo do cache {f_name}: {e}")
-
+                logger.error(f"Erro ao limpar cache: {e}")
+                
         input_audio_path = os.path.join(cache_dir, f"original_input{audio_ext}")
-        logger.info(f"Salvando novo arquivo de áudio carregado em: {input_audio_path}")
         with open(input_audio_path, "wb") as f:
             shutil.copyfileobj(audio_file.file, f)
+            
+        if save_to_library:
+            shutil.copy2(input_audio_path, os.path.join(LIBRARY_DIR, "videos", audio_file.filename))
             
         input_bg_path = None
         has_bg = False
@@ -1141,9 +1382,16 @@ def process_karaoke(
             bg_ext = os.path.splitext(bg_file.filename)[1]
             bg_filename = bg_file.filename
             input_bg_path = os.path.join(cache_dir, f"original_bg{bg_ext}")
-            logger.info(f"Salvando imagem de fundo carregada em: {input_bg_path}")
             with open(input_bg_path, "wb") as f:
                 shutil.copyfileobj(bg_file.file, f)
+            has_bg = True
+            if save_to_library:
+                shutil.copy2(input_bg_path, os.path.join(LIBRARY_DIR, "photos", bg_filename))
+        elif library_bg:
+            bg_ext = os.path.splitext(library_bg)[1]
+            bg_filename = library_bg
+            input_bg_path = os.path.join(cache_dir, f"original_bg{bg_ext}")
+            shutil.copy2(os.path.join(LIBRARY_DIR, "photos", library_bg), input_bg_path)
             has_bg = True
             
         cached_meta = {
@@ -1152,15 +1400,91 @@ def process_karaoke(
             "input_ext": audio_ext,
             "has_bg": has_bg,
             "bg_ext": bg_ext,
-            "bg_filename": bg_filename
+            "bg_filename": bg_filename,
+            "lyrics_text": lyrics_text or ""
         }
         with open(cache_meta_file, "w", encoding="utf-8") as f:
-            import json
             json.dump(cached_meta, f, indent=4)
+
+    else:
+        cached_meta = {}
+        if os.path.exists(cache_meta_file):
+            try:
+                with open(cache_meta_file, "r", encoding="utf-8") as f:
+                    cached_meta = json.load(f)
+            except Exception:
+                pass
+                
+        orig_name = cached_meta.get("original_filename")
+        input_ext = cached_meta.get("input_ext")
+        
+        if not orig_name or not input_ext:
+            raise HTTPException(
+                status_code=400,
+                detail="Nenhum arquivo enviado, nenhuma URL e nenhum cache disponível no servidor."
+            )
+            
+        input_audio_path = os.path.join(cache_dir, f"original_input{input_ext}")
+        if not os.path.exists(input_audio_path):
+            raise HTTPException(
+                status_code=400,
+                detail="Arquivos de cache não encontrados. Por favor, envie uma música."
+            )
+            
+        if lyrics_text is not None:
+            cached_meta["lyrics_text"] = lyrics_text
+            with open(cache_meta_file, "w", encoding="utf-8") as f:
+                json.dump(cached_meta, f, indent=4)
+                
+        if bg_file and bg_file.filename:
+            if cached_meta.get("has_bg"):
+                old_ext = cached_meta.get("bg_ext", "")
+                old_path = os.path.join(cache_dir, f"original_bg{old_ext}")
+                if os.path.exists(old_path):
+                    try:
+                        os.remove(old_path)
+                    except Exception:
+                        pass
+            bg_ext = os.path.splitext(bg_file.filename)[1]
+            bg_filename = bg_file.filename
+            input_bg_path = os.path.join(cache_dir, f"original_bg{bg_ext}")
+            with open(input_bg_path, "wb") as f:
+                shutil.copyfileobj(bg_file.file, f)
+            cached_meta["has_bg"] = True
+            cached_meta["bg_ext"] = bg_ext
+            cached_meta["bg_filename"] = bg_filename
+            with open(cache_meta_file, "w", encoding="utf-8") as f:
+                json.dump(cached_meta, f, indent=4)
+            if save_to_library:
+                shutil.copy2(input_bg_path, os.path.join(LIBRARY_DIR, "photos", bg_filename))
+        elif library_bg:
+            if cached_meta.get("has_bg"):
+                old_ext = cached_meta.get("bg_ext", "")
+                old_path = os.path.join(cache_dir, f"original_bg{old_ext}")
+                if os.path.exists(old_path):
+                    try:
+                        os.remove(old_path)
+                    except Exception:
+                        pass
+            bg_ext = os.path.splitext(library_bg)[1]
+            bg_filename = library_bg
+            input_bg_path = os.path.join(cache_dir, f"original_bg{bg_ext}")
+            shutil.copy2(os.path.join(LIBRARY_DIR, "photos", library_bg), input_bg_path)
+            cached_meta["has_bg"] = True
+            cached_meta["bg_ext"] = bg_ext
+            cached_meta["bg_filename"] = bg_filename
+            with open(cache_meta_file, "w", encoding="utf-8") as f:
+                json.dump(cached_meta, f, indent=4)
+        else:
+            input_bg_path = None
+            if cached_meta.get("has_bg"):
+                bg_ext = cached_meta.get("bg_ext")
+                input_bg_path = os.path.join(cache_dir, f"original_bg{bg_ext}")
+                if not os.path.exists(input_bg_path):
+                    input_bg_path = None
 
     update_state("processing", "Uploading", 5, original_filename=orig_name)
         
-    # 3. Adicionar tarefa na fila de execução de segundo plano síncrona
     background_tasks.add_task(
         run_pipeline, 
         input_audio_path, 
@@ -1179,7 +1503,9 @@ def process_karaoke(
         show_next_line_preview,
         lyrics_text,
         enable_correction,
-        keep_first_line_visible
+        keep_first_line_visible,
+        youtube_url,
+        only_remove_vocals
     )
     
     return {"status": "processing"}
@@ -1191,12 +1517,12 @@ def send_telegram_video_flow(token: str, chat_id: str, video_path: str, orig_nam
             token=token,
             chat_id=chat_id,
             video_path=video_path,
-            caption=f"🎥 <b>Sal0 karaoke</b>: Aqui está o seu vídeo de karaoke pronto para <b>{orig_name}</b>!"
+            caption=f"🎥 <b>Sal0 Karaokê</b>: Aqui está o seu vídeo de karaokê pronto para <b>{orig_name}</b>!"
         )
         send_telegram_notification(
             token=token, 
             chat_id=chat_id, 
-            message=f"✅ <b>Sal0 karaoke</b>: Processamento de <b>{orig_name}</b> concluído!"
+            message=f"✅ <b>Sal0 Karaokê</b>: Processamento de <b>{orig_name}</b> concluído!"
         )
     except Exception as e:
         logger.error(f"Erro no envio em segundo plano para o Telegram: {e}")
@@ -1218,7 +1544,9 @@ def run_pipeline(
     show_next_line_preview: bool = False,
     lyrics_text: str = None,
     enable_correction: bool = True,
-    keep_first_line_visible: bool = False
+    keep_first_line_visible: bool = False,
+    youtube_url: str = None,
+    only_remove_vocals: bool = False
 ):
     """Pipeline principal de processamento sequencial."""
     # Obter o lock de processamento exclusivo (segurança de job único)
@@ -1243,7 +1571,7 @@ def run_pipeline(
         send_telegram_notification(
             telegram_token, 
             telegram_chat_id, 
-            f"🎙️ <b>Sal0 karaoke</b>: Iniciando processamento de <b>{orig_name}</b>..."
+            f"🎙️ <b>Sal0 Karaokê</b>: Iniciando processamento de <b>{orig_name}</b>..."
         )
 
         # Pasta de saída mapeada via volume docker-compose
@@ -1273,6 +1601,38 @@ def run_pipeline(
                     cached_meta = json.load(f)
             except Exception:
                 pass
+
+        # Se for link do YouTube, realiza o download agora em background
+        if youtube_url and youtube_url.strip():
+            pm.check_cancelled()
+            update_state("processing", "Downloading YouTube", 5)
+            send_telegram_notification(
+                telegram_token, 
+                telegram_chat_id, 
+                f"🌐 <b>Sal0 Karaokê</b>: Iniciando download do YouTube..."
+            )
+            
+            try:
+                input_audio_path, title = download_youtube(youtube_url, cache_dir)
+                orig_name = title
+                update_state("processing", "Extracting audio", 15, original_filename=orig_name)
+                
+                ext = os.path.splitext(input_audio_path)[1]
+                cached_meta["original_filename"] = orig_name
+                cached_meta["audio_filename"] = orig_name + ext
+                cached_meta["input_ext"] = ext
+                with open(cache_meta_file, "w", encoding="utf-8") as f:
+                    import json
+                    json.dump(cached_meta, f, indent=4)
+                    
+                send_telegram_notification(
+                    telegram_token, 
+                    telegram_chat_id, 
+                    f"📥 <b>Sal0 Karaokê</b>: Download concluído! <b>{orig_name}</b>"
+                )
+            except Exception as e:
+                logger.error(f"Erro ao baixar do YouTube: {e}")
+                raise RuntimeError(f"Falha ao baixar vídeo do YouTube: {e}")
                 
         # Verificar se a música sendo processada agora é DIFERENTE da do cache
         # Se for diferente, apagamos todo o conteúdo do cache para começar do zero!
@@ -1304,7 +1664,7 @@ def run_pipeline(
             else:
                 pm.check_cancelled()
                 update_state("processing", "Extracting audio", 15)
-                send_telegram_notification(telegram_token, telegram_chat_id, "🎵 <b>Sal0 karaoke</b>: Extraindo áudio (15%)")
+                send_telegram_notification(telegram_token, telegram_chat_id, "🎵 <b>Sal0 Karaokê</b>: Extraindo áudio (15%)")
                 extract_audio(input_audio_path, converted_wav)
             
             pm.check_cancelled()
@@ -1319,13 +1679,48 @@ def run_pipeline(
             else:
                 pm.check_cancelled()
                 update_state("processing", "Separating vocals", 40)
-                send_telegram_notification(telegram_token, telegram_chat_id, "✂️ <b>Sal0 karaoke</b>: Separando áudio (40%)")
+                send_telegram_notification(telegram_token, telegram_chat_id, "✂️ <b>Sal0 Karaokê</b>: Separando áudio (40%)")
                 with tempfile.TemporaryDirectory() as demucs_tmp:
                     v_tmp, i_tmp = separate_vocals(converted_wav, demucs_tmp)
                     shutil.move(v_tmp, vocals_wav)
                     shutil.move(i_tmp, instrumental_wav)
                     
             pm.check_cancelled()
+
+            # Se only_remove_vocals estiver ativo, pulamos transcrição e legenda, indo direto para renderização
+            if only_remove_vocals:
+                pm.check_cancelled()
+                update_state("processing", "Rendering final video", 95)
+                send_telegram_notification(
+                    telegram_token, 
+                    telegram_chat_id, 
+                    f"🎬 <b>Sal0 Karaokê</b>: Renderizando vídeo sem a voz do cantor (95%)"
+                )
+                
+                # Forçar o uso do vídeo original enviado
+                render_karaoke_video(
+                    instrumental_path=instrumental_wav,
+                    ass_path=None,
+                    output_mp4_path=final_mp4_path,
+                    background_image_path=None,
+                    original_video_path=input_audio_path,
+                    background_mode="original_video"
+                )
+                
+                pm.check_cancelled()
+                update_state("processing", "Cleaning temporary files", 98)
+                update_state("done", "Done", 100, result_file=final_mp4_path)
+                logger.info("Pipeline concluído: Vocais removidos do vídeo original com sucesso.")
+                
+                processing_lock.release()
+                
+                if telegram_token and telegram_chat_id:
+                    threading.Thread(
+                        target=send_telegram_video_flow,
+                        args=(telegram_token, telegram_chat_id, final_mp4_path, orig_name),
+                        daemon=True
+                    ).start()
+                return
             
             # Passo 3: Transcrever vocais com Whisper selecionado
             segments = None
@@ -1346,7 +1741,7 @@ def run_pipeline(
             if segments is None:
                 pm.check_cancelled()
                 update_state("processing", "Transcribing vocals", 70)
-                send_telegram_notification(telegram_token, telegram_chat_id, f"✍️ <b>Sal0 karaoke</b>: Transcrevendo voz ({whisper_model}) (70%)")
+                send_telegram_notification(telegram_token, telegram_chat_id, f"✍️ <b>Sal0 Karaokê</b>: Transcrevendo voz ({whisper_model}) (70%)")
                 
                 transcribe_audio = vocals_wav if transcribe_source == "vocals" else converted_wav
                 logger.info(f"Fonte de transcrição escolhida: {transcribe_audio} (Modo: {transcribe_source})")
@@ -1386,7 +1781,7 @@ def run_pipeline(
                 send_telegram_notification(
                     telegram_token, 
                     telegram_chat_id, 
-                    f"⚠️ <b>Sal0 karaoke</b>: A transcrição de <b>{orig_name}</b> está pronta para correção! "
+                    f"⚠️ <b>Sal0 Karaokê</b>: A transcrição de <b>{orig_name}</b> está pronta para correção! "
                     "Entre no aplicativo web para revisar/corrigir a legenda e continuar a renderização."
                 )
                 
@@ -1406,9 +1801,9 @@ def run_pipeline(
             
             pm.check_cancelled()
             
-            # Passo 4: Gerar legendas ASS com efeitos de karaoke
+            # Passo 4: Gerar legendas ASS com efeitos de karaokê
             update_state("processing", "Generating subtitles", 80)
-            send_telegram_notification(telegram_token, telegram_chat_id, "📝 <b>Sal0 karaoke</b>: Gerando legenda (80%)")
+            send_telegram_notification(telegram_token, telegram_chat_id, "📝 <b>Sal0 Karaokê</b>: Gerando legenda (80%)")
             ass_path = os.path.join(tmpdir, "karaoke.ass")
             generate_ass_karaoke(
                 segments=segments, 
@@ -1429,7 +1824,7 @@ def run_pipeline(
             
             # Passo 5: Renderizar o vídeo final
             update_state("processing", "Rendering final video", 95)
-            send_telegram_notification(telegram_token, telegram_chat_id, "🎬 <b>Sal0 karaoke</b>: Renderizando vídeo (95%)")
+            send_telegram_notification(telegram_token, telegram_chat_id, "🎬 <b>Sal0 Karaokê</b>: Renderizando vídeo (95%)")
             render_karaoke_video(
                 instrumental_path=instrumental_wav,
                 ass_path=ass_path,
@@ -1450,7 +1845,7 @@ def run_pipeline(
 
             # Processamento local CONCLUÍDO na UI!
             update_state("done", "Done", 100, result_file=final_mp4_path)
-            logger.info("Pipeline de Karaoke Maker concluído com sucesso!")
+            logger.info("Pipeline de Karaokê Maker concluído com sucesso!")
             
             # Liberar o lock de processamento imediatamente para que o usuário possa usar o site
             processing_lock.release()
@@ -1473,7 +1868,7 @@ def run_pipeline(
             send_telegram_notification(
                 telegram_token, 
                 telegram_chat_id, 
-                f"❌ <b>Sal0 karaoke</b>: Falha ao processar <b>{orig_name}</b>. Erro: {e}"
+                f"❌ <b>Sal0 Karaokê</b>: Falha ao processar <b>{orig_name}</b>. Erro: {e}"
             )
         
         # Preservamos os arquivos de entrada no cache mesmo após erro
@@ -1489,17 +1884,17 @@ def run_pipeline(
 
 @app.get("/api/download")
 def download_file(current_user: dict = Depends(get_current_user)):
-    """Endpoint para baixar o arquivo final de vídeo karaoke."""
+    """Endpoint para baixar o arquivo final de vídeo karaokê."""
     file_path = "/data/output/final_karaoke.mp4"
     if not os.path.exists(file_path):
         raise HTTPException(
             status_code=404, 
             detail="Arquivo de vídeo não encontrado. Por favor, processe um áudio primeiro."
         )
-    # Recuperar o nome original com sufixo _karaoke
+    # Recuperar o nome original com sufixo _karaokê
     with state_lock:
         orig_name = state.get("original_filename", "final")
-    download_name = f"{orig_name}_karaoke.mp4"
+    download_name = f"{orig_name}_karaokê.mp4"
     return FileResponse(
         file_path, 
         media_type="video/mp4", 
