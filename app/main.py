@@ -82,7 +82,7 @@ def download_youtube(url: str, cache_dir: str) -> tuple[str, str]:
     """Baixa o melhor vídeo/áudio do YouTube usando yt-dlp e retorna o caminho do arquivo e o título."""
     import yt_dlp
     ydl_opts = {
-        'format': 'best[height<=720]/best',
+        'format': 'bestvideo[height<=1080]+bestaudio/best',
         'outtmpl': os.path.join(cache_dir, 'original_input.%(ext)s'),
         'quiet': True,
         'no_warnings': True,
