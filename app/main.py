@@ -689,6 +689,95 @@ def run_youtube_download_bg(url: str):
             f"❌ <b>Sal0 Karaokê</b>: Falha ao baixar vídeo do YouTube. Erro: {e}"
         )
 
+def download_bg_youtube(url: str, cache_dir: str) -> tuple[str, str]:
+    """Baixa apenas o fluxo de vídeo do YouTube (sem áudio) para uso como fundo."""
+    import yt_dlp
+    
+    ydl_opts = {
+        'format': 'bestvideo[height<=1080]/bestvideo/best',
+        'outtmpl': os.path.join(cache_dir, 'bg_yt_raw.%(ext)s'),
+        'merge_output_format': 'mp4',
+        'remux_video': 'mp4',
+        'quiet': True,
+        'no_warnings': True,
+    }
+    
+    title = "Fundo YouTube"
+    try:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(url, download=True)
+            title = info.get('title', 'Fundo YouTube')
+    except Exception as e:
+        logger.warning(f"Falha ao baixar fundo do YouTube com yt-dlp: {e}")
+        
+    raw_file = os.path.join(cache_dir, 'bg_yt_raw.mp4')
+    if not os.path.exists(raw_file):
+        for f in os.listdir(cache_dir):
+            if f.startswith("bg_yt_raw."):
+                raw_file = os.path.join(cache_dir, f)
+                break
+                
+    # Remover o áudio usando ffmpeg (-an) para garantir 100% sem som
+    no_audio_file = os.path.join(cache_dir, 'bg_yt_no_audio.mp4')
+    try:
+        cmd = ['ffmpeg', '-y', '-i', raw_file, '-c:v', 'copy', '-an', no_audio_file]
+        subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
+    except Exception as err:
+        logger.error(f"Erro ao remover áudio do fundo com ffmpeg: {err}")
+        no_audio_file = raw_file
+        
+    return no_audio_file, title
+
+def run_bg_youtube_download_bg(url: str):
+    cache_dir = "/data/cache"
+    os.makedirs(cache_dir, exist_ok=True)
+    
+    tele_config = load_telegram_config()
+    telegram_token = tele_config.get("telegram_token", "")
+    telegram_chat_id = tele_config.get("telegram_chat_id", "")
+    
+    try:
+        update_state("processing", "Downloading YouTube Background", 5, original_filename="Baixando fundo do YouTube...")
+        
+        send_telegram_notification(
+            telegram_token,
+            telegram_chat_id,
+            f"🖼️ <b>Sal0 Karaokê</b>: Iniciando download de fundo do YouTube (sem áudio) de <b>{url}</b>..."
+        )
+        
+        no_audio_path, title = download_bg_youtube(url, cache_dir)
+        ext = os.path.splitext(no_audio_path)[1]
+        
+        # Salvar na biblioteca de fotos/vídeos de fundo permanentemente
+        try:
+            lib_photos_dir = "/data/library/photos"
+            os.makedirs(lib_photos_dir, exist_ok=True)
+            safe_title = "".join([c for c in title if c.isalnum() or c in ' ._-']).strip() or "fundo_youtube"
+            dest_filename = f"{safe_title}_sem_audio{ext}"
+            dest_file = os.path.join(lib_photos_dir, dest_filename)
+            shutil.copy2(no_audio_path, dest_file)
+            logger.info(f"Vídeo de fundo sem áudio salvo na biblioteca: {dest_file}")
+        except Exception as copy_err:
+            logger.error(f"Erro ao salvar fundo do YouTube na biblioteca: {copy_err}")
+
+        send_telegram_notification(
+            telegram_token,
+            telegram_chat_id,
+            f"🖼️ <b>Sal0 Karaokê</b>: Fundo do YouTube baixado sem áudio e salvo na Biblioteca! <b>{title}</b>"
+        )
+        
+        update_state("idle", "Idle", 0, original_filename=title)
+        
+    except Exception as e:
+        logger.error(f"Erro no download de fundo do YouTube em background: {e}")
+        update_state("error", "Error", 0, error_message=f"Falha ao baixar fundo do YouTube: {e}")
+        send_telegram_notification(
+            telegram_token,
+            telegram_chat_id,
+            f"❌ <b>Sal0 Karaokê</b>: Falha ao baixar fundo do YouTube. Erro: {e}"
+        )
+
+
 @app.post("/api/download-youtube-preset")
 def download_youtube_preset(
     data: YouTubePresetModel,
@@ -708,6 +797,25 @@ def download_youtube_preset(
     return {"status": "started"}
 
 # Gerenciamento de Perfis de Uso Persistentes em JSON
+@app.post("/api/download-bg-youtube-preset")
+def download_bg_youtube_preset(
+    data: YouTubePresetModel,
+    current_user: dict = Depends(get_current_user)
+):
+    if processing_lock.locked():
+        raise HTTPException(
+            status_code=429,
+            detail="O servidor está ocupado processando outro vídeo. Por favor, aguarde alguns minutos."
+        )
+        
+    url = data.youtube_url.strip()
+    if not url:
+        raise HTTPException(status_code=400, detail="URL do YouTube vazia.")
+        
+    threading.Thread(target=run_bg_youtube_download_bg, args=(url,), daemon=True).start()
+    return {"status": "started"}
+
+
 PROFILES_FILE = "/data/output/profiles.json"
 
 class ProfileModel(BaseModel):
