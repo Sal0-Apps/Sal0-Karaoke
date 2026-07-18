@@ -409,7 +409,7 @@
             to { opacity: 1; transform: translateY(0); }
         }
 
-        /* Novas Classes para Abas e Responsividade Mobile v2.1.3 */
+        /* Novas Classes para Abas e Responsividade Mobile v2.2.0 */
         .tab-btn {
             background: transparent;
             color: var(--text-muted);
@@ -507,7 +507,7 @@
             }
         }
 
-        /* ===== MODAIS RESPONSIVOS v2.1.3 ===== */
+        /* ===== MODAIS RESPONSIVOS v2.2.0 ===== */
         [id$="Modal"] > div,
         #helpModal > div,
         #correctionConfirmModal > div,
@@ -525,7 +525,7 @@
         #authOverlay > div#setupCard { width: min(420px, 95vw) !important; }
 
     
-        /* ===== STYLES RESPONSIVOS v2.1.3 DEFINITIVOS ===== */
+        /* ===== STYLES RESPONSIVOS v2.2.0 DEFINITIVOS ===== */
         html, body {
             overflow-x: hidden !important;
             max-width: 100vw !important;
@@ -611,7 +611,7 @@
                 <p style="margin: 0; font-size: 0.85rem; color: var(--text-muted);">Separação de áudio e geração de vídeos de karaokê locais via IA</p>
             </div>
         </header>
-        <!-- Barra de Abas e Controles do Cabeçalho v2.1.3 -->
+        <!-- Barra de Abas e Controles do Cabeçalho v2.2.0 -->
         <div style="display: flex; gap: 0.8rem; align-items: center; margin-bottom: 1.5rem; justify-content: space-between; flex-wrap: wrap; width: 100%;">
             <div class="tabs-nav" style="display: flex; gap: 0.4rem; background: rgba(255, 255, 255, 0.03); border: 1px solid var(--glass-border); padding: 0.35rem; border-radius: 12px; flex: 1; max-width: 440px; margin: 0;">
                 <button type="button" id="tabBtnCreate" class="tab-btn active" style="flex: 1; padding: 0.65rem; border-radius: 8px; border: none; font-weight: 700; font-size: 0.85rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.4rem; transition: all 0.2s;">🎙️ Criar Karaokê</button>
@@ -639,7 +639,7 @@
 
         <div id="createTabContent">        <!-- Formulário de Processamento -->
         <form id="karaokêForm">
-            <!-- Banner de Mídia Ativa Selecionada v2.1.3 -->
+            <!-- Banner de Mídia Ativa Selecionada v2.2.0 -->
             <div id="activeMediaBanner" style="background: rgba(139, 92, 246, 0.12); border: 1px solid rgba(139, 92, 246, 0.3); border-radius: 14px; padding: 0.9rem 1.2rem; margin-bottom: 1.2rem; display: flex; align-items: center; justify-content: space-between; gap: 0.8rem; flex-wrap: wrap; box-shadow: 0 4px 16px rgba(0,0,0,0.2);">
                 <div style="display: flex; align-items: center; gap: 0.75rem;">
                     <span id="activeMediaIcon" style="font-size: 1.6rem;">🎵</span>
@@ -1153,7 +1153,7 @@
 
         <!-- Rodapé com Versão Oculta -->
         <footer style="text-align: center; margin-top: 3rem; margin-bottom: 1.5rem; font-size: 0.72rem; color: rgba(255,255,255,0.18); font-weight: 500; letter-spacing: 0.05em;">
-            Sal0 Karaokê v2.1.3 &copy; 2026
+            Sal0 Karaokê v2.2.0 &copy; 2026
         </footer>
         </div>
 
@@ -1205,7 +1205,7 @@
                     <p style="margin-bottom: 0.8rem; color: var(--text-muted);">Preencha o Token do Bot e ID do Chat para receber o progresso detalhado de renderização e **receber o vídeo MP4 final diretamente** no seu canal ou grupo do Telegram assim que concluído.</p>
                     
                     <h4 style="color: #60a5fa; margin-top: 1rem; margin-bottom: 0.3rem;">6. Biblioteca de Mídias & YouTube</h4>
-                    <p style="margin-bottom: 0.8rem; color: var(--text-muted);">A partir da v2.1.3, você pode salvar arquivos permanentemente em <code>/data/library/</code> (organizados em Músicas, Fundo e Histórico), carregar links do YouTube (o servidor baixa via yt-dlp) e usar vídeos de plano de fundo em loop ou cortados no tempo do áudio instrumental.</p>
+                    <p style="margin-bottom: 0.8rem; color: var(--text-muted);">A partir da v2.2.0, você pode salvar arquivos permanentemente em <code>/data/library/</code> (organizados em Músicas, Fundo e Histórico), carregar links do YouTube (o servidor baixa via yt-dlp) e usar vídeos de plano de fundo em loop ou cortados no tempo do áudio instrumental.</p>
                 </div>
                 
                 <button type="button" id="btnHelpDismiss" class="btn-success" style="margin-top: 1.2rem; width: 100%; padding: 0.7rem; border-radius: 8px; font-weight: 600; cursor: pointer; outline: none; border: 1px solid rgba(16, 185, 129, 0.3);">Entendi</button>
@@ -1627,7 +1627,7 @@
             bgBadge.style.display = "inline-flex";
         }
 
-        // ── Botões de Salvar / Limpar a Letra (Servidor + LocalStorage v2.1.3) ───────────
+        // ── Botões de Salvar / Limpar a Letra (Servidor + LocalStorage v2.2.0) ───────────
         const lyricsText = document.getElementById('lyricsText');
         const btnSaveLyrics = document.getElementById('btnSaveLyrics');
         const btnClearLyrics = document.getElementById('btnClearLyrics');
@@ -1694,7 +1694,7 @@
         }
         // ──────────────────────────────────────────────────────────────────────
 
-        // Envio do formulário via AJAX v2.1.3
+        // Envio do formulário via AJAX v2.2.0
         form.addEventListener('submit', (e) => {
             e.preventDefault();
             
@@ -2578,6 +2578,7 @@
                     "base": "Base (Mais Leve - ~140MB)",
                     "small": "Small (Leve - ~460MB)",
                     "medium": "Medium (Recomendado - ~1.5GB)",
+                    "large-v3-turbo": "Large v3 Turbo (Super Rápido & Alta Precisão - ~1.5GB)",
                     "large-v2": "Large v2 (Muito Preciso - ~3GB)",
                     "large-v3": "Large v3 (Precisão Máxima - ~3GB)"
                 };
@@ -2807,7 +2808,7 @@
             if (pollingInterval) clearInterval(pollingInterval);
         }
 
-        // --- CÓDIGO DA BIBLIOTECA & PREVIEW AVANÇADO v2.1.3 ---
+        // --- CÓDIGO DA BIBLIOTECA & PREVIEW AVANÇADO v2.2.0 ---
         const tabBtnCreate = document.getElementById('tabBtnCreate');
         const tabBtnLibrary = document.getElementById('tabBtnLibrary');
         const createTabContent = document.getElementById('createTabContent');
@@ -2828,7 +2829,7 @@
             loadLibrary();
         });
 
-        // Alternador de sub-modos (Upload / YouTube) para Música v2.1.3
+        // Alternador de sub-modos (Upload / YouTube) para Música v2.2.0
         const btnAudioModeUpload = document.getElementById('btnAudioModeUpload');
         const btnAudioModeYoutube = document.getElementById('btnAudioModeYoutube');
         const audioUploadContainer = document.getElementById('audioUploadContainer');
@@ -2908,7 +2909,7 @@
 
         // btnAudioModeLibrary removido do form
 
-        // Alternador de sub-modos (Upload / YouTube / Biblioteca) para Fundo v2.1.3
+        // Alternador de sub-modos (Upload / YouTube / Biblioteca) para Fundo v2.2.0
         const btnBgModeUpload = document.getElementById('btnBgModeUpload');
         const btnBgModeYoutube = document.getElementById('btnBgModeYoutube');
         const btnBgModeLibrary = document.getElementById('btnBgModeLibrary');
@@ -3124,7 +3125,7 @@
         };
 
         
-        // ── SISTEMA DE FONTE ÚNICA DE VERDADE PARA MÍDIA DE ÁUDIO v2.1.3 ──────
+        // ── SISTEMA DE FONTE ÚNICA DE VERDADE PARA MÍDIA DE ÁUDIO v2.2.0 ──────
         let currentAudioSource = { type: 'none', title: '', value: '' };
 
         function setAudioSource(type, data) {

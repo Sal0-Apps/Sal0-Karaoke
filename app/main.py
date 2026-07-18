@@ -542,6 +542,7 @@ model_download_status = {
     "base": {"status": "idle", "progress": 0, "error": None},
     "small": {"status": "idle", "progress": 0, "error": None},
     "medium": {"status": "idle", "progress": 0, "error": None},
+    "large-v3-turbo": {"status": "idle", "progress": 0, "error": None},
     "large-v2": {"status": "idle", "progress": 0, "error": None},
     "large-v3": {"status": "idle", "progress": 0, "error": None}
 }
@@ -893,7 +894,7 @@ def delete_lyrics_server(current_user: dict = Depends(get_current_user)):
 
 
 
-# Sistema de Logs de Diagnóstico v2.1.3
+# Sistema de Logs de Diagnóstico v2.2.0
 DIAGNOSTIC_LOG_FILE = "/data/output/app_diagnostic.log"
 
 def log_diagnostic(message: str, level: str = "INFO"):

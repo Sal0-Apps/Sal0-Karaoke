@@ -7,13 +7,20 @@ from faster_whisper import WhisperModel
 
 print("=== INICIANDO PRÉ-DOWNLOAD DOS MODELOS IA ===")
 
-# 1. Baixar o Whisper Medium
-print("1/2: Baixando Whisper Medium...")
+# 1. Baixar os modelos Whisper Medium e Large v3 Turbo para virem pré-instalados na imagem
+print("1/3: Baixando Whisper Medium pré-instalado...")
 try:
     WhisperModel("medium", device="cpu", compute_type="float32")
-    print("Whisper Medium baixado com sucesso.")
+    print("Whisper Medium pré-instalado com sucesso.")
 except Exception as e:
-    print(f"Aviso ao baixar o Whisper: {e}")
+    print(f"Aviso ao baixar o Whisper Medium: {e}")
+
+print("2/3: Baixando Whisper Large v3 Turbo pré-instalado...")
+try:
+    WhisperModel("large-v3-turbo", device="cpu", compute_type="float32")
+    print("Whisper Large v3 Turbo pré-instalado com sucesso.")
+except Exception as e:
+    print(f"Aviso ao baixar o Whisper Large v3 Turbo: {e}")
 
 # 2. Criar áudio de 10 segundos com onda senoidal de 440Hz (sinal real para evitar AssertionError)
 dummy_wav = "dummy_signal.wav"
