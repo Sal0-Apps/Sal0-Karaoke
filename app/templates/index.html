@@ -409,7 +409,7 @@
             to { opacity: 1; transform: translateY(0); }
         }
 
-        /* Novas Classes para Abas e Responsividade Mobile v1.9.2 */
+        /* Novas Classes para Abas e Responsividade Mobile v2.0.0 */
         .tab-btn {
             background: transparent;
             color: var(--text-muted);
@@ -507,7 +507,7 @@
             }
         }
 
-        /* ===== MODAIS RESPONSIVOS v1.9.2 ===== */
+        /* ===== MODAIS RESPONSIVOS v2.0.0 ===== */
         [id$="Modal"] > div,
         #helpModal > div,
         #correctionConfirmModal > div,
@@ -525,7 +525,7 @@
         #authOverlay > div#setupCard { width: min(420px, 95vw) !important; }
 
     
-        /* ===== STYLES RESPONSIVOS v1.9.2 DEFINITIVOS ===== */
+        /* ===== STYLES RESPONSIVOS v2.0.0 DEFINITIVOS ===== */
         html, body {
             overflow-x: hidden !important;
             max-width: 100vw !important;
@@ -611,7 +611,7 @@
                 <p style="margin: 0; font-size: 0.85rem; color: var(--text-muted);">Separação de áudio e geração de vídeos de karaokê locais via IA</p>
             </div>
         </header>
-        <!-- Barra de Abas e Controles do Cabeçalho v1.9.2 -->
+        <!-- Barra de Abas e Controles do Cabeçalho v2.0.0 -->
         <div style="display: flex; gap: 0.8rem; align-items: center; margin-bottom: 1.5rem; justify-content: space-between; flex-wrap: wrap; width: 100%;">
             <div class="tabs-nav" style="display: flex; gap: 0.4rem; background: rgba(255, 255, 255, 0.03); border: 1px solid var(--glass-border); padding: 0.35rem; border-radius: 12px; flex: 1; max-width: 440px; margin: 0;">
                 <button type="button" id="tabBtnCreate" class="tab-btn active" style="flex: 1; padding: 0.65rem; border-radius: 8px; border: none; font-weight: 700; font-size: 0.85rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.4rem; transition: all 0.2s;">🎙️ Criar Karaokê</button>
@@ -636,6 +636,17 @@
 
         <div id="createTabContent">        <!-- Formulário de Processamento -->
         <form id="karaokêForm">
+            <!-- Banner de Mídia Ativa Selecionada v2.0.0 -->
+            <div id="activeMediaBanner" style="background: rgba(139, 92, 246, 0.12); border: 1px solid rgba(139, 92, 246, 0.3); border-radius: 14px; padding: 0.9rem 1.2rem; margin-bottom: 1.2rem; display: flex; align-items: center; justify-content: space-between; gap: 0.8rem; flex-wrap: wrap; box-shadow: 0 4px 16px rgba(0,0,0,0.2);">
+                <div style="display: flex; align-items: center; gap: 0.75rem;">
+                    <span id="activeMediaIcon" style="font-size: 1.6rem;">🎵</span>
+                    <div>
+                        <span style="font-size: 0.7rem; color: #c084fc; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; display: block; margin-bottom: 0.1rem;">Mídia Selecionada para a Produção</span>
+                        <span id="activeMediaTitle" style="font-size: 0.92rem; color: #ffffff; font-weight: 700; word-break: break-word;">Nenhuma mídia selecionada (Aguardando arquivo, URL ou Biblioteca)</span>
+                    </div>
+                </div>
+                <span id="activeMediaSourceBadge" style="background: rgba(255,255,255,0.08); color: var(--text-muted); padding: 0.3rem 0.75rem; border-radius: 20px; font-size: 0.75rem; font-weight: 600; border: 1px solid rgba(255,255,255,0.1);">Nenhuma</span>
+            </div>
 
 
             <!-- ÁREA DE MÍDIA (Música e Imagem de Fundo Lado a Lado) -->
@@ -1138,17 +1149,25 @@
 
         <!-- Rodapé com Versão Oculta -->
         <footer style="text-align: center; margin-top: 3rem; margin-bottom: 1.5rem; font-size: 0.72rem; color: rgba(255,255,255,0.18); font-weight: 500; letter-spacing: 0.05em;">
-            Sal0 Karaokê v1.9.2 &copy; 2026
+            Sal0 Karaokê v2.0.0 &copy; 2026
         </footer>
         </div>
 
         <!-- Popup / Modal de Confirmação para Revisar Legendas -->
         <div id="correctionConfirmModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.65); z-index: 9999; align-items: center; justify-content: center; backdrop-filter: blur(4px);">
             <div style="background: rgba(30, 27, 57, 0.98); border: 1px solid var(--glass-border); padding: 1.5rem 1.2rem; border-radius: 16px; max-width: min(420px, 92vw); width: 92%; text-align: center; box-shadow: 0 12px 48px rgba(0,0,0,0.65); box-sizing: border-box;">
-                <span style="font-size: 2.2rem; display: block; margin-bottom: 0.8rem;">✍️</span>
-                <h3 style="color: var(--text-main); margin-bottom: 0.6rem; font-size: 1.25rem; font-weight: 700;">Revisão de Legenda</h3>
-                <p style="color: var(--text-muted); font-size: 0.85rem; line-height: 1.5; margin-bottom: 1.8rem;">
-                    Gostaria de pausar o processamento para revisar, editar tempos e ajustar as estrofes antes de renderizar o vídeo final?
+                <span style="font-size: 2.2rem; display: block; margin-bottom: 0.4rem;">✍️</span>
+                <h3 style="color: var(--text-main); margin-bottom: 0.6rem; font-size: 1.25rem; font-weight: 700;">Confirmar Produção</h3>
+                
+                <!-- Box Transparente com a Mídia Exata a ser Processada -->
+                <div id="confirmMediaBox" style="background: rgba(139, 92, 246, 0.15); border: 1px solid rgba(139, 92, 246, 0.4); border-radius: 12px; padding: 0.8rem 1rem; margin-bottom: 1.2rem; text-align: center;">
+                    <span style="font-size: 0.7rem; color: #c084fc; font-weight: 700; text-transform: uppercase; display: block; margin-bottom: 0.2rem;">🎵 Vídeo / Música a Processar</span>
+                    <span id="confirmMediaTitle" style="font-size: 0.95rem; color: #ffffff; font-weight: 700; word-break: break-word; display: block;">Música Selecionada</span>
+                    <span id="confirmMediaSource" style="font-size: 0.75rem; color: var(--text-muted); display: block; margin-top: 0.2rem;">Origem: Biblioteca</span>
+                </div>
+
+                <p style="color: var(--text-muted); font-size: 0.82rem; line-height: 1.4; margin-bottom: 1.5rem;">
+                    Deseja pausar a produção para revisar e editar a legenda estrofe por estrofe?
                 </p>
                 <div style="display: flex; gap: 0.8rem; justify-content: center; width: 100%;">
                     <button type="button" id="btnConfirmNo" style="flex: 1; height: 38px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.03); cursor: pointer; border-radius: 8px; color: var(--text-main); font-weight: 500; font-size: 0.85rem; transition: background 0.2s; outline: none; margin: 0;">Não, gerar direto</button>
@@ -1182,7 +1201,7 @@
                     <p style="margin-bottom: 0.8rem; color: var(--text-muted);">Preencha o Token do Bot e ID do Chat para receber o progresso detalhado de renderização e **receber o vídeo MP4 final diretamente** no seu canal ou grupo do Telegram assim que concluído.</p>
                     
                     <h4 style="color: #60a5fa; margin-top: 1rem; margin-bottom: 0.3rem;">6. Biblioteca de Mídias & YouTube</h4>
-                    <p style="margin-bottom: 0.8rem; color: var(--text-muted);">A partir da v1.9.2, você pode salvar arquivos permanentemente em <code>/data/library/</code> (organizados em Músicas, Fundo e Histórico), carregar links do YouTube (o servidor baixa via yt-dlp) e usar vídeos de plano de fundo em loop ou cortados no tempo do áudio instrumental.</p>
+                    <p style="margin-bottom: 0.8rem; color: var(--text-muted);">A partir da v2.0.0, você pode salvar arquivos permanentemente em <code>/data/library/</code> (organizados em Músicas, Fundo e Histórico), carregar links do YouTube (o servidor baixa via yt-dlp) e usar vídeos de plano de fundo em loop ou cortados no tempo do áudio instrumental.</p>
                 </div>
                 
                 <button type="button" id="btnHelpDismiss" class="btn-success" style="margin-top: 1.2rem; width: 100%; padding: 0.7rem; border-radius: 8px; font-weight: 600; cursor: pointer; outline: none; border: 1px solid rgba(16, 185, 129, 0.3);">Entendi</button>
@@ -1546,11 +1565,9 @@
 
         audioFile.addEventListener('change', () => {
             if (audioFile.files.length) {
-                updateAudioBadge(audioFile.files[0].name);
-                // Limpar seleção de música da biblioteca ao enviar arquivo novo
-                const libHidden = document.getElementById('libraryAudioHidden');
-                if (libHidden) libHidden.value = '';
-                audioFile.setAttribute('required', 'true');
+                const fname = audioFile.files[0].name;
+                updateAudioBadge(fname);
+                setAudioSource('upload', fname);
             }
         });
 
@@ -1606,7 +1623,7 @@
             bgBadge.style.display = "inline-flex";
         }
 
-        // ── Botões de Salvar / Limpar a Letra (Servidor + LocalStorage v1.9.2) ───────────
+        // ── Botões de Salvar / Limpar a Letra (Servidor + LocalStorage v2.0.0) ───────────
         const lyricsText = document.getElementById('lyricsText');
         const btnSaveLyrics = document.getElementById('btnSaveLyrics');
         const btnClearLyrics = document.getElementById('btnClearLyrics');
@@ -1673,20 +1690,36 @@
         }
         // ──────────────────────────────────────────────────────────────────────
 
-        // Envio do formulário via AJAX
+        // Envio do formulário via AJAX v2.0.0
         form.addEventListener('submit', (e) => {
             e.preventDefault();
             
-            // Validar se há música selecionada (arquivo, biblioteca ou cache)
             const libHidden = document.getElementById('libraryAudioHidden');
             const hasLibrary = libHidden && libHidden.value.trim() !== '';
             const hasFile = audioFile.files && audioFile.files.length > 0;
-            const hasCache = hasServerCache;
-            const hasYoutube = currentAudioMode === 'youtube' && document.getElementById('youtubeUrl').value.trim() !== '';
+            const hasYoutube = document.getElementById('youtubeUrl').value.trim() !== '';
             
-            if (!hasFile && !hasLibrary && !hasCache && !hasYoutube) {
-                alert('Selecione uma música para continuar. Envie um arquivo, escolha da Biblioteca ou use uma música do cache do servidor.');
+            if (!hasFile && !hasLibrary && !hasYoutube && !hasServerCache) {
+                alert('Por favor, selecione uma música antes de criar o Karaokê (faça Upload, digite um link do YouTube ou escolha da Biblioteca).');
                 return;
+            }
+
+            // Atualizar os textos do modal de confirmação com a mídia exata
+            const confirmTitle = document.getElementById('confirmMediaTitle');
+            const confirmSource = document.getElementById('confirmMediaSource');
+
+            if (hasLibrary) {
+                if (confirmTitle) confirmTitle.innerText = libHidden.value;
+                if (confirmSource) confirmSource.innerText = 'Origem: 📚 Biblioteca de Músicas';
+            } else if (hasFile) {
+                if (confirmTitle) confirmTitle.innerText = audioFile.files[0].name;
+                if (confirmSource) confirmSource.innerText = 'Origem: 📁 Arquivo Uploaded Local';
+            } else if (hasYoutube) {
+                if (confirmTitle) confirmTitle.innerText = document.getElementById('youtubeUrl').value.trim();
+                if (confirmSource) confirmSource.innerText = 'Origem: 🌐 Link do YouTube';
+            } else {
+                if (confirmTitle) confirmTitle.innerText = 'Última Música do Cache';
+                if (confirmSource) confirmSource.innerText = 'Origem: 💾 Cache do Servidor';
             }
             
             // Ocultar elementos de estado anterior
@@ -2764,7 +2797,7 @@
             if (pollingInterval) clearInterval(pollingInterval);
         }
 
-        // --- CÓDIGO DA BIBLIOTECA & PREVIEW AVANÇADO v1.9.2 ---
+        // --- CÓDIGO DA BIBLIOTECA & PREVIEW AVANÇADO v2.0.0 ---
         const tabBtnCreate = document.getElementById('tabBtnCreate');
         const tabBtnLibrary = document.getElementById('tabBtnLibrary');
         const createTabContent = document.getElementById('createTabContent');
@@ -2785,7 +2818,7 @@
             loadLibrary();
         });
 
-        // Alternador de sub-modos (Upload / YouTube) para Música v1.9.2
+        // Alternador de sub-modos (Upload / YouTube) para Música v2.0.0
         const btnAudioModeUpload = document.getElementById('btnAudioModeUpload');
         const btnAudioModeYoutube = document.getElementById('btnAudioModeYoutube');
         const audioUploadContainer = document.getElementById('audioUploadContainer');
@@ -2865,7 +2898,7 @@
 
         // btnAudioModeLibrary removido do form
 
-        // Alternador de sub-modos (Upload / YouTube / Biblioteca) para Fundo v1.9.2
+        // Alternador de sub-modos (Upload / YouTube / Biblioteca) para Fundo v2.0.0
         const btnBgModeUpload = document.getElementById('btnBgModeUpload');
         const btnBgModeYoutube = document.getElementById('btnBgModeYoutube');
         const btnBgModeLibrary = document.getElementById('btnBgModeLibrary');
@@ -3080,42 +3113,72 @@
             }
         };
 
-        window.processLibraryAudio = function(filename) {
-            // Definir o modo de áudio como biblioteca
-            currentAudioMode = 'library';
-            
-            // Limpar URL do YouTube para EVITAR reaproveitar links antigos
-            const youtubeInput = document.getElementById('youtubeUrl');
-            if (youtubeInput) youtubeInput.value = '';
-            
-            // Limpar arquivo local de upload
+        
+        // ── SISTEMA DE FONTE ÚNICA DE VERDADE PARA MÍDIA DE ÁUDIO v2.0.0 ──────
+        let currentAudioSource = { type: 'none', title: '', value: '' };
+
+        function setAudioSource(type, data) {
+            const hiddenLib = document.getElementById('libraryAudioHidden');
+            const ytInput = document.getElementById('youtubeUrl');
             const audioFileInput = document.getElementById('audioFile');
-            if (audioFileInput) audioFileInput.value = '';
             
-            // Preencher o hidden input com o arquivo selecionado da biblioteca
-            const hiddenInput = document.getElementById('libraryAudioHidden');
-            if (hiddenInput) hiddenInput.value = filename;
-            
-            // Atualizar os botões visuais e containers da aba Criar
-            if (btnAudioModeUpload) btnAudioModeUpload.classList.add('active');
-            if (btnAudioModeYoutube) btnAudioModeYoutube.classList.remove('active');
-            if (audioUploadContainer) audioUploadContainer.style.display = 'block';
-            if (audioYoutubeContainer) audioYoutubeContainer.style.display = 'none';
-            
-            // Mostrar o arquivo selecionado no badge
-            const audioText = document.getElementById('audioText');
-            const audioBadge = document.getElementById('audioBadge');
-            if (audioText) audioText.innerText = 'Música da Biblioteca:';
-            if (audioBadge) {
-                audioBadge.innerText = filename;
-                audioBadge.style.display = 'inline-flex';
-                audioBadge.style.background = '#6d28d9';
+            const activeTitle = document.getElementById('activeMediaTitle');
+            const activeSourceBadge = document.getElementById('activeMediaSourceBadge');
+            const activeIcon = document.getElementById('activeMediaIcon');
+
+            if (type === 'library') {
+                currentAudioMode = 'library';
+                currentAudioSource = { type: 'library', title: data, value: data };
+                if (hiddenLib) hiddenLib.value = data;
+                if (ytInput) ytInput.value = '';
+                if (audioFileInput) audioFileInput.value = '';
+                
+                if (activeTitle) activeTitle.innerText = data;
+                if (activeSourceBadge) {
+                    activeSourceBadge.innerText = '📚 Biblioteca';
+                    activeSourceBadge.style.background = '#6d28d9';
+                    activeSourceBadge.style.color = '#ffffff';
+                }
+                if (activeIcon) activeIcon.innerText = '📚';
+                
+            } else if (type === 'youtube') {
+                currentAudioMode = 'youtube';
+                currentAudioSource = { type: 'youtube', title: data, value: data };
+                if (hiddenLib) hiddenLib.value = '';
+                if (audioFileInput) audioFileInput.value = '';
+                if (ytInput) ytInput.value = data;
+                
+                if (activeTitle) activeTitle.innerText = data || 'Vídeo do YouTube';
+                if (activeSourceBadge) {
+                    activeSourceBadge.innerText = '🌐 YouTube';
+                    activeSourceBadge.style.background = '#0284c7';
+                    activeSourceBadge.style.color = '#ffffff';
+                }
+                if (activeIcon) activeIcon.innerText = '🌐';
+                
+            } else if (type === 'upload') {
+                currentAudioMode = 'upload';
+                currentAudioSource = { type: 'upload', title: data, value: data };
+                if (hiddenLib) hiddenLib.value = '';
+                if (ytInput) ytInput.value = '';
+                
+                if (activeTitle) activeTitle.innerText = data;
+                if (activeSourceBadge) {
+                    activeSourceBadge.innerText = '📁 Upload Local';
+                    activeSourceBadge.style.background = '#8b5cf6';
+                    activeSourceBadge.style.color = '#ffffff';
+                }
+                if (activeIcon) activeIcon.innerText = '📁';
             }
-            hasServerCache = true;
-            
-            // Ir para a aba de Criar Karaokê
+        }
+
+        window.processLibraryAudio = function(filename) {
+            setAudioSource('library', filename);
             tabBtnCreate.click();
+            const banner = document.getElementById('activeMediaBanner');
+            if (banner) banner.scrollIntoView({ behavior: 'smooth' });
         };
+
 
         window.useLibraryBg = function(filename) {
             btnBgModeLibrary.click();

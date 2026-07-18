@@ -1494,6 +1494,22 @@ def get_status(current_user: dict = Depends(get_current_user)):
         return state
 
 @app.post("/api/process")
+def purge_audio_cache_directory(cache_dir: str):
+    """Apaga todos os arquivos e subpastas de áudio do cache, preservando apenas imagens de fundo se necessário."""
+    if os.path.exists(cache_dir):
+        for f_name in os.listdir(cache_dir):
+            if f_name.startswith("original_bg"):
+                continue
+            f_path = os.path.join(cache_dir, f_name)
+            try:
+                if os.path.isfile(f_path):
+                    os.remove(f_path)
+                elif os.path.isdir(f_path):
+                    shutil.rmtree(f_path)
+            except Exception as e:
+                logger.warning(f"Erro ao purgar {f_name} do cache: {e}")
+
+
 def process_karaoke(
     background_tasks: BackgroundTasks,
     current_user: dict = Depends(get_current_user),
