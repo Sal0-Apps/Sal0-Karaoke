@@ -454,10 +454,7 @@ def startup_event():
         except Exception as e:
             logger.error(f"Erro ao carregar estado inicial no startup: {e}")
 
-def send_telegram_notification(token: str, chat_id: str, message: str):
-    """Envia uma mensagem de notificação para um chat específico via Bot do Telegram."""
-    if not token or not chat_id:
-        return
+def _send_telegram_notification_worker(token: str, chat_id: str, message: str):
     try:
         url = f"https://api.telegram.org/bot{token}/sendMessage"
         payload = {
@@ -465,10 +462,19 @@ def send_telegram_notification(token: str, chat_id: str, message: str):
             "text": message,
             "parse_mode": "HTML"
         }
-        # Timeout curto para evitar gargalos na thread
-        requests.post(url, json=payload, timeout=8)
+        requests.post(url, json=payload, timeout=10)
     except Exception as e:
         logger.error(f"Erro ao enviar notificação para o Telegram: {e}")
+
+def send_telegram_notification(token: str, chat_id: str, message: str):
+    """Envia uma mensagem de notificação para um chat específico via Bot do Telegram sem bloquear o pipeline ( Thread Assíncrona )."""
+    if not token or not chat_id:
+        return
+    threading.Thread(
+        target=_send_telegram_notification_worker,
+        args=(token, chat_id, message),
+        daemon=True
+    ).start()
 
 def send_telegram_video(token: str, chat_id: str, video_path: str, caption: str = ""):
     """Envia o vídeo final gerado diretamente para o chat do Telegram."""
@@ -912,7 +918,7 @@ def delete_lyrics_server(current_user: dict = Depends(get_current_user)):
 
 
 
-# Sistema de Logs de Diagnóstico v2.2.3
+# Sistema de Logs de Diagnóstico v2.2.4
 DIAGNOSTIC_LOG_FILE = "/data/output/app_diagnostic.log"
 
 def log_diagnostic(message: str, level: str = "INFO"):
@@ -1604,7 +1610,7 @@ def process_karaoke(
             if state.get("status") in ["idle", "error", "done"]:
                 try:
                     processing_lock.release()
-                    logger.info("Failsafe v2.2.3: Lock de concorrência obsoleto liberado com sucesso.")
+                    logger.info("Failsafe v2.2.4: Lock de concorrência obsoleto liberado com sucesso.")
                 except Exception:
                     pass
             else:
