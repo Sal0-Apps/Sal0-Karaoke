@@ -79,28 +79,47 @@ def hash_password(password: str, salt: str = None) -> tuple[str, str]:
     return dk.hex(), salt
 
 def download_youtube(url: str, cache_dir: str) -> tuple[str, str]:
-    """Baixa o melhor vídeo/áudio do YouTube usando yt-dlp e retorna o caminho do arquivo e o título."""
+    """Baixa o melhor vídeo/áudio do YouTube usando yt-dlp com fallback para o formato 'best'."""
     import yt_dlp
-    ydl_opts = {
-        'format': 'bestvideo[ext=mp4][height<=1080]+bestaudio[ext=m4a]/best[ext=mp4][height<=1080]/bestvideo[height<=1080]+bestaudio/best[height<=1080]/best',
+    
+    ydl_opts_primary = {
+        'format': 'bestvideo[height<=1080]+bestaudio/best[height<=1080]/best',
         'outtmpl': os.path.join(cache_dir, 'original_input.%(ext)s'),
         'merge_output_format': 'mp4',
         'remux_video': 'mp4',
         'quiet': True,
         'no_warnings': True,
     }
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        info = ydl.extract_info(url, download=True)
-        title = info.get('title', 'YouTube Video')
+    
+    ydl_opts_fallback = {
+        'format': 'best',
+        'outtmpl': os.path.join(cache_dir, 'original_input.%(ext)s'),
+        'merge_output_format': 'mp4',
+        'remux_video': 'mp4',
+        'quiet': True,
+        'no_warnings': True,
+    }
+    
+    title = "YouTube Video"
+    try:
+        logger.info("Tentando baixar do YouTube com formato primário (<=1080p)...")
+        with yt_dlp.YoutubeDL(ydl_opts_primary) as ydl:
+            info = ydl.extract_info(url, download=True)
+            title = info.get('title', 'YouTube Video')
+    except Exception as e:
+        logger.warning(f"Falha ao baixar no formato primário ({e}). Tentando formato fallback 'best'...")
+        with yt_dlp.YoutubeDL(ydl_opts_fallback) as ydl:
+            info = ydl.extract_info(url, download=True)
+            title = info.get('title', 'YouTube Video')
         
-        # O arquivo final será .mp4 devido ao merge e remux
-        file_path = os.path.join(cache_dir, 'original_input.mp4')
-        if not os.path.exists(file_path):
-            for f in os.listdir(cache_dir):
-                if f.startswith("original_input."):
-                    file_path = os.path.join(cache_dir, f)
-                    break
-        return file_path, title
+    # O arquivo final será .mp4 devido ao merge e remux
+    file_path = os.path.join(cache_dir, 'original_input.mp4')
+    if not os.path.exists(file_path):
+        for f in os.listdir(cache_dir):
+            if f.startswith("original_input."):
+                file_path = os.path.join(cache_dir, f)
+                break
+    return file_path, title
 
 def get_current_user(x_session_token: str = Header(None), token: str = Query(None)):
     users = load_users()
@@ -642,10 +661,21 @@ def run_youtube_download_bg(url: str):
         with open(cache_meta_file, "w", encoding="utf-8") as f:
             json.dump(cached_meta, f, indent=4)
             
+        # Salvar também na biblioteca de vídeos permanentemente
+        try:
+            lib_video_dir = "/data/library/videos"
+            os.makedirs(lib_video_dir, exist_ok=True)
+            safe_title = "".join([c for c in title if c.isalnum() or c in ' ._-']).strip() or "youtube_download"
+            dest_file = os.path.join(lib_video_dir, f"{safe_title}{ext}")
+            shutil.copy2(input_audio_path, dest_file)
+            logger.info(f"Vídeo do YouTube adicionado à biblioteca: {dest_file}")
+        except Exception as copy_err:
+            logger.error(f"Erro ao salvar vídeo do YouTube na biblioteca: {copy_err}")
+
         send_telegram_notification(
             telegram_token,
             telegram_chat_id,
-            f"📥 <b>Sal0 Karaokê</b>: Download concluído! <b>{title}</b>"
+            f"📥 <b>Sal0 Karaokê</b>: Download concluído e adicionado à Biblioteca! <b>{title}</b>"
         )
         
         update_state("idle", "Idle", 0, original_filename=title)
@@ -1619,19 +1649,77 @@ def process_karaoke(
     return {"status": "processing"}
 
 def send_telegram_video_flow(token: str, chat_id: str, video_path: str, orig_name: str):
-    """Auxiliar para envio de vídeo para o Telegram em segundo plano (thread dedicada)."""
+    """Auxiliar para envio de vídeo para o Telegram em segundo plano (thread dedicada) com tratamento de limite de 50MB."""
+    if not token or not chat_id:
+        return
+
+    LIMIT_50MB = 50 * 1024 * 1024
+    
+    # Função auxiliar para copiar vídeo final para a biblioteca de histórico
+    def save_to_library_history():
+        try:
+            lib_history_dir = "/data/library/history"
+            os.makedirs(lib_history_dir, exist_ok=True)
+            safe_name = "".join([c for c in orig_name if c.isalnum() or c in ' ._-']).strip() or "video_final"
+            dest_filename = f"{safe_name}.mp4"
+            dest_path = os.path.join(lib_history_dir, dest_filename)
+            counter = 1
+            while os.path.exists(dest_path):
+                dest_filename = f"{safe_name}_{counter}.mp4"
+                dest_path = os.path.join(lib_history_dir, dest_filename)
+                counter += 1
+            shutil.copy2(video_path, dest_path)
+            logger.info(f"Vídeo de karaokê {orig_name} salvo automaticamente na biblioteca de histórico: {dest_path}")
+            return dest_filename
+        except Exception as err:
+            logger.error(f"Erro ao salvar vídeo na biblioteca de histórico: {err}")
+            return None
+
     try:
-        send_telegram_video(
-            token=token,
-            chat_id=chat_id,
-            video_path=video_path,
-            caption=f"🎥 <b>Sal0 Karaokê</b>: Aqui está o seu vídeo de karaokê pronto para <b>{orig_name}</b>!"
-        )
-        send_telegram_notification(
-            token=token, 
-            chat_id=chat_id, 
-            message=f"✅ <b>Sal0 Karaokê</b>: Processamento de <b>{orig_name}</b> concluído!"
-        )
+        if os.path.exists(video_path) and os.path.getsize(video_path) > LIMIT_50MB:
+            file_size_mb = os.path.getsize(video_path) / (1024 * 1024)
+            logger.info(f"O vídeo {orig_name} tem {file_size_mb:.1f}MB, excedendo o limite de 50MB do Telegram.")
+            dest_name = save_to_library_history()
+            
+            msg = (
+                f"🎬 <b>Sal0 Karaokê</b>: O vídeo de <b>{orig_name}</b> foi concluído com sucesso!\n\n"
+                f"⚠️ O arquivo possui <b>{file_size_mb:.1f}MB</b> (excede o limite de 50MB do Telegram para bots).\n"
+                f"💾 Ele foi salvo automaticamente no servidor e já está disponível na sua <b>Biblioteca</b>!"
+            )
+            send_telegram_notification(token=token, chat_id=chat_id, message=msg)
+            return
+
+        # Tentativa de envio para vídeos <= 50MB
+        url = f"https://api.telegram.org/bot{token}/sendVideo"
+        success = False
+        with open(video_path, "rb") as video_file:
+            files = {"video": video_file}
+            data = {
+                "chat_id": chat_id,
+                "caption": f"🎥 <b>Sal0 Karaokê</b>: Aqui está o seu vídeo de karaokê pronto para <b>{orig_name}</b>!",
+                "parse_mode": "HTML"
+            }
+            res = requests.post(url, data=data, files=files, timeout=90)
+            if res.status_code == 200:
+                success = True
+                logger.info("Vídeo enviado com sucesso para o Telegram.")
+            else:
+                logger.error(f"Telegram recusou envio do vídeo: {res.text}")
+
+        if success:
+            send_telegram_notification(
+                token=token, 
+                chat_id=chat_id, 
+                message=f"✅ <b>Sal0 Karaokê</b>: Processamento de <b>{orig_name}</b> concluído!"
+            )
+        else:
+            save_to_library_history()
+            msg = (
+                f"🎬 <b>Sal0 Karaokê</b>: O vídeo de <b>{orig_name}</b> foi concluído com sucesso!\n\n"
+                f"⚠️ Não foi possível enviar o vídeo via Telegram. Ele foi salvo no servidor e está disponível na sua <b>Biblioteca</b>."
+            )
+            send_telegram_notification(token=token, chat_id=chat_id, message=msg)
+
     except Exception as e:
         logger.error(f"Erro no envio em segundo plano para o Telegram: {e}")
 

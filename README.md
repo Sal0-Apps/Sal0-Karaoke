@@ -37,17 +37,17 @@ services:
 O aplicativo segue um esquema de versionamento estruturado. Você pode escolher a tag da imagem no seu `docker-compose.yml` de acordo com a sua preferência:
 
 * `latest`: Atualizações contínuas contendo as últimas correções e novidades desenvolvidas. (Recomendado para uso do desenvolvedor principal).
-* `1.5.3`: Versão estável com biblioteca permanente de mídias, suporte a vídeos de fundo em loop, download direto do YouTube, criptografia forte PBKDF2 e preview sobreposto ao fundo real.
+* `1.6.0`: Versão estável com biblioteca permanente de mídias, suporte a vídeos de fundo em loop, download direto do YouTube, criptografia forte PBKDF2 e preview sobreposto ao fundo real.
 * `1.1.1`: Versão estável inicial contendo o sistema de cache avançado, edição milimétrica de legendas em formato `Minutos:Segundos`, auto-seleção inteligente de fundo, failsafe de tela preta e novo controle de acesso local com contas de usuário.
 
 Para travar em uma versão estável específica, basta alterar a linha `image` do compose, por exemplo:
-`image: ghcr.io/sal0-apps/sal0-karaoke:1.5.3`
+`image: ghcr.io/sal0-apps/sal0-karaoke:1.6.0`
 
 ---
 
 ## 🔐 Controle de Acesso e Contas Locais
 
-A partir da versão **1.5.3**, o Sal0 Karaokê conta com armazenamento criptográfico forte das senhas de usuários:
+A partir da versão **1.6.0**, o Sal0 Karaokê conta com armazenamento criptográfico forte das senhas de usuários:
 
 1. **PBKDF2 com Salt de 128 bits:** As senhas não são mais armazenadas em hashes simples (SHA-256). Agora o sistema utiliza derivação de chave forte PBKDF2 com Salt individual aleatório de 16 bytes e 100.000 iterações.
 2. **Migração Automática:** Usuários legados criados sob o padrão antigo (v1.1) são detectados e migrados de forma transparente para a nova criptografia forte no primeiro login bem-sucedido.
