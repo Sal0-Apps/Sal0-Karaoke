@@ -407,7 +407,7 @@
             to { opacity: 1; transform: translateY(0); }
         }
 
-        /* Novas Classes para Abas e Responsividade Mobile v1.7.0 */
+        /* Novas Classes para Abas e Responsividade Mobile v1.7.1 */
         .tab-btn {
             background: transparent;
             color: var(--text-muted);
@@ -505,7 +505,7 @@
             }
         }
 
-        /* ===== MODAIS RESPONSIVOS v1.7.0 ===== */
+        /* ===== MODAIS RESPONSIVOS v1.7.1 ===== */
         [id$="Modal"] > div,
         #helpModal > div,
         #correctionConfirmModal > div,
@@ -521,6 +521,60 @@
         #correctionConfirmModal > div { width: min(440px, 95vw) !important; }
         #authOverlay > div#loginCard,
         #authOverlay > div#setupCard { width: min(420px, 95vw) !important; }
+
+    
+        /* ===== STYLES RESPONSIVOS v1.7.1 DEFINITIVOS ===== */
+        html, body {
+            overflow-x: hidden !important;
+            max-width: 100vw !important;
+            width: 100% !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            position: relative !important;
+        }
+
+        *, *::before, *::after {
+            box-sizing: border-box !important;
+            min-width: 0 !important;
+        }
+
+        .container {
+            max-width: 820px !important;
+            width: 100% !important;
+            box-sizing: border-box !important;
+            overflow-x: hidden !important;
+        }
+
+        /* Modais Enquadrados no Celular */
+        #helpModal, #correctionConfirmModal, #authOverlay {
+            padding: 0.5rem !important;
+            box-sizing: border-box !important;
+        }
+
+        #helpModal > div,
+        #correctionConfirmModal > div,
+        #authOverlay > div#loginCard,
+        #authOverlay > div#setupCard {
+            max-width: min(600px, 92vw) !important;
+            max-height: 85vh !important;
+            width: 92vw !important;
+            overflow-y: auto !important;
+            overflow-x: hidden !important;
+            box-sizing: border-box !important;
+            border-radius: 16px !important;
+            margin: auto !important;
+            padding: 1.2rem 1rem !important;
+        }
+
+        @media (max-width: 600px) {
+            body {
+                padding: 0.5rem 0.3rem !important;
+            }
+            .container {
+                padding: 1rem 0.6rem !important;
+                border-radius: 16px !important;
+            }
+        }
 
     </style>
 </head>
@@ -576,7 +630,7 @@
                     <span class="label">🎵 Música ou Vídeo Original</span>
                     <div style="display: flex; gap: 0.3rem; margin-top: 0.3rem; margin-bottom: 0.4rem;">
                         <button type="button" id="btnAudioModeUpload" class="btn-tab-small active">📁 Enviar</button>
-                        <button type="button" id="btnAudioModeYoutube" class="btn-tab-small" style="display: none;">🌐 YouTube</button>
+                        <button type="button" id="btnAudioModeYoutube" class="btn-tab-small">🌐 YouTube</button>
 
                     </div>
                     
@@ -672,18 +726,7 @@
             <!-- Seção de Ajustes Avançados Colapsáveis -->
             <div id="advancedContent" style="display: none; margin-top: 1.5rem; background: rgba(255, 255, 255, 0.015); border: 1px solid var(--glass-border); border-radius: 14px; padding: 1.2rem;">
                 
-                <!-- Ativação do Downloader do YouTube (Teste Beta) -->
-                <div class="form-group" style="border: 1px solid rgba(255,255,255,0.05); border-radius: 10px; padding: 1rem; background: rgba(0,0,0,0.15); margin-bottom: 1rem;">
-                    <label style="display: flex; align-items: center; justify-content: space-between; cursor: pointer; user-select: none;">
-                        <span class="label" style="margin: 0; display: flex; align-items: center; gap: 0.4rem; color: #fb7185; font-weight: 600;">
-                            <span>🌐</span> Habilitar Downloader do YouTube na tela principal
-                        </span>
-                        <input type="checkbox" id="toggleYoutubeFeature" style="width: 18px; height: 18px; cursor: pointer; accent-color: #fb7185;">
-                    </label>
-                    <div class="bg-info-text" style="margin-top: 0.4rem;">
-                        <span>Ao ativar esta opção, o modo YouTube ficará visível na seleção de mídias originais.</span>
-                    </div>
-                </div>
+                
                 
                 <!-- Perfis de Configuração -->
                 <div class="form-group" style="border: 1px solid rgba(255,255,255,0.05); border-radius: 10px; padding: 1rem; background: rgba(0,0,0,0.15);">
@@ -1069,7 +1112,7 @@
 
         <!-- Rodapé com Versão Oculta -->
         <footer style="text-align: center; margin-top: 3rem; margin-bottom: 1.5rem; font-size: 0.72rem; color: rgba(255,255,255,0.18); font-weight: 500; letter-spacing: 0.05em;">
-            Sal0 Karaokê v1.7.0 &copy; 2026
+            Sal0 Karaokê v1.7.1 &copy; 2026
         </footer>
         </div>
 
@@ -1113,7 +1156,7 @@
                     <p style="margin-bottom: 0.8rem; color: var(--text-muted);">Preencha o Token do Bot e ID do Chat para receber o progresso detalhado de renderização e **receber o vídeo MP4 final diretamente** no seu canal ou grupo do Telegram assim que concluído.</p>
                     
                     <h4 style="color: #60a5fa; margin-top: 1rem; margin-bottom: 0.3rem;">6. Biblioteca de Mídias & YouTube</h4>
-                    <p style="margin-bottom: 0.8rem; color: var(--text-muted);">A partir da v1.7.0, você pode salvar arquivos permanentemente em <code>/data/library/</code> (organizados em Músicas, Fundo e Histórico), carregar links do YouTube (o servidor baixa via yt-dlp) e usar vídeos de plano de fundo em loop ou cortados no tempo do áudio instrumental.</p>
+                    <p style="margin-bottom: 0.8rem; color: var(--text-muted);">A partir da v1.7.1, você pode salvar arquivos permanentemente em <code>/data/library/</code> (organizados em Músicas, Fundo e Histórico), carregar links do YouTube (o servidor baixa via yt-dlp) e usar vídeos de plano de fundo em loop ou cortados no tempo do áudio instrumental.</p>
                 </div>
                 
                 <button type="button" id="btnHelpDismiss" class="btn-success" style="margin-top: 1.2rem; width: 100%; padding: 0.7rem; border-radius: 8px; font-weight: 600; cursor: pointer; outline: none; border: 1px solid rgba(16, 185, 129, 0.3);">Entendi</button>
@@ -1649,10 +1692,17 @@
             formData.append('enable_correction', enableCorrection ? "true" : "false");
             formData.append('keep_first_line_visible', document.getElementById('keepFirstLineVisible').value);
             
-            formData.append('youtube_url', currentAudioMode === 'youtube' ? document.getElementById('youtubeUrl').value.trim() : '');
-            // library_audio: usa o hidden input preenchido pelo botão Criar na aba Biblioteca
             const libHidden = document.getElementById('libraryAudioHidden');
-            formData.append('library_audio', libHidden ? libHidden.value : '');
+            const libVal = libHidden ? libHidden.value.trim() : '';
+            
+            if (libVal !== '') {
+                // Se foi selecionado da biblioteca, forçar o envio de library_audio e ZERAR o youtube_url
+                formData.append('library_audio', libVal);
+                formData.append('youtube_url', '');
+            } else {
+                formData.append('library_audio', '');
+                formData.append('youtube_url', currentAudioMode === 'youtube' ? document.getElementById('youtubeUrl').value.trim() : '');
+            }
             formData.append('library_bg', currentBgMode === 'library' ? document.getElementById('libraryBgSelect').value : '');
             formData.append('save_to_library', document.getElementById('saveToLibrary').checked ? "true" : "false");
             formData.append('only_remove_vocals', document.getElementById('onlyRemoveVocals').checked ? "true" : "false");
@@ -2663,7 +2713,7 @@
             if (pollingInterval) clearInterval(pollingInterval);
         }
 
-        // --- CÓDIGO DA BIBLIOTECA & PREVIEW AVANÇADO v1.7.0 ---
+        // --- CÓDIGO DA BIBLIOTECA & PREVIEW AVANÇADO v1.7.1 ---
         const tabBtnCreate = document.getElementById('tabBtnCreate');
         const tabBtnLibrary = document.getElementById('tabBtnLibrary');
         const createTabContent = document.getElementById('createTabContent');
@@ -2684,67 +2734,41 @@
             loadLibrary();
         });
 
-        // Alternador de sub-modos (Upload / YouTube / Biblioteca) para Música
+        // Alternador de sub-modos (Upload / YouTube) para Música v1.7.1
         const btnAudioModeUpload = document.getElementById('btnAudioModeUpload');
         const btnAudioModeYoutube = document.getElementById('btnAudioModeYoutube');
-        const btnAudioModeLibrary = null; // removido do form principal
         const audioUploadContainer = document.getElementById('audioUploadContainer');
         const audioYoutubeContainer = document.getElementById('audioYoutubeContainer');
-        const audioLibraryContainer = document.getElementById('audioLibraryContainer');
         
         let currentAudioMode = 'upload';
 
-        
-        // Alternador de visibilidade do YouTube via Ajustes Avançados
-        const toggleYoutubeFeature = document.getElementById('toggleYoutubeFeature');
-        
-        function syncYoutubeToggleState() {
-            const isEnabled = localStorage.getItem('enable_youtube_feature') === 'true';
-            if (toggleYoutubeFeature) toggleYoutubeFeature.checked = isEnabled;
-            if (btnAudioModeYoutube) {
-                btnAudioModeYoutube.style.display = isEnabled ? 'inline-flex' : 'none';
-                if (!isEnabled && currentAudioMode === 'youtube') {
-                    btnAudioModeUpload.click();
-                }
-            }
-        }
-        
-        if (toggleYoutubeFeature) {
-            toggleYoutubeFeature.addEventListener('change', () => {
-                localStorage.setItem('enable_youtube_feature', toggleYoutubeFeature.checked ? 'true' : 'false');
-                syncYoutubeToggleState();
+        if (btnAudioModeUpload) {
+            btnAudioModeUpload.addEventListener('click', () => {
+                currentAudioMode = 'upload';
+                btnAudioModeUpload.classList.add('active');
+                if (btnAudioModeYoutube) btnAudioModeYoutube.classList.remove('active');
+                if (audioUploadContainer) audioUploadContainer.style.display = 'block';
+                if (audioYoutubeContainer) audioYoutubeContainer.style.display = 'none';
+                
+                // Limpar hidden input da biblioteca ao alternar para upload
+                const libHidden = document.getElementById('libraryAudioHidden');
+                if (libHidden) libHidden.value = '';
             });
         }
-        
-        syncYoutubeToggleState();
 
-        btnAudioModeUpload.addEventListener('click', () => {
-            currentAudioMode = 'upload';
-            btnAudioModeUpload.classList.add('active');
-            btnAudioModeYoutube.classList.remove('active');
-            btnAudioModeLibrary.classList.remove('active');
-            audioUploadContainer.style.display = 'block';
-            audioYoutubeContainer.style.display = 'none';
-            audioLibraryContainer.style.display = 'none';
-            if (!hasServerCache) {
-                document.getElementById('audioFile').setAttribute('required', 'true');
-            }
-            document.getElementById('youtubeUrl').removeAttribute('required');
-            document.getElementById('libraryAudioSelect').removeAttribute('required');
-        });
-
-        btnAudioModeYoutube.addEventListener('click', () => {
-            currentAudioMode = 'youtube';
-            btnAudioModeYoutube.classList.add('active');
-            btnAudioModeUpload.classList.remove('active');
-            btnAudioModeLibrary.classList.remove('active');
-            audioUploadContainer.style.display = 'none';
-            audioYoutubeContainer.style.display = 'block';
-            audioLibraryContainer.style.display = 'none';
-            document.getElementById('audioFile').removeAttribute('required');
-            document.getElementById('youtubeUrl').setAttribute('required', 'true');
-            document.getElementById('libraryAudioSelect').removeAttribute('required');
-        });
+        if (btnAudioModeYoutube) {
+            btnAudioModeYoutube.addEventListener('click', () => {
+                currentAudioMode = 'youtube';
+                btnAudioModeYoutube.classList.add('active');
+                if (btnAudioModeUpload) btnAudioModeUpload.classList.remove('active');
+                if (audioUploadContainer) audioUploadContainer.style.display = 'none';
+                if (audioYoutubeContainer) audioYoutubeContainer.style.display = 'block';
+                
+                // Limpar hidden input da biblioteca ao alternar para youtube
+                const libHidden = document.getElementById('libraryAudioHidden');
+                if (libHidden) libHidden.value = '';
+            });
+        }
 
         const btnDownloadYoutube = document.getElementById('btnDownloadYoutube');
         btnDownloadYoutube.addEventListener('click', async () => {
@@ -2941,15 +2965,28 @@
         };
 
         window.processLibraryAudio = function(filename) {
+            // Definir o modo de áudio como biblioteca
+            currentAudioMode = 'library';
+            
+            // Limpar URL do YouTube para EVITAR reaproveitar links antigos
+            const youtubeInput = document.getElementById('youtubeUrl');
+            if (youtubeInput) youtubeInput.value = '';
+            
+            // Limpar arquivo local de upload
+            const audioFileInput = document.getElementById('audioFile');
+            if (audioFileInput) audioFileInput.value = '';
+            
             // Preencher o hidden input com o arquivo selecionado da biblioteca
             const hiddenInput = document.getElementById('libraryAudioHidden');
             if (hiddenInput) hiddenInput.value = filename;
             
-            // Atualizar o badge de áudio para mostrar que um arquivo foi selecionado
-            const audioFileInput = document.getElementById('audioFile');
-            if (audioFileInput) audioFileInput.removeAttribute('required');
+            // Atualizar os botões visuais e containers da aba Criar
+            if (btnAudioModeUpload) btnAudioModeUpload.classList.add('active');
+            if (btnAudioModeYoutube) btnAudioModeYoutube.classList.remove('active');
+            if (audioUploadContainer) audioUploadContainer.style.display = 'block';
+            if (audioYoutubeContainer) audioYoutubeContainer.style.display = 'none';
             
-            // Mostrar o arquivo selecionado no badge do upload
+            // Mostrar o arquivo selecionado no badge
             const audioText = document.getElementById('audioText');
             const audioBadge = document.getElementById('audioBadge');
             if (audioText) audioText.innerText = 'Música da Biblioteca:';
