@@ -549,26 +549,26 @@ model_download_status = {
 
 def is_model_downloaded(model_size: str) -> bool:
     """Verifica de forma ultra leve (no disco) se o modelo Whisper já está baixado no servidor."""
-    repo_id = f"Systran/faster-whisper-{model_size}"
-    folder_name = f"models--{repo_id.replace('/', '--')}"
-    model_dir = os.path.join("/data/output/models/whisper", folder_name)
-    
-    # Se a pasta principal do cache do HuggingFace não existe, não está baixado
-    if not os.path.isdir(model_dir):
-        return False
-        
-    # Verifica se há alguma pasta snapshots não vazia contendo o modelo
-    snapshots_dir = os.path.join(model_dir, "snapshots")
-    if os.path.isdir(snapshots_dir):
-        try:
-            subdirs = [os.path.join(snapshots_dir, d) for d in os.listdir(snapshots_dir) if os.path.isdir(os.path.join(snapshots_dir, d))]
-            for s_dir in subdirs:
-                # O model.bin é o arquivo binário essencial do ctranslate2/faster-whisper
-                if os.path.exists(os.path.join(s_dir, "model.bin")):
-                    return True
-        except Exception:
-            return False
-            
+    possible_folders = [
+        f"models--Systran--faster-whisper-{model_size}",
+        f"models--deepdml--faster-whisper-{model_size}",
+        f"models--openai--whisper-{model_size}"
+    ]
+    if model_size == "large-v3-turbo":
+        possible_folders.insert(0, "models--deepdml--faster-whisper-large-v3-turbo")
+
+    for folder_name in possible_folders:
+        model_dir = os.path.join("/data/output/models/whisper", folder_name)
+        if os.path.isdir(model_dir):
+            snapshots_dir = os.path.join(model_dir, "snapshots")
+            if os.path.isdir(snapshots_dir):
+                try:
+                    subdirs = [os.path.join(snapshots_dir, d) for d in os.listdir(snapshots_dir) if os.path.isdir(os.path.join(snapshots_dir, d))]
+                    for s_dir in subdirs:
+                        if os.path.exists(os.path.join(s_dir, "model.bin")):
+                            return True
+                except Exception:
+                    pass
     return False
 
 def download_model_worker(model_size: str):
@@ -580,14 +580,24 @@ def download_model_worker(model_size: str):
         model_download_status[model_size]["status"] = "downloading"
         model_download_status[model_size]["progress"] = 30
         
-        # Faz o download oficial
-        model = WhisperModel(
-            model_size,
-            device="cpu",
-            compute_type="int8",
-            download_root="/data/output/models/whisper",
-            local_files_only=False
-        )
+        # Faz o download oficial com fallback para repo ID completo
+        target_name = "deepdml/faster-whisper-large-v3-turbo" if model_size == "large-v3-turbo" else model_size
+        try:
+            model = WhisperModel(
+                target_name,
+                device="cpu",
+                compute_type="int8",
+                download_root="/data/output/models/whisper",
+                local_files_only=False
+            )
+        except Exception:
+            model = WhisperModel(
+                model_size,
+                device="cpu",
+                compute_type="int8",
+                download_root="/data/output/models/whisper",
+                local_files_only=False
+            )
         
         # Desaloca imediatamente para liberar os GBs de RAM que foram baixados
         del model
@@ -894,7 +904,7 @@ def delete_lyrics_server(current_user: dict = Depends(get_current_user)):
 
 
 
-# Sistema de Logs de Diagnóstico v2.2.0
+# Sistema de Logs de Diagnóstico v2.2.1
 DIAGNOSTIC_LOG_FILE = "/data/output/app_diagnostic.log"
 
 def log_diagnostic(message: str, level: str = "INFO"):
