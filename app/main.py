@@ -79,14 +79,23 @@ def hash_password(password: str, salt: str = None) -> tuple[str, str]:
     return dk.hex(), salt
 
 def download_youtube(url: str, cache_dir: str) -> tuple[str, str]:
-    """Baixa o melhor vídeo/áudio do YouTube usando yt-dlp com fallback para o formato 'best'."""
+    """Baixa o melhor vídeo/áudio do YouTube usando yt-dlp com expurgo prévio e 'overwrites': True."""
     import yt_dlp
+    
+    # Expurgo prévio obrigatorio de qualquer original_input.* no cache para impedir que o yt-dlp pule o download
+    for f in os.listdir(cache_dir):
+        if f.startswith("original_input."):
+            try:
+                os.remove(os.path.join(cache_dir, f))
+            except Exception:
+                pass
     
     ydl_opts_primary = {
         'format': 'bestvideo[height<=1080]+bestaudio/best[height<=1080]/best',
         'outtmpl': os.path.join(cache_dir, 'original_input.%(ext)s'),
         'merge_output_format': 'mp4',
         'remux_video': 'mp4',
+        'overwrites': True,
         'quiet': True,
         'no_warnings': True,
     }
@@ -96,6 +105,7 @@ def download_youtube(url: str, cache_dir: str) -> tuple[str, str]:
         'outtmpl': os.path.join(cache_dir, 'original_input.%(ext)s'),
         'merge_output_format': 'mp4',
         'remux_video': 'mp4',
+        'overwrites': True,
         'quiet': True,
         'no_warnings': True,
     }
@@ -690,14 +700,23 @@ def run_youtube_download_bg(url: str):
         )
 
 def download_bg_youtube(url: str, cache_dir: str) -> tuple[str, str]:
-    """Baixa apenas o fluxo de vídeo do YouTube (sem áudio) para uso como fundo com fallback."""
+    """Baixa apenas o fluxo de vídeo do YouTube (sem áudio) para uso como fundo com expurgo e overwrites: True."""
     import yt_dlp
+    
+    # Expurgo prévio obrigatorio de qualquer bg_yt_raw.* no cache
+    for f in os.listdir(cache_dir):
+        if f.startswith("bg_yt_raw.") or f.startswith("bg_yt_no_audio."):
+            try:
+                os.remove(os.path.join(cache_dir, f))
+            except Exception:
+                pass
     
     ydl_opts_primary = {
         'format': 'bestvideo[height<=1080]/bestvideo/best',
         'outtmpl': os.path.join(cache_dir, 'bg_yt_raw.%(ext)s'),
         'merge_output_format': 'mp4',
         'remux_video': 'mp4',
+        'overwrites': True,
         'quiet': True,
         'no_warnings': True,
     }
@@ -706,6 +725,7 @@ def download_bg_youtube(url: str, cache_dir: str) -> tuple[str, str]:
         'outtmpl': os.path.join(cache_dir, 'bg_yt_raw.%(ext)s'),
         'merge_output_format': 'mp4',
         'remux_video': 'mp4',
+        'overwrites': True,
         'quiet': True,
         'no_warnings': True,
     }
@@ -828,6 +848,46 @@ def download_bg_youtube_preset(
         
     threading.Thread(target=run_bg_youtube_download_bg, args=(url,), daemon=True).start()
     return {"status": "started"}
+
+
+SAVED_LYRICS_FILE = "/data/output/saved_lyrics.txt"
+
+class LyricsModel(BaseModel):
+    lyrics_text: str = ""
+
+@app.get("/api/lyrics")
+def get_saved_lyrics(current_user: dict = Depends(get_current_user)):
+    """Retorna a letra salva no servidor."""
+    if os.path.exists(SAVED_LYRICS_FILE):
+        try:
+            with open(SAVED_LYRICS_FILE, "r", encoding="utf-8") as f:
+                return {"lyrics_text": f.read()}
+        except Exception as e:
+            logger.error(f"Erro ao ler letra do servidor: {e}")
+    return {"lyrics_text": ""}
+
+@app.post("/api/lyrics")
+def save_lyrics_server(data: LyricsModel, current_user: dict = Depends(get_current_user)):
+    """Salva a letra da música no servidor."""
+    try:
+        os.makedirs(os.path.dirname(SAVED_LYRICS_FILE), exist_ok=True)
+        with open(SAVED_LYRICS_FILE, "w", encoding="utf-8") as f:
+            f.write(data.lyrics_text or "")
+        return {"status": "saved"}
+    except Exception as e:
+        logger.error(f"Erro ao salvar letra no servidor: {e}")
+        raise HTTPException(status_code=500, detail=f"Erro ao salvar letra no servidor: {e}")
+
+@app.delete("/api/lyrics")
+def delete_lyrics_server(current_user: dict = Depends(get_current_user)):
+    """Exclui a letra salva do servidor."""
+    try:
+        if os.path.exists(SAVED_LYRICS_FILE):
+            os.remove(SAVED_LYRICS_FILE)
+        return {"status": "deleted"}
+    except Exception as e:
+        logger.error(f"Erro ao excluir letra do servidor: {e}")
+        raise HTTPException(status_code=500, detail=f"Erro ao excluir letra do servidor: {e}")
 
 
 PROFILES_FILE = "/data/output/profiles.json"
@@ -2011,6 +2071,16 @@ def run_pipeline(
             with open(cache_meta_file, "w", encoding="utf-8") as f:
                 import json
                 json.dump(cached_meta, f, indent=4)
+
+        # Se for um novo arquivo ou URL do YouTube, garanta que arquivos intermediários da música anterior não existam
+        if youtube_url or not os.path.exists(os.path.join(cache_dir, "original_converted.wav")):
+            for inter_file in ["vocals.wav", "instrumental.wav", "transcribed_segments.json"]:
+                inter_path = os.path.join(cache_dir, inter_file)
+                if os.path.exists(inter_path):
+                    try:
+                        os.remove(inter_path)
+                    except Exception as e:
+                        pass
 
         # Criar diretório temporário para todo o processamento intermediário (Demucs, Whisper, ASS)
         with tempfile.TemporaryDirectory() as tmpdir:
