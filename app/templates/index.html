@@ -396,7 +396,7 @@
             to { opacity: 1; transform: translateY(0); }
         }
 
-        /* Novas Classes para Abas e Responsividade Mobile v1.5.3 */
+        /* Novas Classes para Abas e Responsividade Mobile v1.6.0 */
         .tab-btn {
             background: transparent;
             color: var(--text-muted);
@@ -542,7 +542,7 @@
                     <span class="label">🎵 Música ou Vídeo Original</span>
                     <div style="display: flex; gap: 0.3rem; margin-top: 0.3rem; margin-bottom: 0.4rem;">
                         <button type="button" id="btnAudioModeUpload" class="btn-tab-small active">📁 Enviar</button>
-                        <button type="button" id="btnAudioModeYoutube" class="btn-tab-small">🌐 YouTube</button>
+                        <button type="button" id="btnAudioModeYoutube" class="btn-tab-small" style="display: none;">🌐 YouTube (Beta)</button>
                         <button type="button" id="btnAudioModeLibrary" class="btn-tab-small">📚 Biblioteca</button>
                     </div>
                     
@@ -634,6 +634,19 @@
 
             <!-- Seção de Ajustes Avançados Colapsáveis -->
             <div id="advancedContent" style="display: none; margin-top: 1.5rem; background: rgba(255, 255, 255, 0.015); border: 1px solid var(--glass-border); border-radius: 14px; padding: 1.2rem;">
+                
+                <!-- Ativação do Downloader do YouTube (Teste Beta) -->
+                <div class="form-group" style="border: 1px solid rgba(255,255,255,0.05); border-radius: 10px; padding: 1rem; background: rgba(0,0,0,0.15); margin-bottom: 1rem;">
+                    <label style="display: flex; align-items: center; justify-content: space-between; cursor: pointer; user-select: none;">
+                        <span class="label" style="margin: 0; display: flex; align-items: center; gap: 0.4rem; color: #fb7185; font-weight: 600;">
+                            <span>🌐</span> Habilitar Downloader do YouTube na tela principal (Teste Beta)
+                        </span>
+                        <input type="checkbox" id="toggleYoutubeFeature" style="width: 18px; height: 18px; cursor: pointer; accent-color: #fb7185;">
+                    </label>
+                    <div class="bg-info-text" style="margin-top: 0.4rem;">
+                        <span>Ao ativar esta opção, o modo YouTube ficará visível na seleção de mídias originais para baixar vídeos do YouTube para a Biblioteca.</span>
+                    </div>
+                </div>
                 
                 <!-- Perfis de Configuração -->
                 <div class="form-group" style="border: 1px solid rgba(255,255,255,0.05); border-radius: 10px; padding: 1rem; background: rgba(0,0,0,0.15);">
@@ -1019,7 +1032,7 @@
 
         <!-- Rodapé com Versão Oculta -->
         <footer style="text-align: center; margin-top: 3rem; margin-bottom: 1.5rem; font-size: 0.72rem; color: rgba(255,255,255,0.18); font-weight: 500; letter-spacing: 0.05em;">
-            Sal0 Karaokê v1.5.3 &copy; 2026
+            Sal0 Karaokê v1.6.0 &copy; 2026
         </footer>
         </div>
 
@@ -1063,7 +1076,7 @@
                     <p style="margin-bottom: 0.8rem; color: var(--text-muted);">Preencha o Token do Bot e ID do Chat para receber o progresso detalhado de renderização e **receber o vídeo MP4 final diretamente** no seu canal ou grupo do Telegram assim que concluído.</p>
                     
                     <h4 style="color: #60a5fa; margin-top: 1rem; margin-bottom: 0.3rem;">6. Biblioteca de Mídias & YouTube</h4>
-                    <p style="margin-bottom: 0.8rem; color: var(--text-muted);">A partir da v1.5.3, você pode salvar arquivos permanentemente em <code>/data/library/</code> (organizados em Músicas, Fundo e Histórico), carregar links do YouTube (o servidor baixa via yt-dlp) e usar vídeos de plano de fundo em loop ou cortados no tempo do áudio instrumental.</p>
+                    <p style="margin-bottom: 0.8rem; color: var(--text-muted);">A partir da v1.6.0, você pode salvar arquivos permanentemente em <code>/data/library/</code> (organizados em Músicas, Fundo e Histórico), carregar links do YouTube (o servidor baixa via yt-dlp) e usar vídeos de plano de fundo em loop ou cortados no tempo do áudio instrumental.</p>
                 </div>
                 
                 <button type="button" id="btnHelpDismiss" class="btn-success" style="margin-top: 1.2rem; width: 100%; padding: 0.7rem; border-radius: 8px; font-weight: 600; cursor: pointer; outline: none; border: 1px solid rgba(16, 185, 129, 0.3);">Entendi</button>
@@ -1598,6 +1611,8 @@
                         downloadBox.style.display = "block";
                         btnSubmit.disabled = false;
                         document.getElementById('correctionCard').style.display = "none";
+                        loadLibrary();
+                        loadLibraryOptions();
                     } else if (data.status === "waiting_for_user_correction") {
                         clearInterval(pollingInterval);
                         pollingInterval = null;
@@ -1618,6 +1633,8 @@
                         btnDownloadYoutube.disabled = false;
                         btnDownloadYoutube.innerHTML = '<span>📥</span> Baixar do YouTube';
                         checkCache();
+                        loadLibrary();
+                        loadLibraryOptions();
                     }
                     
                 } catch (e) {
@@ -2549,7 +2566,7 @@
             if (pollingInterval) clearInterval(pollingInterval);
         }
 
-        // --- CÓDIGO DA BIBLIOTECA & PREVIEW AVANÇADO v1.5.3 ---
+        // --- CÓDIGO DA BIBLIOTECA & PREVIEW AVANÇADO v1.6.0 ---
         const tabBtnCreate = document.getElementById('tabBtnCreate');
         const tabBtnLibrary = document.getElementById('tabBtnLibrary');
         const createTabContent = document.getElementById('createTabContent');
@@ -2579,6 +2596,30 @@
         const audioLibraryContainer = document.getElementById('audioLibraryContainer');
         
         let currentAudioMode = 'upload';
+
+        
+        // Alternador de visibilidade do YouTube via Ajustes Avançados
+        const toggleYoutubeFeature = document.getElementById('toggleYoutubeFeature');
+        
+        function syncYoutubeToggleState() {
+            const isEnabled = localStorage.getItem('enable_youtube_feature') === 'true';
+            if (toggleYoutubeFeature) toggleYoutubeFeature.checked = isEnabled;
+            if (btnAudioModeYoutube) {
+                btnAudioModeYoutube.style.display = isEnabled ? 'inline-flex' : 'none';
+                if (!isEnabled && currentAudioMode === 'youtube') {
+                    btnAudioModeUpload.click();
+                }
+            }
+        }
+        
+        if (toggleYoutubeFeature) {
+            toggleYoutubeFeature.addEventListener('change', () => {
+                localStorage.setItem('enable_youtube_feature', toggleYoutubeFeature.checked ? 'true' : 'false');
+                syncYoutubeToggleState();
+            });
+        }
+        
+        syncYoutubeToggleState();
 
         btnAudioModeUpload.addEventListener('click', () => {
             currentAudioMode = 'upload';
@@ -2737,13 +2778,14 @@
                     videosList.innerHTML = '<p style="font-size: 0.8rem; color: var(--text-muted); text-align: center; margin-top: 2rem;">Nenhum arquivo na biblioteca.</p>';
                 } else {
                     data.videos.forEach(file => {
+                        const escapedFile = file.replace(/'/g, "\\'");
                         const item = document.createElement('div');
                         item.className = 'library-item';
                         item.innerHTML = `
                             <span style="font-size: 0.85rem; color: var(--text-main); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 70%;" title="${file}">🎵 ${file}</span>
                             <div class="actions" style="display: flex; gap: 0.4rem;">
-                                <button class="btn-secondary" style="font-size: 0.75rem; padding: 0.3rem 0.6rem; border-color: rgba(139,92,246,0.3); color: #c084fc; cursor:pointer;" onclick="processLibraryAudio('${file}')">🎙️ Criar</button>
-                                <button class="btn-secondary" style="font-size: 0.75rem; padding: 0.3rem 0.6rem; border-color: rgba(239,68,68,0.2); color: #fca5a5; cursor:pointer;" onclick="deleteLibraryFile('videos', '${file}')">❌</button>
+                                <button class="btn-secondary" style="font-size: 0.75rem; padding: 0.3rem 0.6rem; border-color: rgba(139,92,246,0.3); color: #c084fc; cursor:pointer;" onclick="processLibraryAudio('${escapedFile}')">🎙️ Criar</button>
+                                <button class="btn-secondary" style="font-size: 0.75rem; padding: 0.3rem 0.6rem; border-color: rgba(239,68,68,0.2); color: #fca5a5; cursor:pointer;" onclick="deleteLibraryFile('videos', '${escapedFile}')">❌</button>
                             </div>
                         `;
                         videosList.appendChild(item);
@@ -2758,13 +2800,14 @@
                     data.photos.forEach(file => {
                         const isVideo = file.toLowerCase().match(/\.(mp4|mov|mkv|webm|avi)$/);
                         const icon = isVideo ? '🎥' : '🖼️';
+                        const escapedFile = file.replace(/'/g, "\\'");
                         const item = document.createElement('div');
                         item.className = 'library-item';
                         item.innerHTML = `
                             <span style="font-size: 0.85rem; color: var(--text-main); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 70%;" title="${file}">${icon} ${file}</span>
                             <div class="actions" style="display: flex; gap: 0.4rem;">
-                                <button class="btn-secondary" style="font-size: 0.75rem; padding: 0.3rem 0.6rem; border-color: rgba(236,72,153,0.3); color: #f472b6; cursor:pointer;" onclick="useLibraryBg('${file}')">🖼️ Usar</button>
-                                <button class="btn-secondary" style="font-size: 0.75rem; padding: 0.3rem 0.6rem; border-color: rgba(239,68,68,0.2); color: #fca5a5; cursor:pointer;" onclick="deleteLibraryFile('photos', '${file}')">❌</button>
+                                <button class="btn-secondary" style="font-size: 0.75rem; padding: 0.3rem 0.6rem; border-color: rgba(236,72,153,0.3); color: #f472b6; cursor:pointer;" onclick="useLibraryBg('${escapedFile}')">🖼️ Usar</button>
+                                <button class="btn-secondary" style="font-size: 0.75rem; padding: 0.3rem 0.6rem; border-color: rgba(239,68,68,0.2); color: #fca5a5; cursor:pointer;" onclick="deleteLibraryFile('photos', '${escapedFile}')">❌</button>
                             </div>
                         `;
                         photosList.appendChild(item);
@@ -2777,13 +2820,14 @@
                     historyList.innerHTML = '<p style="font-size: 0.8rem; color: var(--text-muted); text-align: center; margin-top: 2rem; grid-column: 1/-1;">Nenhum karaokê gerado salvo no histórico.</p>';
                 } else {
                     data.history.forEach(file => {
+                        const escapedFile = file.replace(/'/g, "\\'");
                         const item = document.createElement('div');
                         item.className = 'library-item';
                         item.innerHTML = `
                             <span style="font-size: 0.85rem; color: var(--text-main); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 70%;" title="${file}">🎬 ${file}</span>
                             <div class="actions" style="display: flex; gap: 0.4rem;">
                                 <a href="/api/library/download/history/${encodeURIComponent(file)}?token=${localStorage.getItem('auth_token')}" class="btn-secondary" style="font-size: 0.75rem; padding: 0.3rem 0.6rem; border-color: rgba(16,185,129,0.3); color: #34d399; text-decoration: none; display: inline-flex; align-items: center; justify-content: center; cursor:pointer;">⬇️ Baixar</a>
-                                <button class="btn-secondary" style="font-size: 0.75rem; padding: 0.3rem 0.6rem; border-color: rgba(239,68,68,0.2); color: #fca5a5; cursor:pointer;" onclick="deleteLibraryFile('history', '${file}')">❌</button>
+                                <button class="btn-secondary" style="font-size: 0.75rem; padding: 0.3rem 0.6rem; border-color: rgba(239,68,68,0.2); color: #fca5a5; cursor:pointer;" onclick="deleteLibraryFile('history', '${escapedFile}')">❌</button>
                             </div>
                         `;
                         historyList.appendChild(item);
