@@ -912,7 +912,7 @@ def delete_lyrics_server(current_user: dict = Depends(get_current_user)):
 
 
 
-# Sistema de Logs de Diagnóstico v2.2.2
+# Sistema de Logs de Diagnóstico v2.2.3
 DIAGNOSTIC_LOG_FILE = "/data/output/app_diagnostic.log"
 
 def log_diagnostic(message: str, level: str = "INFO"):
@@ -1600,10 +1600,18 @@ def process_karaoke(
     """
     # 1. Verificar se o servidor já está processando alguma música
     if processing_lock.locked():
-        raise HTTPException(
-            status_code=429, 
-            detail="O servidor está ocupado processando outro vídeo. Por favor, aguarde alguns minutos."
-        )
+        with state_lock:
+            if state.get("status") in ["idle", "error", "done"]:
+                try:
+                    processing_lock.release()
+                    logger.info("Failsafe v2.2.3: Lock de concorrência obsoleto liberado com sucesso.")
+                except Exception:
+                    pass
+            else:
+                raise HTTPException(
+                    status_code=429, 
+                    detail="O servidor está ocupado processando outro vídeo. Por favor, aguarde alguns minutos."
+                )
 
     cache_dir = "/data/cache"
     os.makedirs(cache_dir, exist_ok=True)
