@@ -1,6 +1,6 @@
 #!/bin/bash
 # ==============================================================================
-# 🚀 Sal0 Karaokê - Script de Release Automatizado (Git & GitHub v2.1.0)
+# 🚀 Sal0 Karaokê - Script de Release Automatizado (Git & GitHub v2.1.1)
 # Uso: bash deploy.sh <versao> [mensagem]
 # ==============================================================================
 
@@ -8,6 +8,11 @@
 GIT_AUTHOR_NAME="VictorS4l0"
 GIT_AUTHOR_EMAIL="victormordecai@gmail.com"
 GITHUB_USER="VictorS4l0"
+
+# Tenta restaurar permissões da pasta .git se esteve sob posse do root
+sudo chown -R $USER:$USER . 2>/dev/null || true
+rm -f .git/index.lock 2>/dev/null
+rm -f .git/refs/remotes/origin/*.lock 2>/dev/null
 
 # Tenta ler o Token de um arquivo local seguro (.env_deploy ou ~/.github_token) se existir
 GITHUB_TOKEN=""
@@ -20,16 +25,12 @@ fi
 # Define o comando Git injetando a exceção de diretório seguro e identidade do autor
 GIT="git -c safe.directory=* -c user.name=$GIT_AUTHOR_NAME -c user.email=$GIT_AUTHOR_EMAIL"
 
-# Limpar travas órfãs do Git se existirem
-rm -f .git/index.lock 2>/dev/null
-rm -f .git/refs/remotes/origin/*.lock 2>/dev/null
-
 VERSION=$1
 MESSAGE=${2:-"Atualizacao e melhorias"}
 
 if [ -z "$VERSION" ]; then
     echo "❌ Erro: Informe o número da versão."
-    echo "📌 Exemplo de uso: bash deploy.sh 2.1.0 \"Descricao das alteracoes\""
+    echo "📌 Exemplo de uso: bash deploy.sh 2.1.1 \"Descricao das alteracoes\""
     exit 1
 fi
 
@@ -47,24 +48,18 @@ echo "========================================================"
 echo "🚀 Criando e enviando Release no GitHub: Sal0 Karaokê $TAG"
 echo "========================================================"
 
-# Se o último commit contiver segredo rejeitado pelo GitHub, desfaz o commit local automaticamente
-if $GIT log -1 --pretty=%B 2>/dev/null | grep -q "Release v"; then
-    echo "🔄 Desfazendo commit local com segredo antigo..."
-    $GIT reset HEAD~1 2>/dev/null
-fi
-
 # 1. Adicionar e commitar alterações no Git
 echo "📦 1/3 Adicionando arquivos e criando commit seguro..."
 $GIT add .
-$GIT commit -m "Release $TAG: $MESSAGE"
+$GIT commit -m "Release $TAG: $MESSAGE" 2>/dev/null
 
-# 2. Push para a branch main
+# 2. Push para a branch main (forçado para alinhar o histórico)
 echo "⬆️ 2/3 Enviando código para o GitHub (main)..."
-$GIT push "$PUSH_TARGET" main
+$GIT push "$PUSH_TARGET" main --force
 PUSH_STATUS=$?
 
 if [ $PUSH_STATUS -ne 0 ]; then
-    echo "❌ Erro no envio da branch main. Verifique se o Token no .env_deploy é válido."
+    echo "❌ Erro no envio da branch main."
     exit 1
 fi
 
@@ -73,7 +68,7 @@ echo "🏷️ 3/3 Criando e enviando a Tag $TAG para o GitHub..."
 $GIT tag -d "$TAG" 2>/dev/null
 $GIT push "$PUSH_TARGET" --delete "$TAG" 2>/dev/null
 $GIT tag -a "$TAG" -m "Release $TAG: $MESSAGE"
-$GIT push "$PUSH_TARGET" "$TAG"
+$GIT push "$PUSH_TARGET" "$TAG" --force
 TAG_STATUS=$?
 
 if [ $TAG_STATUS -eq 0 ]; then
