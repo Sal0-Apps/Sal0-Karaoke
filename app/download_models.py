@@ -17,7 +17,7 @@ except Exception as e:
 
 print("2/3: Baixando Whisper Large v3 Turbo pré-instalado...")
 try:
-    WhisperModel("large-v3-turbo", device="cpu", compute_type="float32")
+    WhisperModel("deepdml/faster-whisper-large-v3-turbo", device="cpu", compute_type="float32")
     print("Whisper Large v3 Turbo pré-instalado com sucesso.")
 except Exception as e:
     print(f"Aviso ao baixar o Whisper Large v3 Turbo: {e}")

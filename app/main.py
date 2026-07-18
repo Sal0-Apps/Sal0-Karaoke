@@ -547,6 +547,13 @@ model_download_status = {
     "large-v3": {"status": "idle", "progress": 0, "error": None}
 }
 
+def resolve_whisper_repo(model_size: str) -> str:
+    """Mapeia nomes amigáveis para repositórios oficiais do Hugging Face."""
+    if model_size == "large-v3-turbo":
+        return "deepdml/faster-whisper-large-v3-turbo"
+    return model_size
+
+
 def is_model_downloaded(model_size: str) -> bool:
     """Verifica de forma ultra leve (no disco) se o modelo Whisper já está baixado no servidor."""
     possible_folders = [
@@ -565,7 +572,8 @@ def is_model_downloaded(model_size: str) -> bool:
                 try:
                     subdirs = [os.path.join(snapshots_dir, d) for d in os.listdir(snapshots_dir) if os.path.isdir(os.path.join(snapshots_dir, d))]
                     for s_dir in subdirs:
-                        if os.path.exists(os.path.join(s_dir, "model.bin")):
+                        files = os.listdir(s_dir)
+                        if any(f in files for f in ["model.bin", "model.safetensors", "config.json"]):
                             return True
                 except Exception:
                     pass
@@ -904,7 +912,7 @@ def delete_lyrics_server(current_user: dict = Depends(get_current_user)):
 
 
 
-# Sistema de Logs de Diagnóstico v2.2.1
+# Sistema de Logs de Diagnóstico v2.2.2
 DIAGNOSTIC_LOG_FILE = "/data/output/app_diagnostic.log"
 
 def log_diagnostic(message: str, level: str = "INFO"):
