@@ -1,32 +1,12 @@
-# Python caches
-__pycache__/
+# Arquivos de dados do app
+/data/cache/*
+/data/output/*
+!/data/cache/.gitkeep
+!/data/output/.gitkeep
 *.pyc
-*.pyo
-*.pyd
-.pytest_cache/
+__pycache__/
 
-# Docker volumes locais e dados
-data/
-models/
-torch/
-huggingface/
-whisper/
-
-# Arquivos temporários e uploads
-app/temp/
-app/tmp/
-app/karaoke_uploads/
-*.wav
-*.mp3
-*.m4a
-*.flac
-*.mp4
-*.mkv
-*.avi
-*.ass
-*.png
-*.jpg
-*.jpeg
-
-# Permitir o favicon oficial
-!app/templates/favicon.png
+# Credenciais locais e tokens de deploy (Nunca commitar no Git)
+.env_deploy
+*.token
+deploy_credentials.txt

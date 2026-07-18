@@ -890,6 +890,44 @@ def delete_lyrics_server(current_user: dict = Depends(get_current_user)):
         raise HTTPException(status_code=500, detail=f"Erro ao excluir letra do servidor: {e}")
 
 
+
+# Sistema de Logs de Diagnóstico v2.1.1
+DIAGNOSTIC_LOG_FILE = "/data/output/app_diagnostic.log"
+
+def log_diagnostic(message: str, level: str = "INFO"):
+    """Escreve mensagens detalhadas no arquivo de log de diagnóstico."""
+    import datetime
+    timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    formatted_msg = f"[{timestamp}] [{level}] {message}\n"
+    print(formatted_msg, end="")
+    try:
+        os.makedirs(os.path.dirname(DIAGNOSTIC_LOG_FILE), exist_ok=True)
+        with open(DIAGNOSTIC_LOG_FILE, "a", encoding="utf-8") as f:
+            f.write(formatted_msg)
+    except Exception:
+        pass
+
+@app.get("/api/logs/download")
+def download_diagnostic_logs(current_user: dict = Depends(get_current_user)):
+    """Endpoint para baixar os logs detalhados de diagnóstico do servidor."""
+    if os.path.exists(DIAGNOSTIC_LOG_FILE):
+        return FileResponse(
+            DIAGNOSTIC_LOG_FILE,
+            media_type="text/plain",
+            filename="sal0_karaoke_diagnostic_logs.txt"
+        )
+    # Se não existir ainda o arquivo de log dedicado, cria um com o estado atual
+    try:
+        log_diagnostic("Log de diagnóstico gerado pelo usuário.")
+        return FileResponse(
+            DIAGNOSTIC_LOG_FILE,
+            media_type="text/plain",
+            filename="sal0_karaoke_diagnostic_logs.txt"
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro ao gerar arquivo de logs: {e}")
+
+
 PROFILES_FILE = "/data/output/profiles.json"
 
 class ProfileModel(BaseModel):
@@ -1493,7 +1531,6 @@ def get_status(current_user: dict = Depends(get_current_user)):
     with state_lock:
         return state
 
-@app.post("/api/process")
 def purge_audio_cache_directory(cache_dir: str):
     """Apaga todos os arquivos e subpastas de áudio do cache, preservando apenas imagens de fundo se necessário."""
     if os.path.exists(cache_dir):
@@ -1510,6 +1547,7 @@ def purge_audio_cache_directory(cache_dir: str):
                 logger.warning(f"Erro ao purgar {f_name} do cache: {e}")
 
 
+@app.post("/api/process")
 def process_karaoke(
     background_tasks: BackgroundTasks,
     current_user: dict = Depends(get_current_user),
@@ -1652,9 +1690,31 @@ def process_karaoke(
                 pass
 
     elif library_audio:
-        lib_audio_path = os.path.join(LIBRARY_DIR, "videos", library_audio)
+        import unicodedata
+        lib_video_dir = os.path.join(LIBRARY_DIR, "videos")
+        lib_audio_path = os.path.join(lib_video_dir, library_audio)
+        
+        # Busca resiliente se o nome exato com acentos/caracteres especiais falhar
         if not os.path.exists(lib_audio_path):
-            raise HTTPException(status_code=400, detail="Arquivo não encontrado na biblioteca de áudio.")
+            log_diagnostic(f"Arquivo exato '{library_audio}' não encontrado no caminho direto. Iniciando busca resiliente...", "WARNING")
+            found_file = None
+            if os.path.exists(lib_video_dir):
+                available = os.listdir(lib_video_dir)
+                target_norm = unicodedata.normalize('NFD', library_audio).encode('ascii', 'ignore').decode().lower()
+                for fname in available:
+                    fname_norm = unicodedata.normalize('NFD', fname).encode('ascii', 'ignore').decode().lower()
+                    if fname_norm == target_norm or fname.lower() == library_audio.lower():
+                        found_file = fname
+                        break
+            if found_file:
+                log_diagnostic(f"Música encontrada via correspondência resiliente: '{found_file}'", "INFO")
+                library_audio = found_file
+                lib_audio_path = os.path.join(lib_video_dir, library_audio)
+            else:
+                avail_list = os.listdir(lib_video_dir) if os.path.exists(lib_video_dir) else []
+                err_detail = f"Música '{library_audio}' não encontrada na Biblioteca. Arquivos disponíveis na pasta /data/library/videos: {avail_list}"
+                log_diagnostic(err_detail, "ERROR")
+                raise HTTPException(status_code=400, detail=err_detail)
             
         orig_name = os.path.splitext(library_audio)[0]
         audio_ext = os.path.splitext(library_audio)[1]
