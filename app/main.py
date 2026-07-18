@@ -1,3 +1,5 @@
+import socket
+socket.setdefaulttimeout(120)  # Timeout de 120s para impedir travamentos de socket em downloads de IA
 import os
 import uuid
 import shutil
@@ -891,7 +893,7 @@ def delete_lyrics_server(current_user: dict = Depends(get_current_user)):
 
 
 
-# Sistema de Logs de Diagnóstico v2.1.1
+# Sistema de Logs de Diagnóstico v2.1.3
 DIAGNOSTIC_LOG_FILE = "/data/output/app_diagnostic.log"
 
 def log_diagnostic(message: str, level: str = "INFO"):
@@ -2187,7 +2189,7 @@ def run_pipeline(
                 update_state("processing", "Separating vocals", 40)
                 send_telegram_notification(telegram_token, telegram_chat_id, "✂️ <b>Sal0 Karaokê</b>: Separando áudio (40%)")
                 with tempfile.TemporaryDirectory() as demucs_tmp:
-                    v_tmp, i_tmp = separate_vocals(converted_wav, demucs_tmp)
+                    v_tmp, i_tmp = separate_vocals(converted_wav, demucs_tmp, update_callback=update_state)
                     shutil.move(v_tmp, vocals_wav)
                     shutil.move(i_tmp, instrumental_wav)
                     
@@ -2251,6 +2253,13 @@ def run_pipeline(
                 
                 transcribe_audio = vocals_wav if transcribe_source == "vocals" else converted_wav
                 logger.info(f"Fonte de transcrição escolhida: {transcribe_audio} (Modo: {transcribe_source})")
+                
+                # Verificar se o modelo Whisper está baixado para informar o usuário na 1ª vez
+                folder_name = f"models--Systran--faster-whisper-{whisper_model}"
+                model_path = os.path.join("/data/output/models/whisper", folder_name)
+                if not os.path.exists(model_path):
+                    update_state("processing", f"Baixando Modelo de IA Whisper {whisper_model} (Download único de ~1.5GB)...", 65)
+                
                 segments = transcribe_vocals(transcribe_audio, model_size=whisper_model, initial_prompt=lyrics_text)
                 
                 if segments:

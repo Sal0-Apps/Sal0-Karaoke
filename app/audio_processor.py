@@ -56,7 +56,7 @@ def extract_audio(input_path: str, output_wav_path: str) -> str:
         logger.error(f"Erro no FFmpeg ao extrair áudio: {e}")
         raise
 
-def separate_vocals(audio_path: str, temp_output_dir: str) -> tuple[str, str]:
+def separate_vocals(audio_path: str, temp_output_dir: str, update_callback=None) -> tuple[str, str]:
     """Usa Demucs em modo CPU para separar o áudio em vocais e instrumental (no_vocals)."""
     logger.info(f"Iniciando a separação de vocais com Demucs para: {audio_path}")
     
@@ -65,13 +65,14 @@ def separate_vocals(audio_path: str, temp_output_dir: str) -> tuple[str, str]:
     
     # Demucs salva em: <temp_output_dir>/<model_name>/<audio_stem>/
     # O modelo padrão que usamos é o "htdemucs"
-    model_name = "htdemucs"
+    model_name = "htdemucs_ft"
     
     # Montar comando do Demucs
     # Usando o modelo padrão htdemucs, rodando apenas na CPU, e separando apenas vocals + instrumental
     cmd = [
         "demucs",
         "-d", "cpu",
+        "-n", "htdemucs_ft",
         "--two-stems", "vocals",
         "-o", temp_output_dir,
         audio_path
@@ -96,6 +97,7 @@ def separate_vocals(audio_path: str, temp_output_dir: str) -> tuple[str, str]:
         )
         pm.set_active_process(process)
         
+        import re
         for line in process.stdout:
             if pm.cancel_event.is_set():
                 process.terminate()
@@ -103,6 +105,14 @@ def separate_vocals(audio_path: str, temp_output_dir: str) -> tuple[str, str]:
             line_str = line.strip()
             if line_str:
                 logger.info(f"[Demucs] {line_str}")
+                if update_callback:
+                    if "downloading" in line_str.lower() or "download" in line_str.lower():
+                        update_callback("processing", "Baixando Modelo de IA Demucs (Aguarde a 1ª vez)...", 25)
+                    match = re.search(r'(\d+)%', line_str)
+                    if match:
+                        pct = int(match.group(1))
+                        scaled_pct = 25 + int(pct * 0.30)
+                        update_callback("processing", f"Separando vocais do áudio (Demucs {pct}%)", scaled_pct)
                 
         process.wait()
         pm.clear_active_process()
