@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Sal0 Karaokê - Gerador Automático de Vídeos</title>
     <link rel="icon" type="image/png" href="/favicon.png">
     <!-- Google Fonts para tipografia premium -->
@@ -35,14 +35,16 @@
 
         html, body {
             overflow-x: hidden !important;
-            max-width: 100vw !important;
+            max-width: 100% !important;
             width: 100% !important;
             margin: 0;
             padding: 0;
+            position: relative;
         }
 
-        * {
+        *, *::before, *::after {
             min-width: 0;
+            box-sizing: border-box;
         }
 
         body {
@@ -405,7 +407,7 @@
             to { opacity: 1; transform: translateY(0); }
         }
 
-        /* Novas Classes para Abas e Responsividade Mobile v1.6.1 */
+        /* Novas Classes para Abas e Responsividade Mobile v1.7.0 */
         .tab-btn {
             background: transparent;
             color: var(--text-muted);
@@ -502,6 +504,24 @@
                 flex-basis: 100% !important;
             }
         }
+
+        /* ===== MODAIS RESPONSIVOS v1.7.0 ===== */
+        [id$="Modal"] > div,
+        #helpModal > div,
+        #correctionConfirmModal > div,
+        #authOverlay > div {
+            max-width: min(600px, 95vw) !important;
+            max-height: 90vh !important;
+            width: 95vw !important;
+            overflow-y: auto !important;
+            overflow-x: hidden !important;
+            box-sizing: border-box !important;
+        }
+        #helpModal > div { width: min(600px, 95vw) !important; }
+        #correctionConfirmModal > div { width: min(440px, 95vw) !important; }
+        #authOverlay > div#loginCard,
+        #authOverlay > div#setupCard { width: min(420px, 95vw) !important; }
+
     </style>
 </head>
 <body>
@@ -549,15 +569,15 @@
             </div>
 
             <!-- ÁREA DE MÍDIA (Música e Imagem de Fundo Lado a Lado) -->
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.2rem; margin-top: 0.5rem;">
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr)); gap: 1.2rem; margin-top: 0.5rem;">
                 
                 <!-- Coluna 1: Música ou Vídeo Original -->
                 <div class="form-group" style="margin: 0; display: flex; flex-direction: column;">
                     <span class="label">🎵 Música ou Vídeo Original</span>
                     <div style="display: flex; gap: 0.3rem; margin-top: 0.3rem; margin-bottom: 0.4rem;">
                         <button type="button" id="btnAudioModeUpload" class="btn-tab-small active">📁 Enviar</button>
-                        <button type="button" id="btnAudioModeYoutube" class="btn-tab-small" style="display: none;">🌐 YouTube (Beta)</button>
-                        <button type="button" id="btnAudioModeLibrary" class="btn-tab-small">📚 Biblioteca</button>
+                        <button type="button" id="btnAudioModeYoutube" class="btn-tab-small" style="display: none;">🌐 YouTube</button>
+
                     </div>
                     
                     <div id="audioUploadContainer">
@@ -565,7 +585,7 @@
                             <span class="upload-icon" style="font-size: 1.5rem; margin-bottom: 0.2rem;">🎵</span>
                             <p class="upload-text" id="audioText" style="font-size: 0.8rem; margin: 0 0 0.1rem 0; font-weight: 500;">Arraste a música ou clique</p>
                             <p class="upload-hint" style="font-size: 0.65rem; color: var(--text-muted); margin: 0;">mp3, wav, flac, m4a, mp4...</p>
-                            <input type="file" id="audioFile" name="audio_file" class="file-input" accept=".mp3,.wav,.flac,.m4a,.mp4,.mkv,.avi" required style="display: none;">
+                            <input type="file" id="audioFile" name="audio_file" class="file-input" accept=".mp3,.wav,.flac,.m4a,.mp4,.mkv,.avi" style="display: none;">
                             <div class="file-selected-badge" id="audioBadge" style="display: none; background: #8b5cf6; color: white; padding: 0.2rem 0.5rem; border-radius: 20px; font-size: 0.7rem; font-weight: 500; margin-top: 0.3rem; max-width: 90%; text-overflow: ellipsis; overflow: hidden; white-space: nowrap;">Nenhum arquivo selecionado</div>
                         </div>
                     </div>
@@ -579,11 +599,8 @@
                         </div>
                     </div>
                     
-                    <div id="audioLibraryContainer" style="display: none;">
-                        <select id="libraryAudioSelect" name="library_audio" class="btn-secondary" style="width: 100%; border: 1px solid var(--glass-border); padding: 0.6rem 0.8rem; background: #141226; color: var(--text-main); border-radius: 10px; font-size: 0.8rem; cursor: pointer; outline: none;">
-                            <option value="">Selecione uma música da biblioteca...</option>
-                        </select>
-                    </div>
+                    <!-- library_audio preenchido via JS pelo botão Criar na aba Biblioteca -->
+                    <input type="hidden" id="libraryAudioHidden" name="library_audio" value="">
                 </div>
 
                 <!-- Coluna 2: Imagem ou Vídeo de Fundo (Opcional) -->
@@ -659,12 +676,12 @@
                 <div class="form-group" style="border: 1px solid rgba(255,255,255,0.05); border-radius: 10px; padding: 1rem; background: rgba(0,0,0,0.15); margin-bottom: 1rem;">
                     <label style="display: flex; align-items: center; justify-content: space-between; cursor: pointer; user-select: none;">
                         <span class="label" style="margin: 0; display: flex; align-items: center; gap: 0.4rem; color: #fb7185; font-weight: 600;">
-                            <span>🌐</span> Habilitar Downloader do YouTube na tela principal (Teste Beta)
+                            <span>🌐</span> Habilitar Downloader do YouTube na tela principal
                         </span>
                         <input type="checkbox" id="toggleYoutubeFeature" style="width: 18px; height: 18px; cursor: pointer; accent-color: #fb7185;">
                     </label>
                     <div class="bg-info-text" style="margin-top: 0.4rem;">
-                        <span>Ao ativar esta opção, o modo YouTube ficará visível na seleção de mídias originais para baixar vídeos do YouTube para a Biblioteca.</span>
+                        <span>Ao ativar esta opção, o modo YouTube ficará visível na seleção de mídias originais.</span>
                     </div>
                 </div>
                 
@@ -991,7 +1008,7 @@
         <!-- Conteúdo da Aba Biblioteca & Histórico -->
         <div id="libraryTabContent" style="display: none; animation: fadeIn 0.3s ease-out; flex-direction: column; gap: 1.5rem;">
             <!-- Grid de Envio Rápido para a Biblioteca -->
-            <div style="background: rgba(30, 27, 57, 0.4); border: 1px solid var(--glass-border); padding: 1.2rem; border-radius: 12px; display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem;">
+            <div style="background: rgba(30, 27, 57, 0.4); border: 1px solid var(--glass-border); padding: 1.2rem; border-radius: 12px; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr)); gap: 1rem;">
                 <div>
                     <h4 style="margin: 0 0 0.5rem 0; font-size: 0.9rem; color: var(--text-main); font-weight: 700;">📥 Adicionar Música/Vídeo à Biblioteca</h4>
                     <form id="libAudioUploadForm" style="display: flex; flex-direction: column; gap: 0.4rem;">
@@ -1017,7 +1034,7 @@
             </div>
 
             <!-- Listagem de Seções da Biblioteca -->
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem;">
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr)); gap: 1.5rem;">
                 <!-- Coluna A: Faixas de Músicas -->
                 <div style="background: rgba(30, 27, 57, 0.45); border: 1px solid var(--glass-border); border-radius: 12px; padding: 1.2rem; display: flex; flex-direction: column; height: 360px;">
                     <h3 style="margin: 0 0 0.8rem 0; font-size: 1.05rem; font-weight: 700; color: #8b5cf6; display: flex; align-items: center; gap: 0.4rem;">
@@ -1044,7 +1061,7 @@
                 <h3 style="margin: 0 0 0.8rem 0; font-size: 1.05rem; font-weight: 700; color: #10b981; display: flex; align-items: center; gap: 0.4rem;">
                     <span>🎬</span> Histórico de Karaokês Concluídos
                 </h3>
-                <div id="libHistoryList" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 0.8rem; max-height: 350px; overflow-y: auto; padding-right: 0.3rem;">
+                <div id="libHistoryList" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr)); gap: 0.8rem; max-height: 350px; overflow-y: auto; padding-right: 0.3rem;">
                     <!-- Listado dinamicamente -->
                 </div>
             </div>
@@ -1052,7 +1069,7 @@
 
         <!-- Rodapé com Versão Oculta -->
         <footer style="text-align: center; margin-top: 3rem; margin-bottom: 1.5rem; font-size: 0.72rem; color: rgba(255,255,255,0.18); font-weight: 500; letter-spacing: 0.05em;">
-            Sal0 Karaokê v1.6.1 &copy; 2026
+            Sal0 Karaokê v1.7.0 &copy; 2026
         </footer>
         </div>
 
@@ -1096,7 +1113,7 @@
                     <p style="margin-bottom: 0.8rem; color: var(--text-muted);">Preencha o Token do Bot e ID do Chat para receber o progresso detalhado de renderização e **receber o vídeo MP4 final diretamente** no seu canal ou grupo do Telegram assim que concluído.</p>
                     
                     <h4 style="color: #60a5fa; margin-top: 1rem; margin-bottom: 0.3rem;">6. Biblioteca de Mídias & YouTube</h4>
-                    <p style="margin-bottom: 0.8rem; color: var(--text-muted);">A partir da v1.6.1, você pode salvar arquivos permanentemente em <code>/data/library/</code> (organizados em Músicas, Fundo e Histórico), carregar links do YouTube (o servidor baixa via yt-dlp) e usar vídeos de plano de fundo em loop ou cortados no tempo do áudio instrumental.</p>
+                    <p style="margin-bottom: 0.8rem; color: var(--text-muted);">A partir da v1.7.0, você pode salvar arquivos permanentemente em <code>/data/library/</code> (organizados em Músicas, Fundo e Histórico), carregar links do YouTube (o servidor baixa via yt-dlp) e usar vídeos de plano de fundo em loop ou cortados no tempo do áudio instrumental.</p>
                 </div>
                 
                 <button type="button" id="btnHelpDismiss" class="btn-success" style="margin-top: 1.2rem; width: 100%; padding: 0.7rem; border-radius: 8px; font-weight: 600; cursor: pointer; outline: none; border: 1px solid rgba(16, 185, 129, 0.3);">Entendi</button>
@@ -1461,6 +1478,10 @@
         audioFile.addEventListener('change', () => {
             if (audioFile.files.length) {
                 updateAudioBadge(audioFile.files[0].name);
+                // Limpar seleção de música da biblioteca ao enviar arquivo novo
+                const libHidden = document.getElementById('libraryAudioHidden');
+                if (libHidden) libHidden.value = '';
+                audioFile.setAttribute('required', 'true');
             }
         });
 
@@ -1468,6 +1489,7 @@
             audioText.innerText = "Arquivo selecionado:";
             audioBadge.innerText = filename;
             audioBadge.style.display = "inline-flex";
+            audioBadge.style.background = "#8b5cf6";
         }
 
         // Eventos Drag and Drop para imagem de fundo
@@ -1561,6 +1583,18 @@
         form.addEventListener('submit', (e) => {
             e.preventDefault();
             
+            // Validar se há música selecionada (arquivo, biblioteca ou cache)
+            const libHidden = document.getElementById('libraryAudioHidden');
+            const hasLibrary = libHidden && libHidden.value.trim() !== '';
+            const hasFile = audioFile.files && audioFile.files.length > 0;
+            const hasCache = hasServerCache;
+            const hasYoutube = currentAudioMode === 'youtube' && document.getElementById('youtubeUrl').value.trim() !== '';
+            
+            if (!hasFile && !hasLibrary && !hasCache && !hasYoutube) {
+                alert('Selecione uma música para continuar. Envie um arquivo, escolha da Biblioteca ou use uma música do cache do servidor.');
+                return;
+            }
+            
             // Ocultar elementos de estado anterior
             errorCard.style.display = "none";
             downloadBox.style.display = "none";
@@ -1616,7 +1650,9 @@
             formData.append('keep_first_line_visible', document.getElementById('keepFirstLineVisible').value);
             
             formData.append('youtube_url', currentAudioMode === 'youtube' ? document.getElementById('youtubeUrl').value.trim() : '');
-            formData.append('library_audio', currentAudioMode === 'library' ? document.getElementById('libraryAudioSelect').value : '');
+            // library_audio: usa o hidden input preenchido pelo botão Criar na aba Biblioteca
+            const libHidden = document.getElementById('libraryAudioHidden');
+            formData.append('library_audio', libHidden ? libHidden.value : '');
             formData.append('library_bg', currentBgMode === 'library' ? document.getElementById('libraryBgSelect').value : '');
             formData.append('save_to_library', document.getElementById('saveToLibrary').checked ? "true" : "false");
             formData.append('only_remove_vocals', document.getElementById('onlyRemoveVocals').checked ? "true" : "false");
@@ -2627,7 +2663,7 @@
             if (pollingInterval) clearInterval(pollingInterval);
         }
 
-        // --- CÓDIGO DA BIBLIOTECA & PREVIEW AVANÇADO v1.6.1 ---
+        // --- CÓDIGO DA BIBLIOTECA & PREVIEW AVANÇADO v1.7.0 ---
         const tabBtnCreate = document.getElementById('tabBtnCreate');
         const tabBtnLibrary = document.getElementById('tabBtnLibrary');
         const createTabContent = document.getElementById('createTabContent');
@@ -2651,7 +2687,7 @@
         // Alternador de sub-modos (Upload / YouTube / Biblioteca) para Música
         const btnAudioModeUpload = document.getElementById('btnAudioModeUpload');
         const btnAudioModeYoutube = document.getElementById('btnAudioModeYoutube');
-        const btnAudioModeLibrary = document.getElementById('btnAudioModeLibrary');
+        const btnAudioModeLibrary = null; // removido do form principal
         const audioUploadContainer = document.getElementById('audioUploadContainer');
         const audioYoutubeContainer = document.getElementById('audioYoutubeContainer');
         const audioLibraryContainer = document.getElementById('audioLibraryContainer');
@@ -2752,19 +2788,7 @@
             }
         });
 
-        btnAudioModeLibrary.addEventListener('click', () => {
-            currentAudioMode = 'library';
-            btnAudioModeLibrary.classList.add('active');
-            btnAudioModeUpload.classList.remove('active');
-            btnAudioModeYoutube.classList.remove('active');
-            audioUploadContainer.style.display = 'none';
-            audioYoutubeContainer.style.display = 'none';
-            audioLibraryContainer.style.display = 'block';
-            document.getElementById('audioFile').removeAttribute('required');
-            document.getElementById('youtubeUrl').removeAttribute('required');
-            document.getElementById('libraryAudioSelect').setAttribute('required', 'true');
-            loadLibraryOptions();
-        });
+        // btnAudioModeLibrary removido do form
 
         // Alternador de sub-modos (Upload / Biblioteca) para Fundo (Background)
         const btnBgModeUpload = document.getElementById('btnBgModeUpload');
@@ -2917,16 +2941,26 @@
         };
 
         window.processLibraryAudio = function(filename) {
-            btnAudioModeLibrary.click();
-            const audioSelect = document.getElementById('libraryAudioSelect');
-            let opt = Array.from(audioSelect.options).find(o => o.value === filename);
-            if (!opt) {
-                opt = document.createElement('option');
-                opt.value = filename;
-                opt.innerText = filename;
-                audioSelect.appendChild(opt);
+            // Preencher o hidden input com o arquivo selecionado da biblioteca
+            const hiddenInput = document.getElementById('libraryAudioHidden');
+            if (hiddenInput) hiddenInput.value = filename;
+            
+            // Atualizar o badge de áudio para mostrar que um arquivo foi selecionado
+            const audioFileInput = document.getElementById('audioFile');
+            if (audioFileInput) audioFileInput.removeAttribute('required');
+            
+            // Mostrar o arquivo selecionado no badge do upload
+            const audioText = document.getElementById('audioText');
+            const audioBadge = document.getElementById('audioBadge');
+            if (audioText) audioText.innerText = 'Música da Biblioteca:';
+            if (audioBadge) {
+                audioBadge.innerText = filename;
+                audioBadge.style.display = 'inline-flex';
+                audioBadge.style.background = '#6d28d9';
             }
-            audioSelect.value = filename;
+            hasServerCache = true;
+            
+            // Ir para a aba de Criar Karaokê
             tabBtnCreate.click();
         };
 
