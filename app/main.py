@@ -690,11 +690,19 @@ def run_youtube_download_bg(url: str):
         )
 
 def download_bg_youtube(url: str, cache_dir: str) -> tuple[str, str]:
-    """Baixa apenas o fluxo de vídeo do YouTube (sem áudio) para uso como fundo."""
+    """Baixa apenas o fluxo de vídeo do YouTube (sem áudio) para uso como fundo com fallback."""
     import yt_dlp
     
-    ydl_opts = {
+    ydl_opts_primary = {
         'format': 'bestvideo[height<=1080]/bestvideo/best',
+        'outtmpl': os.path.join(cache_dir, 'bg_yt_raw.%(ext)s'),
+        'merge_output_format': 'mp4',
+        'remux_video': 'mp4',
+        'quiet': True,
+        'no_warnings': True,
+    }
+    ydl_opts_fallback = {
+        'format': 'best',
         'outtmpl': os.path.join(cache_dir, 'bg_yt_raw.%(ext)s'),
         'merge_output_format': 'mp4',
         'remux_video': 'mp4',
@@ -704,11 +712,17 @@ def download_bg_youtube(url: str, cache_dir: str) -> tuple[str, str]:
     
     title = "Fundo YouTube"
     try:
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        with yt_dlp.YoutubeDL(ydl_opts_primary) as ydl:
             info = ydl.extract_info(url, download=True)
             title = info.get('title', 'Fundo YouTube')
     except Exception as e:
-        logger.warning(f"Falha ao baixar fundo do YouTube com yt-dlp: {e}")
+        logger.warning(f"Falha no formato primário do fundo YouTube ({e}). Tentando fallback...")
+        try:
+            with yt_dlp.YoutubeDL(ydl_opts_fallback) as ydl:
+                info = ydl.extract_info(url, download=True)
+                title = info.get('title', 'Fundo YouTube')
+        except Exception as err:
+            logger.error(f"Erro fatal no download de fundo YouTube: {err}")
         
     raw_file = os.path.join(cache_dir, 'bg_yt_raw.mp4')
     if not os.path.exists(raw_file):
@@ -1499,15 +1513,16 @@ def process_karaoke(
             if save_to_library:
                 shutil.copy2(input_bg_path, os.path.join(LIBRARY_DIR, "photos", bg_filename))
         elif library_bg:
-            bg_ext = os.path.splitext(library_bg)[1]
-            bg_filename = library_bg
-            input_bg_path = os.path.join(cache_dir, f"original_bg{bg_ext}")
-            shutil.copy2(os.path.join(LIBRARY_DIR, "photos", library_bg), input_bg_path)
-            has_bg = True
+            src_bg = os.path.join(LIBRARY_DIR, "photos", library_bg)
+            if os.path.exists(src_bg):
+                bg_ext = os.path.splitext(library_bg)[1]
+                bg_filename = library_bg
+                input_bg_path = os.path.join(cache_dir, f"original_bg{bg_ext}")
+                shutil.copy2(src_bg, input_bg_path)
+                has_bg = True
             
         if not already_downloaded:
-            # Limpar cache de processamento anterior
-            logger.info("Novo processamento do YouTube solicitado. Limpando o cache anterior...")
+            logger.info(f"Novo processamento do YouTube solicitado ({youtube_url.strip()}). Limpando cache anterior...")
             for f_name in os.listdir(cache_dir):
                 if f_name.startswith("original_bg"):
                     continue
@@ -1518,13 +1533,27 @@ def process_karaoke(
                     elif os.path.isdir(f_path):
                         shutil.rmtree(f_path)
                 except Exception as e:
-                    logger.error(f"Erro ao limpar arquivo do cache {f_name}: {e}")
+                    logger.error(f"Erro ao limpar cache: {e}")
+
+            # Baixar o áudio/vídeo do YouTube agora
+            input_audio_path, orig_name = download_youtube(youtube_url.strip(), cache_dir)
+            ext = os.path.splitext(input_audio_path)[1]
+
+            if save_to_library:
+                try:
+                    lib_video_dir = os.path.join(LIBRARY_DIR, "videos")
+                    os.makedirs(lib_video_dir, exist_ok=True)
+                    safe_title = "".join([c for c in orig_name if c.isalnum() or c in ' ._-']).strip() or "youtube_download"
+                    shutil.copy2(input_audio_path, os.path.join(lib_video_dir, f"{safe_title}{ext}"))
+                except Exception as copy_err:
+                    logger.error(f"Erro ao salvar YouTube na biblioteca: {copy_err}")
 
             cached_meta = {
+                "source_type": "youtube",
                 "youtube_url": youtube_url.strip(),
                 "original_filename": orig_name,
-                "audio_filename": "YouTube Download",
-                "input_ext": ".mp4",
+                "audio_filename": orig_name + ext,
+                "input_ext": ext,
                 "has_bg": has_bg,
                 "bg_ext": bg_ext,
                 "bg_filename": bg_filename,
@@ -1583,11 +1612,13 @@ def process_karaoke(
             if save_to_library:
                 shutil.copy2(input_bg_path, os.path.join(LIBRARY_DIR, "photos", bg_filename))
         elif library_bg:
-            bg_ext = os.path.splitext(library_bg)[1]
-            bg_filename = library_bg
-            input_bg_path = os.path.join(cache_dir, f"original_bg{bg_ext}")
-            shutil.copy2(os.path.join(LIBRARY_DIR, "photos", library_bg), input_bg_path)
-            has_bg = True
+            src_bg = os.path.join(LIBRARY_DIR, "photos", library_bg)
+            if os.path.exists(src_bg):
+                bg_ext = os.path.splitext(library_bg)[1]
+                bg_filename = library_bg
+                input_bg_path = os.path.join(cache_dir, f"original_bg{bg_ext}")
+                shutil.copy2(src_bg, input_bg_path)
+                has_bg = True
 
         cached_meta = {
             "original_filename": orig_name,
@@ -1638,11 +1669,13 @@ def process_karaoke(
             if save_to_library:
                 shutil.copy2(input_bg_path, os.path.join(LIBRARY_DIR, "photos", bg_filename))
         elif library_bg:
-            bg_ext = os.path.splitext(library_bg)[1]
-            bg_filename = library_bg
-            input_bg_path = os.path.join(cache_dir, f"original_bg{bg_ext}")
-            shutil.copy2(os.path.join(LIBRARY_DIR, "photos", library_bg), input_bg_path)
-            has_bg = True
+            src_bg = os.path.join(LIBRARY_DIR, "photos", library_bg)
+            if os.path.exists(src_bg):
+                bg_ext = os.path.splitext(library_bg)[1]
+                bg_filename = library_bg
+                input_bg_path = os.path.join(cache_dir, f"original_bg{bg_ext}")
+                shutil.copy2(src_bg, input_bg_path)
+                has_bg = True
             
         cached_meta = {
             "original_filename": orig_name,
