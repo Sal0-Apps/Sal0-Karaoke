@@ -16,7 +16,8 @@ WORKDIR /app
 # Copiar e instalar requirements.txt
 COPY requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt
+    pip install --no-cache-dir -r requirements.txt && \
+    pip install --no-cache-dir --upgrade yt-dlp
 
 # Copiar script auxiliar e pré-baixar os modelos (Whisper Medium e Demucs htdemucs)
 COPY download_models.py .
