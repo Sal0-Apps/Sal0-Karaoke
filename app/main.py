@@ -630,10 +630,6 @@ def run_youtube_download_bg(url: str):
     cache_dir = "/data/cache"
     os.makedirs(cache_dir, exist_ok=True)
     cache_meta_file = os.path.join(cache_dir, "cache_meta.json")
-
-    # Se uma música da biblioteca foi explicitamente selecionada, anular youtube_url para não reaproveitar YouTube anterior
-    if library_audio and library_audio.strip():
-        youtube_url = None
     
     # Carregar configuração global do Telegram do arquivo json
     tele_config = load_telegram_config()
@@ -1355,6 +1351,10 @@ def process_karaoke(
     cache_dir = "/data/cache"
     os.makedirs(cache_dir, exist_ok=True)
     cache_meta_file = os.path.join(cache_dir, "cache_meta.json")
+
+    # Se uma música da biblioteca foi explicitamente selecionada, anular youtube_url para priorizar a biblioteca
+    if library_audio and library_audio.strip():
+        youtube_url = None
 
     # 2. Determinar se usaremos arquivos enviados, biblioteca, YouTube ou cache
     if youtube_url and youtube_url.strip():

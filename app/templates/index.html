@@ -407,7 +407,7 @@
             to { opacity: 1; transform: translateY(0); }
         }
 
-        /* Novas Classes para Abas e Responsividade Mobile v1.7.1 */
+        /* Novas Classes para Abas e Responsividade Mobile v1.7.2 */
         .tab-btn {
             background: transparent;
             color: var(--text-muted);
@@ -505,7 +505,7 @@
             }
         }
 
-        /* ===== MODAIS RESPONSIVOS v1.7.1 ===== */
+        /* ===== MODAIS RESPONSIVOS v1.7.2 ===== */
         [id$="Modal"] > div,
         #helpModal > div,
         #correctionConfirmModal > div,
@@ -523,7 +523,7 @@
         #authOverlay > div#setupCard { width: min(420px, 95vw) !important; }
 
     
-        /* ===== STYLES RESPONSIVOS v1.7.1 DEFINITIVOS ===== */
+        /* ===== STYLES RESPONSIVOS v1.7.2 DEFINITIVOS ===== */
         html, body {
             overflow-x: hidden !important;
             max-width: 100vw !important;
@@ -697,7 +697,7 @@
             <!-- Opções adicionais de biblioteca (Salvar ao enviar) -->
             <div style="display: flex; gap: 0.8rem; margin-top: 1rem; flex-wrap: wrap; flex-direction: column; background: rgba(255, 255, 255, 0.015); border: 1px solid rgba(255, 255, 255, 0.04); padding: 0.8rem 1rem; border-radius: 12px;">
                 <div style="display: flex; align-items: center; gap: 0.5rem;">
-                    <input type="checkbox" id="saveToLibrary" name="save_to_library" checked style="cursor: pointer; width: 16px; height: 16px;">
+                    <input type="checkbox" id="saveToLibrary" name="save_to_library" style="cursor: pointer; width: 16px; height: 16px;">
                     <label for="saveToLibrary" style="font-size: 0.78rem; color: var(--text-muted); cursor: pointer; user-select: none;">💾 Salvar arquivos enviados na biblioteca permanente</label>
                 </div>
                 <div style="display: flex; align-items: center; gap: 0.5rem;">
@@ -1112,7 +1112,7 @@
 
         <!-- Rodapé com Versão Oculta -->
         <footer style="text-align: center; margin-top: 3rem; margin-bottom: 1.5rem; font-size: 0.72rem; color: rgba(255,255,255,0.18); font-weight: 500; letter-spacing: 0.05em;">
-            Sal0 Karaokê v1.7.1 &copy; 2026
+            Sal0 Karaokê v1.7.2 &copy; 2026
         </footer>
         </div>
 
@@ -1156,7 +1156,7 @@
                     <p style="margin-bottom: 0.8rem; color: var(--text-muted);">Preencha o Token do Bot e ID do Chat para receber o progresso detalhado de renderização e **receber o vídeo MP4 final diretamente** no seu canal ou grupo do Telegram assim que concluído.</p>
                     
                     <h4 style="color: #60a5fa; margin-top: 1rem; margin-bottom: 0.3rem;">6. Biblioteca de Mídias & YouTube</h4>
-                    <p style="margin-bottom: 0.8rem; color: var(--text-muted);">A partir da v1.7.1, você pode salvar arquivos permanentemente em <code>/data/library/</code> (organizados em Músicas, Fundo e Histórico), carregar links do YouTube (o servidor baixa via yt-dlp) e usar vídeos de plano de fundo em loop ou cortados no tempo do áudio instrumental.</p>
+                    <p style="margin-bottom: 0.8rem; color: var(--text-muted);">A partir da v1.7.2, você pode salvar arquivos permanentemente em <code>/data/library/</code> (organizados em Músicas, Fundo e Histórico), carregar links do YouTube (o servidor baixa via yt-dlp) e usar vídeos de plano de fundo em loop ou cortados no tempo do áudio instrumental.</p>
                 </div>
                 
                 <button type="button" id="btnHelpDismiss" class="btn-success" style="margin-top: 1.2rem; width: 100%; padding: 0.7rem; border-radius: 8px; font-weight: 600; cursor: pointer; outline: none; border: 1px solid rgba(16, 185, 129, 0.3);">Entendi</button>
@@ -2713,7 +2713,7 @@
             if (pollingInterval) clearInterval(pollingInterval);
         }
 
-        // --- CÓDIGO DA BIBLIOTECA & PREVIEW AVANÇADO v1.7.1 ---
+        // --- CÓDIGO DA BIBLIOTECA & PREVIEW AVANÇADO v1.7.2 ---
         const tabBtnCreate = document.getElementById('tabBtnCreate');
         const tabBtnLibrary = document.getElementById('tabBtnLibrary');
         const createTabContent = document.getElementById('createTabContent');
@@ -2734,7 +2734,7 @@
             loadLibrary();
         });
 
-        // Alternador de sub-modos (Upload / YouTube) para Música v1.7.1
+        // Alternador de sub-modos (Upload / YouTube) para Música v1.7.2
         const btnAudioModeUpload = document.getElementById('btnAudioModeUpload');
         const btnAudioModeYoutube = document.getElementById('btnAudioModeYoutube');
         const audioUploadContainer = document.getElementById('audioUploadContainer');
