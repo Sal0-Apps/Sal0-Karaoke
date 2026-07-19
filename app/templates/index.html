@@ -972,7 +972,7 @@
 
         <!-- RODAPÉ DISCRETO DA PÁGINA -->
         <footer>
-            Sal0 Karaokê v3.5.5
+            Sal0 Karaokê v3.5.6
         </footer>
 
     </div> <!-- Container End -->
@@ -2045,6 +2045,10 @@
             await fetchUsers();
             await fetchModelsStatus();
             await loadLibrary();
+
+            // CHECAGEM DE STATUS EM SEGUNDO PLANO AO ABRIR OU RECARREGAR A PÁGINA
+            await fetchStatus();
+            startPolling();
         });
 
         async function deleteUser(username) {
