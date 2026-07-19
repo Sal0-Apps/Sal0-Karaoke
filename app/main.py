@@ -40,13 +40,37 @@ USERS_FILE = "/data/users.json"
 SESSIONS_FILE = "/data/sessions.json"
 
 def load_users():
-    if not os.path.exists(USERS_FILE):
-        return {}
-    try:
-        with open(USERS_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except Exception:
-        return {}
+    """Carrega a lista de usuários de /data/users.json, /data/output/users.json ou varredura em /data."""
+    possible_paths = [
+        "/data/users.json",
+        "/data/output/users.json"
+    ]
+    for path in possible_paths:
+        if os.path.exists(path):
+            try:
+                with open(path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    if isinstance(data, dict):
+                        return data
+            except Exception:
+                pass
+                
+    if os.path.exists("/data"):
+        try:
+            for root, dirs, files in os.walk("/data"):
+                if "users.json" in files:
+                    u_path = os.path.join(root, "users.json")
+                    try:
+                        with open(u_path, "r", encoding="utf-8") as f:
+                            data = json.load(f)
+                            if isinstance(data, dict):
+                                return data
+                    except Exception:
+                        pass
+        except Exception:
+            pass
+            
+    return {}
 
 def save_users(users):
     try:
@@ -998,7 +1022,7 @@ def delete_lyrics_server(current_user: dict = Depends(get_current_user)):
 
 
 
-# Sistema de Logs de Diagnóstico v3.0.11
+# Sistema de Logs de Diagnóstico v3.0.14
 DIAGNOSTIC_LOG_FILE = "/data/output/app_diagnostic.log"
 
 def log_diagnostic(message: str, level: str = "INFO"):
@@ -1229,16 +1253,30 @@ def get_favicon():
     return HTMLResponse(status_code=404)
 
 @app.get("/api/auth_status")
-def auth_status(x_session_token: str = Header(None)):
+def auth_status(
+    x_session_token: str = Header(None),
+    authorization: str = Header(None),
+    token: str = Query(None)
+):
     users = load_users()
     if not users:
         return {"status": "setup"}
-    if not x_session_token:
+        
+    active_token = x_session_token or token
+    if not active_token and authorization:
+        if authorization.startswith("Bearer "):
+            active_token = authorization.split(" ")[1].strip()
+        else:
+            active_token = authorization.strip()
+
+    if not active_token:
         return {"status": "login"}
+
     sessions = load_sessions()
-    session = sessions.get(x_session_token)
+    session = sessions.get(active_token)
     if not session:
         return {"status": "login"}
+
     return {
         "status": "authenticated",
         "username": session.get("username"),
@@ -1284,39 +1322,60 @@ def login(data: dict):
     if not username or not password:
         raise HTTPException(status_code=400, detail="Usuário e senha são obrigatórios.")
         
-    user = users.get(username)
-    if not user:
+    user_data = users.get(username)
+    if not user_data:
         raise HTTPException(status_code=401, detail="Usuário ou senha incorretos.")
         
-    # Lógica de migração automática do SHA-256 legado para PBKDF2
-    salt = user.get("salt")
-    if not salt:
-        # Tentar validar usando o sha256 simples antigo
+    # Caso 1: Formato Legado v2.0 onde o valor era uma string direta com o hash SHA-256
+    if isinstance(user_data, str):
         legacy_hash = hashlib.sha256(password.encode("utf-8")).hexdigest()
-        if user.get("password_hash") != legacy_hash:
+        if user_data != legacy_hash:
             raise HTTPException(status_code=401, detail="Usuário ou senha incorretos.")
-        # Se validado com sucesso, migramos imediatamente!
+        # Migração transparente para PBKDF2
         pw_hash, new_salt = hash_password(password)
-        user["password_hash"] = pw_hash
-        user["salt"] = new_salt
-        users[username] = user
+        user_info = {
+            "password_hash": pw_hash,
+            "salt": new_salt,
+            "role": "admin" if username in ["admin", "root"] else "user"
+        }
+        users[username] = user_info
         save_users(users)
-        logger.info(f"Usuário {username} migrado com sucesso para criptografia PBKDF2.")
+        logger.info(f"Usuário '{username}' migrado com sucesso do formato string SHA-256 para PBKDF2.")
+        user_data = user_info
+        
+    # Caso 2: Formato de dicionário (v2.0 / v3.0)
+    elif isinstance(user_data, dict):
+        pw_hash_stored = user_data.get("password_hash") or user_data.get("password")
+        salt = user_data.get("salt")
+        
+        if not salt:
+            legacy_hash = hashlib.sha256(password.encode("utf-8")).hexdigest()
+            if pw_hash_stored != legacy_hash:
+                raise HTTPException(status_code=401, detail="Usuário ou senha incorretos.")
+            pw_hash, new_salt = hash_password(password)
+            user_data["password_hash"] = pw_hash
+            user_data["salt"] = new_salt
+            if "role" not in user_data:
+                user_data["role"] = "admin" if username in ["admin", "root"] else "user"
+            users[username] = user_data
+            save_users(users)
+            logger.info(f"Usuário '{username}' migrado com sucesso de dicionário sem salt para PBKDF2.")
+        else:
+            check_hash, _ = hash_password(password, salt=salt)
+            if pw_hash_stored != check_hash:
+                raise HTTPException(status_code=401, detail="Usuário ou senha incorretos.")
     else:
-        # Validar usando PBKDF2 com o salt correspondente
-        check_hash, _ = hash_password(password, salt=salt)
-        if user.get("password_hash") != check_hash:
-            raise HTTPException(status_code=401, detail="Usuário ou senha incorretos.")
+        raise HTTPException(status_code=401, detail="Formato de dados do usuário inválido.")
         
     token = str(uuid.uuid4())
     sessions = load_sessions()
     sessions[token] = {
         "username": username,
-        "role": user.get("role", "user")
+        "role": user_data.get("role", "admin" if username in ["admin", "root"] else "user")
     }
     save_sessions(sessions)
     
-    return {"status": "success", "token": token, "username": username, "role": user.get("role", "user")}
+    return {"status": "success", "token": token, "username": username, "role": user_data.get("role", "user")}
 
 @app.post("/api/logout")
 def logout(x_session_token: str = Header(None)):
@@ -1737,7 +1796,7 @@ def process_karaoke(
             if state.get("status") in ["idle", "error", "done"]:
                 try:
                     processing_lock.release()
-                    logger.info("Failsafe v3.0.11: Lock de concorrência obsoleto liberado com sucesso.")
+                    logger.info("Failsafe v3.0.14: Lock de concorrência obsoleto liberado com sucesso.")
                 except Exception:
                     pass
             else:
