@@ -6,7 +6,15 @@
 *.pyc
 __pycache__/
 
-# Credenciais locais e tokens de deploy (Nunca commitar no Git)
+# Backups locais e pastas temporárias
+v224_backup/
+zip_extract_*/
+scratch/
+*.zip
+
+# Credenciais locais, tokens de deploy e logs (NUNCA commitar no Git)
 .env_deploy
+.env
 *.token
+*.log
 deploy_credentials.txt
