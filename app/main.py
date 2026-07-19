@@ -394,12 +394,13 @@ def align_lyrics(official_lyrics_text: str, transcribed_segments: list[dict]) ->
             
     return new_segments
 
-def update_state(status: str, step: str, progress: int, error_message: str = "", result_file: str = None, original_filename: str = None):
+def update_state(status: str, step: str, progress: int, error_message: str = "", result_file: str = None, original_filename: str = None, step_progress: int = None):
     """Atualiza o estado global da aplicação de forma thread-safe e persiste no disco."""
     with state_lock:
         state["status"] = status
         state["step"] = step
         state["progress"] = progress
+        state["step_progress"] = step_progress if step_progress is not None else progress
         state["error_message"] = error_message
         state["result_file"] = result_file
         if original_filename is not None:
@@ -504,6 +505,52 @@ TELEGRAM_FILE = "/data/output/telegram.json"
 class TelegramModel(BaseModel):
     telegram_token: str
     telegram_chat_id: str
+
+
+EXTERNAL_URL_FILE = "/data/output/external_url.json"
+
+class ExternalUrlModel(BaseModel):
+    external_url: str
+
+def get_internal_ip() -> str:
+    """Retorna o endereço IP interno da máquina na rede local."""
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(('8.8.8.8', 80))
+        ip = s.getsockname()[0]
+        s.close()
+        return ip
+    except Exception:
+        return "localhost"
+
+def load_external_url_config() -> dict:
+    """Carrega a URL/IP externo do disco."""
+    if not os.path.exists(EXTERNAL_URL_FILE):
+        return {"external_url": ""}
+    try:
+        with open(EXTERNAL_URL_FILE, "r", encoding="utf-8") as f:
+            import json
+            return json.load(f)
+    except Exception:
+        return {"external_url": ""}
+
+@app.get("/api/external_url")
+def get_external_url_config():
+    """Endpoint para ler a URL/IP externo configurado."""
+    return load_external_url_config()
+
+@app.post("/api/external_url")
+def save_external_url_config(config: ExternalUrlModel):
+    """Endpoint para salvar a URL/IP externo configurado."""
+    try:
+        os.makedirs(os.path.dirname(EXTERNAL_URL_FILE), exist_ok=True)
+        with open(EXTERNAL_URL_FILE, "w", encoding="utf-8") as f:
+            import json
+            json.dump({"external_url": config.external_url.strip()}, f, indent=4)
+        return {"status": "success"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro ao salvar URL externa: {e}")
+
 
 def load_telegram_config() -> dict:
     """Carrega as credenciais globais do Telegram do disco."""
@@ -918,7 +965,7 @@ def delete_lyrics_server(current_user: dict = Depends(get_current_user)):
 
 
 
-# Sistema de Logs de Diagnóstico v2.2.4
+# Sistema de Logs de Diagnóstico v3.0.0
 DIAGNOSTIC_LOG_FILE = "/data/output/app_diagnostic.log"
 
 def log_diagnostic(message: str, level: str = "INFO"):
@@ -933,6 +980,25 @@ def log_diagnostic(message: str, level: str = "INFO"):
             f.write(formatted_msg)
     except Exception:
         pass
+
+
+@app.get("/api/download")
+def download_result_file(file: str = Query(None), current_user: dict = Depends(get_current_user)):
+    """Endpoint universal para baixar arquivos de vídeo de resultado da pasta /data/output ou /data/library."""
+    if not file:
+        with state_lock:
+            file = state.get("result_file")
+            
+    if not file or not os.path.exists(file):
+        raise HTTPException(status_code=404, detail="Arquivo de resultado não encontrado no servidor.")
+        
+    filename = os.path.basename(file)
+    return FileResponse(
+        file,
+        media_type="video/mp4",
+        filename=filename
+    )
+
 
 @app.get("/api/logs/download")
 def download_diagnostic_logs(current_user: dict = Depends(get_current_user)):
@@ -1610,7 +1676,7 @@ def process_karaoke(
             if state.get("status") in ["idle", "error", "done"]:
                 try:
                     processing_lock.release()
-                    logger.info("Failsafe v2.2.4: Lock de concorrência obsoleto liberado com sucesso.")
+                    logger.info("Failsafe v3.0.0: Lock de concorrência obsoleto liberado com sucesso.")
                 except Exception:
                     pass
             else:
