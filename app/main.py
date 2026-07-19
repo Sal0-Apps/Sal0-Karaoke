@@ -980,7 +980,7 @@ def delete_lyrics_server(current_user: dict = Depends(get_current_user)):
 
 
 
-# Sistema de Logs de Diagnóstico v3.5.8
+# Sistema de Logs de Diagnóstico v3.5.9
 DIAGNOSTIC_LOG_FILE = "/data/output/app_diagnostic.log"
 
 def log_diagnostic(message: str, level: str = "INFO"):
@@ -1508,6 +1508,15 @@ def get_cached_background(current_user: dict = Depends(get_current_user)):
     
     raise HTTPException(status_code=404, detail="Nenhum plano de fundo disponível em cache.")
 
+
+@app.post("/api/skip_edit")
+def skip_edit(current_user: dict = Depends(get_current_user)):
+    """Continua o processamento sem alterar as legendas."""
+    global correction_event
+    correction_event.set()
+    return {"status": "success", "message": "Renderização retomada sem alterações."}
+
+
 @app.get("/api/segments_to_edit")
 def get_segments_to_edit(current_user: dict = Depends(get_current_user)):
     global segments_to_edit
@@ -1659,6 +1668,7 @@ def process_karaoke(
     lyrics_text: str = Form(None),
     enable_correction: bool = Form(True),
     keep_first_line_visible: bool = Form(False),
+    enable_correction: bool = Form(False),
     pause_for_editing: bool = Form(False),
     youtube_url: str = Form(None),
     library_audio: str = Form(None),
@@ -1675,7 +1685,7 @@ def process_karaoke(
             if state.get("status") in ["idle", "error", "done"]:
                 try:
                     processing_lock.release()
-                    logger.info("Failsafe v3.5.8: Lock de concorrência obsoleto liberado com sucesso.")
+                    logger.info("Failsafe v3.5.9: Lock de concorrência obsoleto liberado com sucesso.")
                 except Exception:
                     pass
             else:

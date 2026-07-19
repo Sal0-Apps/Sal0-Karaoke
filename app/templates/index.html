@@ -688,8 +688,8 @@
 
                         <div style="margin-top: 1rem; display: flex; flex-direction: column; gap: 0.4rem;">
                             <label style="font-size: 0.82rem; color: var(--text-main); font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 0.5rem; background: rgba(139, 92, 246, 0.1); padding: 0.5rem 0.8rem; border-radius: 8px; border: 1px solid var(--glass-border);">
-                                <input type="checkbox" id="pauseForEditing" name="pause_for_editing" style="accent-color: var(--accent);">
-                                ✏️ Pausar a 75% para revisar/editar a legenda antes da renderização final
+                                <input type="checkbox" id="enableCorrection" name="enable_correction" style="accent-color: var(--accent);">
+                                ✏️ Pausar a 75% para revisar e editar texto e tempos da legenda antes da renderização
                             </label>
                             <label style="font-size: 0.82rem; color: var(--text-main); cursor: pointer; display: flex; align-items: center; gap: 0.5rem;">
                                 <input type="checkbox" id="breakOnPunctuation" name="break_on_punctuation" checked style="accent-color: var(--accent);">
@@ -770,25 +770,48 @@
             </div>
 
             <!-- CARD DE REVISÃO E EDIÇÃO DE LEGENDAS (PAUSA INTERMEDIÁRIA) -->
-            <div class="card" id="correctionCard" style="display: none; border-color: rgba(139, 92, 246, 0.4);">
-                <div class="card-header">
-                    <span class="card-title">✏️ Revisão & Edição da Legenda Antes da Renderização</span>
-                    <button type="button" id="btnContinueProcess" class="btn-primary" style="width: auto; padding: 0.5rem 1.2rem; font-size: 0.85rem;">🚀 Salvar e Renderizar Vídeo Karaokê</button>
+            <!-- CARD DE REVISÃO E EDIÇÃO DE LEGENDAS (V2.2.4 FULL COMPATIBILIDADE) -->
+        <div id="correctionCard" style="display: none; background: rgba(30, 27, 57, 0.85); border: 1px solid var(--glass-border); padding: 1.5rem; border-radius: 14px; margin-top: 1.5rem; box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37); backdrop-filter: blur(8px);">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem;">
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    <span style="font-size: 1.3rem;">✏️</span>
+                    <h3 style="margin: 0; font-size: 1.1rem; font-weight: 700; color: var(--text-main);">Revisão & Edição Avançada da Legenda (Texto e Tempos)</h3>
                 </div>
+                <button type="button" id="btnContinueProcess" class="btn-primary" style="width: auto; padding: 0.5rem 1.2rem; font-size: 0.85rem;">🚀 Salvar e Renderizar Vídeo Karaokê</button>
+            </div>
+            
+            <!-- Grid de Duas Colunas: Live Preview e Lista de Estrofes -->
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.5rem; margin-bottom: 1.5rem;">
                 
-                <p style="font-size: 0.82rem; color: var(--text-muted); margin-bottom: 1rem;">
-                    Revise ou edite o texto de cada estrofe gerado pelo Whisper AI abaixo antes que o vídeo final seja renderizado.
-                </p>
-
-                <div id="segmentsEditList" style="display: flex; flex-direction: column; gap: 0.8rem; max-height: 50vh; overflow-y: auto; padding-right: 0.5rem;">
-                    <!-- Preenchido via JS fetchSegmentsToEdit() -->
+                <!-- Coluna A: Mockup Live Preview -->
+                <div style="display: flex; flex-direction: column; gap: 0.8rem;">
+                    <span style="font-size: 0.82rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">📺 Pré-visualização ao Vivo</span>
+                    
+                    <!-- Container Mockup 16:9 -->
+                    <div id="previewVideoMock" style="position: relative; width: 100%; aspect-ratio: 16/9; background: #000; border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; padding: 1.5rem; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.5);">
+                        <img id="previewBgImage" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; z-index: 1; display: none;">
+                        <video id="previewBgVideo" autoplay loop muted playsinline style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; z-index: 1; display: none;"></video>
+                        <div id="previewSubtitleText" style="position: relative; z-index: 2; text-align: center; line-height: 1.2; text-shadow: 2px 2px 0px #000, -2px -2px 0px #000, 2px -2px 0px #000, -2px 2px 0px #000; font-weight: 700; width: 95%; overflow: hidden; text-overflow: ellipsis; white-space: normal; word-wrap: break-word;">
+                            Selecione ou edite uma linha...
+                        </div>
+                    </div>
                 </div>
 
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 1.2rem; pt: 1rem; border-top: 1px solid var(--glass-border);">
-                    <button type="button" class="btn-cancel-task btn-secondary" style="background: rgba(239,68,68,0.15); color: #fca5a5; border-color: rgba(239,68,68,0.3);">🛑 Cancelar Processamento</button>
-                    <button type="button" id="btnSkipEdit" class="btn-secondary">⏩ Pular e Renderizar Sem Alterar</button>
+                <!-- Coluna B: Lista de Estrofes com Edição de Tempos e Texto -->
+                <div style="display: flex; flex-direction: column; gap: 0.8rem;">
+                    <span style="font-size: 0.82rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">📜 Estrofes & Tempos Transcritor</span>
+                    
+                    <div id="correctionList" style="display: flex; flex-direction: column; gap: 0.8rem; max-height: 400px; overflow-y: auto; padding-right: 0.5rem;">
+                        <!-- Preenchido dinamicamente via renderSegments() -->
+                    </div>
                 </div>
             </div>
+
+            <div style="display: flex; justify-content: space-between; align-items: center; pt: 1rem; border-top: 1px solid var(--glass-border);">
+                <button type="button" class="btn-cancel-task btn-secondary" style="background: rgba(239,68,68,0.15); color: #fca5a5; border-color: rgba(239,68,68,0.3);">🛑 Cancelar Processamento</button>
+                <button type="button" id="btnSkipEdit" class="btn-secondary">⏩ Pular e Renderizar Sem Alterar</button>
+            </div>
+        </div>
 
             <!-- CARD DE DOWNLOAD DO VÍDEO CONCLUÍDO -->
             <div class="card" id="downloadBox" style="display: none; text-align: center; border-color: rgba(16, 185, 129, 0.4);">
@@ -980,7 +1003,7 @@
 
         <!-- RODAPÉ DISCRETO DA PÁGINA -->
         <footer>
-            Sal0 Karaokê v3.5.8
+            Sal0 Karaokê v3.5.9
         </footer>
 
     </div> <!-- Container End -->
@@ -2165,6 +2188,130 @@
         }
 
 
+
+        let isShowingCorrection = false;
+        let currentSegments = [];
+
+        async function loadCorrectionPanel() {
+            if (isShowingCorrection) return;
+            isShowingCorrection = true;
+
+            try {
+                const res = await authFetch('/api/segments_to_edit');
+                if (!res.ok) throw new Error("Falha ao obter legendas para correção.");
+                
+                currentSegments = await res.json();
+                renderSegments();
+                
+                const correctionCard = document.getElementById('correctionCard');
+                if (correctionCard) correctionCard.style.display = "block";
+            } catch (err) {
+                console.error("Erro ao carregar painel de correção:", err);
+                isShowingCorrection = false;
+            }
+        }
+
+        function renderSegments() {
+            const container = document.getElementById('correctionList');
+            if (!container) return;
+            container.innerHTML = "";
+
+            if (!currentSegments || currentSegments.length === 0) {
+                container.innerHTML = "<p style='font-size: 0.8rem; color: var(--text-muted);'>Nenhuma estrofe transcrita.</p>";
+                return;
+            }
+
+            currentSegments.forEach((seg, idx) => {
+                const card = document.createElement('div');
+                card.style.display = "flex";
+                card.style.flexDirection = "column";
+                card.style.gap = "0.4rem";
+                card.style.background = "var(--input-bg)";
+                card.style.border = "1px solid var(--glass-border)";
+                card.style.padding = "0.75rem";
+                card.style.borderRadius = "8px";
+
+                const headerRow = document.createElement('div');
+                headerRow.style.display = "flex";
+                headerRow.style.justifyContent = "space-between";
+                headerRow.style.alignItems = "center";
+
+                const title = document.createElement('span');
+                title.style.fontSize = "0.78rem";
+                title.style.fontWeight = "700";
+                title.style.color = "var(--accent)";
+                title.innerText = `ESTROFE #${idx + 1}`;
+
+                const btnDelete = document.createElement('button');
+                btnDelete.type = "button";
+                btnDelete.innerHTML = "🗑️";
+                btnDelete.style.background = "none";
+                btnDelete.style.border = "none";
+                btnDelete.style.cursor = "pointer";
+                btnDelete.style.fontSize = "0.85rem";
+                btnDelete.title = "Excluir Linha";
+                btnDelete.onclick = () => {
+                    currentSegments.splice(idx, 1);
+                    renderSegments();
+                };
+
+                headerRow.appendChild(title);
+                headerRow.appendChild(btnDelete);
+                card.appendChild(headerRow);
+
+                // Linha de Edição dos Tempos (Início e Fim)
+                const timeRow = document.createElement('div');
+                timeRow.style.display = "flex";
+                timeRow.style.gap = "0.5rem";
+
+                const startInput = document.createElement('input');
+                startInput.type = "number";
+                startInput.step = "0.1";
+                startInput.className = "input-text";
+                startInput.style.fontSize = "0.75rem";
+                startInput.style.padding = "0.2rem 0.4rem";
+                startInput.value = seg.start ? seg.start.toFixed(2) : "0.00";
+                startInput.onchange = (e) => { seg.start = parseFloat(e.target.value) || 0; };
+
+                const endInput = document.createElement('input');
+                endInput.type = "number";
+                endInput.step = "0.1";
+                endInput.className = "input-text";
+                endInput.style.fontSize = "0.75rem";
+                endInput.style.padding = "0.2rem 0.4rem";
+                endInput.value = seg.end ? seg.end.toFixed(2) : "0.00";
+                endInput.onchange = (e) => { seg.end = parseFloat(e.target.value) || 0; };
+
+                timeRow.appendChild(document.createTextNode("⏱️ Início: "));
+                timeRow.appendChild(startInput);
+                timeRow.appendChild(document.createTextNode(" Fim: "));
+                timeRow.appendChild(endInput);
+                card.appendChild(timeRow);
+
+                // Campo de Texto da Estrofe
+                const textInput = document.createElement('input');
+                textInput.type = "text";
+                textInput.className = "input-text";
+                textInput.value = seg.text || "";
+                textInput.style.fontWeight = "500";
+                textInput.oninput = (e) => {
+                    seg.text = e.target.value;
+                    updatePreviewText(seg.text);
+                };
+
+                card.appendChild(textInput);
+                container.appendChild(card);
+            });
+        }
+
+        function updatePreviewText(txt) {
+            const previewSubtitleText = document.getElementById('previewSubtitleText');
+            if (previewSubtitleText) {
+                previewSubtitleText.innerText = txt || "Selecione ou edite uma linha...";
+            }
+        }
+
+
 async function fetchStatus() {
             try {
                 const res = await authFetch('/api/status');
@@ -2192,7 +2339,7 @@ async function fetchStatus() {
                     if (btnSubmit) btnSubmit.disabled = true;
 
                     updateTimelineUI(data.step || "");
-                } else if (data.status === "awaiting_review") {
+                } else if (data.status === "waiting_for_user_correction" || data.status === "awaiting_review") {
                     // PAUSA PARA EDIÇÃO DE LEGENDA PRÉ-RENDERIZAÇÃO
                     if (formCard) formCard.style.display = "none";
                     if (processCard) processCard.style.display = "none";
