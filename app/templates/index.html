@@ -1003,7 +1003,7 @@
 
         <!-- RODAPÉ DISCRETO DA PÁGINA -->
         <footer>
-            Sal0 Karaokê v3.6.0
+            Sal0 Karaokê v3.6.1
         </footer>
 
     </div> <!-- Container End -->
@@ -2189,13 +2189,11 @@
 
 
 
+        
         let isShowingCorrection = false;
         let currentSegments = [];
 
         async function loadCorrectionPanel() {
-            if (isShowingCorrection) return;
-            isShowingCorrection = true;
-
             try {
                 const res = await authFetch('/api/segments_to_edit');
                 if (!res.ok) throw new Error("Falha ao obter legendas para correção.");
@@ -2205,9 +2203,9 @@
                 
                 const correctionCard = document.getElementById('correctionCard');
                 if (correctionCard) correctionCard.style.display = "block";
+                isShowingCorrection = true;
             } catch (err) {
                 console.error("Erro ao carregar painel de correção:", err);
-                isShowingCorrection = false;
             }
         }
 
@@ -2217,7 +2215,7 @@
             container.innerHTML = "";
 
             if (!currentSegments || currentSegments.length === 0) {
-                container.innerHTML = "<p style='font-size: 0.8rem; color: var(--text-muted);'>Nenhuma estrofe transcrita.</p>";
+                container.innerHTML = "<p style='font-size: 0.82rem; color: var(--text-muted); text-align: center; padding: 1rem;'>Nenhuma estrofe transcrita para editar.</p>";
                 return;
             }
 
@@ -2262,7 +2260,13 @@
                 // Linha de Edição dos Tempos (Início e Fim)
                 const timeRow = document.createElement('div');
                 timeRow.style.display = "flex";
-                timeRow.style.gap = "0.5rem";
+                timeRow.style.alignItems = "center";
+                timeRow.style.gap = "0.4rem";
+                timeRow.style.fontSize = "0.75rem";
+
+                const startLabel = document.createElement('span');
+                startLabel.innerText = "⏱️ Início:";
+                startLabel.style.color = "var(--text-muted)";
 
                 const startInput = document.createElement('input');
                 startInput.type = "number";
@@ -2270,8 +2274,14 @@
                 startInput.className = "input-text";
                 startInput.style.fontSize = "0.75rem";
                 startInput.style.padding = "0.2rem 0.4rem";
+                startInput.style.width = "80px";
                 startInput.value = seg.start ? seg.start.toFixed(2) : "0.00";
                 startInput.onchange = (e) => { seg.start = parseFloat(e.target.value) || 0; };
+
+                const endLabel = document.createElement('span');
+                endLabel.innerText = "Fim:";
+                endLabel.style.color = "var(--text-muted)";
+                endLabel.style.marginLeft = "0.4rem";
 
                 const endInput = document.createElement('input');
                 endInput.type = "number";
@@ -2279,12 +2289,13 @@
                 endInput.className = "input-text";
                 endInput.style.fontSize = "0.75rem";
                 endInput.style.padding = "0.2rem 0.4rem";
+                endInput.style.width = "80px";
                 endInput.value = seg.end ? seg.end.toFixed(2) : "0.00";
                 endInput.onchange = (e) => { seg.end = parseFloat(e.target.value) || 0; };
 
-                timeRow.appendChild(document.createTextNode("⏱️ Início: "));
+                timeRow.appendChild(startLabel);
                 timeRow.appendChild(startInput);
-                timeRow.appendChild(document.createTextNode(" Fim: "));
+                timeRow.appendChild(endLabel);
                 timeRow.appendChild(endInput);
                 card.appendChild(timeRow);
 
@@ -2311,8 +2322,80 @@
             }
         }
 
+        function initCorrectionButtonListeners() {
+            const btnContinue = document.getElementById('btnContinueProcess');
+            const btnSkip = document.getElementById('btnSkipEdit');
 
-async function fetchStatus() {
+            if (btnContinue) {
+                btnContinue.onclick = async () => {
+                    btnContinue.disabled = true;
+                    btnContinue.innerText = "⏳ Salvando e Renderizando...";
+                    try {
+                        const res = await authFetch('/api/continue_process', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ segments: currentSegments })
+                        });
+                        if (res.ok) {
+                            document.getElementById('correctionCard').style.display = 'none';
+                            document.getElementById('processCard').style.display = 'block';
+                            isShowingCorrection = false;
+                            startPolling();
+                        } else {
+                            alert("Erro ao retomar renderização.");
+                        }
+                    } catch (e) {
+                        alert("Erro: " + e.message);
+                    } finally {
+                        btnContinue.disabled = false;
+                        btnContinue.innerText = "🚀 Salvar e Renderizar Vídeo Karaokê";
+                    }
+                };
+            }
+
+            if (btnSkip) {
+                btnSkip.onclick = async () => {
+                    btnSkip.disabled = true;
+                    btnSkip.innerText = "⏳ Renderizando...";
+                    try {
+                        const res = await authFetch('/api/skip_edit', { method: 'POST' });
+                        if (res.ok) {
+                            document.getElementById('correctionCard').style.display = 'none';
+                            document.getElementById('processCard').style.display = 'block';
+                            isShowingCorrection = false;
+                            startPolling();
+                        }
+                    } catch (e) {
+                        alert("Erro: " + e.message);
+                    } finally {
+                        btnSkip.disabled = false;
+                        btnSkip.innerText = "⏩ Pular e Renderizar Sem Alterar";
+                    }
+                };
+            }
+
+            document.querySelectorAll('.btn-cancel-task').forEach(btn => {
+                btn.onclick = async () => {
+                    if (!confirm("Deseja realmente cancelar a produção deste vídeo de karaokê?")) return;
+                    try {
+                        const res = await authFetch('/api/cancel', { method: 'POST' });
+                        if (res.ok) {
+                            document.getElementById('correctionCard').style.display = 'none';
+                            document.getElementById('processCard').style.display = 'none';
+                            const formCard = document.getElementById('karaokêForm');
+                            if (formCard) formCard.style.display = 'block';
+                            isShowingCorrection = false;
+                            startPolling();
+                        }
+                    } catch (e) {
+                        alert("Erro ao cancelar: " + e.message);
+                    }
+                };
+            });
+        }
+
+
+        async function fetchStatus() {
             try {
                 const res = await authFetch('/api/status');
                 if (!res.ok) return;
