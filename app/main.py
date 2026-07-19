@@ -133,13 +133,23 @@ def download_youtube(url: str, cache_dir: str) -> tuple[str, str]:
                 break
     return file_path, title
 
-def get_current_user(x_session_token: str = Header(None), token: str = Query(None)):
+def get_current_user(
+    x_session_token: str = Header(None),
+    authorization: str = Header(None),
+    token: str = Query(None)
+):
     users = load_users()
     if not users:
         # Modo Setup: Sem usuários criados ainda
         return {"username": "setup_mode", "role": "setup"}
     
     active_token = x_session_token or token
+    if not active_token and authorization:
+        if authorization.startswith("Bearer "):
+            active_token = authorization.split(" ")[1].strip()
+        else:
+            active_token = authorization.strip()
+
     if not active_token:
         raise HTTPException(status_code=401, detail="Sessão não fornecida.")
         
@@ -621,7 +631,7 @@ def resolve_whisper_repo(model_size: str) -> str:
 
 
 def is_model_downloaded(model_size: str) -> bool:
-    """Verifica se o modelo Whisper existe na pasta /data/output/models/whisper da v2.0 ou no cache do sistema."""
+    """Verifica se o modelo Whisper existe na pasta /data/output/models/whisper ou no cache do sistema."""
     whisper_dirs = [
         "/data/output/models/whisper",
         "/data/models/whisper",
@@ -630,13 +640,13 @@ def is_model_downloaded(model_size: str) -> bool:
         os.path.expanduser("~/.cache/huggingface/hub")
     ]
 
-    keywords = [model_size]
+    targets = [model_size]
     if model_size == "large-v3-turbo":
-        keywords.extend(["turbo", "large-v3-turbo"])
+        targets.extend(["turbo", "large-v3-turbo"])
     elif model_size == "large-v3":
-        keywords.extend(["large-v3", "large_v3"])
+        targets.extend(["large-v3", "large_v3"])
     elif model_size == "large-v2":
-        keywords.extend(["large-v2", "large_v2"])
+        targets.extend(["large-v2", "large_v2"])
 
     for w_dir in whisper_dirs:
         if not os.path.exists(w_dir):
@@ -645,20 +655,11 @@ def is_model_downloaded(model_size: str) -> bool:
             entries = os.listdir(w_dir)
             for entry in entries:
                 entry_path = os.path.join(w_dir, entry)
-                if not os.path.isdir(entry_path):
-                    continue
                 entry_lower = entry.lower()
-                if any(kw in entry_lower for kw in keywords):
-                    # Verificar se a pasta contém arquivos de peso/configuração do modelo
+                if os.path.isdir(entry_path) and any(t in entry_lower for t in targets):
                     for root, dirs, files in os.walk(entry_path):
-                        if any(f in files for f in ["model.bin", "model.safetensors", "config.json", "tokenizer.json", "vocabulary.txt", "pytorch_model.bin"]):
+                        if files and len(files) > 0:
                             return True
-                        for f in files:
-                            try:
-                                if os.path.getsize(os.path.join(root, f)) > 10 * 1024 * 1024:
-                                    return True
-                            except Exception:
-                                pass
         except Exception:
             pass
 
@@ -997,7 +998,7 @@ def delete_lyrics_server(current_user: dict = Depends(get_current_user)):
 
 
 
-# Sistema de Logs de Diagnóstico v3.0.10
+# Sistema de Logs de Diagnóstico v3.0.11
 DIAGNOSTIC_LOG_FILE = "/data/output/app_diagnostic.log"
 
 def log_diagnostic(message: str, level: str = "INFO"):
@@ -1736,7 +1737,7 @@ def process_karaoke(
             if state.get("status") in ["idle", "error", "done"]:
                 try:
                     processing_lock.release()
-                    logger.info("Failsafe v3.0.10: Lock de concorrência obsoleto liberado com sucesso.")
+                    logger.info("Failsafe v3.0.11: Lock de concorrência obsoleto liberado com sucesso.")
                 except Exception:
                     pass
             else:
