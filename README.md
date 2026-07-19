@@ -1,4 +1,4 @@
-# 🎤 Sal0 Karaokê v3.0.4
+# 🎤 Sal0 Karaokê v3.0.5
 
 Uma ferramenta local, simples e funcional para criar vídeos de karaokê com remoção de voz via inteligência artificial e legendas sincronizadas.
 
@@ -32,7 +32,7 @@ version: '3.8'
 
 services:
   karaoke:
-    image: ghcr.io/sal0-apps/sal0-karaoke:3.0.4
+    image: ghcr.io/sal0-apps/sal0-karaoke:3.0.5
     container_name: karaoke-app
     ports:
       - "7860:7860"

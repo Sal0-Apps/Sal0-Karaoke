@@ -933,7 +933,7 @@
 
         <!-- RODAPÉ DISCRETO DA PÁGINA -->
         <footer>
-            Sal0 Karaokê v3.0.4
+            Sal0 Karaokê v3.0.5
         </footer>
 
     </div> <!-- Container End -->
@@ -1239,8 +1239,8 @@
 
                     if (input) input.value = data.external_url || '';
                     if (data.external_url) {
-                        if (text) text.innerText = `✓ URL Externa Configurada: ${data.external_url}`;
-                        if (badge) badge.style.display = 'block';
+                        if (text) text.innerText = `✓ URL / IP de Acesso Externo Configurado: ${data.external_url}`;
+                        if (badge) badge.style.display = 'flex';
                         if (inputsDiv) inputsDiv.style.display = 'none';
                     } else {
                         if (badge) badge.style.display = 'none';

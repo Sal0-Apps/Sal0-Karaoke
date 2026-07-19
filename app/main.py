@@ -537,6 +537,44 @@ def save_telegram_config(config: TelegramModel):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erro ao salvar configurações do Telegram: {e}")
 
+# Gerenciamento de Configuração de IP/URL Externa
+EXTERNAL_URL_FILE = "/data/output/external_url.json"
+
+class ExternalUrlModel(BaseModel):
+    external_url: str
+
+def load_external_url_config() -> dict:
+    """Carrega a URL/IP externo do disco."""
+    if not os.path.exists(EXTERNAL_URL_FILE):
+        return {"external_url": ""}
+    try:
+        with open(EXTERNAL_URL_FILE, "r", encoding="utf-8") as f:
+            import json
+            return json.load(f)
+    except Exception as e:
+        logger.error(f"Erro ao carregar URL externa: {e}")
+        return {"external_url": ""}
+
+@app.get("/api/external_url")
+def get_external_url_config():
+    """Endpoint para ler a URL/IP externo salvo."""
+    return load_external_url_config()
+
+@app.post("/api/external_url")
+def save_external_url_config(config: ExternalUrlModel):
+    """Endpoint para salvar a URL/IP externo."""
+    try:
+        os.makedirs(os.path.dirname(EXTERNAL_URL_FILE), exist_ok=True)
+        with open(EXTERNAL_URL_FILE, "w", encoding="utf-8") as f:
+            import json
+            json.dump({
+                "external_url": config.external_url.strip()
+            }, f, indent=4)
+        return {"status": "success"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro ao salvar URL externa: {e}")
+
+
 # Gerenciamento de Downloads de Modelos Whisper em Background
 class ModelDownloadRequest(BaseModel):
     model_size: str = None
@@ -934,7 +972,7 @@ def delete_lyrics_server(current_user: dict = Depends(get_current_user)):
 
 
 
-# Sistema de Logs de Diagnóstico v3.0.4
+# Sistema de Logs de Diagnóstico v3.0.5
 DIAGNOSTIC_LOG_FILE = "/data/output/app_diagnostic.log"
 
 def log_diagnostic(message: str, level: str = "INFO"):
@@ -1626,7 +1664,7 @@ def process_karaoke(
             if state.get("status") in ["idle", "error", "done"]:
                 try:
                     processing_lock.release()
-                    logger.info("Failsafe v3.0.4: Lock de concorrência obsoleto liberado com sucesso.")
+                    logger.info("Failsafe v3.0.5: Lock de concorrência obsoleto liberado com sucesso.")
                 except Exception:
                     pass
             else:
