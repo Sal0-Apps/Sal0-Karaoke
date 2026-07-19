@@ -33,7 +33,7 @@ version: '3.8'
 
 services:
   karaoke:
-    image: ghcr.io/sal0-apps/sal0-karaoke:3.5.7
+    image: ghcr.io/sal0-apps/sal0-karaoke:3.5.8
     container_name: karaoke-app
     ports:
       - "7860:7860"

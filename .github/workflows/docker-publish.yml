@@ -5,7 +5,8 @@ on:
     branches:
       - main
     tags:
-      - 'v*' # Dispara quando tags começando com v são criadas, ex: v1.0
+      - 'v*'
+  workflow_dispatch: # Dispara quando tags começando com v são criadas, ex: v1.0
 
 env:
   REGISTRY: ghcr.io
