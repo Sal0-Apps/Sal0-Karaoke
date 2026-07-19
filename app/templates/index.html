@@ -607,6 +607,40 @@
                                     <option value="color">Cor Sólida Escura</option>
                                 </select>
                             </div>
+
+                            <div class="form-group">
+                                <span class="label">Palavras por Linha (0 = Auto)</span>
+                                <input type="number" id="wordsPerLine" name="words_per_line" value="0" min="0" max="30" class="input-text">
+                            </div>
+
+                            <div class="form-group">
+                                <span class="label">Limite de Caracteres / Linha</span>
+                                <input type="number" id="maxCharsLine" name="max_chars_line" value="40" min="0" max="100" class="input-text">
+                            </div>
+
+                            <div class="form-group">
+                                <span class="label">Fonte da Transcrição IA</span>
+                                <select id="transcribeSource" name="transcribe_source" class="select-input">
+                                    <option value="vocals" selected>Vocais Isolados Demucs (Recomendado)</option>
+                                    <option value="original">Áudio Original Completo</option>
+                                </select>
+                            </div>
+
+                            <div class="form-group">
+                                <span class="label">Exibir Prévia da Próxima Frase</span>
+                                <select id="showNextLinePreview" name="show_next_line_preview" class="select-input">
+                                    <option value="false" selected>Não (Padrão)</option>
+                                    <option value="true">Sim (Exibir marcação da próxima linha)</option>
+                                </select>
+                            </div>
+
+                            <div class="form-group">
+                                <span class="label">Legenda Visível desde o Início</span>
+                                <select id="keepFirstLineVisible" name="keep_first_line_visible" class="select-input">
+                                    <option value="false" selected>Não (Aparecer no tempo exato)</option>
+                                    <option value="true">Sim (Manter visível no início do vídeo)</option>
+                                </select>
+                            </div>
                         </div>
 
                         <div style="margin-top: 1rem; display: flex; flex-direction: column; gap: 0.4rem;">
@@ -621,6 +655,10 @@
                             <label style="font-size: 0.82rem; color: #fff; cursor: pointer; display: flex; align-items: center; gap: 0.5rem;">
                                 <input type="checkbox" id="saveToLibrary" name="save_to_library" checked style="accent-color: var(--accent);">
                                 Salvar mídias enviadas na biblioteca permanente
+                            </label>
+                            <label style="font-size: 0.82rem; color: #fca5a5; cursor: pointer; display: flex; align-items: center; gap: 0.5rem;">
+                                <input type="checkbox" id="onlyRemoveVocals" name="only_remove_vocals" style="accent-color: var(--pink-accent);">
+                                Apenas remover vocais (Gerar instrumental sem legenda)
                             </label>
                         </div>
 
@@ -813,10 +851,10 @@
         </div>
 
         <!-- ============================================================= -->
-        <!-- ABA 3: BIBLIOTECA & HISTÓRICO (DESIGN E ESTRUTURA 100% v3.0.0) -->
+        <!-- ABA 3: BIBLIOTECA & HISTÓRICO (DESIGN E ESTRUTURA 100% v3.0.1) -->
         <!-- ============================================================= -->
         <div id="libraryTabContent" style="display: none; flex-direction: column; gap: 1.5rem;">
-            <!-- Grid de Envio Rápido para a Biblioteca (v3.0.0) -->
+            <!-- Grid de Envio Rápido para a Biblioteca (v3.0.1) -->
             <div style="background: rgba(30, 27, 57, 0.4); border: 1px solid var(--glass-border); padding: 1.2rem; border-radius: 12px; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr)); gap: 1rem;">
                 <div>
                     <h4 style="margin: 0 0 0.5rem 0; font-size: 0.9rem; color: #fff;">➕ Adicionar Mídia de Áudio/Vídeo</h4>
@@ -840,7 +878,7 @@
                 </div>
             </div>
 
-            <!-- Seção 1: Músicas e Vídeos Originais (v3.0.0) -->
+            <!-- Seção 1: Músicas e Vídeos Originais (v3.0.1) -->
             <div class="card" style="margin: 0;">
                 <div class="card-header">
                     <span class="card-title">🎵 Músicas & Vídeos Originais</span>
@@ -850,7 +888,7 @@
                 </div>
             </div>
 
-            <!-- Seção 2: Imagens e Vídeos de Fundo (v3.0.0) -->
+            <!-- Seção 2: Imagens e Vídeos de Fundo (v3.0.1) -->
             <div class="card" style="margin: 0;">
                 <div class="card-header">
                     <span class="card-title">🖼️ Imagens & Vídeos de Fundo</span>
@@ -860,7 +898,7 @@
                 </div>
             </div>
 
-            <!-- Seção 3: Karaokês Renderizados no Histórico (v3.0.0) -->
+            <!-- Seção 3: Karaokês Renderizados no Histórico (v3.0.1) -->
             <div class="card" style="margin: 0;">
                 <div class="card-header">
                     <span class="card-title">🎬 Karaokês Renderizados no Histórico</span>
@@ -873,7 +911,7 @@
 
         <!-- RODAPÉ DISCRETO DA PÁGINA -->
         <footer>
-            Sal0 Karaokê v3.0.0
+            Sal0 Karaokê v3.0.1
         </footer>
 
     </div> <!-- Container End -->
@@ -997,7 +1035,7 @@
         if (tabBtnSettings) tabBtnSettings.onclick = () => switchTab('settings');
         if (tabBtnLibrary) tabBtnLibrary.onclick = () => switchTab('library');
 
-        // FUNÇÃO PARA CARREGAR E RENDERIZAR A BIBLIOTECA (100% DESIGN v3.0.0)
+        // FUNÇÃO PARA CARREGAR E RENDERIZAR A BIBLIOTECA (100% DESIGN v3.0.1)
         async function loadLibrary() {
             try {
                 const res = await authFetch('/api/library');
@@ -1257,7 +1295,7 @@
                 };
             }
 
-            // Uploads Diretos na Aba Biblioteca (v3.0.0)
+            // Uploads Diretos na Aba Biblioteca (v3.0.1)
             const libAudioUploadArea = document.getElementById('libAudioUploadArea');
             const libAudioFile = document.getElementById('libAudioFile');
             if (libAudioUploadArea && libAudioFile) {
@@ -1280,7 +1318,7 @@
                 };
             }
 
-            // Submit handlers dos formulários da biblioteca (v3.0.0)
+            // Submit handlers dos formulários da biblioteca (v3.0.1)
             const libAudioUploadForm = document.getElementById('libAudioUploadForm');
             if (libAudioUploadForm) {
                 libAudioUploadForm.onsubmit = async (e) => {
@@ -1449,7 +1487,12 @@
                         text_position: document.getElementById('textPosition').value,
                         text_color: document.getElementById('textColor').value,
                         font_size: document.getElementById('fontSize').value,
-                        background_mode: document.getElementById('backgroundMode').value
+                        background_mode: document.getElementById('backgroundMode').value,
+                        words_per_line: parseInt(document.getElementById('wordsPerLine').value) || 0,
+                        max_chars_line: parseInt(document.getElementById('maxCharsLine').value) || 40,
+                        transcribe_source: document.getElementById('transcribeSource').value,
+                        show_next_line_preview: document.getElementById('showNextLinePreview').value === 'true',
+                        keep_first_line_visible: document.getElementById('keepFirstLineVisible').value === 'true'
                     };
                     try {
                         const res = await authFetch('/api/profiles', {
