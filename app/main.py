@@ -965,7 +965,7 @@ def delete_lyrics_server(current_user: dict = Depends(get_current_user)):
 
 
 
-# Sistema de Logs de Diagnóstico v3.0.3
+# Sistema de Logs de Diagnóstico v3.0.5
 DIAGNOSTIC_LOG_FILE = "/data/output/app_diagnostic.log"
 
 def log_diagnostic(message: str, level: str = "INFO"):
@@ -1338,16 +1338,35 @@ LIBRARY_DIR = "/data/library"
 
 @app.get("/api/library")
 def get_library_files(current_user: dict = Depends(get_current_user)):
-    """Retorna as listas de arquivos disponíveis na biblioteca (videos, photos, history)."""
+    """Retorna as listas de arquivos disponíveis na biblioteca (videos, photos, history) e arquivos soltos em /data/library."""
     result = {"videos": [], "photos": [], "history": []}
     for section in ["videos", "photos", "history"]:
         path = os.path.join(LIBRARY_DIR, section)
-        if os.path.exists(path):
-            try:
-                files = sorted(os.listdir(path))
-                result[section] = [f for f in files if os.path.isfile(os.path.join(path, f)) and not f.startswith('.')]
-            except Exception as e:
-                logger.error(f"Erro ao listar biblioteca {section}: {e}")
+        os.makedirs(path, exist_ok=True)
+        try:
+            files = sorted(os.listdir(path))
+            result[section] = [f for f in files if os.path.isfile(os.path.join(path, f)) and not f.startswith('.')]
+        except Exception as e:
+            logger.error(f"Erro ao listar biblioteca {section}: {e}")
+
+    # Escanear arquivos soltos diretamente em /data/library/
+    if os.path.exists(LIBRARY_DIR):
+        try:
+            loose_files = sorted(os.listdir(LIBRARY_DIR))
+            video_exts = {'.mp4', '.mkv', '.avi', '.mp3', '.wav', '.flac', '.m4a', '.webm'}
+            photo_exts = {'.jpg', '.jpeg', '.png', '.webp', '.gif'}
+            
+            for f in loose_files:
+                f_path = os.path.join(LIBRARY_DIR, f)
+                if os.path.isfile(f_path) and not f.startswith('.'):
+                    ext = os.path.splitext(f)[1].lower()
+                    if ext in video_exts and f not in result["videos"]:
+                        result["videos"].append(f)
+                    elif ext in photo_exts and f not in result["photos"]:
+                        result["photos"].append(f)
+        except Exception as e:
+            logger.error(f"Erro ao listar arquivos soltos em {LIBRARY_DIR}: {e}")
+
     return result
 
 @app.post("/api/library/upload")
@@ -1676,7 +1695,7 @@ def process_karaoke(
             if state.get("status") in ["idle", "error", "done"]:
                 try:
                     processing_lock.release()
-                    logger.info("Failsafe v3.0.3: Lock de concorrência obsoleto liberado com sucesso.")
+                    logger.info("Failsafe v3.0.5: Lock de concorrência obsoleto liberado com sucesso.")
                 except Exception:
                     pass
             else:

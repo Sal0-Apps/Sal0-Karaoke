@@ -5,7 +5,7 @@
     <meta name="color-scheme" content="dark">
     <meta name="supported-color-schemes" content="dark">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Sal0 Karaokê v3.0.3 - Gerador Automático de Vídeos</title>
+    <title>Sal0 Karaokê v3.0.5 - Gerador Automático de Vídeos</title>
     <link rel="icon" type="image/png" href="/favicon.png">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -420,7 +420,7 @@
                     <textarea id="lyricsText" name="lyrics_text" placeholder="Cole a letra oficial aqui..." style="width: 100%; min-height: 90px; border: 1px solid var(--glass-border); padding: 0.7rem; background: rgba(0,0,0,0.15); color: #fff; border-radius: 12px; font-size: 0.85rem; outline: none; resize: vertical;"></textarea>
                 </div>
 
-                <!-- Painel de Ajustes Avançados Restaurado (TODAS AS OPÇÕES v3.0.3) -->
+                <!-- Painel de Ajustes Avançados Restaurado (TODAS AS OPÇÕES v3.0.5) -->
                 <div id="advancedContent" style="display: none; margin-top: 1.2rem; background: rgba(255,255,255,0.015); border: 1px solid var(--glass-border); border-radius: 14px; padding: 1rem;">
                     
                     <!-- Perfis -->
@@ -446,10 +446,38 @@
                         </select>
                     </div>
 
-                    <!-- Gerenciador de Modelos -->
+                    <!-- Gerenciador de Modelos de IA Pré-renderizado v3.0.5 -->
                     <div style="border: 1px solid rgba(255,255,255,0.05); border-radius: 10px; padding: 0.8rem; background: rgba(0,0,0,0.15); margin-bottom: 1rem;">
-                        <span class="label">🤖 Gerenciador de Modelos de IA (Cache Local)</span>
-                        <div id="modelsListContainer" style="display: grid; gap: 0.6rem; margin-top: 0.5rem;"></div>
+                        <span class="label">🤖 Gerenciador de Modelos de IA (Cache Local no Servidor)</span>
+                        <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.6rem;">
+                            Baixe os modelos Whisper para o cache do servidor para poupar RAM e acelerar o processamento:
+                        </div>
+                        <div id="modelsListContainer" style="display: grid; gap: 0.6rem;">
+                            <div class="model-item-row" data-model="base" style="display: flex; justify-content: space-between; align-items: center; padding: 0.45rem 0.7rem; background: rgba(0,0,0,0.2); border-radius: 8px; font-size: 0.8rem;">
+                                <span>Base (Mais Leve - ~140MB)</span>
+                                <button type="button" class="btn-secondary" onclick="triggerModelDownload('base')">⬇️ Baixar</button>
+                            </div>
+                            <div class="model-item-row" data-model="small" style="display: flex; justify-content: space-between; align-items: center; padding: 0.45rem 0.7rem; background: rgba(0,0,0,0.2); border-radius: 8px; font-size: 0.8rem;">
+                                <span>Small (Leve - ~460MB)</span>
+                                <button type="button" class="btn-secondary" onclick="triggerModelDownload('small')">⬇️ Baixar</button>
+                            </div>
+                            <div class="model-item-row" data-model="medium" style="display: flex; justify-content: space-between; align-items: center; padding: 0.45rem 0.7rem; background: rgba(0,0,0,0.2); border-radius: 8px; font-size: 0.8rem;">
+                                <span>Medium (Recomendado - ~1.5GB)</span>
+                                <button type="button" class="btn-secondary" onclick="triggerModelDownload('medium')">⬇️ Baixar</button>
+                            </div>
+                            <div class="model-item-row" data-model="large-v3-turbo" style="display: flex; justify-content: space-between; align-items: center; padding: 0.45rem 0.7rem; background: rgba(0,0,0,0.2); border-radius: 8px; font-size: 0.8rem;">
+                                <span>Large v3 Turbo (Super Rápido & Alta Precisão - ~1.5GB)</span>
+                                <button type="button" class="btn-secondary" onclick="triggerModelDownload('large-v3-turbo')">⬇️ Baixar</button>
+                            </div>
+                            <div class="model-item-row" data-model="large-v2" style="display: flex; justify-content: space-between; align-items: center; padding: 0.45rem 0.7rem; background: rgba(0,0,0,0.2); border-radius: 8px; font-size: 0.8rem;">
+                                <span>Large v2 (Muito Preciso - ~3GB)</span>
+                                <button type="button" class="btn-secondary" onclick="triggerModelDownload('large-v2')">⬇️ Baixar</button>
+                            </div>
+                            <div class="model-item-row" data-model="large-v3" style="display: flex; justify-content: space-between; align-items: center; padding: 0.45rem 0.7rem; background: rgba(0,0,0,0.2); border-radius: 8px; font-size: 0.8rem;">
+                                <span>Large v3 (Precisão Máxima - ~3GB)</span>
+                                <button type="button" class="btn-secondary" onclick="triggerModelDownload('large-v3')">⬇️ Baixar</button>
+                            </div>
+                        </div>
                     </div>
 
                     <!-- Estilização da Legenda -->
@@ -531,22 +559,36 @@
                         </div>
                     </div>
 
-                    <!-- Configuração de IP / URL Externa -->
+                    <!-- Configuração de IP / URL Externa com Estado Oculto v3.0.5 -->
                     <div style="border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 0.8rem; background: rgba(0,0,0,0.15); margin-bottom: 1rem;">
                         <span class="label" style="color: #34d399;">🌐 Configuração de IP / URL Externa (Acesso Remoto)</span>
-                        <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.5rem;">
-                            Digite o IP externo ou URL (ex: <b>http://meuservidor.ddns.net:7885</b>) para incluir links de download remoto no Telegram:
+                        
+                        <div id="externalUrlConfiguredBadge" style="display: none; background: rgba(16,185,129,0.12); border: 1px solid rgba(16,185,129,0.3); border-radius: 8px; padding: 0.6rem 0.8rem; margin-top: 0.4rem; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.4rem;">
+                            <span style="color: #34d399; font-size: 0.8rem; font-weight: 600;">✓ URL Externa Configurada (<span id="externalUrlValText" style="color: #fff;">-</span>)</span>
+                            <button type="button" id="btnEditExternalUrl" class="btn-secondary" style="font-size: 0.72rem; padding: 0.25rem 0.5rem; background: rgba(255,255,255,0.08);">✏️ Editar</button>
                         </div>
-                        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
-                            <input type="text" id="externalUrlInput" placeholder="http://meuservidor.ddns.net:7885" style="flex: 1; min-width: 200px; border: 1px solid var(--glass-border); padding: 0.5rem 0.7rem; background: #141226; color: #fff; border-radius: 8px; font-size: 0.82rem; outline: none;">
-                            <button type="button" id="btnSaveExternalUrl" class="btn-secondary" style="background: rgba(16,185,129,0.2); color: #34d399;">💾 Salvar URL Externa</button>
+
+                        <div id="externalUrlInputsDiv" style="margin-top: 0.4rem;">
+                            <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.5rem;">
+                                Digite o IP externo ou URL (ex: <b>http://meuservidor.ddns.net:7885</b>) para incluir links de download remoto no Telegram:
+                            </div>
+                            <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                                <input type="text" id="externalUrlInput" placeholder="http://meuservidor.ddns.net:7885" style="flex: 1; min-width: 200px; border: 1px solid var(--glass-border); padding: 0.5rem 0.7rem; background: #141226; color: #fff; border-radius: 8px; font-size: 0.82rem; outline: none;">
+                                <button type="button" id="btnSaveExternalUrl" class="btn-secondary" style="background: rgba(16,185,129,0.2); color: #34d399;">💾 Salvar URL Externa</button>
+                            </div>
                         </div>
                     </div>
 
-                    <!-- Telegram Config -->
+                    <!-- Telegram Config com Estado Oculto v3.0.5 -->
                     <div style="border: 1px solid rgba(255,255,255,0.05); border-radius: 10px; padding: 0.8rem; background: rgba(0,0,0,0.15); margin-bottom: 1rem;">
                         <span class="label">🤖 Telegram Bot (Notificações e Envio de Vídeo)</span>
-                        <div style="display: grid; gap: 0.5rem; margin-top: 0.4rem;">
+                        
+                        <div id="telegramConfiguredBadge" style="display: none; background: rgba(16,185,129,0.12); border: 1px solid rgba(16,185,129,0.3); border-radius: 8px; padding: 0.6rem 0.8rem; margin-top: 0.4rem; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.4rem;">
+                            <span style="color: #34d399; font-size: 0.8rem; font-weight: 600;">✓ Bot do Telegram Ativo e Configurado</span>
+                            <button type="button" id="btnEditTelegram" class="btn-secondary" style="font-size: 0.72rem; padding: 0.25rem 0.5rem; background: rgba(255,255,255,0.08);">✏️ Editar</button>
+                        </div>
+
+                        <div id="telegramInputsDiv" style="display: grid; gap: 0.5rem; margin-top: 0.4rem;">
                             <input type="text" id="telegramTokenInput" placeholder="Token do Bot" style="border: 1px solid var(--glass-border); padding: 0.5rem; background: #141226; color: #fff; border-radius: 8px; font-size: 0.8rem; outline: none;">
                             <input type="text" id="telegramChatIdInput" placeholder="Chat ID" style="border: 1px solid var(--glass-border); padding: 0.5rem; background: #141226; color: #fff; border-radius: 8px; font-size: 0.8rem; outline: none;">
                             <button type="button" id="btnSaveTelegram" class="btn-secondary" style="background: rgba(59,130,246,0.2); color: #60a5fa;">💾 Salvar Telegram</button>
@@ -571,7 +613,7 @@
             </form>
         </div>
 
-        <!-- Modo Foco / Painel de Progresso v3.0.3 -->
+        <!-- Modo Foco / Painel de Progresso v3.0.5 -->
         <div class="process-card" id="processCard">
             <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem;">
                 <span style="font-weight: 800; font-size: 0.95rem; color: #c084fc;">⚡ Produção em Andamento (Modo Foco)</span>
@@ -638,7 +680,7 @@
         </div>
     </div>
 
-    <!-- Modal de Mídia Ativa (v3.0.3) -->
+    <!-- Modal de Mídia Ativa (v3.0.5) -->
     <div id="activeMediaModal" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.75); z-index: 9999; justify-content: center; align-items: center; backdrop-filter: blur(4px);">
         <div style="background: #141226; border: 1px solid var(--glass-border); border-radius: 16px; padding: 1.5rem; width: 90vw; max-width: 460px;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
@@ -661,18 +703,53 @@
         </div>
     </div>
 
-    <!-- Modal de Manual -->
-    <div id="helpModal" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.75); z-index: 9999; justify-content: center; align-items: center; backdrop-filter: blur(4px);">
-        <div style="background: #141226; border: 1px solid var(--glass-border); border-radius: 16px; padding: 1.5rem; width: 90vw; max-width: 600px; max-height: 80vh; overflow-y: auto;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-                <h3 style="margin: 0; color: #60a5fa;">📖 Manual de Instruções Sal0 Karaokê v3.0.3</h3>
-                <button type="button" id="btnCloseHelpModal" style="background: none; border: none; color: #fff; font-size: 1.2rem; cursor: pointer;">✕</button>
+    <!-- Modal de Manual e Tutorial Completo v3.0.5 -->
+    <div id="helpModal" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.8); z-index: 9999; justify-content: center; align-items: center; backdrop-filter: blur(5px);">
+        <div style="background: #141226; border: 1px solid var(--glass-border); border-radius: 18px; padding: 1.6rem; width: 92vw; max-width: 650px; max-height: 85vh; overflow-y: auto; box-shadow: 0 10px 30px rgba(0,0,0,0.6);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.2rem; padding-bottom: 0.6rem; border-bottom: 1px solid rgba(255,255,255,0.08);">
+                <h3 style="margin: 0; color: #60a5fa; font-size: 1.15rem; font-weight: 800;">📖 Manual e Tutorial de Uso - Sal0 Karaokê</h3>
+                <button type="button" id="btnCloseHelpModal" style="background: none; border: none; color: #fff; font-size: 1.4rem; cursor: pointer;">✕</button>
             </div>
-            <div style="font-size: 0.85rem; line-height: 1.6; color: var(--text-muted);">
-                <p><b>1. Seleção de Mídia:</b> Escolha o seu áudio via Upload local, link do YouTube ou diretamente pela aba <b>Biblioteca</b>.</p>
-                <p><b>2. Modo Foco & Progresso:</b> Durante a geração, a tela entra em Modo Foco mantendo apenas a Barra Geral e a Barra da Etapa Atual. Clique em <i>👁️ Mostrar Formulário</i> se quiser alterar opções durante a execução.</p>
-                <p><b>3. IP Externo & Telegram:</b> Configure a sua URL Externa em Ajustes Avançados para receber links de download direto remoto no seu celular via Telegram.</p>
-                <p><b>4. Edição de Legendas:</b> Cole a letra oficial para orientar o Whisper a alinhar as sílabas com 100% de precisão gramatical.</p>
+            
+            <div style="font-size: 0.84rem; line-height: 1.6; color: #d1d5db; display: flex; flex-direction: column; gap: 1rem;">
+                <div style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); padding: 1rem; border-radius: 12px;">
+                    <h4 style="color: #c084fc; margin-bottom: 0.4rem; font-size: 0.95rem;">🎙️ 1. O que é o Sal0 Karaokê?</h4>
+                    <p>O <b>Sal0 Karaokê</b> é uma aplicação local de IA de alta precisão que isola os vocais do cantor utilizando o modelo <b>Demucs (htdemucs_ft)</b>, realiza a transcrição sincronizada sílaba a sílaba com <b>Whisper</b>, e gera vídeos de Karaokê em MP4 com legendas animadas em tempo real.</p>
+                </div>
+
+                <div style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); padding: 1rem; border-radius: 12px;">
+                    <h4 style="color: #34d399; margin-bottom: 0.4rem; font-size: 0.95rem;">🎬 2. Passo a Passo para Criar um Karaokê</h4>
+                    <ol style="margin-left: 1.2rem; display: flex; flex-direction: column; gap: 0.4rem;">
+                        <li><b>Escolha o Áudio/Música:</b> Envie um arquivo local (MP3, WAV, MP4), cole um link do YouTube ou selecione uma música já existente na sua <i>Biblioteca</i>.</li>
+                        <li><b>Escolha o Fundo (Opcional):</b> Deixe em <i>Paisagem Aleatória</i> ou escolha uma imagem/vídeo customizado.</li>
+                        <li><b>Letra Oficial (Opcional):</b> Se quiser 100% de precisão ortográfica, cole a letra da música no campo de letra oficial.</li>
+                        <li><b>Clique em Criar Vídeo Karaokê:</b> O processo será iniciado imediatamente no servidor.</li>
+                    </ol>
+                </div>
+
+                <div style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); padding: 1rem; border-radius: 12px;">
+                    <h4 style="color: #fbbf24; margin-bottom: 0.4rem; font-size: 0.95rem;">⚡ 3. Modo Foco & Acompanhamento</h4>
+                    <p>Assim que o vídeo começa a ser produzido, a interface entra em <b>Modo Foco</b> para economizar espaço e exibir a <b>Barra Geral (Total)</b> e a <b>Barra da Etapa Atual</b> em tempo real (ex: progresso do Demucs). Para reexibir o formulário, clique em <i>👁️ Mostrar Formulário</i>.</p>
+                </div>
+
+                <div style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); padding: 1rem; border-radius: 12px;">
+                    <h4 style="color: #60a5fa; margin-bottom: 0.4rem; font-size: 0.95rem;">⚙️ 4. Ajustes Avançados e Modelos de IA</h4>
+                    <p>No painel <b>⚙️ Ajustes</b>, você pode alterar o estilo da legenda (sílaba por sílaba, cor de destaque, tamanho da fonte e posição), alternar entre os modelos Whisper (Medium, Large v3 Turbo, Large v3) e baixar previamente os modelos de IA para o cache do servidor.</p>
+                </div>
+
+                <div style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); padding: 1rem; border-radius: 12px;">
+                    <h4 style="color: #f472b6; margin-bottom: 0.4rem; font-size: 0.95rem;">📱 5. Telegram Bot & IP Externo</h4>
+                    <p>Configure o seu <b>Token de Bot do Telegram</b> e <b>Chat ID</b> para receber notificações automáticas no celular quando um vídeo terminar. Em <b>IP / URL Externa</b>, insira a URL do seu servidor para receber links de download remoto direto no chat do Telegram.</p>
+                </div>
+
+                <div style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); padding: 1rem; border-radius: 12px;">
+                    <h4 style="color: #a7f3d0; margin-bottom: 0.4rem; font-size: 0.95rem;">📚 6. Biblioteca e Reutilização de Mídias</h4>
+                    <p>Todos os vídeos e fundos salvos ficam acessíveis na aba <b>📚 Biblioteca & Histórico</b>. Você pode reutilizar qualquer música ou vídeo salvo sem precisar refazer uploads ou downloads do YouTube.</p>
+                </div>
+            </div>
+            
+            <div style="text-align: right; margin-top: 1.2rem;">
+                <button type="button" class="btn-primary" id="btnConfirmHelpModal" style="height: 38px; width: auto; padding: 0 1.5rem;">Entendido</button>
             </div>
         </div>
     </div>
@@ -903,7 +980,7 @@
             };
         }
 
-        // Ler e Salvar Telegram Config
+        // Ler e Salvar Telegram Config com Estado Oculto v3.0.5
         async function fetchTelegramConfig() {
             try {
                 const res = await authFetch('/api/telegram');
@@ -911,11 +988,31 @@
                     const data = await res.json();
                     const tokenIn = document.getElementById('telegramTokenInput');
                     const chatIn = document.getElementById('telegramChatIdInput');
+                    const badge = document.getElementById('telegramConfiguredBadge');
+                    const inputsDiv = document.getElementById('telegramInputsDiv');
+                    
                     if (tokenIn && data.telegram_token) tokenIn.value = data.telegram_token;
                     if (chatIn && data.telegram_chat_id) chatIn.value = data.telegram_chat_id;
+
+                    if (data.telegram_token && data.telegram_chat_id && badge && inputsDiv) {
+                        badge.style.display = 'flex';
+                        inputsDiv.style.display = 'none';
+                    } else if (inputsDiv) {
+                        inputsDiv.style.display = 'grid';
+                        if (badge) badge.style.display = 'none';
+                    }
                 }
             } catch (e) {}
         }
+
+        const btnEditTelegram = document.getElementById('btnEditTelegram');
+        if (btnEditTelegram) {
+            btnEditTelegram.onclick = () => {
+                const inputsDiv = document.getElementById('telegramInputsDiv');
+                if (inputsDiv) inputsDiv.style.display = inputsDiv.style.display === 'none' ? 'grid' : 'none';
+            };
+        }
+
         const btnSaveTelegram = document.getElementById('btnSaveTelegram');
         if (btnSaveTelegram) {
             btnSaveTelegram.onclick = async () => {
@@ -927,22 +1024,47 @@
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ telegram_token: token, telegram_chat_id: chatId })
                     });
-                    if (res.ok) alert("Configurações do Telegram salvas!");
+                    if (res.ok) {
+                        alert("Configurações do Telegram salvas!");
+                        await fetchTelegramConfig();
+                    }
                 } catch (e) { alert("Erro: " + e.message); }
             };
         }
 
-        // Ler e Salvar URL Externa
+        // Ler e Salvar URL Externa com Estado Oculto v3.0.5
         async function fetchExternalUrlConfig() {
             try {
                 const res = await authFetch('/api/external_url');
                 if (res.ok) {
                     const data = await res.json();
                     const input = document.getElementById('externalUrlInput');
+                    const badge = document.getElementById('externalUrlConfiguredBadge');
+                    const inputsDiv = document.getElementById('externalUrlInputsDiv');
+                    const valText = document.getElementById('externalUrlValText');
+                    
                     if (input && data.external_url) input.value = data.external_url;
+                    if (valText && data.external_url) valText.innerText = data.external_url;
+
+                    if (data.external_url && badge && inputsDiv) {
+                        badge.style.display = 'flex';
+                        inputsDiv.style.display = 'none';
+                    } else if (inputsDiv) {
+                        inputsDiv.style.display = 'block';
+                        if (badge) badge.style.display = 'none';
+                    }
                 }
             } catch (e) {}
         }
+
+        const btnEditExternalUrl = document.getElementById('btnEditExternalUrl');
+        if (btnEditExternalUrl) {
+            btnEditExternalUrl.onclick = () => {
+                const inputsDiv = document.getElementById('externalUrlInputsDiv');
+                if (inputsDiv) inputsDiv.style.display = inputsDiv.style.display === 'none' ? 'block' : 'none';
+            };
+        }
+
         const btnSaveExternalUrl = document.getElementById('btnSaveExternalUrl');
         if (btnSaveExternalUrl) {
             btnSaveExternalUrl.onclick = async () => {
@@ -953,7 +1075,10 @@
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ external_url: url })
                     });
-                    if (res.ok) alert("URL Externa salva com sucesso!");
+                    if (res.ok) {
+                        alert("URL Externa salva com sucesso!");
+                        await fetchExternalUrlConfig();
+                    }
                 } catch (e) { alert("Erro ao salvar: " + e.message); }
             };
         }
@@ -1099,15 +1224,12 @@
             } catch (e) {}
         }
 
-        // Modelos
+        // Modelos de IA com Sincronização Dinâmica v3.0.5
         async function fetchModelsStatus() {
             try {
                 const res = await authFetch('/api/models');
                 if (!res.ok) return;
                 const data = await res.json();
-                const container = document.getElementById('modelsListContainer');
-                if (!container) return;
-                container.innerHTML = '';
                 
                 const friendlyNames = {
                     "base": "Base (Mais Leve - ~140MB)",
@@ -1120,29 +1242,22 @@
 
                 Object.keys(data).forEach(size => {
                     const m = data[size];
-                    const row = document.createElement('div');
-                    row.style.display = 'flex';
-                    row.style.justifyContent = 'space-between';
-                    row.style.alignItems = 'center';
-                    row.style.padding = '0.4rem 0.6rem';
-                    row.style.background = 'rgba(0,0,0,0.2)';
-                    row.style.borderRadius = '8px';
-                    row.style.fontSize = '0.8rem';
-                    row.innerHTML = `<span>${friendlyNames[size] || size}</span>`;
-                    
-                    if (m.status === 'done') {
-                        row.innerHTML += '<span style="color: #10b981; font-weight: 600;">✓ Baixado no Servidor</span>';
-                    } else if (m.status === 'downloading') {
-                        row.innerHTML += `<span style="color: #c084fc; font-weight: 600;">⏳ Baixando (${m.progress}%)</span>`;
-                    } else {
-                        const btn = document.createElement('button');
-                        btn.type = 'button';
-                        btn.className = 'btn-secondary';
-                        btn.innerText = '⬇️ Baixar';
-                        btn.onclick = () => triggerModelDownload(size);
-                        row.appendChild(btn);
+                    const row = document.querySelector(`.model-item-row[data-model="${size}"]`);
+                    if (row) {
+                        row.innerHTML = `<span>${friendlyNames[size] || size}</span>`;
+                        if (m.status === 'done') {
+                            row.innerHTML += '<span style="color: #10b981; font-weight: 700;">✓ Baixado no Servidor</span>';
+                        } else if (m.status === 'downloading') {
+                            row.innerHTML += `<span style="color: #c084fc; font-weight: 700;">⏳ Baixando (${m.progress}%)</span>`;
+                        } else {
+                            const btn = document.createElement('button');
+                            btn.type = 'button';
+                            btn.className = 'btn-secondary';
+                            btn.innerText = '⬇️ Baixar';
+                            btn.onclick = () => triggerModelDownload(size);
+                            row.appendChild(btn);
+                        }
                     }
-                    container.appendChild(row);
                 });
             } catch (e) {}
         }
