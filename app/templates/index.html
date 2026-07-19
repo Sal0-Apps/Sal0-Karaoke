@@ -498,6 +498,14 @@
         <div id="createTabContent">
             <!-- Form Principal -->
             <form id="karaokêForm">
+                <!-- BADGE DE REUTILIZAÇÃO DE CACHE RÁPIDA -->
+                <div id="cacheNoticeBadge" style="display: none; background: rgba(139, 92, 246, 0.15); border: 1px solid rgba(139, 92, 246, 0.35); padding: 0.8rem 1.2rem; border-radius: var(--radius-md); margin-bottom: 1.2rem; align-items: center; justify-content: space-between;">
+                    <div>
+                        <strong style="color: var(--accent); font-size: 0.88rem; display: block; margin-bottom: 0.2rem;">⚡ Mídia em Cache Pronta para Recriação Rápida</strong>
+                        <span id="cacheNoticeText" style="font-size: 0.78rem; color: var(--text-muted);">Altere qualquer ajuste de legenda, cor ou fonte abaixo e recrie o vídeo em segundos sem re-processar a IA.</span>
+                    </div>
+                </div>
+
                 <div class="card">
                     <div class="card-header">
                         <span class="card-title">🎵 Arquivo de Música ou Vídeo Original</span>
@@ -972,7 +980,7 @@
 
         <!-- RODAPÉ DISCRETO DA PÁGINA -->
         <footer>
-            Sal0 Karaokê v3.5.6
+            Sal0 Karaokê v3.5.7
         </footer>
 
     </div> <!-- Container End -->
@@ -2047,6 +2055,7 @@
             await loadLibrary();
 
             // CHECAGEM DE STATUS EM SEGUNDO PLANO AO ABRIR OU RECARREGAR A PÁGINA
+            await fetchCacheInfo();
             await fetchStatus();
             startPolling();
         });
@@ -2133,7 +2142,30 @@
             pollingInterval = setInterval(fetchStatus, 600);
         }
 
-        async function fetchStatus() {
+        
+        async function fetchCacheInfo() {
+            try {
+                const res = await authFetch('/api/cache_info');
+                if (!res.ok) return;
+                const data = await res.json();
+                const badge = document.getElementById('cacheNoticeBadge');
+                const text = document.getElementById('cacheNoticeText');
+
+                if (data.has_cache) {
+                    if (text) {
+                        text.innerHTML = `Mídia em cache: <strong>${data.audio_filename}</strong>. Altere cor, fonte, modo de legenda ou fundo e clique em <em>'Criar Vídeo Karaokê'</em> para gerar uma nova versão instantaneamente!`;
+                    }
+                    if (badge) badge.style.display = 'flex';
+                } else {
+                    if (badge) badge.style.display = 'none';
+                }
+            } catch (e) {
+                console.error("Erro ao carregar informações de cache:", e);
+            }
+        }
+
+
+async function fetchStatus() {
             try {
                 const res = await authFetch('/api/status');
                 if (!res.ok) return;
@@ -2181,6 +2213,7 @@
                     }
                     if (btnSubmit) { btnSubmit.disabled = false; btnSubmit.innerHTML = '🎬 Criar Vídeo Karaokê'; }
                     isShowingCorrection = false;
+                    await fetchCacheInfo();
                     await loadLibrary();
                 } else if (data.status === "error") {
                     if (pollingInterval) clearInterval(pollingInterval);
