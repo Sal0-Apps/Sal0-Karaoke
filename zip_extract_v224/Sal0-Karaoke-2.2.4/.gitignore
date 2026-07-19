@@ -1,0 +1,12 @@
+# Arquivos de dados do app
+/data/cache/*
+/data/output/*
+!/data/cache/.gitkeep
+!/data/output/.gitkeep
+*.pyc
+__pycache__/
+
+# Credenciais locais e tokens de deploy (Nunca commitar no Git)
+.env_deploy
+*.token
+deploy_credentials.txt

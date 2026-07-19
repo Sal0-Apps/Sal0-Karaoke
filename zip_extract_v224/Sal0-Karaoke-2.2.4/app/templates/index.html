@@ -1,0 +1,3417 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="color-scheme" content="dark">
+    <meta name="supported-color-schemes" content="dark">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Sal0 Karaokê - Gerador Automático de Vídeos</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <!-- Google Fonts para tipografia premium -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --bg-gradient: linear-gradient(135deg, #0f0c1b 0%, #15102a 50%, #090614 100%);
+            --glass-bg: rgba(255, 255, 255, 0.03);
+            --glass-border: rgba(255, 255, 255, 0.07);
+            --primary: #8b5cf6;
+            --primary-glow: rgba(139, 92, 246, 0.4);
+            --secondary: #3b82f6;
+            --success: #10b981;
+            --success-glow: rgba(16, 185, 129, 0.4);
+            --danger: #ef4444;
+            --text-main: #f3f4f6;
+            --text-muted: #9ca3af;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        html, body {
+            overflow-x: hidden !important;
+            max-width: 100% !important;
+            width: 100% !important;
+            margin: 0;
+            padding: 0;
+            position: relative;
+        }
+
+        *, *::before, *::after {
+            min-width: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: var(--bg-gradient);
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 1rem 0.75rem;
+            overflow-x: hidden !important;
+        }
+
+        /* Container Principal */
+        .container {
+            width: 100%;
+            max-width: 820px;
+            min-width: 0;
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            border-radius: 24px;
+            padding: 2rem;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            position: relative;
+            z-index: 1;
+            box-sizing: border-box;
+            overflow-x: hidden;
+        }
+
+        /* Efeito de luz decorativo ao fundo */
+        .glow-orb {
+            position: absolute;
+            width: 300px;
+            height: 300px;
+            background: radial-gradient(circle, var(--primary-glow) 0%, rgba(0,0,0,0) 70%);
+            top: -150px;
+            right: -150px;
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        header h1 {
+            font-size: 2.2rem;
+            font-weight: 800;
+            background: linear-gradient(to right, #a78bfa, #60a5fa);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 0.5rem;
+            letter-spacing: -0.5px;
+        }
+
+        header p {
+            color: var(--text-muted);
+            font-size: 0.95rem;
+        }
+
+        /* Formulários e Upload */
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .label {
+            display: block;
+            font-size: 0.85rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            color: var(--text-muted);
+            margin-bottom: 0.6rem;
+        }
+
+        .upload-area {
+            border: 2px dashed var(--glass-border);
+            border-radius: 16px;
+            padding: 2.5rem 1.5rem;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: rgba(255, 255, 255, 0.01);
+            position: relative;
+        }
+
+        .upload-area:hover, .upload-area.dragover {
+            border-color: var(--primary);
+            background: rgba(139, 92, 246, 0.03);
+            box-shadow: 0 0 15px rgba(139, 92, 246, 0.1);
+        }
+
+        .upload-icon {
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+            display: block;
+        }
+
+        .upload-text {
+            font-size: 1rem;
+            font-weight: 600;
+            color: var(--text-main);
+            margin-bottom: 0.25rem;
+        }
+
+        .upload-hint {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+
+        .file-input {
+            display: none;
+        }
+
+        .file-selected-badge {
+            margin-top: 1rem;
+            display: inline-flex;
+            align-items: center;
+            background: rgba(139, 92, 246, 0.15);
+            border: 1px solid rgba(139, 92, 246, 0.3);
+            color: #c084fc;
+            padding: 0.4rem 1rem;
+            border-radius: 99px;
+            font-size: 0.85rem;
+            font-weight: 500;
+        }
+
+        /* Estilo para imagem de fundo opcional */
+        .bg-selector-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: rgba(255, 255, 255, 0.015);
+            border: 1px solid var(--glass-border);
+            border-radius: 14px;
+            padding: 1rem;
+            margin-top: 1rem;
+        }
+
+        .bg-info-text {
+            font-size: 0.9rem;
+        }
+
+        .bg-info-text span {
+            display: block;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-top: 0.1rem;
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--glass-border);
+            color: var(--text-main);
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 500;
+            font-size: 0.85rem;
+            transition: all 0.2s ease;
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        /* Botão Processar Principal */
+        .btn-primary {
+            display: block;
+            width: 100%;
+            background: linear-gradient(90deg, var(--primary) 0%, var(--secondary) 100%);
+            border: none;
+            color: #fff;
+            padding: 1.1rem;
+            font-size: 1.1rem;
+            font-weight: 700;
+            border-radius: 14px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px var(--primary-glow);
+            margin-top: 2rem;
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(139, 92, 246, 0.5);
+        }
+
+        .btn-primary:active:not(:disabled) {
+            transform: translateY(0);
+        }
+
+        .btn-primary:disabled {
+            background: rgba(255, 255, 255, 0.07);
+            color: var(--text-muted);
+            cursor: not-allowed;
+            box-shadow: none;
+        }
+
+        /* Painel de Processamento */
+        .process-card {
+            display: none;
+            border-top: 1px solid var(--glass-border);
+            margin-top: 2rem;
+            padding-top: 2rem;
+        }
+
+        /* Barra de Progresso */
+        .progress-container {
+            margin-bottom: 2rem;
+        }
+
+        .progress-info {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.9rem;
+            font-weight: 600;
+            margin-bottom: 0.6rem;
+        }
+
+        .progress-bar-bg {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 99px;
+            height: 10px;
+            width: 100%;
+            overflow: hidden;
+            border: 1px solid rgba(255,255,255,0.03);
+        }
+
+        .progress-bar-fill {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, var(--primary) 0%, var(--secondary) 100%);
+            border-radius: 99px;
+            transition: width 0.4s cubic-bezier(0.1, 0.8, 0.25, 1);
+            box-shadow: 0 0 10px var(--primary-glow);
+        }
+
+        /* Timeline de Status */
+        .timeline {
+            display: flex;
+            flex-direction: column;
+            gap: 0.8rem;
+            margin-bottom: 2rem;
+        }
+
+        .timeline-step {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            opacity: 0.35;
+            transition: all 0.3s ease;
+        }
+
+        .timeline-step.active {
+            opacity: 1;
+            font-weight: 600;
+            color: #c084fc;
+        }
+
+        .timeline-step.active .step-dot {
+            background: var(--primary);
+            box-shadow: 0 0 12px var(--primary);
+            animation: pulse 1.5s infinite;
+        }
+
+        .timeline-step.completed {
+            opacity: 0.8;
+            color: var(--success);
+        }
+
+        .timeline-step.completed .step-dot {
+            background: var(--success);
+            box-shadow: 0 0 8px var(--success-glow);
+        }
+
+        .step-dot {
+            width: 10px;
+            height: 10px;
+            background: var(--text-muted);
+            border-radius: 50%;
+            transition: all 0.3s ease;
+        }
+
+        .step-name {
+            font-size: 0.95rem;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(139, 92, 246, 0.7); }
+            70% { transform: scale(1.2); box-shadow: 0 0 0 10px rgba(139, 92, 246, 0); }
+            100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(139, 92, 246, 0); }
+        }
+
+        /* Caixa de Erro */
+        .error-card {
+            display: none;
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            border-radius: 12px;
+            padding: 1rem;
+            color: #fca5a5;
+            margin-top: 1.5rem;
+            font-size: 0.9rem;
+            line-height: 1.5;
+        }
+
+        /* Botão Download Final */
+        .download-box {
+            display: none;
+            text-align: center;
+            margin-top: 2rem;
+            padding: 1.5rem;
+            background: rgba(16, 185, 129, 0.05);
+            border: 1px solid rgba(16, 185, 129, 0.2);
+            border-radius: 16px;
+            animation: slideUp 0.5s ease-out;
+        }
+
+        .btn-success {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            background: linear-gradient(90deg, var(--success) 0%, #059669 100%);
+            border: none;
+            color: #fff;
+            padding: 1rem 2.5rem;
+            font-size: 1.1rem;
+            font-weight: 700;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px var(--success-glow);
+            text-decoration: none;
+        }
+
+        .btn-success:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(16, 185, 129, 0.5);
+        }
+
+        .download-title {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: #a7f3d0;
+            margin-bottom: 0.4rem;
+        }
+
+        .download-desc {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin-bottom: 1.2rem;
+        }
+
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(15px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Novas Classes para Abas e Responsividade Mobile v2.2.4 */
+        .tab-btn {
+            background: transparent;
+            color: var(--text-muted);
+            border: none;
+            outline: none;
+        }
+        .tab-btn.active {
+            background: var(--primary);
+            color: #fff;
+            box-shadow: 0 0 12px rgba(139, 92, 246, 0.4);
+        }
+        
+        .btn-tab-small {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            color: var(--text-muted);
+            font-size: 0.72rem;
+            font-weight: 600;
+            padding: 0.25rem 0.55rem;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            outline: none;
+        }
+        .btn-tab-small:hover {
+            background: rgba(255, 255, 255, 0.08);
+            color: var(--text-main);
+        }
+        .btn-tab-small.active {
+            background: rgba(139, 92, 246, 0.15);
+            border-color: rgba(139, 92, 246, 0.4);
+            color: #c084fc;
+        }
+
+        .library-item {
+            background: rgba(0, 0, 0, 0.2);
+            border: 1px solid rgba(255,255,255,0.04);
+            padding: 0.75rem 1rem;
+            border-radius: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 0.8rem;
+            transition: all 0.2s;
+        }
+        .library-item:hover {
+            border-color: rgba(255,255,255,0.08);
+            background: rgba(0, 0, 0, 0.3);
+        }
+
+        /* Responsividade Mobile Avançada */
+        @media (max-width: 600px) {
+            html, body {
+                overflow-x: hidden !important;
+            }
+            .container {
+                padding: 0.9rem 0.7rem;
+                border-radius: 16px;
+                width: 100% !important;
+            }
+            .upload-area {
+                height: 120px !important;
+            }
+            .library-item {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 0.5rem;
+            }
+            .library-item .actions {
+                width: 100%;
+                display: flex;
+                gap: 0.4rem;
+                justify-content: flex-end;
+            }
+            .library-item .actions button, .library-item .actions a {
+                flex: 1;
+                font-size: 0.7rem !important;
+                padding: 0.4rem !important;
+                text-align: center;
+            }
+            h1 {
+                font-size: 1.4rem !important;
+            }
+            header p {
+                font-size: 0.75rem !important;
+            }
+            .tab-btn {
+                font-size: 0.76rem !important;
+                padding: 0.6rem 0.3rem !important;
+                gap: 0.25rem !important;
+            }
+            .tabs-nav {
+                max-width: 100% !important;
+                flex-basis: 100% !important;
+            }
+        }
+
+        /* ===== MODAIS RESPONSIVOS v2.2.4 ===== */
+        [id$="Modal"] > div,
+        #helpModal > div,
+        #correctionConfirmModal > div,
+        #authOverlay > div {
+            max-width: min(600px, 95vw) !important;
+            max-height: 90vh !important;
+            width: 95vw !important;
+            overflow-y: auto !important;
+            overflow-x: hidden !important;
+            box-sizing: border-box !important;
+        }
+        #helpModal > div { width: min(600px, 95vw) !important; }
+        #correctionConfirmModal > div { width: min(440px, 95vw) !important; }
+        #authOverlay > div#loginCard,
+        #authOverlay > div#setupCard { width: min(420px, 95vw) !important; }
+
+    
+        /* ===== STYLES RESPONSIVOS v2.2.4 DEFINITIVOS ===== */
+        html, body {
+            overflow-x: hidden !important;
+            max-width: 100vw !important;
+            width: 100% !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            position: relative !important;
+        }
+
+        *, *::before, *::after {
+            box-sizing: border-box !important;
+            min-width: 0 !important;
+        }
+
+        .container {
+            max-width: 820px !important;
+            width: 100% !important;
+            box-sizing: border-box !important;
+            overflow-x: hidden !important;
+        }
+
+        /* Modais Enquadrados no Celular */
+        #helpModal, #correctionConfirmModal, #authOverlay {
+            padding: 0.5rem !important;
+            box-sizing: border-box !important;
+        }
+
+        #helpModal > div,
+        #correctionConfirmModal > div,
+        #authOverlay > div#loginCard,
+        #authOverlay > div#setupCard {
+            max-width: min(600px, 92vw) !important;
+            max-height: 85vh !important;
+            width: 92vw !important;
+            overflow-y: auto !important;
+            overflow-x: hidden !important;
+            box-sizing: border-box !important;
+            border-radius: 16px !important;
+            margin: auto !important;
+            padding: 1.2rem 1rem !important;
+        }
+
+        @media (max-width: 600px) {
+            body {
+                padding: 0.5rem 0.3rem !important;
+            }
+            .container {
+                padding: 1rem 0.6rem !important;
+                border-radius: 16px !important;
+            }
+        }
+
+    
+        :root {
+            color-scheme: dark !important;
+            supported-color-schemes: dark !important;
+        }
+
+        html, body {
+            color-scheme: dark !important;
+            background-color: #0a0814 !important;
+            color: #f3f4f6 !important;
+        }
+
+        h1, h2, h3, h4, h5, h6, .label, header p, .upload-text {
+            color: #f3f4f6 !important;
+        }
+
+        h1 {
+            color: #ffffff !important;
+            text-shadow: 0 0 15px rgba(139, 92, 246, 0.6) !important;
+        }
+
+    
+        /* Alinhamento uniforme dos botões do cabeçalho */
+        header .header-tools-row {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            flex-wrap: wrap;
+        }
+        header button, header select {
+            height: 34px !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            box-sizing: border-box !important;
+        }
+
+</style>
+</head>
+<body>
+    <div class="glow-orb"></div>
+    <div class="container">
+        <header style="display: flex; align-items: center; justify-content: center; gap: 1rem; margin-bottom: 2rem;">
+            <img src="/favicon.png" alt="Microfone" style="width: 48px; height: 48px; border-radius: 50%; box-shadow: 0 0 15px var(--primary-glow); border: 1px solid rgba(255,255,255,0.15); object-fit: cover;">
+            <div style="text-align: left;">
+                <h1 style="margin: 0; font-size: 1.8rem; font-weight: 800; letter-spacing: -0.025em; color: var(--text-main);">Sal0 Karaokê</h1>
+                <p style="margin: 0; font-size: 0.85rem; color: var(--text-muted);">Separação de áudio e geração de vídeos de karaokê locais via IA</p>
+            </div>
+        </header>
+        <!-- Barra de Abas e Controles do Cabeçalho v2.2.4 -->
+        <div style="display: flex; gap: 0.8rem; align-items: center; margin-bottom: 1.5rem; justify-content: space-between; flex-wrap: wrap; width: 100%;">
+            <div class="tabs-nav" style="display: flex; gap: 0.4rem; background: rgba(255, 255, 255, 0.03); border: 1px solid var(--glass-border); padding: 0.35rem; border-radius: 12px; flex: 1; max-width: 440px; margin: 0;">
+                <button type="button" id="tabBtnCreate" class="tab-btn active" style="flex: 1; padding: 0.65rem; border-radius: 8px; border: none; font-weight: 700; font-size: 0.85rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.4rem; transition: all 0.2s;">🎙️ Criar Karaokê</button>
+                <button type="button" id="tabBtnLibrary" class="tab-btn" style="flex: 1; padding: 0.65rem; border-radius: 8px; border: none; font-weight: 700; font-size: 0.85rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.4rem; transition: all 0.2s;">📚 Biblioteca & Histórico</button>
+            </div>
+            <div style="display: flex; gap: 0.4rem; align-items: center; flex-wrap: wrap;">
+                <span style="font-size: 0.78rem; color: var(--text-muted); font-weight: 500;">Perfil:</span>
+                <select id="profileSelect" class="btn-secondary" style="border: 1px solid var(--glass-border); padding: 0.45rem 0.65rem; background: #141226; color: var(--text-main); border-radius: 10px; cursor: pointer; outline: none; font-size: 0.78rem; font-weight: 600;">
+                    <!-- Preenchido via JS -->
+                </select>
+                <button type="button" id="btnToggleAdvanced" style="background: rgba(255, 255, 255, 0.05); border: 1px solid var(--glass-border); padding: 0.45rem 0.7rem; border-radius: 10px; color: #c084fc; font-size: 0.78rem; font-weight: 600; display: flex; align-items: center; gap: 0.3rem; cursor: pointer; transition: all 0.2s ease; outline: none;">
+                    <span style="font-size: 0.85rem;">⚙️</span> Ajustes
+                </button>
+                <button type="button" id="btnOpenHelp" style="background: rgba(255, 255, 255, 0.05); border: 1px solid var(--glass-border); padding: 0.45rem 0.7rem; border-radius: 10px; color: #60a5fa; font-size: 0.78rem; font-weight: 600; display: flex; align-items: center; gap: 0.3rem; cursor: pointer; transition: all 0.2s ease; outline: none;">
+                    <span style="font-size: 0.85rem;">📖</span> Manual
+                </button>
+                <button type="button" id="btnDownloadLogs" style="background: rgba(255, 255, 255, 0.05); border: 1px solid var(--glass-border); padding: 0.45rem 0.7rem; border-radius: 10px; color: #38bdf8; font-size: 0.78rem; font-weight: 600; display: flex; align-items: center; gap: 0.3rem; cursor: pointer; transition: all 0.2s ease; outline: none;" title="Baixar Logs de Diagnostico do Servidor">
+                    <span style="font-size: 0.85rem;">📋</span> Logs
+                </button>
+                <button type="button" id="btnLogout" style="background: rgba(255, 255, 255, 0.05); border: 1px solid var(--glass-border); padding: 0.45rem 0.7rem; border-radius: 10px; color: #fca5a5; font-size: 0.78rem; font-weight: 600; display: flex; align-items: center; gap: 0.3rem; cursor: pointer; transition: all 0.2s ease; outline: none;">
+                    <span style="font-size: 0.85rem;">🚪</span> Sair
+                </button>
+            </div>
+        </div>
+
+        <div id="createTabContent">        <!-- Formulário de Processamento -->
+        <form id="karaokêForm">
+            <!-- Banner de Mídia Ativa Selecionada v2.2.4 -->
+            <div id="activeMediaBanner" style="background: rgba(139, 92, 246, 0.12); border: 1px solid rgba(139, 92, 246, 0.3); border-radius: 14px; padding: 0.9rem 1.2rem; margin-bottom: 1.2rem; display: flex; align-items: center; justify-content: space-between; gap: 0.8rem; flex-wrap: wrap; box-shadow: 0 4px 16px rgba(0,0,0,0.2);">
+                <div style="display: flex; align-items: center; gap: 0.75rem;">
+                    <span id="activeMediaIcon" style="font-size: 1.6rem;">🎵</span>
+                    <div>
+                        <span style="font-size: 0.7rem; color: #c084fc; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; display: block; margin-bottom: 0.1rem;">Mídia Selecionada para a Produção</span>
+                        <span id="activeMediaTitle" style="font-size: 0.92rem; color: #ffffff; font-weight: 700; word-break: break-word;">Nenhuma mídia selecionada (Aguardando arquivo, URL ou Biblioteca)</span>
+                    </div>
+                </div>
+                <span id="activeMediaSourceBadge" style="background: rgba(255,255,255,0.08); color: var(--text-muted); padding: 0.3rem 0.75rem; border-radius: 20px; font-size: 0.75rem; font-weight: 600; border: 1px solid rgba(255,255,255,0.1);">Nenhuma</span>
+            </div>
+
+
+            <!-- ÁREA DE MÍDIA (Música e Imagem de Fundo Lado a Lado) -->
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr)); gap: 1.2rem; margin-top: 0.5rem;">
+                
+                <!-- Coluna 1: Música ou Vídeo Original -->
+                <div class="form-group" style="margin: 0; display: flex; flex-direction: column;">
+                    <span class="label">🎵 Música ou Vídeo Original</span>
+                    <div style="display: flex; gap: 0.3rem; margin-top: 0.3rem; margin-bottom: 0.4rem;">
+                        <button type="button" id="btnAudioModeUpload" class="btn-tab-small active">📁 Enviar</button>
+                        <button type="button" id="btnAudioModeYoutube" class="btn-tab-small">🌐 YouTube</button>
+                        <button type="button" id="btnAudioModeLibrary" class="btn-tab-small">📚 Biblioteca</button>
+                    </div>
+                    
+                    <div id="audioUploadContainer">
+                        <div class="upload-area" id="audioUploadArea" style="height: 105px; display: flex; flex-direction: column; justify-content: center; align-items: center; border: 2px dashed rgba(255,255,255,0.15); border-radius: 14px; background: rgba(0,0,0,0.1); cursor: pointer; transition: all 0.2s;">
+                            <span class="upload-icon" style="font-size: 1.5rem; margin-bottom: 0.2rem;">🎵</span>
+                            <p class="upload-text" id="audioText" style="font-size: 0.8rem; margin: 0 0 0.1rem 0; font-weight: 500;">Arraste a música ou clique</p>
+                            <p class="upload-hint" style="font-size: 0.65rem; color: var(--text-muted); margin: 0;">mp3, wav, flac, m4a, mp4...</p>
+                            <input type="file" id="audioFile" name="audio_file" class="file-input" accept=".mp3,.wav,.flac,.m4a,.mp4,.mkv,.avi" style="display: none;">
+                            <div class="file-selected-badge" id="audioBadge" style="display: none; background: #8b5cf6; color: white; padding: 0.2rem 0.5rem; border-radius: 20px; font-size: 0.7rem; font-weight: 500; margin-top: 0.3rem; max-width: 90%; text-overflow: ellipsis; overflow: hidden; white-space: nowrap;">Nenhum arquivo selecionado</div>
+                        </div>
+                    </div>
+                    
+                    <div id="audioYoutubeContainer" style="display: none;">
+                        <div style="display: flex; flex-direction: column; gap: 0.4rem;">
+                            <input type="text" id="youtubeUrl" name="youtube_url" placeholder="Cole a URL do YouTube (ex: https://...)" style="width: 100%; border: 1px solid var(--glass-border); padding: 0.6rem 0.8rem; background: rgba(0,0,0,0.15); color: var(--text-main); border-radius: 10px; font-size: 0.8rem; outline: none; box-shadow: inset 0 2px 4px rgba(0,0,0,0.25);">
+                            <button type="button" id="btnDownloadYoutube" class="btn-primary" style="font-size: 0.78rem; padding: 0.5rem; font-weight: 700; width: 100%; display: flex; align-items: center; justify-content: center; gap: 0.35rem; border: none; cursor: pointer;">
+                                <span>📥</span> Baixar do YouTube
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- library_audio preenchido via JS pelo botão Criar na aba Biblioteca -->
+                    <input type="hidden" id="libraryAudioHidden" name="library_audio" value="">
+                </div>
+
+                <!-- Coluna 2: Imagem ou Vídeo de Fundo (Opcional) -->
+                <div class="form-group" style="margin: 0; display: flex; flex-direction: column;">
+                    <span class="label">🖼️ Imagem ou Vídeo de Fundo (Opcional)</span>
+                    <div style="display: flex; gap: 0.3rem; margin-top: 0.3rem; margin-bottom: 0.4rem;">
+                        <button type="button" id="btnBgModeUpload" class="btn-tab-small active">📁 Enviar</button>
+                        <button type="button" id="btnBgModeYoutube" class="btn-tab-small">🌐 YouTube</button>
+                        <button type="button" id="btnBgModeLibrary" class="btn-tab-small">📚 Biblioteca</button>
+                    </div>
+                    
+                    <div id="bgUploadContainer">
+                        <div class="upload-area" id="bgUploadArea" style="height: 105px; display: flex; flex-direction: column; justify-content: center; align-items: center; border: 2px dashed rgba(255,255,255,0.15); border-radius: 14px; background: rgba(0,0,0,0.1); cursor: pointer; transition: all 0.2s;">
+                            <span class="upload-icon" style="font-size: 1.5rem; margin-bottom: 0.2rem;">🖼️</span>
+                            <p class="upload-text" id="bgTextName" style="font-size: 0.8rem; margin: 0 0 0.1rem 0; font-weight: 500;">Arraste o fundo ou clique</p>
+                            <p class="upload-hint" style="font-size: 0.65rem; color: var(--text-muted); margin: 0;">Imagem ou vídeo</p>
+                            <input type="file" id="bgFile" name="bg_file" class="file-input" accept="image/*,video/*" style="display: none;">
+                            <div class="file-selected-badge" id="bgBadge" style="display: none; background: #ec4899; color: white; padding: 0.2rem 0.5rem; border-radius: 20px; font-size: 0.7rem; font-weight: 500; margin-top: 0.3rem; max-width: 90%; text-overflow: ellipsis; overflow: hidden; white-space: nowrap;">Nenhum arquivo selecionado</div>
+                        </div>
+                    </div>
+                    
+                    <div id="bgYoutubeContainer" style="display: none;">
+                        <div style="display: flex; flex-direction: column; gap: 0.4rem;">
+                            <input type="text" id="bgYoutubeUrl" placeholder="Cole a URL do vídeo/imagem do YouTube para fundo..." style="width: 100%; border: 1px solid var(--glass-border); padding: 0.6rem 0.8rem; background: rgba(0,0,0,0.15); color: var(--text-main); border-radius: 10px; font-size: 0.8rem; outline: none; box-shadow: inset 0 2px 4px rgba(0,0,0,0.25);">
+                            <button type="button" id="btnDownloadBgYoutube" class="btn-primary" style="font-size: 0.78rem; padding: 0.5rem; font-weight: 700; width: 100%; display: flex; align-items: center; justify-content: center; gap: 0.35rem; border: none; cursor: pointer; background: linear-gradient(90deg, #ec4899 0%, #8b5cf6 100%);">
+                                <span>📥</span> Baixar Fundo do YouTube (Sem Áudio)
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div id="bgLibraryContainer" style="display: none;">
+                        <select id="libraryBgSelect" name="library_bg" class="btn-secondary" style="width: 100%; border: 1px solid var(--glass-border); padding: 0.6rem 0.8rem; background: #141226; color: var(--text-main); border-radius: 10px; font-size: 0.8rem; cursor: pointer; outline: none;">
+                            <option value="">Selecione um fundo da biblioteca...</option>
+                        </select>
+                    </div>
+
+                    <!-- Modo de Exibição do Fundo do Vídeo -->
+                    <div style="margin-top: 0.6rem;">
+                        <span class="label" style="font-size: 0.72rem; color: var(--text-muted); margin-bottom: 0.25rem;">Exibição no Vídeo</span>
+                        <select id="backgroundMode" name="background_mode" class="btn-secondary" style="width: 100%; border: 1px solid var(--glass-border); padding: 0.55rem 0.75rem; background: #141226; color: var(--text-main); border-radius: 10px; font-size: 0.8rem; cursor: pointer; outline: none; font-weight: 600;">
+                            <option value="random_landscape" selected>🏞️ Paisagem Aleatória (Padrão)</option>
+                            <option value="image">🖼️ Usar Fundo Enviado/Biblioteca</option>
+                            <option value="original_video">🎥 Usar Vídeo Original (Música)</option>
+                            <option value="solid_black">⬛ Fundo Preto Sólido</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+  
+            <!-- Opções adicionais de biblioteca (Salvar ao enviar) -->
+            <div style="display: flex; gap: 0.8rem; margin-top: 1rem; flex-wrap: wrap; flex-direction: column; background: rgba(255, 255, 255, 0.015); border: 1px solid rgba(255, 255, 255, 0.04); padding: 0.8rem 1rem; border-radius: 12px;">
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    <input type="checkbox" id="saveToLibrary" name="save_to_library" style="cursor: pointer; width: 16px; height: 16px;">
+                    <label for="saveToLibrary" style="font-size: 0.78rem; color: var(--text-muted); cursor: pointer; user-select: none;">💾 Salvar arquivos enviados na biblioteca permanente</label>
+                </div>
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    <input type="checkbox" id="onlyRemoveVocals" name="only_remove_vocals" style="cursor: pointer; width: 16px; height: 16px;">
+                    <label for="onlyRemoveVocals" style="font-size: 0.78rem; color: #f472b6; font-weight: 600; cursor: pointer; user-select: none;">🎤 Apenas remover voz do cantor do vídeo original (pular legendagem/Whisper)</label>
+                </div>
+            </div>
+
+            <!-- Letra Oficial da Música (Opcional) para orientar o Whisper -->
+            <div class="form-group" style="margin-top: 1.2rem;">
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.3rem; flex-wrap: wrap; gap: 0.4rem;">
+                    <span class="label" style="display: flex; align-items: center; gap: 0.35rem; margin: 0;">
+                        <span>📝</span> Letra Oficial da Música (Opcional)
+                    </span>
+                    <div style="display: flex; gap: 0.4rem;">
+                        <button type="button" id="btnSaveLyrics" title="Salvar letra no navegador" style="background: rgba(16,185,129,0.12); border: 1px solid rgba(16,185,129,0.3); color: #34d399; font-size: 0.72rem; font-weight: 600; padding: 0.25rem 0.65rem; border-radius: 8px; cursor: pointer; display: flex; align-items: center; gap: 0.3rem; transition: all 0.2s;">💾 Salvar</button>
+                        <button type="button" id="btnClearLyrics" title="Limpar letra" style="background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.25); color: #fca5a5; font-size: 0.72rem; font-weight: 600; padding: 0.25rem 0.65rem; border-radius: 8px; cursor: pointer; display: flex; align-items: center; gap: 0.3rem; transition: all 0.2s;">🗑️ Limpar</button>
+                    </div>
+                </div>
+                <div class="bg-info-text" style="margin-bottom: 0.4rem;">
+                    <span>Cole a letra aqui para guiar o Whisper a transcrever com 100% de precisão gramatical e quebras corretas. Use <b>Salvar</b> para manter entre sessões.</span>
+                </div>
+                <textarea id="lyricsText" name="lyrics_text" placeholder="Cole a letra oficial aqui..." style="width: 100%; min-height: 100px; border: 1px solid var(--glass-border); padding: 0.7rem 0.9rem; background: rgba(0,0,0,0.15); color: var(--text-main); border-radius: 12px; outline: none; font-size: 0.9rem; font-family: inherit; resize: vertical; box-shadow: inset 0 2px 4px rgba(0,0,0,0.25);"></textarea>
+            </div>
+
+            <!-- Seção de Ajustes Avançados Colapsáveis -->
+            <div id="advancedContent" style="display: none; margin-top: 1.5rem; background: rgba(255, 255, 255, 0.015); border: 1px solid var(--glass-border); border-radius: 14px; padding: 1.2rem;">
+                
+                
+                
+                <!-- Perfis de Configuração -->
+                <div class="form-group" style="border: 1px solid rgba(255,255,255,0.05); border-radius: 10px; padding: 1rem; background: rgba(0,0,0,0.15);">
+                    <span class="label">Salvar ou Excluir Perfil Atual</span>
+                    <div style="display: flex; gap: 0.8rem; align-items: center; margin-top: 0.5rem; flex-wrap: wrap;">
+                        <input type="text" id="profileNameInput" placeholder="Nome do perfil" style="flex: 1; border: 1px solid var(--glass-border); padding: 0.5rem; background: #141226; color: var(--text-main); border-radius: 8px; font-size: 0.85rem; outline: none; min-width: 150px;">
+                        <button type="button" class="btn-secondary" id="btnSaveProfile" style="background: rgba(139, 92, 246, 0.2); border-color: rgba(139, 92, 246, 0.4); color: #c084fc; font-weight: 500;">💾 Salvar</button>
+                        <button type="button" class="btn-secondary" id="btnDeleteProfile" style="background: rgba(239, 68, 68, 0.1); border-color: rgba(239, 68, 68, 0.3); color: #fca5a5; font-weight: 500;">🗑️ Excluir</button>
+                    </div>
+                </div>
+
+                <!-- Seleção do Modelo do Whisper -->
+                <div class="form-group" style="margin-top: 1rem;">
+                    <span class="label">Modelo de Transcrição Whisper</span>
+                    <div class="bg-selector-row" style="margin-top: 0.5rem;">
+                        <div class="bg-info-text">
+                            <span>Escolha a precisão da IA (modelos maiores salvam no cache do servidor):</span>
+                        </div>
+                        <select id="whisperModel" name="whisper_model" class="btn-secondary" style="border: 1px solid var(--glass-border); padding: 0.5rem; background: #141226; color: var(--text-main); border-radius: 8px; cursor: pointer; outline: none; max-width: 250px;">
+                            <option value="medium" selected>Medium (Recomendado - Equilibrado)</option>
+                            <option value="large-v3-turbo">Large v3 Turbo (Super Rápido & Alta Precisão)</option>
+                            <option value="large-v3">Large v3 (Precisão Máxima Absoluta)</option>
+                            <option value="large-v2">Large v2 (Excelente precisão)</option>
+                            <option value="small">Small (Rápido / Média precisão)</option>
+                            <option value="base">Base (Ultra rápido / Pouca precisão)</option>
+                        </select>
+                    </div>
+                </div>
+
+
+
+                <!-- Gerenciador de Modelos de IA (Download no Servidor) -->
+                <div class="form-group" style="border: 1px solid rgba(255,255,255,0.05); border-radius: 10px; padding: 1rem; background: rgba(0,0,0,0.15); margin-top: 1rem;">
+                    <span class="label">🤖 Gerenciador de Modelos de IA (Cache Local)</span>
+                    <div class="bg-info-text" style="margin-top: 0.3rem; margin-bottom: 0.8rem;">
+                        <span>Para poupar RAM e evitar timeouts, baixe previamente os modelos desejados para o disco do seu servidor:</span>
+                    </div>
+                    <div style="display: grid; gap: 0.8rem;" id="modelsListContainer">
+                        <!-- Preenchido via Javascript -->
+                    </div>
+                </div>
+
+                <!-- Estilização da Legenda -->
+                <div class="form-group" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; border: 1px solid rgba(255,255,255,0.05); border-radius: 10px; padding: 1rem; background: rgba(0,0,0,0.15); margin-top: 1rem;">
+                    <div>
+                        <span class="label" style="margin-bottom: 0.3rem;">Tamanho da Fonte</span>
+                        <input type="number" id="fontSize" name="font_size" value="32" min="16" max="72" class="btn-secondary" style="width: 100%; border: 1px solid var(--glass-border); padding: 0.5rem; background: #141226; color: var(--text-main); border-radius: 8px; outline: none; text-align: center;">
+                    </div>
+                    <div>
+                        <span class="label" style="margin-bottom: 0.3rem;">Cor do Destaque</span>
+                        <div style="display: flex; gap: 0.5rem; align-items: center;">
+                            <input type="color" id="textColor" name="text_color" value="#00FFFF" style="border: 1px solid var(--glass-border); background: none; border-radius: 8px; width: 45px; height: 36px; padding: 2px; cursor: pointer;">
+                            <span id="colorHexText" style="font-size: 0.85rem; color: var(--text-muted);">#00FFFF</span>
+                        </div>
+                    </div>
+                    <div>
+                        <span class="label" style="margin-bottom: 0.3rem;">Posição do Texto</span>
+                        <select id="textPosition" name="text_position" class="btn-secondary" style="width: 100%; border: 1px solid var(--glass-border); padding: 0.5rem; background: #141226; color: var(--text-main); border-radius: 8px; outline: none; cursor: pointer;">
+                            <option value="bottom" selected>Inferior (Padrão)</option>
+                            <option value="middle">Centro</option>
+                            <option value="top">Superior</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Configurações de Comportamento e Quebra de Legenda -->
+                <div class="form-group" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; border: 1px solid rgba(255,255,255,0.05); border-radius: 10px; padding: 1rem; background: rgba(0,0,0,0.15); margin-top: 1rem;">
+                    <div>
+                        <span class="label" style="margin-bottom: 0.3rem;">Tipo de Legenda</span>
+                        <select id="subtitleMode" name="subtitle_mode" class="btn-secondary" style="width: 100%; border: 1px solid var(--glass-border); padding: 0.5rem; background: #141226; color: var(--text-main); border-radius: 8px; outline: none; cursor: pointer;">
+                            <option value="syllable" selected>Seguir Sílabas (Karaokê)</option>
+                            <option value="phrase">Frases Sincronizadas (Comum)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <span class="label" style="margin-bottom: 0.3rem;">Palavras por Linha</span>
+                        <input type="number" id="wordsPerLine" name="words_per_line" value="0" min="0" max="30" class="btn-secondary" style="width: 100%; border: 1px solid var(--glass-border); padding: 0.5rem; background: #141226; color: var(--text-main); border-radius: 8px; outline: none; text-align: center;" title="Use 0 para sem limite">
+                    </div>
+                    <div>
+                        <span class="label" style="margin-bottom: 0.3rem;">Máx. Caracteres</span>
+                        <input type="number" id="maxCharsLine" name="max_chars_line" value="40" min="0" max="100" class="btn-secondary" style="width: 100%; border: 1px solid var(--glass-border); padding: 0.5rem; background: #141226; color: var(--text-main); border-radius: 8px; outline: none; text-align: center;" title="Use 0 para sem limite">
+                    </div>
+                    <div>
+                        <span class="label" style="margin-bottom: 0.3rem;">Quebrar em Pontuação</span>
+                        <select id="breakOnPunctuation" name="break_on_punctuation" class="btn-secondary" style="width: 100%; border: 1px solid var(--glass-border); padding: 0.5rem; background: #141226; color: var(--text-main); border-radius: 8px; outline: none; cursor: pointer;">
+                            <option value="true" selected>Sim</option>
+                            <option value="false">Não</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Novas Opções de Sincronismo e Pré-visualização -->
+                <div class="form-group" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; border: 1px solid rgba(255,255,255,0.05); border-radius: 10px; padding: 1rem; background: rgba(0,0,0,0.15); margin-top: 1rem;">
+                    <div>
+                        <span class="label" style="margin-bottom: 0.3rem;">🎸 Instrumental nas Pausas</span>
+                        <select id="showInstrumental" name="show_instrumental" class="btn-secondary" style="width: 100%; border: 1px solid var(--glass-border); padding: 0.5rem; background: #141226; color: var(--text-main); border-radius: 8px; outline: none; cursor: pointer;">
+                            <option value="true" selected>Sim (Padrão)</option>
+                            <option value="false">Não</option>
+                        </select>
+                    </div>
+                    <div>
+                        <span class="label" style="margin-bottom: 0.3rem;">🎙️ Fonte de Transcrição</span>
+                        <select id="transcribeSource" name="transcribe_source" class="btn-secondary" style="width: 100%; border: 1px solid var(--glass-border); padding: 0.5rem; background: #141226; color: var(--text-main); border-radius: 8px; outline: none; cursor: pointer;" title="Escolha se deseja transcrever usando a voz isolada ou a música completa (com instrumental)">
+                            <option value="vocals" selected>Voz Isolada (Recomendado)</option>
+                            <option value="original">Música Completa (Original)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <span class="label" style="margin-bottom: 0.3rem;">👁️ Pré-visualizar Próxima Linha</span>
+                        <select id="showNextLinePreview" name="show_next_line_preview" class="btn-secondary" style="width: 100%; border: 1px solid var(--glass-border); padding: 0.5rem; background: #141226; color: var(--text-main); border-radius: 8px; outline: none; cursor: pointer;">
+                            <option value="false" selected>Não (Padrão)</option>
+                            <option value="true">Sim (Ofuscada)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <span class="label" style="margin-bottom: 0.3rem;">📝 Letra Visível no Início</span>
+                        <select id="keepFirstLineVisible" name="keep_first_line_visible" class="btn-secondary" style="width: 100%; border: 1px solid var(--glass-border); padding: 0.5rem; background: #141226; color: var(--text-main); border-radius: 8px; outline: none; cursor: pointer;" title="Exibe a primeira linha da letra estática logo na introdução até começar a cantar">
+                            <option value="false" selected>Não (Padrão)</option>
+                            <option value="true">Sim</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Notificações no Telegram (Configuração Global) -->
+                <div class="form-group" style="border: 1px solid rgba(255,255,255,0.05); border-radius: 10px; padding: 1rem; background: rgba(0,0,0,0.15); margin-top: 1rem;">
+                    <span class="label">Telegram Bot (Notificações e Envio de Vídeo)</span>
+                    
+                    <!-- Badge de Status Configurado -->
+                    <div id="telegramStatusBadge" style="display: none; align-items: center; justify-content: space-between; background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.2); padding: 0.6rem 1rem; border-radius: 8px; margin-top: 0.5rem;">
+                        <span style="color: #a7f3d0; font-size: 0.85rem; font-weight: 500;">✓ Bot do Telegram Ativo e Configurado</span>
+                        <button type="button" class="btn-secondary" id="btnEditTelegram" style="font-size: 0.75rem; padding: 0.3rem 0.6rem; border-color: rgba(255,255,255,0.15); background: transparent; cursor: pointer;">✏️ Alterar</button>
+                    </div>
+                    
+                    <!-- Campos de Edição do Telegram -->
+                    <div id="telegramFields" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-top: 0.5rem;">
+                        <div>
+                            <span style="font-size: 0.75rem; color: var(--text-muted); display: block; margin-bottom: 0.2rem;">Token do Bot</span>
+                            <input type="text" id="telegramToken" placeholder="Ex: 123456:ABC..." style="width: 100%; border: 1px solid var(--glass-border); padding: 0.5rem 0.8rem; background: #141226; color: var(--text-main); border-radius: 8px; font-size: 0.85rem; outline: none;">
+                        </div>
+                        <div>
+                            <span style="font-size: 0.75rem; color: var(--text-muted); display: block; margin-bottom: 0.2rem;">ID do Chat / Grupo</span>
+                            <div style="display: flex; gap: 0.5rem;">
+                                <input type="text" id="telegramChatId" placeholder="Ex: -100123456789" style="flex: 1; border: 1px solid var(--glass-border); padding: 0.5rem 0.8rem; background: #141226; color: var(--text-main); border-radius: 8px; font-size: 0.85rem; outline: none;">
+                                <button type="button" class="btn-secondary" id="btnSaveTelegram" style="background: rgba(16, 185, 129, 0.2); border-color: rgba(16, 185, 129, 0.4); color: #a7f3d0; font-size: 0.85rem;">Salvar</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Gerenciamento de Usuários (Visível apenas para Administradores) -->
+                <div id="userManagementSection" style="display: none; border: 1px solid rgba(255,255,255,0.05); border-radius: 10px; padding: 1rem; background: rgba(0,0,0,0.15); margin-top: 1rem;">
+                    <span class="label" style="display: flex; align-items: center; gap: 0.3rem;">👤 Gerenciamento de Contas Locais</span>
+                    <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.8rem;">
+                        Como administrador, você pode criar e gerenciar perfis de login para outros usuários acessarem este servidor.
+                    </div>
+                    
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 0.8rem; margin-bottom: 1rem; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 1rem;">
+                        <div>
+                            <span style="font-size: 0.7rem; color: var(--text-muted); display: block; margin-bottom: 0.2rem;">Nome do Usuário</span>
+                            <input type="text" id="newUsername" placeholder="Ex: maria" style="width: 100%; border: 1px solid var(--glass-border); padding: 0.4rem 0.6rem; background: #141226; color: var(--text-main); border-radius: 6px; font-size: 0.8rem; outline: none;">
+                        </div>
+                        <div>
+                            <span style="font-size: 0.7rem; color: var(--text-muted); display: block; margin-bottom: 0.2rem;">Senha</span>
+                            <input type="password" id="newPassword" placeholder="Sua senha" style="width: 100%; border: 1px solid var(--glass-border); padding: 0.4rem 0.6rem; background: #141226; color: var(--text-main); border-radius: 6px; font-size: 0.8rem; outline: none;">
+                        </div>
+                        <div style="display: flex; align-items: flex-end;">
+                            <button type="button" class="btn-secondary" id="btnCreateUser" style="width: 100%; background: rgba(139, 92, 246, 0.2); border-color: rgba(139, 92, 246, 0.4); color: #c084fc; font-weight: 500; font-size: 0.8rem; padding: 0.4rem;">➕ Adicionar</button>
+                        </div>
+                    </div>
+
+                    <div>
+                        <span style="font-size: 0.75rem; color: var(--text-muted); display: block; margin-bottom: 0.5rem; font-weight: 600;">Usuários Cadastrados</span>
+                        <div id="usersListContainer" style="display: flex; flex-direction: column; gap: 0.5rem; max-height: 150px; overflow-y: auto;">
+                            <!-- Inserido dinamicamente via JS -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Botão Submit -->
+            <button type="submit" class="btn-primary" id="btnSubmit" style="margin-top: 1.5rem;">🎬 Criar Vídeo Karaokê</button>
+        </form>
+
+        <!-- Painel de Status / Progresso -->
+        <div class="process-card" id="processCard">
+            <div class="progress-container">
+                <div class="progress-info">
+                    <span id="statusMessage">Iniciando processamento...</span>
+                    <span id="progressPercent">0%</span>
+                </div>
+                <div class="progress-bar-bg">
+                    <div class="progress-bar-fill" id="progressBarFill"></div>
+                </div>
+            </div>
+
+            <!-- Botão de Cancelamento de Processamento -->
+            <div style="display: flex; justify-content: center; margin-top: 1.2rem; margin-bottom: 0.2rem;">
+                <button type="button" class="btn-cancel-task btn-secondary" style="background: rgba(239, 68, 68, 0.12); border-color: rgba(239, 68, 68, 0.25); color: #fca5a5; font-size: 0.8rem; font-weight: 600; padding: 0.45rem 1rem; border-radius: 8px; cursor: pointer; transition: all 0.2s; outline: none;">
+                    🛑 Cancelar Processamento
+                </button>
+            </div>
+
+            <!-- Linha de Etapas do Pipeline -->
+            <div class="timeline" id="timeline">
+                <div class="timeline-step" id="step-Uploading">
+                    <div class="step-dot"></div>
+                    <span class="step-name">Carregando arquivo (Uploading)</span>
+                </div>
+                <div class="timeline-step" id="step-Extracting">
+                    <div class="step-dot"></div>
+                    <span class="step-name">Extraindo áudio (Extracting audio)</span>
+                </div>
+                <div class="timeline-step" id="step-Separating">
+                    <div class="step-dot"></div>
+                    <span class="step-name">Separando vocais do instrumental (Separating vocals)</span>
+                </div>
+                <div class="timeline-step" id="step-Transcribing">
+                    <div class="step-dot"></div>
+                    <span class="step-name">Transcrevendo voz (Transcribing vocals)</span>
+                </div>
+                <div class="timeline-step" id="step-Subtitles">
+                    <div class="step-dot"></div>
+                    <span class="step-name">Gerando sincronização de legenda (Generating subtitles)</span>
+                </div>
+                <div class="timeline-step" id="step-Rendering">
+                    <div class="step-dot"></div>
+                    <span class="step-name">Renderizando vídeo final (Rendering final video)</span>
+                </div>
+                <div class="timeline-step" id="step-Cleaning">
+                    <div class="step-dot"></div>
+                    <span class="step-name">Limpando arquivos temporários (Cleaning temporary files)</span>
+                </div>
+                <div class="timeline-step" id="step-Done">
+                    <div class="step-dot"></div>
+                    <span class="step-name">Concluído (Done)</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Painel de Correção / Edição de Legenda (Pausa Intermediária) -->
+        <div id="correctionCard" style="display: none; background: rgba(30, 27, 57, 0.85); border: 1px solid var(--glass-border); padding: 1.5rem; border-radius: 14px; margin-top: 1.5rem; box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37); backdrop-filter: blur(8px);">
+            <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.8rem;">
+                <span style="font-size: 1.3rem;">✍️</span>
+                <h3 style="margin: 0; font-size: 1.1rem; font-weight: 700; color: var(--text-main);">Revisão & Edição Avançada da Legenda</h3>
+            </div>
+            
+            <!-- Grid de Duas Colunas: Live Preview e Lista de Estrofes -->
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.5rem; margin-bottom: 1.5rem;">
+                
+                <!-- Coluna A: Mockup Live Preview -->
+                <div style="display: flex; flex-direction: column; gap: 0.8rem;">
+                    <span style="font-size: 0.82rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">👁️ Pré-visualização ao Vivo</span>
+                    
+                    <!-- Container Mockup 16:9 -->
+                    <div id="previewVideoMock" style="position: relative; width: 100%; aspect-ratio: 16/9; background: #000; border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; padding: 1.5rem; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.5);">
+                        <!-- Elementos dinâmicos de background para o preview -->
+                        <img id="previewBgImage" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; z-index: 1; display: none;">
+                        <video id="previewBgVideo" autoplay loop muted playsinline style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; z-index: 1; display: none;"></video>
+                        <!-- Linha de Pré-visualização de Legenda -->
+                        <div id="previewSubtitleText" style="position: relative; z-index: 2; text-align: center; line-height: 1.2; text-shadow: 2px 2px 0px #000, -2px -2px 0px #000, 2px -2px 0px #000, -2px 2px 0px #000; font-weight: 700; width: 95%; overflow: hidden; text-overflow: ellipsis; white-space: normal; word-wrap: break-word;">
+                            Selecione ou edite uma linha...
+                        </div>
+                    </div>
+                    
+                    <div style="font-size: 0.72rem; color: var(--text-muted); line-height: 1.4; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.04); padding: 0.8rem; border-radius: 8px;">
+                        💡 O preview acima atualiza em tempo real conforme você edita o texto, o tamanho da fonte, a cor do destaque ou a posição do texto nas Configurações Avançadas.
+                    </div>
+                </div>
+                
+                <!-- Coluna B: Lista de Estrofes e Ações -->
+                <div style="display: flex; flex-direction: column;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                        <span style="font-size: 0.82rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">🎼 Estrofes & Cronometragem</span>
+                        <button type="button" id="btnAddSegment" class="btn-secondary" style="font-size: 0.75rem; padding: 0.3rem 0.6rem; border-color: rgba(255,255,255,0.15); background: rgba(255,255,255,0.03); cursor: pointer; border-radius: 6px; outline: none;">
+                            ➕ Adicionar Linha
+                        </button>
+                    </div>
+                    
+                    <div id="correctionList" style="max-height: 280px; overflow-y: auto; display: flex; flex-direction: column; gap: 0.75rem; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05); padding: 0.8rem; background: rgba(0,0,0,0.25);">
+                        <!-- Blocos de estrofes gerados via JS -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Botões Inferiores do Painel de Correção -->
+            <div style="display: flex; gap: 0.8rem; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 1.2rem;">
+                <button type="button" class="btn-cancel-task btn-secondary" style="flex: 1; background: rgba(239, 68, 68, 0.08); border: 1px solid rgba(239, 68, 68, 0.25); color: #fca5a5; font-size: 0.9rem; font-weight: 600; padding: 0.65rem 1rem; border-radius: 8px; cursor: pointer; outline: none; transition: all 0.2s;">
+                    🛑 Cancelar Produção
+                </button>
+                <button type="button" id="btnContinueProcess" class="btn-success" style="flex: 1; font-weight: 600; padding: 0.65rem 1rem; font-size: 0.9rem; cursor: pointer; border-radius: 8px; outline: none; border: 1px solid rgba(16, 185, 129, 0.3); transition: all 0.2s;">
+                    💾 Salvar e Renderizar
+                </button>
+            </div>
+        </div>
+
+        <!-- Erro no Processamento -->
+        <div class="error-card" id="errorCard"></div>
+
+        <!-- Botão Download -->
+        <div class="download-box" id="downloadBox">
+            <p class="download-title">🎉 Seu Karaokê está pronto!</p>
+            <p class="download-desc">O vídeo foi gerado em alta definição com áudio instrumental e legenda sincronizada.</p>
+            <div style="display: flex; gap: 0.8rem; justify-content: center; flex-wrap: wrap;">
+                <a href="/api/download" class="btn-success" id="btnDownload" download>
+                    <span>⬇️</span> Baixar Vídeo MP4
+                </a>
+                <button type="button" id="btnShowSaveHistory" class="btn-secondary" style="font-weight: 700; padding: 1rem 2rem; border-radius: 12px; font-size: 1rem; border: 1px solid var(--glass-border); cursor: pointer; outline: none; background: rgba(255,255,255,0.05); color: var(--text-main); transition: all 0.2s;">
+                    <span>📚</span> Salvar na Biblioteca
+                </button>
+            </div>
+            
+            <div id="saveHistoryFormContainer" style="display: none; margin-top: 1.2rem; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 1.2rem; text-align: left; max-width: 450px; margin-left: auto; margin-right: auto;">
+                <label class="label" style="font-size: 0.85rem; color: var(--text-muted);">Nome para salvar no histórico:</label>
+                <div style="display: flex; gap: 0.5rem; margin-top: 0.4rem;">
+                    <input type="text" id="historyVideoTitle" placeholder="Digite o título do Karaokê..." style="flex: 1; border: 1px solid var(--glass-border); padding: 0.6rem; background: #141226; color: var(--text-main); border-radius: 8px; font-size: 0.85rem; outline: none;">
+                    <button type="button" id="btnConfirmSaveHistory" class="btn-primary" style="font-size: 0.85rem; padding: 0.6rem 1.2rem; font-weight: 600;">Confirmar</button>
+                </div>
+            </div>
+        </div>
+
+        </div>
+
+        <!-- Conteúdo da Aba Biblioteca & Histórico -->
+        <div id="libraryTabContent" style="display: none; animation: fadeIn 0.3s ease-out; flex-direction: column; gap: 1.5rem;">
+            <!-- Grid de Envio Rápido para a Biblioteca -->
+            <div style="background: rgba(30, 27, 57, 0.4); border: 1px solid var(--glass-border); padding: 1.2rem; border-radius: 12px; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr)); gap: 1rem;">
+                <div>
+                    <h4 style="margin: 0 0 0.5rem 0; font-size: 0.9rem; color: var(--text-main); font-weight: 700;">📥 Adicionar Música/Vídeo à Biblioteca</h4>
+                    <form id="libAudioUploadForm" style="display: flex; flex-direction: column; gap: 0.4rem;">
+                        <div class="upload-area" id="libAudioUploadArea" style="height: 80px; display: flex; flex-direction: column; justify-content: center; align-items: center; border: 2px dashed rgba(255,255,255,0.15); border-radius: 10px; background: rgba(0,0,0,0.1); cursor: pointer; transition: all 0.2s;">
+                            <span style="font-size: 1.2rem;">🎵</span>
+                            <span id="libAudioFileName" style="font-size: 0.75rem; color: var(--text-muted); font-weight: 500; text-align: center; max-width: 90%; text-overflow: ellipsis; overflow: hidden; white-space: nowrap;">Arraste a música ou clique</span>
+                        </div>
+                        <input type="file" id="libAudioFile" accept=".mp3,.wav,.flac,.m4a,.mp4,.mkv,.avi" style="display: none;">
+                        <button type="submit" id="btnLibAudioUpload" class="btn-primary" style="font-size: 0.8rem; padding: 0.5rem; display: none;">⬆️ Enviar Música</button>
+                    </form>
+                </div>
+                <div>
+                    <h4 style="margin: 0 0 0.5rem 0; font-size: 0.9rem; color: var(--text-main); font-weight: 700;">📥 Adicionar Fundo (Imagem/Vídeo)</h4>
+                    <form id="libBgUploadForm" style="display: flex; flex-direction: column; gap: 0.4rem;">
+                        <div class="upload-area" id="libBgUploadArea" style="height: 80px; display: flex; flex-direction: column; justify-content: center; align-items: center; border: 2px dashed rgba(255,255,255,0.15); border-radius: 10px; background: rgba(0,0,0,0.1); cursor: pointer; transition: all 0.2s;">
+                            <span style="font-size: 1.2rem;">🖼️</span>
+                            <span id="libBgFileName" style="font-size: 0.75rem; color: var(--text-muted); font-weight: 500; text-align: center; max-width: 90%; text-overflow: ellipsis; overflow: hidden; white-space: nowrap;">Arraste o fundo ou clique</span>
+                        </div>
+                        <input type="file" id="libBgFile" accept="image/*,video/*" style="display: none;">
+                        <button type="submit" id="btnLibBgUpload" class="btn-primary" style="font-size: 0.8rem; padding: 0.5rem; display: none;">⬆️ Enviar Fundo</button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Listagem de Seções da Biblioteca -->
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr)); gap: 1.5rem;">
+                <!-- Coluna A: Faixas de Músicas -->
+                <div style="background: rgba(30, 27, 57, 0.45); border: 1px solid var(--glass-border); border-radius: 12px; padding: 1.2rem; display: flex; flex-direction: column; height: 360px;">
+                    <h3 style="margin: 0 0 0.8rem 0; font-size: 1.05rem; font-weight: 700; color: #8b5cf6; display: flex; align-items: center; gap: 0.4rem;">
+                        <span>🎵</span> Músicas Originais
+                    </h3>
+                    <div id="libVideosList" style="flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 0.6rem; padding-right: 0.3rem;">
+                        <!-- Listado dinamicamente -->
+                    </div>
+                </div>
+
+                <!-- Coluna B: Imagens/Vídeos de Fundo -->
+                <div style="background: rgba(30, 27, 57, 0.45); border: 1px solid var(--glass-border); border-radius: 12px; padding: 1.2rem; display: flex; flex-direction: column; height: 360px;">
+                    <h3 style="margin: 0 0 0.8rem 0; font-size: 1.05rem; font-weight: 700; color: #ec4899; display: flex; align-items: center; gap: 0.4rem;">
+                        <span>🖼️</span> Imagens e Vídeos de Fundo
+                    </h3>
+                    <div id="libPhotosList" style="flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 0.6rem; padding-right: 0.3rem;">
+                        <!-- Listado dinamicamente -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Seção de Histórico de Karaokês Prontos -->
+            <div style="background: rgba(30, 27, 57, 0.45); border: 1px solid var(--glass-border); border-radius: 12px; padding: 1.2rem; display: flex; flex-direction: column;">
+                <h3 style="margin: 0 0 0.8rem 0; font-size: 1.05rem; font-weight: 700; color: #10b981; display: flex; align-items: center; gap: 0.4rem;">
+                    <span>🎬</span> Histórico de Karaokês Concluídos
+                </h3>
+                <div id="libHistoryList" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr)); gap: 0.8rem; max-height: 350px; overflow-y: auto; padding-right: 0.3rem;">
+                    <!-- Listado dinamicamente -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Rodapé com Versão Oculta -->
+        <footer style="text-align: center; margin-top: 3rem; margin-bottom: 1.5rem; font-size: 0.72rem; color: rgba(255,255,255,0.18); font-weight: 500; letter-spacing: 0.05em;">
+            Sal0 Karaokê v2.2.4 &copy; 2026
+        </footer>
+        </div>
+
+        <!-- Popup / Modal de Confirmação para Revisar Legendas -->
+        <div id="correctionConfirmModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.65); z-index: 9999; align-items: center; justify-content: center; backdrop-filter: blur(4px);">
+            <div style="background: rgba(30, 27, 57, 0.98); border: 1px solid var(--glass-border); padding: 1.5rem 1.2rem; border-radius: 16px; max-width: min(420px, 92vw); width: 92%; text-align: center; box-shadow: 0 12px 48px rgba(0,0,0,0.65); box-sizing: border-box;">
+                <span style="font-size: 2.2rem; display: block; margin-bottom: 0.4rem;">✍️</span>
+                <h3 style="color: var(--text-main); margin-bottom: 0.6rem; font-size: 1.25rem; font-weight: 700;">Confirmar Produção</h3>
+                
+                <!-- Box Transparente com a Mídia Exata a ser Processada -->
+                <div id="confirmMediaBox" style="background: rgba(139, 92, 246, 0.15); border: 1px solid rgba(139, 92, 246, 0.4); border-radius: 12px; padding: 0.8rem 1rem; margin-bottom: 1.2rem; text-align: center;">
+                    <span style="font-size: 0.7rem; color: #c084fc; font-weight: 700; text-transform: uppercase; display: block; margin-bottom: 0.2rem;">🎵 Vídeo / Música a Processar</span>
+                    <span id="confirmMediaTitle" style="font-size: 0.95rem; color: #ffffff; font-weight: 700; word-break: break-word; display: block;">Música Selecionada</span>
+                    <span id="confirmMediaSource" style="font-size: 0.75rem; color: var(--text-muted); display: block; margin-top: 0.2rem;">Origem: Biblioteca</span>
+                </div>
+
+                <p style="color: var(--text-muted); font-size: 0.82rem; line-height: 1.4; margin-bottom: 1.5rem;">
+                    Deseja pausar a produção para revisar e editar a legenda estrofe por estrofe?
+                </p>
+                <div style="display: flex; gap: 0.8rem; justify-content: center; width: 100%;">
+                    <button type="button" id="btnConfirmNo" style="flex: 1; height: 38px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.03); cursor: pointer; border-radius: 8px; color: var(--text-main); font-weight: 500; font-size: 0.85rem; transition: background 0.2s; outline: none; margin: 0;">Não, gerar direto</button>
+                    <button type="button" id="btnConfirmYes" style="flex: 1; height: 38px; display: inline-flex; align-items: center; justify-content: center; border: none; background: linear-gradient(90deg, var(--primary) 0%, var(--secondary) 100%); cursor: pointer; border-radius: 8px; color: #fff; font-weight: 600; font-size: 0.85rem; transition: transform 0.2s; outline: none; box-shadow: 0 4px 12px var(--primary-glow); margin: 0;">Sim, quero revisar</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal do Manual / Ajuda -->
+        <div id="helpModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 99999; align-items: center; justify-content: center; backdrop-filter: blur(5px);">
+            <div style="background: rgba(30, 27, 57, 0.98); border: 1px solid var(--glass-border); padding: 1.2rem 1rem; border-radius: 16px; max-width: 600px; width: 94%; max-width: min(600px, 94vw); max-height: 88vh; display: flex; flex-direction: column; box-shadow: 0 12px 48px rgba(0,0,0,0.65); box-sizing: border-box; overflow: hidden;">
+                <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 0.8rem; margin-bottom: 1rem;">
+                    <h3 style="color: var(--text-main); margin: 0; font-size: 1.3rem; font-weight: 700; display: flex; align-items: center; gap: 0.5rem;">📖 Manual de Instruções</h3>
+                    <button type="button" id="btnCloseHelp" style="background: none; border: none; color: var(--text-muted); font-size: 1.5rem; cursor: pointer; line-height: 1;">&times;</button>
+                </div>
+                
+                <div style="overflow-y: auto; flex: 1; padding-right: 0.5rem; font-size: 0.88rem; line-height: 1.6; color: var(--text-main);">
+                    <h4 style="color: #60a5fa; margin-top: 0.5rem; margin-bottom: 0.3rem;">1. Fluxo de Trabalho do Karaokê</h4>
+                    <p style="margin-bottom: 0.8rem; color: var(--text-muted);">Envie um arquivo de música ou vídeo. Se desejar, faça upload de uma imagem de fundo (opcional) ou cole a letra oficial para guiar o Whisper a transcrever com 100% de precisão gramatical. Ao clicar em "Criar Vídeo", a IA executará a separação de vocais, transcrição e alinhamento de tempos.</p>
+                    
+                    <h4 style="color: #60a5fa; margin-top: 1rem; margin-bottom: 0.3rem;">2. Persistência de Cache e Substituição</h4>
+                    <p style="margin-bottom: 0.8rem; color: var(--text-muted);">Apenas a <b>última música processada</b> fica salva em cache no servidor. Isso permite reprocessar o mesmo áudio com diferentes ajustes visuais instantaneamente, sem precisar reenviar o arquivo. Ao carregar um arquivo novo, o cache anterior é descartado automaticamente.</p>
+                    
+                    <h4 style="color: #60a5fa; margin-top: 1rem; margin-bottom: 0.3rem;">3. Edição de Legendas em Minutos:Segundos</h4>
+                    <p style="margin-bottom: 0.8rem; color: var(--text-muted);">Na tela de correção de legenda, os tempos de início e fim são exibidos no formato <b><code>MM:SS.cc</code></b> (ex: <code>01:30.50</code> para 1 minuto, 30 segundos e 50 centésimos). Você pode alterar a minutagem diretamente; o sistema recalcula e escala os tempos palavra por palavra no vídeo final de forma proporcional.</p>
+
+                    <h4 style="color: #60a5fa; margin-top: 1rem; margin-bottom: 0.3rem;">4. Estáticas no Início (Letra Visível)</h4>
+                    <p style="margin-bottom: 0.8rem; color: var(--text-muted);">Ative "Letra Visível no Início" nas configurações avançadas para que a primeira linha da letra permaneça estática na tela durante a introdução instrumental da música, surgindo bem antes do cantor iniciar a voz.</p>
+                    
+                    <h4 style="color: #60a5fa; margin-top: 1rem; margin-bottom: 0.3rem;">5. Integração com Telegram Bot</h4>
+                    <p style="margin-bottom: 0.8rem; color: var(--text-muted);">Preencha o Token do Bot e ID do Chat para receber o progresso detalhado de renderização e **receber o vídeo MP4 final diretamente** no seu canal ou grupo do Telegram assim que concluído.</p>
+                    
+                    <h4 style="color: #60a5fa; margin-top: 1rem; margin-bottom: 0.3rem;">6. Biblioteca de Mídias & YouTube</h4>
+                    <p style="margin-bottom: 0.8rem; color: var(--text-muted);">A partir da v2.2.4, você pode salvar arquivos permanentemente em <code>/data/library/</code> (organizados em Músicas, Fundo e Histórico), carregar links do YouTube (o servidor baixa via yt-dlp) e usar vídeos de plano de fundo em loop ou cortados no tempo do áudio instrumental.</p>
+                </div>
+                
+                <button type="button" id="btnHelpDismiss" class="btn-success" style="margin-top: 1.2rem; width: 100%; padding: 0.7rem; border-radius: 8px; font-weight: 600; cursor: pointer; outline: none; border: 1px solid rgba(16, 185, 129, 0.3);">Entendi</button>
+            </div>
+        </div>
+
+        <!-- Overlay de Login / Configuração do Admin (Bloqueio de Tela) -->
+        <div id="authOverlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(10, 8, 20, 0.85); z-index: 999999; align-items: center; justify-content: center; backdrop-filter: blur(12px);">
+            <!-- Card de Login -->
+            <div id="loginCard" style="display: none; background: rgba(30, 27, 57, 0.95); border: 1px solid var(--glass-border); padding: 2.2rem; border-radius: 20px; max-width: 400px; width: 90%; box-shadow: 0 15px 50px rgba(0,0,0,0.65); animation: slideUp 0.3s ease-out;">
+                <div style="text-align: center; margin-bottom: 1.5rem;">
+                    <img src="/favicon.png" alt="Logo" style="width: 56px; height: 56px; border-radius: 50%; box-shadow: 0 0 20px var(--primary-glow); margin-bottom: 0.8rem; border: 1px solid rgba(255,255,255,0.15);">
+                    <h3 style="color: var(--text-main); font-size: 1.4rem; font-weight: 800; margin-bottom: 0.3rem;">Sal0 Karaokê</h3>
+                    <p style="color: var(--text-muted); font-size: 0.85rem;">Faça login para acessar o servidor de karaokê</p>
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 1rem;">
+                    <div>
+                        <label style="font-size: 0.75rem; color: var(--text-muted); display: block; margin-bottom: 0.3rem; font-weight: 600;">Nome de Usuário</label>
+                        <input type="text" id="loginUsername" placeholder="Usuário" style="width: 100%; border: 1px solid var(--glass-border); padding: 0.65rem 0.9rem; background: #141226; color: var(--text-main); border-radius: 10px; font-size: 0.9rem; outline: none;">
+                    </div>
+                    <div>
+                        <label style="font-size: 0.75rem; color: var(--text-muted); display: block; margin-bottom: 0.3rem; font-weight: 600;">Senha</label>
+                        <input type="password" id="loginPassword" placeholder="Sua senha" style="width: 100%; border: 1px solid var(--glass-border); padding: 0.65rem 0.9rem; background: #141226; color: var(--text-main); border-radius: 10px; font-size: 0.9rem; outline: none;">
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 0.5rem; margin-top: 0.2rem;">
+                        <input type="checkbox" id="loginRemember" checked style="cursor: pointer; width: 15px; height: 15px;">
+                        <label for="loginRemember" style="font-size: 0.8rem; color: var(--text-muted); cursor: pointer; user-select: none;">Permanecer conectado neste dispositivo</label>
+                    </div>
+                    <button type="button" id="btnLoginSubmit" class="btn-primary" style="margin-top: 1rem; width: 100%; padding: 0.8rem; border-radius: 10px; font-weight: 700; font-size: 0.95rem; border: none;">Entrar</button>
+                </div>
+            </div>
+
+            <!-- Card de Configuração Inicial do Administrador -->
+            <div id="setupCard" style="display: none; background: rgba(30, 27, 57, 0.95); border: 1px solid var(--glass-border); padding: 2.2rem; border-radius: 20px; max-width: 400px; width: 90%; box-shadow: 0 15px 50px rgba(0,0,0,0.65); animation: slideUp 0.3s ease-out;">
+                <div style="text-align: center; margin-bottom: 1.5rem;">
+                    <span style="font-size: 2.5rem; display: block; margin-bottom: 0.5rem;">👑</span>
+                    <h3 style="color: var(--text-main); font-size: 1.35rem; font-weight: 800; margin-bottom: 0.3rem;">Configuração Inicial</h3>
+                    <p style="color: var(--text-muted); font-size: 0.82rem;">Crie a conta de administrador local para o aplicativo</p>
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 1rem;">
+                    <div>
+                        <label style="font-size: 0.75rem; color: var(--text-muted); display: block; margin-bottom: 0.3rem; font-weight: 600;">Usuário Administrador</label>
+                        <input type="text" id="setupUsername" placeholder="Ex: admin" style="width: 100%; border: 1px solid var(--glass-border); padding: 0.65rem 0.9rem; background: #141226; color: var(--text-main); border-radius: 10px; font-size: 0.9rem; outline: none;">
+                    </div>
+                    <div>
+                        <label style="font-size: 0.75rem; color: var(--text-muted); display: block; margin-bottom: 0.3rem; font-weight: 600;">Senha do Admin</label>
+                        <input type="password" id="setupPassword" placeholder="Sua senha forte" style="width: 100%; border: 1px solid var(--glass-border); padding: 0.65rem 0.9rem; background: #141226; color: var(--text-main); border-radius: 10px; font-size: 0.9rem; outline: none;">
+                    </div>
+                    <div>
+                        <label style="font-size: 0.75rem; color: var(--text-muted); display: block; margin-bottom: 0.3rem; font-weight: 600;">Confirmar Senha</label>
+                        <input type="password" id="setupPasswordConfirm" placeholder="Confirme sua senha" style="width: 100%; border: 1px solid var(--glass-border); padding: 0.65rem 0.9rem; background: #141226; color: var(--text-main); border-radius: 10px; font-size: 0.9rem; outline: none;">
+                    </div>
+                    <button type="button" id="btnSetupSubmit" class="btn-success" style="margin-top: 1rem; width: 100%; padding: 0.8rem; border-radius: 10px; font-weight: 700; font-size: 0.95rem; cursor: pointer; outline: none; border: 1px solid rgba(16, 185, 129, 0.3);">Criar Conta & Fazer Login</button>
+                </div>
+            </div>
+        </div>
+
+    <script>
+        // --- SISTEMA DE SESSÃO E AUTENTICAÇÃO ---
+        async function authFetch(url, options = {}) {
+            const token = localStorage.getItem('auth_token');
+            if (!options.headers) {
+                options.headers = {};
+            }
+            if (token) {
+                options.headers['X-Session-Token'] = token;
+            }
+            if (options.body && typeof options.body === 'string' && !options.headers['Content-Type']) {
+                options.headers['Content-Type'] = 'application/json';
+            }
+            
+            const res = await fetch(url, options);
+            if (res.status === 401 && url !== '/api/auth_status') {
+                localStorage.removeItem('auth_token');
+                checkAuth();
+                throw new Error("Sessão expirada. Por favor, faça login novamente.");
+            }
+            return res;
+        }
+
+        async function checkAuth() {
+            try {
+                const token = localStorage.getItem('auth_token');
+                const headers = {};
+                if (token) {
+                    headers['X-Session-Token'] = token;
+                }
+                const res = await fetch('/api/auth_status', { headers });
+                if (!res.ok) throw new Error("Erro de conexão com o servidor.");
+                const data = await res.json();
+                
+                const overlay = document.getElementById('authOverlay');
+                const loginCard = document.getElementById('loginCard');
+                const setupCard = document.getElementById('setupCard');
+                
+                if (data.status === "setup") {
+                    overlay.style.display = "flex";
+                    setupCard.style.display = "block";
+                    loginCard.style.display = "none";
+                } else if (data.status === "login") {
+                    overlay.style.display = "flex";
+                    setupCard.style.display = "none";
+                    loginCard.style.display = "block";
+                } else if (data.status === "authenticated") {
+                    overlay.style.display = "none";
+                    setupCard.style.display = "none";
+                    loginCard.style.display = "none";
+                    
+                    const userSec = document.getElementById('userManagementSection');
+                    if (data.role === "admin") {
+                        userSec.style.display = "block";
+                        loadUsersList();
+                    } else {
+                        userSec.style.display = "none";
+                    }
+                }
+            } catch (err) {
+                console.error("Erro na verificação de autenticação:", err);
+            }
+        }
+
+        async function loadUsersList() {
+            try {
+                const res = await authFetch('/api/users');
+                if (!res.ok) return;
+                const users = await res.json();
+                const container = document.getElementById('usersListContainer');
+                container.innerHTML = "";
+                
+                users.forEach(u => {
+                    const row = document.createElement('div');
+                    row.style.display = "flex";
+                    row.style.justifyContent = "space-between";
+                    row.style.alignItems = "center";
+                    row.style.padding = "0.4rem 0.6rem";
+                    row.style.background = "rgba(255,255,255,0.02)";
+                    row.style.border = "1px solid rgba(255,255,255,0.05)";
+                    row.style.borderRadius = "6px";
+                    row.style.marginBottom = "0.3rem";
+                    
+                    const text = document.createElement('span');
+                    text.style.fontSize = "0.8rem";
+                    text.style.color = "var(--text-main)";
+                    text.innerText = `${u.username} (${u.role})`;
+                    
+                    row.appendChild(text);
+                    
+                    const btnDel = document.createElement('button');
+                    btnDel.type = "button";
+                    btnDel.innerHTML = "🗑️";
+                    btnDel.style.background = "none";
+                    btnDel.style.border = "none";
+                    btnDel.style.cursor = "pointer";
+                    btnDel.style.fontSize = "0.8rem";
+                    btnDel.style.padding = "0";
+                    btnDel.style.color = "var(--danger)";
+                    btnDel.addEventListener('click', async () => {
+                        if (!confirm(`Deseja realmente remover o usuário "${u.username}"?`)) return;
+                        try {
+                            const delRes = await authFetch(`/api/users/${u.username}`, { method: 'DELETE' });
+                            if (delRes.ok) {
+                                loadUsersList();
+                            } else {
+                                const err = await delRes.json();
+                                alert(err.detail || "Erro ao deletar.");
+                            }
+                        } catch (e) {
+                            alert(e.message);
+                        }
+                    });
+                    row.appendChild(btnDel);
+                    container.appendChild(row);
+                });
+            } catch (err) {
+                console.error("Erro ao carregar usuários:", err);
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            checkAuth();
+            
+            // Setup do Admin
+            document.getElementById('btnSetupSubmit').addEventListener('click', async () => {
+                const username = document.getElementById('setupUsername').value.trim();
+                const password = document.getElementById('setupPassword').value;
+                const confirm = document.getElementById('setupPasswordConfirm').value;
+                
+                if (!username || !password) {
+                    alert("Usuário e senha são obrigatórios!");
+                    return;
+                }
+                if (password !== confirm) {
+                    alert("As senhas não coincidem!");
+                    return;
+                }
+                
+                try {
+                    const res = await fetch('/api/setup_admin', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ username, password })
+                    });
+                    if (!res.ok) {
+                        const err = await res.json();
+                        throw new Error(err.detail || "Falha no setup.");
+                    }
+                    const data = await res.json();
+                    localStorage.setItem('auth_token', data.token);
+                    await checkAuth();
+                    
+                    await fetchProfiles();
+                    await checkCache();
+                    await checkCurrentStatus();
+                } catch (err) {
+                    alert(err.message);
+                }
+            });
+            
+            // Login
+            document.getElementById('btnLoginSubmit').addEventListener('click', async () => {
+                const username = document.getElementById('loginUsername').value.trim();
+                const password = document.getElementById('loginPassword').value;
+                
+                if (!username || !password) {
+                    alert("Usuário e senha são obrigatórios!");
+                    return;
+                }
+                
+                try {
+                    const res = await fetch('/api/login', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ username, password })
+                    });
+                    if (!res.ok) {
+                        const err = await res.json();
+                        throw new Error(err.detail || "Falha no login.");
+                    }
+                    const data = await res.json();
+                    localStorage.setItem('auth_token', data.token);
+                    await checkAuth();
+                    
+                    await fetchProfiles();
+                    await checkCache();
+                    await checkCurrentStatus();
+                } catch (err) {
+                    alert(err.message);
+                }
+            });
+            
+            // Logout
+            document.getElementById('btnLogout').addEventListener('click', async () => {
+                if (!confirm("Deseja realmente sair?")) return;
+                try {
+                    await authFetch('/api/logout', { method: 'POST' });
+                } catch (e) {}
+                localStorage.removeItem('auth_token');
+                location.reload();
+            });
+
+            // Criar Novo Usuário
+            document.getElementById('btnCreateUser').addEventListener('click', async () => {
+                const username = document.getElementById('newUsername').value.trim();
+                const password = document.getElementById('newPassword').value;
+                
+                if (!username || !password) {
+                    alert("Usuário e senha são obrigatórios!");
+                    return;
+                }
+                
+                try {
+                    const res = await authFetch('/api/create_user', {
+                        method: 'POST',
+                        body: JSON.stringify({ username, password, role: "user" })
+                    });
+                    if (res.ok) {
+                        document.getElementById('newUsername').value = "";
+                        document.getElementById('newPassword').value = "";
+                        loadUsersList();
+                    } else {
+                        const err = await res.json();
+                        alert(err.detail || "Erro ao criar usuário.");
+                    }
+                } catch (err) {
+                    alert(err.message);
+                }
+            });
+
+            // Modal de Ajuda / Manual
+            document.getElementById('btnOpenHelp').addEventListener('click', () => {
+                document.getElementById('helpModal').style.display = "flex";
+            });
+            
+            document.getElementById('btnCloseHelp').addEventListener('click', () => {
+                document.getElementById('helpModal').style.display = "none";
+            });
+            
+            document.getElementById('btnHelpDismiss').addEventListener('click', () => {
+                document.getElementById('helpModal').style.display = "none";
+            });
+        });
+
+        const audioUploadArea = document.getElementById('audioUploadArea');
+        const audioFile = document.getElementById('audioFile');
+        const audioText = document.getElementById('audioText');
+        const audioBadge = document.getElementById('audioBadge');
+        
+        const bgUploadArea = document.getElementById('bgUploadArea');
+        const bgFile = document.getElementById('bgFile');
+        const bgTextName = document.getElementById('bgTextName');
+        const bgBadge = document.getElementById('bgBadge');
+        
+        const form = document.getElementById('karaokêForm');
+        const btnSubmit = document.getElementById('btnSubmit');
+        const processCard = document.getElementById('processCard');
+        const progressBarFill = document.getElementById('progressBarFill');
+        const progressPercent = document.getElementById('progressPercent');
+        const statusMessage = document.getElementById('statusMessage');
+        const errorCard = document.getElementById('errorCard');
+        const downloadBox = document.getElementById('downloadBox');
+
+        // Etapas mapeadas para IDs CSS
+        const stepsMap = {
+            "Uploading": "step-Uploading",
+            "Extracting audio": "step-Extracting",
+            "Separating vocals": "step-Separating",
+            "Transcribing vocals": "step-Transcribing",
+            "Generating subtitles": "step-Subtitles",
+            "Rendering final video": "step-Rendering",
+            "Cleaning temporary files": "step-Cleaning",
+            "Done": "step-Done"
+        };
+
+        // Eventos Drag and Drop para arquivo de áudio/vídeo
+        ['dragenter', 'dragover'].forEach(eventName => {
+            audioUploadArea.addEventListener(eventName, (e) => {
+                e.preventDefault();
+                audioUploadArea.classList.add('dragover');
+            }, false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            audioUploadArea.addEventListener(eventName, (e) => {
+                e.preventDefault();
+                audioUploadArea.classList.remove('dragover');
+            }, false);
+        });
+
+        audioUploadArea.addEventListener('drop', (e) => {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+            if (files.length) {
+                audioFile.files = files;
+                updateAudioBadge(files[0].name);
+            }
+        });
+
+        audioUploadArea.addEventListener('click', () => {
+            audioFile.click();
+        });
+
+        audioFile.addEventListener('change', () => {
+            if (audioFile.files.length) {
+                const fname = audioFile.files[0].name;
+                updateAudioBadge(fname);
+                setAudioSource('upload', fname);
+            }
+        });
+
+        function updateAudioBadge(filename) {
+            audioText.innerText = "Arquivo selecionado:";
+            audioBadge.innerText = filename;
+            audioBadge.style.display = "inline-flex";
+            audioBadge.style.background = "#8b5cf6";
+        }
+
+        // Eventos Drag and Drop para imagem de fundo
+        ['dragenter', 'dragover'].forEach(eventName => {
+            bgUploadArea.addEventListener(eventName, (e) => {
+                e.preventDefault();
+                bgUploadArea.classList.add('dragover');
+            }, false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            bgUploadArea.addEventListener(eventName, (e) => {
+                e.preventDefault();
+                bgUploadArea.classList.remove('dragover');
+            }, false);
+        });
+
+        bgUploadArea.addEventListener('drop', (e) => {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+            if (files.length) {
+                bgFile.files = files;
+                updateBgBadge(files[0].name);
+                document.getElementById('backgroundMode').value = 'image';
+            }
+        });
+
+        bgUploadArea.addEventListener('click', () => {
+            bgFile.click();
+        });
+
+        bgFile.addEventListener('change', () => {
+            if (bgFile.files.length) {
+                updateBgBadge(bgFile.files[0].name);
+                document.getElementById('backgroundMode').value = 'image';
+            } else {
+                bgTextName.innerText = "Padrão: Fundo Preto Sólido";
+                bgBadge.style.display = "none";
+            }
+        });
+
+        function updateBgBadge(filename) {
+            bgTextName.innerText = "Imagem selecionada:";
+            bgBadge.innerText = filename;
+            bgBadge.style.display = "inline-flex";
+        }
+
+        // ── Botões de Salvar / Limpar a Letra (Servidor + LocalStorage v2.2.4) ───────────
+        const lyricsText = document.getElementById('lyricsText');
+        const btnSaveLyrics = document.getElementById('btnSaveLyrics');
+        const btnClearLyrics = document.getElementById('btnClearLyrics');
+        const LYRICS_KEY = 'sal0_saved_lyrics';
+
+        // Carregar letra salva no servidor (com fallback para localStorage)
+        (async function loadSavedLyrics() {
+            try {
+                const res = await authFetch('/api/lyrics');
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.lyrics_text && lyricsText) {
+                        lyricsText.value = data.lyrics_text;
+                        localStorage.setItem(LYRICS_KEY, data.lyrics_text);
+                        return;
+                    }
+                }
+            } catch (e) {}
+            const saved = localStorage.getItem(LYRICS_KEY);
+            if (saved && lyricsText && !lyricsText.value.trim()) {
+                lyricsText.value = saved;
+            }
+        })();
+
+        if (btnSaveLyrics) {
+            btnSaveLyrics.addEventListener('click', async () => {
+                const val = lyricsText ? lyricsText.value.trim() : '';
+                if (!val) {
+                    alert('O campo de letra está vazio. Cole a letra antes de salvar.');
+                    return;
+                }
+                localStorage.setItem(LYRICS_KEY, val);
+                try {
+                    await authFetch('/api/lyrics', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ lyrics_text: val })
+                    });
+                } catch (e) {
+                    console.error('Erro ao salvar letra no servidor:', e);
+                }
+                btnSaveLyrics.innerText = '✅ Salva!';
+                btnSaveLyrics.style.background = 'rgba(16,185,129,0.3)';
+                setTimeout(() => {
+                    btnSaveLyrics.innerHTML = '💾 Salvar';
+                    btnSaveLyrics.style.background = 'rgba(16,185,129,0.12)';
+                }, 1800);
+            });
+        }
+
+        if (btnClearLyrics) {
+            btnClearLyrics.addEventListener('click', async () => {
+                if (!lyricsText || !lyricsText.value.trim()) return;
+                if (confirm('Deseja limpar o campo de letra? A letra salva no navegador e no servidor também será removida.')) {
+                    lyricsText.value = '';
+                    localStorage.removeItem(LYRICS_KEY);
+                    try {
+                        await authFetch('/api/lyrics', { method: 'DELETE' });
+                    } catch (e) {
+                        console.error('Erro ao excluir letra do servidor:', e);
+                    }
+                }
+            });
+        }
+        // ──────────────────────────────────────────────────────────────────────
+
+        // Envio do formulário via AJAX v2.2.4
+        form.addEventListener('submit', (e) => {
+            e.preventDefault();
+            
+            const libHidden = document.getElementById('libraryAudioHidden');
+            const hasLibrary = libHidden && libHidden.value.trim() !== '';
+            const hasFile = audioFile.files && audioFile.files.length > 0;
+            const hasYoutube = document.getElementById('youtubeUrl').value.trim() !== '';
+            
+            if (!hasFile && !hasLibrary && !hasYoutube && !hasServerCache) {
+                alert('Por favor, selecione uma música antes de criar o Karaokê (faça Upload, digite um link do YouTube ou escolha da Biblioteca).');
+                return;
+            }
+
+            // Atualizar os textos do modal de confirmação com a mídia exata
+            const confirmTitle = document.getElementById('confirmMediaTitle');
+            const confirmSource = document.getElementById('confirmMediaSource');
+
+            if (hasLibrary) {
+                if (confirmTitle) confirmTitle.innerText = libHidden.value;
+                if (confirmSource) confirmSource.innerText = 'Origem: 📚 Biblioteca de Músicas';
+            } else if (hasFile) {
+                if (confirmTitle) confirmTitle.innerText = audioFile.files[0].name;
+                if (confirmSource) confirmSource.innerText = 'Origem: 📁 Arquivo Uploaded Local';
+            } else if (hasYoutube) {
+                if (confirmTitle) confirmTitle.innerText = document.getElementById('youtubeUrl').value.trim();
+                if (confirmSource) confirmSource.innerText = 'Origem: 🌐 Link do YouTube';
+            } else {
+                if (confirmTitle) confirmTitle.innerText = 'Última Música do Cache';
+                if (confirmSource) confirmSource.innerText = 'Origem: 💾 Cache do Servidor';
+            }
+            
+            // Ocultar elementos de estado anterior
+            errorCard.style.display = "none";
+            downloadBox.style.display = "none";
+            document.getElementById('correctionCard').style.display = "none";
+            
+            // Abrir popup de confirmação de revisão de legenda
+            const modal = document.getElementById('correctionConfirmModal');
+            modal.style.display = "flex";
+        });
+        
+        // Listener para os botões do modal de confirmação
+        document.getElementById('btnConfirmYes').addEventListener('click', () => {
+            submitProcessForm(true);
+        });
+        
+        document.getElementById('btnConfirmNo').addEventListener('click', () => {
+            submitProcessForm(false);
+        });
+        
+        async function submitProcessForm(enableCorrection) {
+            // Ocultar modal
+            document.getElementById('correctionConfirmModal').style.display = "none";
+            
+            // Desativar botão e formulário
+            btnSubmit.disabled = true;
+            
+            // Exibir painel de progresso
+            processCard.style.display = "block";
+            resetTimeline();
+            updateStepActive("Uploading");
+            
+            const formData = new FormData();
+            if (currentAudioMode === 'upload' && audioFile.files.length) {
+                formData.append('audio_file', audioFile.files[0]);
+            }
+            if (currentBgMode === 'upload' && bgFile.files.length) {
+                formData.append('bg_file', bgFile.files[0]);
+            }
+            formData.append('whisper_model', document.getElementById('whisperModel').value);
+            formData.append('font_size', document.getElementById('fontSize').value);
+            formData.append('text_color', document.getElementById('textColor').value);
+            formData.append('text_position', document.getElementById('textPosition').value);
+            formData.append('subtitle_mode', document.getElementById('subtitleMode').value);
+            formData.append('words_per_line', document.getElementById('wordsPerLine').value);
+            formData.append('max_chars_line', document.getElementById('maxCharsLine').value);
+            formData.append('break_on_punctuation', document.getElementById('breakOnPunctuation').value);
+            formData.append('background_mode', document.getElementById('backgroundMode').value);
+            formData.append('show_instrumental', document.getElementById('showInstrumental').value);
+            formData.append('transcribe_source', document.getElementById('transcribeSource').value);
+            formData.append('show_next_line_preview', document.getElementById('showNextLinePreview').value);
+            formData.append('lyrics_text', document.getElementById('lyricsText').value);
+            formData.append('enable_correction', enableCorrection ? "true" : "false");
+            formData.append('keep_first_line_visible', document.getElementById('keepFirstLineVisible').value);
+            
+            const libHidden = document.getElementById('libraryAudioHidden');
+            const libVal = libHidden ? libHidden.value.trim() : '';
+            
+            if (libVal !== '') {
+                // Se foi selecionado da biblioteca, forçar o envio de library_audio e ZERAR o youtube_url
+                formData.append('library_audio', libVal);
+                formData.append('youtube_url', '');
+            } else {
+                formData.append('library_audio', '');
+                formData.append('youtube_url', currentAudioMode === 'youtube' ? document.getElementById('youtubeUrl').value.trim() : '');
+            }
+            formData.append('library_bg', currentBgMode === 'library' ? document.getElementById('libraryBgSelect').value : '');
+            formData.append('save_to_library', document.getElementById('saveToLibrary').checked ? "true" : "false");
+            formData.append('only_remove_vocals', document.getElementById('onlyRemoveVocals').checked ? "true" : "false");
+            
+            try {
+                const response = await authFetch('/api/process', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                if (!response.ok) {
+                    let errDetail = "Erro ao iniciar processamento.";
+                    try {
+                        const errData = await response.json();
+                        errDetail = errData.detail || errData.message || (typeof errData === 'string' ? errData : JSON.stringify(errData));
+                    } catch(e) {
+                        errDetail = `Erro HTTP ${response.status}: ${response.statusText}`;
+                    }
+                    throw new Error(errDetail);
+                }
+                
+                // Iniciar Polling de Status
+                startPolling();
+                
+            } catch (err) {
+                showError(err.message);
+            }
+        }
+
+        let pollingInterval = null;
+
+        function startPolling() {
+            if (pollingInterval) clearInterval(pollingInterval);
+            
+            const pollFunc = async () => {
+                try {
+                    const res = await authFetch('/api/status');
+                    if (!res.ok) throw new Error("Erro ao consultar status.");
+                    
+                    const data = await res.json();
+                    
+                    // Atualizar barra de progresso
+                    progressBarFill.style.width = `${data.progress}%`;
+                    progressPercent.innerText = `${data.progress}%`;
+                    
+                    if (data.step) {
+                        statusMessage.innerText = getStepLabel(data.step);
+                        updateTimeline(data.step);
+                    }
+                    
+                    if (data.status === "done") {
+                        clearInterval(pollingInterval);
+                        pollingInterval = null;
+                        statusMessage.innerText = "Processamento concluído com sucesso!";
+                        progressBarFill.style.width = "100%";
+                        progressPercent.innerText = "100%";
+                        updateTimeline("Done");
+                        
+                        // Exibir download
+                        downloadBox.style.display = "block";
+                        btnSubmit.disabled = false;
+                        document.getElementById('correctionCard').style.display = "none";
+                        loadLibrary();
+                        loadLibraryOptions();
+                    } else if (data.status === "waiting_for_user_correction") {
+                        clearInterval(pollingInterval);
+                        pollingInterval = null;
+                        
+                        processCard.style.display = "none";
+                        loadCorrectionPanel();
+                    } else if (data.status === "error") {
+                        clearInterval(pollingInterval);
+                        pollingInterval = null;
+                        showError(data.error_message || "Ocorreu um erro inesperado durante o processamento.");
+                        btnDownloadYoutube.disabled = false;
+                        btnDownloadYoutube.innerHTML = '<span>📥</span> Baixar do YouTube';
+                    } else if (data.status === "idle") {
+                        clearInterval(pollingInterval);
+                        pollingInterval = null;
+                        processCard.style.display = "none";
+                        btnSubmit.disabled = false;
+                        btnDownloadYoutube.disabled = false;
+                        btnDownloadYoutube.innerHTML = '<span>📥</span> Baixar do YouTube';
+                        checkCache();
+                        loadLibrary();
+                        loadLibraryOptions();
+                    }
+                    
+                } catch (e) {
+                    console.error(e);
+                }
+            };
+            
+            pollFunc(); // Chamada imediata para evitar delay!
+            pollingInterval = setInterval(pollFunc, 1000);
+        }
+
+        // Sincronizar o input color com a string hex
+        const textColor = document.getElementById('textColor');
+        const colorHexText = document.getElementById('colorHexText');
+        textColor.addEventListener('input', () => {
+            colorHexText.innerText = textColor.value.toUpperCase();
+        });
+
+        // Alternador (Toggle) do Painel de Configurações Avançadas
+        const btnToggleAdvanced = document.getElementById('btnToggleAdvanced');
+        const advancedContent = document.getElementById('advancedContent');
+        
+        btnToggleAdvanced.addEventListener('click', () => {
+            if (advancedContent.style.display === "none" || advancedContent.style.display === "") {
+                advancedContent.style.display = "block";
+                btnToggleAdvanced.style.background = "rgba(139, 92, 246, 0.2)";
+                btnToggleAdvanced.style.borderColor = "rgba(139, 92, 246, 0.4)";
+            } else {
+                advancedContent.style.display = "none";
+                btnToggleAdvanced.style.background = "rgba(255, 255, 255, 0.05)";
+                btnToggleAdvanced.style.borderColor = "var(--glass-border)";
+            }
+        });
+
+        // Lógica de Perfis de Uso (Removida referência a Telegram individual)
+        const profileSelect = document.getElementById('profileSelect');
+        const profileNameInput = document.getElementById('profileNameInput');
+        const btnSaveProfile = document.getElementById('btnSaveProfile');
+        const btnDeleteProfile = document.getElementById('btnDeleteProfile');
+        
+        let allProfiles = {};
+        
+        async function fetchProfiles() {
+            try {
+                const res = await authFetch('/api/profiles');
+                if (!res.ok) throw new Error("Erro ao obter perfis do servidor.");
+                allProfiles = await res.json();
+                
+                const selectedVal = profileSelect.value;
+                profileSelect.innerHTML = "";
+                
+                Object.keys(allProfiles).forEach(name => {
+                    const opt = document.createElement('option');
+                    opt.value = name;
+                    opt.innerText = name;
+                    profileSelect.appendChild(opt);
+                });
+                
+                if (selectedVal && allProfiles[selectedVal]) {
+                    profileSelect.value = selectedVal;
+                } else if (profileSelect.options.length) {
+                    profileSelect.selectedIndex = 0;
+                    applyProfile(profileSelect.value);
+                }
+            } catch (err) {
+                console.error("Falha ao sincronizar perfis:", err);
+            }
+        }
+        
+        function applyProfile(profileName) {
+            const prof = allProfiles[profileName];
+            if (!prof) return;
+            
+            document.getElementById('whisperModel').value = prof.whisper_model;
+            document.getElementById('fontSize').value = prof.font_size;
+            document.getElementById('textColor').value = prof.text_color;
+            document.getElementById('colorHexText').innerText = prof.text_color.toUpperCase();
+            document.getElementById('textPosition').value = prof.text_position;
+            
+            // Novos campos de legenda
+            if (prof.subtitle_mode) document.getElementById('subtitleMode').value = prof.subtitle_mode;
+            if (prof.words_per_line !== undefined) document.getElementById('wordsPerLine').value = prof.words_per_line;
+            if (prof.max_chars_line !== undefined) document.getElementById('maxCharsLine').value = prof.max_chars_line;
+            if (prof.break_on_punctuation !== undefined) {
+                document.getElementById('breakOnPunctuation').value = prof.break_on_punctuation ? "true" : "false";
+            }
+            if (prof.background_mode) document.getElementById('backgroundMode').value = prof.background_mode;
+            if (prof.show_instrumental !== undefined) {
+                document.getElementById('showInstrumental').value = prof.show_instrumental ? "true" : "false";
+            }
+            if (prof.transcribe_source) {
+                document.getElementById('transcribeSource').value = prof.transcribe_source;
+            }
+            if (prof.show_next_line_preview !== undefined) {
+                document.getElementById('showNextLinePreview').value = prof.show_next_line_preview ? "true" : "false";
+            }
+            if (prof.keep_first_line_visible !== undefined) {
+                document.getElementById('keepFirstLineVisible').value = prof.keep_first_line_visible ? "true" : "false";
+            }
+        }
+        
+        profileSelect.addEventListener('change', async () => {
+            const profileName = profileSelect.value;
+            applyProfile(profileName);
+            // Preencher o input de nome com o perfil atual para facilitar a edição/sobrescrita
+            profileNameInput.value = profileName;
+            
+            // Salvar no servidor como o último perfil ativo
+            try {
+                await authFetch('/api/last_profile', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ last_profile: profileName })
+                });
+            } catch (e) {
+                console.error("Erro ao persistir último perfil:", e);
+            }
+        });
+        
+        btnSaveProfile.addEventListener('click', async () => {
+            let name = profileNameInput.value.trim();
+            if (!name) {
+                // Se o campo de texto estiver vazio, atualiza/sobrescreve o perfil selecionado
+                name = profileSelect.value;
+            }
+            if (!name) {
+                alert("Por favor, digite o nome do perfil que deseja salvar.");
+                return;
+            }
+            
+            const payload = {
+                name: name,
+                whisper_model: document.getElementById('whisperModel').value,
+                font_size: parseInt(document.getElementById('fontSize').value) || 32,
+                text_color: document.getElementById('textColor').value,
+                text_position: document.getElementById('textPosition').value,
+                telegram_token: "",
+                telegram_chat_id: "",
+                subtitle_mode: document.getElementById('subtitleMode').value,
+                words_per_line: parseInt(document.getElementById('wordsPerLine').value) || 0,
+                max_chars_line: parseInt(document.getElementById('maxCharsLine').value) || 0,
+                break_on_punctuation: document.getElementById('breakOnPunctuation').value === "true",
+                background_mode: document.getElementById('backgroundMode').value,
+                show_instrumental: document.getElementById('showInstrumental').value === "true",
+                transcribe_source: document.getElementById('transcribeSource').value,
+                show_next_line_preview: document.getElementById('showNextLinePreview').value === "true",
+                keep_first_line_visible: document.getElementById('keepFirstLineVisible').value === "true"
+            };
+            
+            try {
+                const res = await authFetch('/api/profiles', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                
+                if (!res.ok) {
+                    const errData = await res.json();
+                    throw new Error(errData.detail || "Erro ao salvar perfil.");
+                }
+                
+                // Salvar como o último perfil ativo
+                try {
+                    await authFetch('/api/last_profile', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ last_profile: name })
+                    });
+                } catch (e) {}
+                
+                profileNameInput.value = "";
+                await fetchProfiles();
+                profileSelect.value = name;
+                applyProfile(name);
+                alert(`Perfil '${name}' salvo com sucesso!`);
+            } catch (err) {
+                alert(`Erro ao salvar perfil: ${err.message}`);
+            }
+        });
+        
+        btnDeleteProfile.addEventListener('click', async () => {
+            const name = profileSelect.value;
+            if (!name) return;
+            
+            if (name === "Padrão") {
+                alert("O perfil 'Padrão' não pode ser excluído.");
+                return;
+            }
+            
+            if (!confirm(`Deseja realmente excluir o perfil '${name}'?`)) {
+                return;
+            }
+            
+            try {
+                const res = await authFetch(`/api/profiles/${encodeURIComponent(name)}`, {
+                    method: 'DELETE'
+                });
+                
+                if (!res.ok) {
+                    const errData = await res.json();
+                    throw new Error(errData.detail || "Erro ao excluir.");
+                }
+                
+                alert(`Perfil '${name}' excluído com sucesso.`);
+                profileSelect.value = "Padrão";
+                await fetchProfiles();
+            } catch (err) {
+                alert(`Erro ao excluir perfil: ${err.message}`);
+            }
+        });
+
+        // Lógica de Configuração do Telegram Global
+        const telegramToken = document.getElementById('telegramToken');
+        const telegramChatId = document.getElementById('telegramChatId');
+        const btnSaveTelegram = document.getElementById('btnSaveTelegram');
+        const telegramStatusBadge = document.getElementById('telegramStatusBadge');
+        const telegramFields = document.getElementById('telegramFields');
+        const btnEditTelegram = document.getElementById('btnEditTelegram');
+        
+        async function fetchTelegramConfig() {
+            try {
+                const res = await authFetch('/api/telegram');
+                if (res.ok) {
+                    const data = await res.json();
+                    telegramToken.value = data.telegram_token || "";
+                    telegramChatId.value = data.telegram_chat_id || "";
+                    
+                    // Se estiver configurado, oculta os inputs e exibe o badge de ativo
+                    if (data.telegram_token && data.telegram_chat_id) {
+                        telegramStatusBadge.style.display = "flex";
+                        telegramFields.style.display = "none";
+                    } else {
+                        telegramStatusBadge.style.display = "none";
+                        telegramFields.style.display = "grid";
+                    }
+                }
+            } catch (err) {
+                console.error("Erro ao carregar configurações do Telegram:", err);
+            }
+        }
+        
+        btnEditTelegram.addEventListener('click', () => {
+            telegramStatusBadge.style.display = "none";
+            telegramFields.style.display = "grid";
+        });
+        
+        btnSaveTelegram.addEventListener('click', async () => {
+            const token = telegramToken.value.trim();
+            const chatId = telegramChatId.value.trim();
+            
+            const payload = {
+                telegram_token: token,
+                telegram_chat_id: chatId
+            };
+            
+            try {
+                const res = await authFetch('/api/telegram', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                
+                if (!res.ok) throw new Error("Erro ao salvar configuração do Telegram.");
+                
+                alert("Configurações do Telegram salvas globalmente!");
+                
+                // Se salvou credenciais válidas, oculta e mostra o badge de ativo
+                if (token && chatId) {
+                    telegramStatusBadge.style.display = "flex";
+                    telegramFields.style.display = "none";
+                } else {
+                    telegramStatusBadge.style.display = "none";
+                    telegramFields.style.display = "grid";
+                }
+            } catch (err) {
+                alert(`Erro ao salvar: ${err.message}`);
+            }
+        });
+
+        // Verificar status inicial do servidor (sincronização multi-navegador)
+        async function checkCurrentStatus() {
+            try {
+                const res = await authFetch('/api/status');
+                if (!res.ok) throw new Error("Erro ao consultar status.");
+                const data = await res.json();
+                
+                if (data.status === "processing") {
+                    btnSubmit.disabled = true;
+                    if (data.step === "Downloading YouTube") {
+                        btnDownloadYoutube.disabled = true;
+                        btnDownloadYoutube.innerHTML = '<span>⏳</span> Baixando...';
+                    } else {
+                        btnDownloadYoutube.disabled = false;
+                        btnDownloadYoutube.innerHTML = '<span>📥</span> Baixar do YouTube';
+                    }
+                    processCard.style.display = "block";
+                    document.getElementById('correctionCard').style.display = "none";
+                    statusMessage.innerText = getStepLabel(data.step);
+                    progressBarFill.style.width = `${data.progress}%`;
+                    progressPercent.innerText = `${data.progress}%`;
+                    updateTimeline(data.step);
+                    
+                    // Iniciar polling automático no navegador aberto
+                    startPolling();
+                } else if (data.status === "waiting_for_user_correction") {
+                    btnSubmit.disabled = true;
+                    btnDownloadYoutube.disabled = false;
+                    btnDownloadYoutube.innerHTML = '<span>📥</span> Baixar do YouTube';
+                    processCard.style.display = "none";
+                    loadCorrectionPanel();
+                } else if (data.status === "done") {
+                    btnSubmit.disabled = false;
+                    btnDownloadYoutube.disabled = false;
+                    btnDownloadYoutube.innerHTML = '<span>📥</span> Baixar do YouTube';
+                    processCard.style.display = "none";
+                    document.getElementById('correctionCard').style.display = "none";
+                    if (data.result_file) {
+                        downloadBox.style.display = "block";
+                    }
+                    checkCache();
+                } else {
+                    btnSubmit.disabled = false;
+                    btnDownloadYoutube.disabled = false;
+                    btnDownloadYoutube.innerHTML = '<span>📥</span> Baixar do YouTube';
+                    processCard.style.display = "none";
+                    document.getElementById('correctionCard').style.display = "none";
+                    checkCache();
+                }
+            } catch (e) {
+                console.error("Erro ao verificar status concorrente:", e);
+            }
+        }
+        
+        let isShowingCorrection = false;
+        let currentSegments = [];
+
+        function secondsToTimeString(seconds) {
+            if (isNaN(seconds) || seconds < 0) return "00:00.00";
+            const mins = Math.floor(seconds / 60);
+            const secs = Math.floor(seconds % 60);
+            const ms = Math.round((seconds % 1) * 100);
+            return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}.${ms.toString().padStart(2, '0')}`;
+        }
+        
+        function timeStringToSeconds(timeStr) {
+            if (!timeStr) return 0;
+            const parts = timeStr.trim().split(':');
+            if (parts.length === 2) {
+                const mins = parseFloat(parts[0]) || 0;
+                const secs = parseFloat(parts[1]) || 0;
+                return mins * 60 + secs;
+            } else if (parts.length === 3) {
+                const hrs = parseFloat(parts[0]) || 0;
+                const mins = parseFloat(parts[1]) || 0;
+                const secs = parseFloat(parts[2]) || 0;
+                return hrs * 3600 + mins * 60 + secs;
+            } else {
+                return parseFloat(timeStr) || 0;
+            }
+        }
+
+        function updatePreview(text) {
+            const previewText = document.getElementById('previewSubtitleText');
+            const previewMock = document.getElementById('previewVideoMock');
+            if (!previewText || !previewMock) return;
+            
+            if (text !== undefined) {
+                previewText.innerText = text;
+            }
+            
+            const fontSize = parseInt(document.getElementById('fontSize').value) || 32;
+            const textColor = document.getElementById('textColor').value;
+            const textPosition = document.getElementById('textPosition').value;
+            
+            previewText.style.fontSize = `${fontSize * 0.45}px`;
+            previewText.style.color = textColor;
+            
+            if (textPosition === "top") {
+                previewMock.style.justifyContent = "flex-start";
+            } else if (textPosition === "middle") {
+                previewMock.style.justifyContent = "center";
+            } else {
+                previewMock.style.justifyContent = "flex-end";
+            }
+        }
+
+        document.getElementById('fontSize').addEventListener('input', () => updatePreview());
+        document.getElementById('textColor').addEventListener('input', () => updatePreview());
+        document.getElementById('textPosition').addEventListener('change', () => updatePreview());
+
+        async function loadCorrectionPanel() {
+            if (isShowingCorrection) return;
+            isShowingCorrection = true;
+            
+            try {
+                const cacheRes = await authFetch('/api/cache_info');
+                if (cacheRes.ok) {
+                    const cacheData = await cacheRes.json();
+                    const previewBgImage = document.getElementById('previewBgImage');
+                    const previewBgVideo = document.getElementById('previewBgVideo');
+                    
+                    if (cacheData.has_cache && cacheData.bg_filename) {
+                        const token = localStorage.getItem('auth_token');
+                        const bgUrl = `/api/cache/background?token=${token}`;
+                        if (cacheData.bg_is_video) {
+                            previewBgImage.style.display = 'none';
+                            previewBgVideo.src = bgUrl;
+                            previewBgVideo.style.display = 'block';
+                            previewBgVideo.play().catch(e => console.log("Auto-play blocked or failed", e));
+                        } else {
+                            previewBgVideo.style.display = 'none';
+                            previewBgVideo.src = '';
+                            previewBgImage.src = bgUrl;
+                            previewBgImage.style.display = 'block';
+                        }
+                    } else {
+                        previewBgImage.style.display = 'none';
+                        previewBgVideo.style.display = 'none';
+                        previewBgVideo.src = '';
+                    }
+                }
+            } catch (e) {
+                console.error("Erro ao carregar fundo do preview:", e);
+            }
+            
+            try {
+                const res = await authFetch('/api/segments_to_edit');
+                if (!res.ok) throw new Error("Falha ao obter legendas para correção.");
+                
+                currentSegments = await res.json();
+                renderSegments();
+                document.getElementById('correctionCard').style.display = "block";
+            } catch (err) {
+                console.error(err);
+                alert("Erro ao carregar legenda para correção: " + err.message);
+                isShowingCorrection = false;
+            }
+        }
+
+        function renderSegments() {
+            const container = document.getElementById('correctionList');
+            container.innerHTML = "";
+            
+            currentSegments.forEach((seg, idx) => {
+                const card = document.createElement('div');
+                card.style.display = "flex";
+                card.style.flexDirection = "column";
+                card.style.gap = "0.4rem";
+                card.style.background = "rgba(255,255,255,0.02)";
+                card.style.border = "1px solid rgba(255,255,255,0.06)";
+                card.style.padding = "0.75rem";
+                card.style.borderRadius = "8px";
+                card.style.position = "relative";
+                
+                const headerRow = document.createElement('div');
+                headerRow.style.display = "flex";
+                headerRow.style.justifyContent = "space-between";
+                headerRow.style.alignItems = "center";
+                
+                const title = document.createElement('span');
+                title.style.fontSize = "0.75rem";
+                title.style.fontWeight = "600";
+                title.style.color = "var(--primary)";
+                title.innerText = `ESTROFE ${idx + 1}`;
+                
+                const btnDelete = document.createElement('button');
+                btnDelete.type = "button";
+                btnDelete.innerHTML = "🗑️";
+                btnDelete.style.background = "none";
+                btnDelete.style.border = "none";
+                btnDelete.style.cursor = "pointer";
+                btnDelete.style.fontSize = "0.85rem";
+                btnDelete.title = "Excluir Linha";
+                btnDelete.addEventListener('click', () => {
+                    currentSegments.splice(idx, 1);
+                    renderSegments();
+                    updatePreview();
+                });
+                
+                headerRow.appendChild(title);
+                headerRow.appendChild(btnDelete);
+                card.appendChild(headerRow);
+                
+                const timeRow = document.createElement('div');
+                timeRow.style.display = "flex";
+                timeRow.style.gap = "0.5rem";
+                
+                const startGroup = document.createElement('div');
+                startGroup.style.flex = "1";
+                const startLabel = document.createElement('span');
+                startLabel.style.fontSize = "0.68rem";
+                startLabel.style.color = "var(--text-muted)";
+                startLabel.innerText = "Início (Min:Seg)";
+                startLabel.style.display = "block";
+                
+                const startInput = document.createElement('input');
+                startInput.type = "text";
+                startInput.value = secondsToTimeString(seg.start);
+                startInput.placeholder = "00:00.00";
+                startInput.style.width = "100%";
+                startInput.style.border = "1px solid var(--glass-border)";
+                startInput.style.padding = "0.3rem 0.5rem";
+                startInput.style.background = "#141226";
+                startInput.style.color = "var(--text-main)";
+                startInput.style.borderRadius = "6px";
+                startInput.style.outline = "none";
+                startInput.style.fontSize = "0.8rem";
+                
+                startInput.addEventListener('input', () => {
+                    seg.start = timeStringToSeconds(startInput.value);
+                    updatePreview();
+                });
+                startInput.addEventListener('change', () => {
+                    const secs = timeStringToSeconds(startInput.value);
+                    seg.start = secs;
+                    startInput.value = secondsToTimeString(secs);
+                    updatePreview();
+                });
+                
+                startGroup.appendChild(startLabel);
+                startGroup.appendChild(startInput);
+                
+                const endGroup = document.createElement('div');
+                endGroup.style.flex = "1";
+                const endLabel = document.createElement('span');
+                endLabel.style.fontSize = "0.68rem";
+                endLabel.style.color = "var(--text-muted)";
+                endLabel.innerText = "Fim (Min:Seg)";
+                endLabel.style.display = "block";
+                
+                const endInput = document.createElement('input');
+                endInput.type = "text";
+                endInput.value = secondsToTimeString(seg.end);
+                endInput.placeholder = "00:00.00";
+                endInput.style.width = "100%";
+                endInput.style.border = "1px solid var(--glass-border)";
+                endInput.style.padding = "0.3rem 0.5rem";
+                endInput.style.background = "#141226";
+                endInput.style.color = "var(--text-main)";
+                endInput.style.borderRadius = "6px";
+                endInput.style.outline = "none";
+                endInput.style.fontSize = "0.8rem";
+                
+                endInput.addEventListener('input', () => {
+                    seg.end = timeStringToSeconds(endInput.value);
+                    updatePreview();
+                });
+                endInput.addEventListener('change', () => {
+                    const secs = timeStringToSeconds(endInput.value);
+                    seg.end = secs;
+                    endInput.value = secondsToTimeString(secs);
+                    updatePreview();
+                });
+                
+                endGroup.appendChild(endLabel);
+                endGroup.appendChild(endInput);
+                
+                timeRow.appendChild(startGroup);
+                timeRow.appendChild(endGroup);
+                card.appendChild(timeRow);
+                
+                const textInput = document.createElement('input');
+                textInput.type = "text";
+                textInput.value = seg.text;
+                textInput.placeholder = "Texto da legenda...";
+                textInput.style.width = "100%";
+                textInput.style.border = "1px solid var(--glass-border)";
+                textInput.style.padding = "0.4rem 0.6rem";
+                textInput.style.background = "#141226";
+                textInput.style.color = "var(--text-main)";
+                textInput.style.borderRadius = "6px";
+                textInput.style.outline = "none";
+                textInput.style.fontSize = "0.85rem";
+                
+                textInput.addEventListener('input', () => {
+                    seg.text = textInput.value;
+                    updatePreview(seg.text);
+                });
+                textInput.addEventListener('focus', () => {
+                    updatePreview(seg.text);
+                });
+                
+                card.appendChild(textInput);
+                container.appendChild(card);
+            });
+            
+            if (currentSegments.length > 0) {
+                updatePreview(currentSegments[0].text);
+            } else {
+                updatePreview("Nenhuma linha de legenda disponível.");
+            }
+        }
+
+        document.getElementById('btnAddSegment').addEventListener('click', () => {
+            let lastEnd = 0.0;
+            if (currentSegments.length > 0) {
+                lastEnd = currentSegments[currentSegments.length - 1].end;
+            }
+            
+            currentSegments.push({
+                start: lastEnd + 1.0,
+                end: lastEnd + 4.0,
+                text: "Nova estrofe",
+                words: []
+            });
+            
+            renderSegments();
+            
+            const container = document.getElementById('correctionList');
+            container.scrollTop = container.scrollHeight;
+            
+            const cards = container.querySelectorAll('div');
+            if (cards.length > 0) {
+                const lastCard = cards[cards.length - 1];
+                const input = lastCard.querySelector('input[type="text"]');
+                if (input) input.focus();
+            }
+        });
+
+        document.getElementById('btnContinueProcess').addEventListener('click', async () => {
+            const btn = document.getElementById('btnContinueProcess');
+            btn.disabled = true;
+            btn.innerText = "💾 Salvando & Renderizando...";
+            
+            try {
+                const res = await authFetch('/api/continue_process', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ segments: currentSegments })
+                });
+                
+                if (!res.ok) {
+                    const err = await res.json();
+                    throw new Error(err.detail || "Erro ao prosseguir.");
+                }
+                
+                document.getElementById('correctionCard').style.display = "none";
+                isShowingCorrection = false;
+                
+                btn.disabled = false;
+                btn.innerText = "💾 Salvar e Renderizar";
+                
+                processCard.style.display = "block";
+                startPolling();
+                
+            } catch (err) {
+                alert("Erro ao continuar: " + err.message);
+                btn.disabled = false;
+                btn.innerText = "💾 Salvar e Renderizar";
+            }
+        });
+        
+        // Cancelar processamento ativo
+        document.querySelectorAll('.btn-cancel-task').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                if (!confirm("Deseja realmente cancelar a produção deste vídeo de karaokê?")) return;
+                
+                try {
+                    const res = await authFetch('/api/cancel', { method: 'POST' });
+                    if (!res.ok) throw new Error("Erro ao enviar comando de cancelamento.");
+                    
+                    const data = await res.json();
+                    alert(data.message || "Processamento cancelado.");
+                    
+                    // Parar o polling
+                    if (pollingInterval) {
+                        clearInterval(pollingInterval);
+                        pollingInterval = null;
+                    }
+                    
+                    // Resetar e ocultar painéis
+                    document.getElementById('processCard').style.display = "none";
+                    document.getElementById('correctionCard').style.display = "none";
+                    document.getElementById('errorCard').style.display = "none";
+                    btnSubmit.disabled = false;
+                    isShowingCorrection = false;
+                    
+                    // Atualizar o status geral
+                    checkCurrentStatus();
+                } catch (e) {
+                    alert("Erro ao tentar cancelar: " + e.message);
+                }
+            });
+        });
+        
+        // Lógica de consulta e download dos Modelos de IA Whisper no Servidor
+        async function fetchModelsStatus() {
+            try {
+                const res = await authFetch('/api/models');
+                if (!res.ok) throw new Error("Erro ao obter status dos modelos.");
+                const data = await res.json();
+                
+                const container = document.getElementById('modelsListContainer');
+                if (!container) return;
+                
+                container.innerHTML = "";
+                
+                const friendlyNames = {
+                    "base": "Base (Mais Leve - ~140MB)",
+                    "small": "Small (Leve - ~460MB)",
+                    "medium": "Medium (Recomendado - ~1.5GB)",
+                    "large-v3-turbo": "Large v3 Turbo (Super Rápido & Alta Precisão - ~1.5GB)",
+                    "large-v2": "Large v2 (Muito Preciso - ~3GB)",
+                    "large-v3": "Large v3 (Precisão Máxima - ~3GB)"
+                };
+                
+                Object.keys(data).forEach(size => {
+                    const modelInfo = data[size];
+                    const row = document.createElement('div');
+                    row.style.display = "flex";
+                    row.style.alignItems = "center";
+                    row.style.justifyContent = "space-between";
+                    row.style.background = "rgba(0,0,0,0.2)";
+                    row.style.padding = "0.5rem 0.8rem";
+                    row.style.borderRadius = "8px";
+                    row.style.flexWrap = "wrap";
+                    row.style.gap = "0.5rem";
+                    
+                    const nameSpan = document.createElement('span');
+                    nameSpan.style.fontSize = "0.85rem";
+                    nameSpan.style.fontWeight = "500";
+                    nameSpan.style.color = "var(--text-main)";
+                    nameSpan.innerText = friendlyNames[size] || size;
+                    
+                    const actionContainer = document.createElement('div');
+                    actionContainer.style.display = "flex";
+                    actionContainer.style.alignItems = "center";
+                    actionContainer.style.gap = "0.8rem";
+                    
+                    if (modelInfo.status === "done") {
+                        const badge = document.createElement('span');
+                        badge.style.color = "#10b981";
+                        badge.style.fontSize = "0.8rem";
+                        badge.style.fontWeight = "600";
+                        badge.innerText = "✓ Baixado no Servidor";
+                        actionContainer.appendChild(badge);
+                    } else if (modelInfo.status === "downloading") {
+                        const prog = document.createElement('span');
+                        prog.style.color = "#c084fc";
+                        prog.style.fontSize = "0.8rem";
+                        prog.style.fontWeight = "600";
+                        prog.innerText = `⏳ Baixando (${modelInfo.progress}%)`;
+                        actionContainer.appendChild(prog);
+                    } else {
+                        const btn = document.createElement('button');
+                        btn.type = "button";
+                        btn.className = "btn-secondary";
+                        btn.style.fontSize = "0.75rem";
+                        btn.style.padding = "0.3rem 0.6rem";
+                        btn.style.borderColor = "rgba(139, 92, 246, 0.4)";
+                        btn.style.background = "rgba(139, 92, 246, 0.15)";
+                        btn.style.color = "#c084fc";
+                        btn.style.cursor = "pointer";
+                        btn.innerText = "⬇️ Baixar";
+                        btn.addEventListener('click', () => triggerModelDownload(size));
+                        actionContainer.appendChild(btn);
+                    }
+                    
+                    row.appendChild(nameSpan);
+                    row.appendChild(actionContainer);
+                    container.appendChild(row);
+                });
+            } catch (err) {
+                console.error("Erro ao sincronizar status dos modelos:", err);
+            }
+        }
+        
+        async function triggerModelDownload(modelSize) {
+            try {
+                const res = await authFetch('/api/models/download', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ model_size: modelSize })
+                });
+                if (!res.ok) {
+                    const errData = await res.json();
+                    throw new Error(errData.detail || "Erro ao iniciar download.");
+                }
+                await fetchModelsStatus();
+            } catch (err) {
+                alert(`Erro ao iniciar download: ${err.message}`);
+            }
+        }
+        
+        let hasServerCache = false;
+        
+        async function checkCache() {
+            try {
+                const res = await authFetch('/api/cache_info');
+                if (res.ok) {
+                    const data = await res.json();
+                    const audioInput = document.getElementById('audioFile');
+                    const bgInput = document.getElementById('bgFile');
+                    
+                    // Não preencher automaticamente a letra do cache
+                    // O usuário deve inserir manualmente a cada uso
+                    
+                    if (data.has_cache) {
+                        hasServerCache = true;
+                        audioInput.removeAttribute('required');
+                        
+                        // Atualizar áudio apenas se não houver arquivo local selecionado
+                        if (audioInput.files.length === 0) {
+                            audioText.innerText = "Música atual no servidor:";
+                            audioBadge.innerText = data.audio_filename + " (No Servidor)";
+                            audioBadge.style.display = "inline-flex";
+                        }
+                        
+                        // Atualizar background apenas se não houver arquivo local selecionado
+                        if (bgInput.files.length === 0) {
+                            if (data.bg_filename) {
+                                bgTextName.innerText = "Fundo atual no servidor:";
+                                bgBadge.innerText = data.bg_filename + " (No Servidor)";
+                                bgBadge.style.display = "inline-flex";
+                            } else {
+                                bgTextName.innerText = "Padrão: Fundo Preto Sólido";
+                                bgBadge.innerText = "";
+                                bgBadge.style.display = "none";
+                            }
+                        }
+                    } else {
+                        hasServerCache = false;
+                        // Validado via JS no submitProcessForm
+                        
+                        if (audioInput.files.length === 0) {
+                            audioText.innerText = "Arraste a música ou clique";
+                            audioBadge.innerText = "";
+                            audioBadge.style.display = "none";
+                        }
+                        
+                        if (bgInput.files.length === 0) {
+                            bgTextName.innerText = "Padrão: Fundo Preto Sólido";
+                            bgBadge.innerText = "";
+                            bgBadge.style.display = "none";
+                        }
+                    }
+                }
+            } catch (e) {
+                console.error("Erro ao carregar cache do servidor:", e);
+            }
+        }
+        
+        // Inicializações ao abrir a página
+        window.addEventListener('DOMContentLoaded', async () => {
+            await fetchTelegramConfig();
+            await fetchProfiles();
+            
+            // Recuperar o último perfil utilizado
+            try {
+                const lastRes = await authFetch('/api/last_profile');
+                if (lastRes.ok) {
+                    const lastData = await lastRes.json();
+                    if (lastData.last_profile && allProfiles[lastData.last_profile]) {
+                        profileSelect.value = lastData.last_profile;
+                        applyProfile(lastData.last_profile);
+                    }
+                }
+            } catch (e) {
+                console.error("Erro ao carregar último perfil:", e);
+            }
+            
+            await checkCache();
+            await fetchModelsStatus();
+            await checkCurrentStatus();
+            
+            // Polling periódico do status dos modelos de IA
+            setInterval(fetchModelsStatus, 5000);
+            
+            // Polling de sincronização em segundo plano para múltiplos dispositivos (3 segundos)
+            setInterval(async () => {
+                if (pollingInterval) return; // Se já estiver ativamente processando/polling no dispositivo, pula
+                await checkCurrentStatus();
+            }, 3000);
+        });
+
+        function getStepLabel(step) {
+            switch(step) {
+                case "Downloading YouTube": return "Baixando vídeo do YouTube (esta etapa pode demorar)...";
+                case "Uploading": return "Enviando arquivo...";
+                case "Extracting audio": return "Extraindo faixa de áudio...";
+                case "Separating vocals": return "Separando vocais do instrumental (esta etapa pode demorar alguns minutos)...";
+                case "Transcribing vocals": return "Transcrevendo voz com Whisper (esta etapa pode demorar)...";
+                case "Generating subtitles": return "Criando marcações de tempo e legenda karaokê...";
+                case "Rendering final video": return "Renderizando vídeo final via FFmpeg...";
+                case "Cleaning temporary files": return "Limpando arquivos temporários e finalizando...";
+                case "Done": return "Pronto!";
+                default: return "Processando...";
+            }
+        }
+
+        function resetTimeline() {
+            Object.values(stepsMap).forEach(id => {
+                const el = document.getElementById(id);
+                el.className = "timeline-step";
+            });
+        }
+
+        function updateStepActive(activeStep) {
+            if (!activeStep) return;
+            let cleanStep = activeStep;
+            if (cleanStep.includes("Downloading YouTube") || cleanStep.includes("Uploading")) cleanStep = "Uploading";
+            else if (cleanStep.includes("Extracting")) cleanStep = "Extracting audio";
+            else if (cleanStep.includes("Separating")) cleanStep = "Separating vocals";
+            else if (cleanStep.includes("Transcribing")) cleanStep = "Transcribing vocals";
+            else if (cleanStep.includes("Generating") || cleanStep.includes("subtitles")) cleanStep = "Generating subtitles";
+            else if (cleanStep.includes("Rendering")) cleanStep = "Rendering final video";
+            else if (cleanStep.includes("Cleaning")) cleanStep = "Cleaning temporary files";
+            else if (cleanStep.includes("Done") || cleanStep.includes("Concluído")) cleanStep = "Done";
+
+            let passedActive = false;
+            
+            Object.keys(stepsMap).forEach(stepKey => {
+                const id = stepsMap[stepKey];
+                const el = document.getElementById(id);
+                if (!el) return;
+                
+                if (stepKey === cleanStep) {
+                    el.className = "timeline-step active";
+                    passedActive = true;
+                } else if (!passedActive) {
+                    el.className = "timeline-step completed";
+                } else {
+                    el.className = "timeline-step";
+                }
+            });
+        }
+
+        function updateTimeline(currentStep) {
+            updateStepActive(currentStep);
+        }
+
+        function showError(message) {
+            errorCard.innerText = `Erro: ${message}`;
+            errorCard.style.display = "block";
+            btnSubmit.disabled = false;
+            if (pollingInterval) clearInterval(pollingInterval);
+        }
+
+        // --- CÓDIGO DA BIBLIOTECA & PREVIEW AVANÇADO v2.2.4 ---
+        const tabBtnCreate = document.getElementById('tabBtnCreate');
+        const tabBtnLibrary = document.getElementById('tabBtnLibrary');
+        const createTabContent = document.getElementById('createTabContent');
+        const libraryTabContent = document.getElementById('libraryTabContent');
+
+        tabBtnCreate.addEventListener('click', () => {
+            tabBtnCreate.classList.add('active');
+            tabBtnLibrary.classList.remove('active');
+            createTabContent.style.display = 'block';
+            libraryTabContent.style.display = 'none';
+        });
+
+        tabBtnLibrary.addEventListener('click', () => {
+            tabBtnLibrary.classList.add('active');
+            tabBtnCreate.classList.remove('active');
+            createTabContent.style.display = 'none';
+            libraryTabContent.style.display = 'flex';
+            loadLibrary();
+        });
+
+        // Alternador de sub-modos (Upload / YouTube) para Música v2.2.4
+        const btnAudioModeUpload = document.getElementById('btnAudioModeUpload');
+        const btnAudioModeYoutube = document.getElementById('btnAudioModeYoutube');
+        const audioUploadContainer = document.getElementById('audioUploadContainer');
+        const audioYoutubeContainer = document.getElementById('audioYoutubeContainer');
+        
+        let currentAudioMode = 'upload';
+
+        if (btnAudioModeUpload) {
+            btnAudioModeUpload.addEventListener('click', () => {
+                currentAudioMode = 'upload';
+                btnAudioModeUpload.classList.add('active');
+                if (btnAudioModeYoutube) btnAudioModeYoutube.classList.remove('active');
+                if (audioUploadContainer) audioUploadContainer.style.display = 'block';
+                if (audioYoutubeContainer) audioYoutubeContainer.style.display = 'none';
+                
+                // Limpar hidden input da biblioteca ao alternar para upload
+                const libHidden = document.getElementById('libraryAudioHidden');
+                if (libHidden) libHidden.value = '';
+            });
+        }
+
+        if (btnAudioModeYoutube) {
+            btnAudioModeYoutube.addEventListener('click', () => {
+                currentAudioMode = 'youtube';
+                btnAudioModeYoutube.classList.add('active');
+                if (btnAudioModeUpload) btnAudioModeUpload.classList.remove('active');
+                if (audioUploadContainer) audioUploadContainer.style.display = 'none';
+                if (audioYoutubeContainer) audioYoutubeContainer.style.display = 'block';
+                
+                // Limpar hidden input da biblioteca ao alternar para youtube
+                const libHidden = document.getElementById('libraryAudioHidden');
+                if (libHidden) libHidden.value = '';
+            });
+        }
+
+        const btnDownloadYoutube = document.getElementById('btnDownloadYoutube');
+        btnDownloadYoutube.addEventListener('click', async () => {
+            const youtubeUrlInput = document.getElementById('youtubeUrl');
+            const url = youtubeUrlInput.value.trim();
+            if (!url) {
+                alert("Por favor, cole uma URL válida do YouTube.");
+                return;
+            }
+            
+            errorCard.style.display = "none";
+            downloadBox.style.display = "none";
+            document.getElementById('correctionCard').style.display = "none";
+            
+            btnDownloadYoutube.disabled = true;
+            btnDownloadYoutube.innerHTML = '<span>⏳</span> Baixando...';
+            
+            processCard.style.display = "block";
+            resetTimeline();
+            updateStepActive("Downloading YouTube");
+            statusMessage.innerText = "Iniciando download do YouTube...";
+            
+            try {
+                const res = await authFetch('/api/download-youtube-preset', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ youtube_url: url })
+                });
+                
+                if (!res.ok) {
+                    const errData = await res.json();
+                    throw new Error(errData.detail || "Erro ao iniciar download do YouTube.");
+                }
+                
+                startPolling();
+                
+            } catch (err) {
+                showError(err.message);
+                btnDownloadYoutube.disabled = false;
+                btnDownloadYoutube.innerHTML = '<span>📥</span> Baixar do YouTube';
+            }
+        });
+
+        // btnAudioModeLibrary removido do form
+
+        // Alternador de sub-modos (Upload / YouTube / Biblioteca) para Fundo v2.2.4
+        const btnBgModeUpload = document.getElementById('btnBgModeUpload');
+        const btnBgModeYoutube = document.getElementById('btnBgModeYoutube');
+        const btnBgModeLibrary = document.getElementById('btnBgModeLibrary');
+        const bgUploadContainer = document.getElementById('bgUploadContainer');
+        const bgYoutubeContainer = document.getElementById('bgYoutubeContainer');
+        const bgLibraryContainer = document.getElementById('bgLibraryContainer');
+        
+        let currentBgMode = 'upload';
+
+        if (btnBgModeUpload) {
+            btnBgModeUpload.addEventListener('click', () => {
+                currentBgMode = 'upload';
+                btnBgModeUpload.classList.add('active');
+                if (btnBgModeYoutube) btnBgModeYoutube.classList.remove('active');
+                if (btnBgModeLibrary) btnBgModeLibrary.classList.remove('active');
+                if (bgUploadContainer) bgUploadContainer.style.display = 'block';
+                if (bgYoutubeContainer) bgYoutubeContainer.style.display = 'none';
+                if (bgLibraryContainer) bgLibraryContainer.style.display = 'none';
+            });
+        }
+
+        if (btnBgModeYoutube) {
+            btnBgModeYoutube.addEventListener('click', () => {
+                currentBgMode = 'youtube';
+                btnBgModeYoutube.classList.add('active');
+                if (btnBgModeUpload) btnBgModeUpload.classList.remove('active');
+                if (btnBgModeLibrary) btnBgModeLibrary.classList.remove('active');
+                if (bgUploadContainer) bgUploadContainer.style.display = 'none';
+                if (bgYoutubeContainer) bgYoutubeContainer.style.display = 'block';
+                if (bgLibraryContainer) bgLibraryContainer.style.display = 'none';
+            });
+        }
+
+        if (btnBgModeLibrary) {
+            btnBgModeLibrary.addEventListener('click', () => {
+                currentBgMode = 'library';
+                btnBgModeLibrary.classList.add('active');
+                if (btnBgModeUpload) btnBgModeUpload.classList.remove('active');
+                if (btnBgModeYoutube) btnBgModeYoutube.classList.remove('active');
+                if (bgUploadContainer) bgUploadContainer.style.display = 'none';
+                if (bgYoutubeContainer) bgYoutubeContainer.style.display = 'none';
+                if (bgLibraryContainer) bgLibraryContainer.style.display = 'block';
+                loadLibraryOptions();
+            });
+        }
+
+        // Listener do Botão Baixar Fundo do YouTube (Sem Áudio)
+        const btnDownloadBgYoutube = document.getElementById('btnDownloadBgYoutube');
+        if (btnDownloadBgYoutube) {
+            btnDownloadBgYoutube.addEventListener('click', async () => {
+                const bgYoutubeUrlInput = document.getElementById('bgYoutubeUrl');
+                const url = bgYoutubeUrlInput ? bgYoutubeUrlInput.value.trim() : '';
+                if (!url) {
+                    alert("Por favor, cole uma URL válida do YouTube para o fundo.");
+                    return;
+                }
+                
+                errorCard.style.display = "none";
+                downloadBox.style.display = "none";
+                document.getElementById('correctionCard').style.display = "none";
+                
+                btnDownloadBgYoutube.disabled = true;
+                btnDownloadBgYoutube.innerHTML = '<span>⏳</span> Baixando Fundo (Sem Áudio)...';
+                
+                processCard.style.display = "block";
+                resetTimeline();
+                updateStepActive("Downloading YouTube Background");
+                statusMessage.innerText = "Iniciando download do fundo do YouTube (sem áudio)...";
+                
+                try {
+                    const res = await authFetch('/api/download-bg-youtube-preset', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ youtube_url: url })
+                    });
+                    
+                    if (!res.ok) {
+                        const errData = await res.json();
+                        throw new Error(errData.detail || "Erro ao iniciar download de fundo do YouTube.");
+                    }
+                    
+                    startPolling();
+                    
+                } catch (err) {
+                    showError(err.message);
+                    btnDownloadBgYoutube.disabled = false;
+                    btnDownloadBgYoutube.innerHTML = '<span>📥</span> Baixar Fundo do YouTube (Sem Áudio)';
+                }
+            });
+        }
+
+        // Preenche opções de bibliotecas nos selectors
+        async function loadLibraryOptions() {
+            try {
+                const res = await authFetch('/api/library');
+                if (!res.ok) return;
+                const data = await res.json();
+                
+                const audioSelect = document.getElementById('libraryAudioSelect');
+                const selectedAudio = audioSelect.value;
+                audioSelect.innerHTML = '<option value="">Selecione uma música da biblioteca...</option>';
+                data.videos.forEach(file => {
+                    const opt = document.createElement('option');
+                    opt.value = file;
+                    opt.innerText = file;
+                    audioSelect.appendChild(opt);
+                });
+                if (selectedAudio) audioSelect.value = selectedAudio;
+
+                const bgSelect = document.getElementById('libraryBgSelect');
+                const selectedBg = bgSelect.value;
+                bgSelect.innerHTML = '<option value="">Selecione um fundo da biblioteca...</option>';
+                data.photos.forEach(file => {
+                    const opt = document.createElement('option');
+                    opt.value = file;
+                    opt.innerText = file;
+                    bgSelect.appendChild(opt);
+                });
+                if (selectedBg) bgSelect.value = selectedBg;
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        // Listagem de arquivos na aba Biblioteca
+        async function loadLibrary() {
+            try {
+                const res = await authFetch('/api/library');
+                if (!res.ok) throw new Error("Falha ao obter lista da biblioteca.");
+                const data = await res.json();
+                
+                const videosList = document.getElementById('libVideosList');
+                videosList.innerHTML = '';
+                if (data.videos.length === 0) {
+                    videosList.innerHTML = '<p style="font-size: 0.8rem; color: var(--text-muted); text-align: center; margin-top: 2rem;">Nenhum arquivo na biblioteca.</p>';
+                } else {
+                    data.videos.forEach(file => {
+                        const escapedFile = file.replace(/'/g, "\\'");
+                        const item = document.createElement('div');
+                        item.className = 'library-item';
+                        item.innerHTML = `
+                            <span style="font-size: 0.85rem; color: var(--text-main); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 70%;" title="${file}">🎵 ${file}</span>
+                            <div class="actions" style="display: flex; gap: 0.4rem;">
+                                <button class="btn-secondary" style="font-size: 0.75rem; padding: 0.3rem 0.6rem; border-color: rgba(139,92,246,0.3); color: #c084fc; cursor:pointer;" onclick="processLibraryAudio('${escapedFile}')">🎙️ Criar</button>
+                                <button class="btn-secondary" style="font-size: 0.75rem; padding: 0.3rem 0.6rem; border-color: rgba(239,68,68,0.2); color: #fca5a5; cursor:pointer;" onclick="deleteLibraryFile('videos', '${escapedFile}')">❌</button>
+                            </div>
+                        `;
+                        videosList.appendChild(item);
+                    });
+                }
+
+                const photosList = document.getElementById('libPhotosList');
+                photosList.innerHTML = '';
+                if (data.photos.length === 0) {
+                    photosList.innerHTML = '<p style="font-size: 0.8rem; color: var(--text-muted); text-align: center; margin-top: 2rem;">Nenhum arquivo na biblioteca.</p>';
+                } else {
+                    data.photos.forEach(file => {
+                        const isVideo = file.toLowerCase().match(/\.(mp4|mov|mkv|webm|avi)$/);
+                        const icon = isVideo ? '🎥' : '🖼️';
+                        const escapedFile = file.replace(/'/g, "\\'");
+                        const item = document.createElement('div');
+                        item.className = 'library-item';
+                        item.innerHTML = `
+                            <span style="font-size: 0.85rem; color: var(--text-main); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 70%;" title="${file}">${icon} ${file}</span>
+                            <div class="actions" style="display: flex; gap: 0.4rem;">
+                                <button class="btn-secondary" style="font-size: 0.75rem; padding: 0.3rem 0.6rem; border-color: rgba(236,72,153,0.3); color: #f472b6; cursor:pointer;" onclick="useLibraryBg('${escapedFile}')">🖼️ Usar</button>
+                                <button class="btn-secondary" style="font-size: 0.75rem; padding: 0.3rem 0.6rem; border-color: rgba(239,68,68,0.2); color: #fca5a5; cursor:pointer;" onclick="deleteLibraryFile('photos', '${escapedFile}')">❌</button>
+                            </div>
+                        `;
+                        photosList.appendChild(item);
+                    });
+                }
+
+                const historyList = document.getElementById('libHistoryList');
+                historyList.innerHTML = '';
+                if (data.history.length === 0) {
+                    historyList.innerHTML = '<p style="font-size: 0.8rem; color: var(--text-muted); text-align: center; margin-top: 2rem; grid-column: 1/-1;">Nenhum karaokê gerado salvo no histórico.</p>';
+                } else {
+                    data.history.forEach(file => {
+                        const escapedFile = file.replace(/'/g, "\\'");
+                        const item = document.createElement('div');
+                        item.className = 'library-item';
+                        item.innerHTML = `
+                            <span style="font-size: 0.85rem; color: var(--text-main); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 70%;" title="${file}">🎬 ${file}</span>
+                            <div class="actions" style="display: flex; gap: 0.4rem;">
+                                <a href="/api/library/download/history/${encodeURIComponent(file)}?token=${localStorage.getItem('auth_token')}" class="btn-secondary" style="font-size: 0.75rem; padding: 0.3rem 0.6rem; border-color: rgba(16,185,129,0.3); color: #34d399; text-decoration: none; display: inline-flex; align-items: center; justify-content: center; cursor:pointer;">⬇️ Baixar</a>
+                                <button class="btn-secondary" style="font-size: 0.75rem; padding: 0.3rem 0.6rem; border-color: rgba(239,68,68,0.2); color: #fca5a5; cursor:pointer;" onclick="deleteLibraryFile('history', '${escapedFile}')">❌</button>
+                            </div>
+                        `;
+                        historyList.appendChild(item);
+                    });
+                }
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        window.deleteLibraryFile = async function(section, filename) {
+            if (!confirm(`Deseja realmente remover '${filename}' da biblioteca?`)) return;
+            try {
+                const res = await authFetch(`/api/library/${section}/${encodeURIComponent(filename)}`, {
+                    method: 'DELETE'
+                });
+                if (!res.ok) {
+                    const err = await res.json();
+                    throw new Error(err.detail || "Erro ao remover arquivo.");
+                }
+                loadLibrary();
+                loadLibraryOptions();
+            } catch (err) {
+                alert(err.message);
+            }
+        };
+
+        
+        // ── SISTEMA DE FONTE ÚNICA DE VERDADE PARA MÍDIA DE ÁUDIO v2.2.4 ──────
+        let currentAudioSource = { type: 'none', title: '', value: '' };
+
+        function setAudioSource(type, data) {
+            const hiddenLib = document.getElementById('libraryAudioHidden');
+            const ytInput = document.getElementById('youtubeUrl');
+            const audioFileInput = document.getElementById('audioFile');
+            
+            const activeTitle = document.getElementById('activeMediaTitle');
+            const activeSourceBadge = document.getElementById('activeMediaSourceBadge');
+            const activeIcon = document.getElementById('activeMediaIcon');
+
+            if (type === 'library') {
+                currentAudioMode = 'library';
+                currentAudioSource = { type: 'library', title: data, value: data };
+                if (hiddenLib) hiddenLib.value = data;
+                if (ytInput) ytInput.value = '';
+                if (audioFileInput) audioFileInput.value = '';
+                
+                if (activeTitle) activeTitle.innerText = data;
+                if (activeSourceBadge) {
+                    activeSourceBadge.innerText = '📚 Biblioteca';
+                    activeSourceBadge.style.background = '#6d28d9';
+                    activeSourceBadge.style.color = '#ffffff';
+                }
+                if (activeIcon) activeIcon.innerText = '📚';
+                
+            } else if (type === 'youtube') {
+                currentAudioMode = 'youtube';
+                currentAudioSource = { type: 'youtube', title: data, value: data };
+                if (hiddenLib) hiddenLib.value = '';
+                if (audioFileInput) audioFileInput.value = '';
+                if (ytInput) ytInput.value = data;
+                
+                if (activeTitle) activeTitle.innerText = data || 'Vídeo do YouTube';
+                if (activeSourceBadge) {
+                    activeSourceBadge.innerText = '🌐 YouTube';
+                    activeSourceBadge.style.background = '#0284c7';
+                    activeSourceBadge.style.color = '#ffffff';
+                }
+                if (activeIcon) activeIcon.innerText = '🌐';
+                
+            } else if (type === 'upload') {
+                currentAudioMode = 'upload';
+                currentAudioSource = { type: 'upload', title: data, value: data };
+                if (hiddenLib) hiddenLib.value = '';
+                if (ytInput) ytInput.value = '';
+                
+                if (activeTitle) activeTitle.innerText = data;
+                if (activeSourceBadge) {
+                    activeSourceBadge.innerText = '📁 Upload Local';
+                    activeSourceBadge.style.background = '#8b5cf6';
+                    activeSourceBadge.style.color = '#ffffff';
+                }
+                if (activeIcon) activeIcon.innerText = '📁';
+            }
+        }
+
+        window.processLibraryAudio = function(filename) {
+            setAudioSource('library', filename);
+            tabBtnCreate.click();
+            const banner = document.getElementById('activeMediaBanner');
+            if (banner) banner.scrollIntoView({ behavior: 'smooth' });
+        };
+
+
+        window.useLibraryBg = function(filename) {
+            btnBgModeLibrary.click();
+            const bgSelect = document.getElementById('libraryBgSelect');
+            let opt = Array.from(bgSelect.options).find(o => o.value === filename);
+            if (!opt) {
+                opt = document.createElement('option');
+                opt.value = filename;
+                opt.innerText = filename;
+                bgSelect.appendChild(opt);
+            }
+            bgSelect.value = filename;
+            document.getElementById('backgroundMode').value = 'image';
+            tabBtnCreate.click();
+        };
+
+        // Envio direto de arquivos da aba Biblioteca
+        const libAudioFile = document.getElementById('libAudioFile');
+        const libAudioUploadArea = document.getElementById('libAudioUploadArea');
+        const btnLibAudioUpload = document.getElementById('btnLibAudioUpload');
+        const libAudioFileName = document.getElementById('libAudioFileName');
+
+        libAudioUploadArea.addEventListener('click', () => libAudioFile.click());
+        libAudioFile.addEventListener('change', () => {
+            if (libAudioFile.files.length) {
+                libAudioFileName.innerText = libAudioFile.files[0].name;
+                btnLibAudioUpload.style.display = 'inline-block';
+            } else {
+                libAudioFileName.innerText = "Arraste a música ou clique";
+                btnLibAudioUpload.style.display = 'none';
+            }
+        });
+
+        // Drag events para Biblioteca Audio
+        ['dragenter', 'dragover'].forEach(eventName => {
+            libAudioUploadArea.addEventListener(eventName, (e) => {
+                e.preventDefault();
+                libAudioUploadArea.classList.add('dragover');
+            }, false);
+        });
+        ['dragleave', 'drop'].forEach(eventName => {
+            libAudioUploadArea.addEventListener(eventName, (e) => {
+                e.preventDefault();
+                libAudioUploadArea.classList.remove('dragover');
+            }, false);
+        });
+        libAudioUploadArea.addEventListener('drop', (e) => {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+            if (files.length) {
+                libAudioFile.files = files;
+                libAudioFileName.innerText = files[0].name;
+                btnLibAudioUpload.style.display = 'inline-block';
+            }
+        });
+
+        document.getElementById('libAudioUploadForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            if (!libAudioFile.files.length) return;
+            
+            const formData = new FormData();
+            formData.append('section', 'videos');
+            formData.append('file', libAudioFile.files[0]);
+            
+            btnLibAudioUpload.disabled = true;
+            btnLibAudioUpload.innerText = "Enviando...";
+            
+            try {
+                const res = await authFetch('/api/library/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                if (!res.ok) throw new Error("Erro ao realizar upload.");
+                
+                alert("Música adicionada à biblioteca com sucesso!");
+                libAudioFile.value = '';
+                libAudioFileName.innerText = "Arraste a música ou clique";
+                btnLibAudioUpload.style.display = 'none';
+                loadLibrary();
+                loadLibraryOptions();
+            } catch (err) {
+                alert(err.message);
+            } finally {
+                btnLibAudioUpload.disabled = false;
+                btnLibAudioUpload.innerText = "⬆️ Enviar Música";
+            }
+        });
+
+        const libBgFile = document.getElementById('libBgFile');
+        const libBgUploadArea = document.getElementById('libBgUploadArea');
+        const btnLibBgUpload = document.getElementById('btnLibBgUpload');
+        const libBgFileName = document.getElementById('libBgFileName');
+
+        libBgUploadArea.addEventListener('click', () => libBgFile.click());
+        libBgFile.addEventListener('change', () => {
+            if (libBgFile.files.length) {
+                libBgFileName.innerText = libBgFile.files[0].name;
+                btnLibBgUpload.style.display = 'inline-block';
+            } else {
+                libBgFileName.innerText = "Arraste o fundo ou clique";
+                btnLibBgUpload.style.display = 'none';
+            }
+        });
+
+        // Drag events para Biblioteca Fundo
+        ['dragenter', 'dragover'].forEach(eventName => {
+            libBgUploadArea.addEventListener(eventName, (e) => {
+                e.preventDefault();
+                libBgUploadArea.classList.add('dragover');
+            }, false);
+        });
+        ['dragleave', 'drop'].forEach(eventName => {
+            libBgUploadArea.addEventListener(eventName, (e) => {
+                e.preventDefault();
+                libBgUploadArea.classList.remove('dragover');
+            }, false);
+        });
+        libBgUploadArea.addEventListener('drop', (e) => {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+            if (files.length) {
+                libBgFile.files = files;
+                libBgFileName.innerText = files[0].name;
+                btnLibBgUpload.style.display = 'inline-block';
+            }
+        });
+
+        document.getElementById('libBgUploadForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            if (!libBgFile.files.length) return;
+            
+            const formData = new FormData();
+            formData.append('section', 'photos');
+            formData.append('file', libBgFile.files[0]);
+            
+            btnLibBgUpload.disabled = true;
+            btnLibBgUpload.innerText = "Enviando...";
+            
+            try {
+                const res = await authFetch('/api/library/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                if (!res.ok) throw new Error("Erro ao realizar upload.");
+                
+                alert("Fundo adicionado à biblioteca com sucesso!");
+                libBgFile.value = '';
+                libBgFileName.innerText = "Arraste o fundo ou clique";
+                btnLibBgUpload.style.display = 'none';
+                loadLibrary();
+                loadLibraryOptions();
+            } catch (err) {
+                alert(err.message);
+            } finally {
+                btnLibBgUpload.disabled = false;
+                btnLibBgUpload.innerText = "⬆️ Enviar";
+            }
+        });
+
+        // Configuração de Salvar Histórico do Download Box
+        const btnShowSaveHistory = document.getElementById('btnShowSaveHistory');
+        const saveHistoryFormContainer = document.getElementById('saveHistoryFormContainer');
+        const btnConfirmSaveHistory = document.getElementById('btnConfirmSaveHistory');
+        const historyVideoTitle = document.getElementById('historyVideoTitle');
+
+        btnShowSaveHistory.addEventListener('click', () => {
+            saveHistoryFormContainer.style.display = 'block';
+            historyVideoTitle.value = audioBadge.innerText.replace(" (No Servidor)", "") || "Meu Karaokê";
+        });
+
+        btnConfirmSaveHistory.addEventListener('click', async () => {
+            const title = historyVideoTitle.value.trim();
+            if (!title) {
+                alert("Por favor, digite um nome para salvar.");
+                return;
+            }
+            
+            btnConfirmSaveHistory.disabled = true;
+            btnConfirmSaveHistory.innerText = "Salvando...";
+            
+            try {
+                const res = await authFetch('/api/library/save_history', {
+                    method: 'POST',
+                    body: JSON.stringify({ title })
+                });
+                if (!res.ok) {
+                    const err = await res.json();
+                    throw new Error(err.detail || "Erro ao salvar.");
+                }
+                alert("Vídeo de Karaokê salvo com sucesso no histórico permanente!");
+                saveHistoryFormContainer.style.display = 'none';
+                loadLibrary();
+            } catch (err) {
+                alert(err.message);
+            } finally {
+                btnConfirmSaveHistory.disabled = false;
+                btnConfirmSaveHistory.innerText = "Confirmar";
+            }
+        });
+    </script>
+</body>
+</html>
