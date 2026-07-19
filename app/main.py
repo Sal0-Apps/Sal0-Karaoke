@@ -599,21 +599,29 @@ def resolve_whisper_repo(model_size: str) -> str:
         "small": "Systran/faster-whisper-small",
         "medium": "Systran/faster-whisper-medium",
         "large-v3-turbo": "deepdml/faster-whisper-large-v3-turbo",
-        "large-v2": "Systran/faster-whisper-large-v2",
-        "large-v3": "Systran/faster-whisper-large-v3"
+        "large-v3": "Systran/faster-whisper-large-v3",
+        "large-v2": "Systran/faster-whisper-large-v2"
     }
     return mapping.get(model_size, model_size)
 
 def is_model_downloaded(model_size: str) -> bool:
-    """Verifica nos diretórios locais se o modelo Whisper já foi baixado."""
+    """Verifica nos diretórios locais se o modelo Whisper já foi baixado sem falso-positivos."""
     key = model_size.lower().strip()
-    keywords = [key]
+    
     if key == "large-v3-turbo":
-        keywords.extend(["large-v3-turbo", "turbo"])
+        match_fn = lambda name: "turbo" in name or "large-v3-turbo" in name
+    elif key == "large-v3":
+        match_fn = lambda name: "large-v3" in name and "turbo" not in name
     elif key == "large-v2":
-        keywords.extend(["large-v2", "large"])
+        match_fn = lambda name: "large-v2" in name or (name == "large" or ("whisper-large" in name and "v3" not in name and "turbo" not in name))
     elif key == "medium":
-        keywords.extend(["medium"])
+        match_fn = lambda name: "medium" in name
+    elif key == "small":
+        match_fn = lambda name: "small" in name
+    elif key == "base":
+        match_fn = lambda name: "base" in name
+    else:
+        match_fn = lambda name: key in name
 
     search_roots = [
         "/data/output/models/whisper",
@@ -629,9 +637,9 @@ def is_model_downloaded(model_size: str) -> bool:
         try:
             for entry in os.listdir(root):
                 entry_path = os.path.join(root, entry)
-                if os.path.isdir(entry_path) and any(kw in entry.lower() for kw in keywords):
+                if os.path.isdir(entry_path) and match_fn(entry.lower()):
                     for r, dirs, files in os.walk(entry_path):
-                        if any(f in files for f in ["model.bin", "model.safetensors", "config.json", "pytorch_model.bin", "model.pt"]):
+                        if any(f in files for f in ["model.bin", "model.safetensors", "config.json", "pytorch_model.bin", "model.pt", "vocabulary.json"]):
                             return True
         except Exception as e:
             logger.warning(f"Erro ao verificar modelos em {root}: {e}")
@@ -769,7 +777,7 @@ def run_youtube_download_bg(url: str):
             f"📥 <b>Sal0 Karaokê</b>: Download concluído e adicionado à Biblioteca! <b>{title}</b>"
         )
         
-        update_state("idle", "Idle", 0, original_filename=title)
+        update_state("done", "Download Concluído e Adicionado à Biblioteca!", 100, original_filename=title)
         
     except Exception as e:
         logger.error(f"Erro no download do YouTube em background: {e}")
@@ -881,7 +889,7 @@ def run_bg_youtube_download_bg(url: str):
             f"🖼️ <b>Sal0 Karaokê</b>: Fundo do YouTube baixado sem áudio e salvo na Biblioteca! <b>{title}</b>"
         )
         
-        update_state("idle", "Idle", 0, original_filename=title)
+        update_state("done", "Download Concluído e Adicionado à Biblioteca!", 100, original_filename=title)
         
     except Exception as e:
         logger.error(f"Erro no download de fundo do YouTube em background: {e}")
@@ -972,7 +980,7 @@ def delete_lyrics_server(current_user: dict = Depends(get_current_user)):
 
 
 
-# Sistema de Logs de Diagnóstico v3.5.0
+# Sistema de Logs de Diagnóstico v3.5.1
 DIAGNOSTIC_LOG_FILE = "/data/output/app_diagnostic.log"
 
 def log_diagnostic(message: str, level: str = "INFO"):
@@ -1664,7 +1672,7 @@ def process_karaoke(
             if state.get("status") in ["idle", "error", "done"]:
                 try:
                     processing_lock.release()
-                    logger.info("Failsafe v3.5.0: Lock de concorrência obsoleto liberado com sucesso.")
+                    logger.info("Failsafe v3.5.1: Lock de concorrência obsoleto liberado com sucesso.")
                 except Exception:
                     pass
             else:

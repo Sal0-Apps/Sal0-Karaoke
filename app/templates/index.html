@@ -479,7 +479,7 @@
                 <h1>Sal0 Karaokê</h1>
             </div>
             <div class="header-actions">
-                <button type="button" class="header-btn" id="btnToggleTheme">🌙 Tema Escuro</button>
+                <button type="button" class="header-btn" id="btnToggleTheme" title="Alternar Tema (Escuro / Claro)" style="padding: 0.35rem 0.65rem; font-size: 0.78rem;">🌙 Escuro</button>
                 <button type="button" class="header-btn" id="btnOpenHelp">❓ Manual</button>
                 <button type="button" class="header-btn" id="btnLogout" style="color: #fca5a5; background: rgba(239,68,68,0.15); border-color: rgba(239,68,68,0.3);">🚪 Sair</button>
             </div>
@@ -589,8 +589,9 @@
                                         <option value="medium" selected>Medium (Recomendado)</option>
                                         <option value="small">Small (Rápido)</option>
                                         <option value="base">Base (Ultrarrápido)</option>
-                                        <option value="large-v3-turbo">Large v3 Turbo</option>
-                                        <option value="large-v2">Large v2 (Máxima Precisão)</option>
+                                        <option value="large-v3-turbo">Large v3 Turbo (~1.5GB)</option>
+                                        <option value="large-v3">Large v3 (Máxima Precisão)</option>
+                                        <option value="large-v2">Large v2 (Alta Precisão)</option>
                                     </select>
                                 </div>
                             </div>
@@ -682,10 +683,13 @@
                                 <input type="checkbox" id="breakOnPunctuation" name="break_on_punctuation" checked style="accent-color: var(--accent);">
                                 Quebrar linhas automaticamente por pontuação
                             </label>
-                            <label style="font-size: 0.82rem; color: var(--text-main); cursor: pointer; display: flex; align-items: center; gap: 0.5rem;">
-                                <input type="checkbox" id="showInstrumental" name="show_instrumental" checked style="accent-color: var(--accent);">
-                                Manter faixa instrumental separada
-                            </label>
+                            <div class="form-group" style="margin-bottom: 0.5rem;">
+                                <span class="label">Exibir Texto "Instrumental" em Silêncios Prolongados (v2.2.4)</span>
+                                <select id="showInstrumental" name="show_instrumental" class="select-input">
+                                    <option value="true" selected>Sim (Exibir marcação Instrumental nos silêncios)</option>
+                                    <option value="false">Não (Manter tela limpa nos momentos de silêncio)</option>
+                                </select>
+                            </div>
                             <label style="font-size: 0.82rem; color: var(--text-main); cursor: pointer; display: flex; align-items: center; gap: 0.5rem;">
                                 <input type="checkbox" id="saveToLibrary" name="save_to_library" checked style="accent-color: var(--accent);">
                                 Salvar mídias enviadas na biblioteca permanente
@@ -942,7 +946,7 @@
 
         <!-- RODAPÉ DISCRETO DA PÁGINA -->
         <footer>
-            Sal0 Karaokê v3.5.0
+            Sal0 Karaokê v3.5.1
         </footer>
 
     </div> <!-- Container End -->
@@ -1019,7 +1023,7 @@
             const selectTheme = document.getElementById('themeSelect');
             
             if (btnTheme) {
-                btnTheme.innerText = theme === 'light' ? '☀️ Tema Claro' : '🌙 Tema Escuro';
+                btnTheme.innerText = theme === 'light' ? '☀️ Claro' : '🌙 Escuro';
             }
             if (selectTheme) {
                 selectTheme.value = theme;
@@ -1171,7 +1175,8 @@
                     "small": "Small (~460MB - Rápido)",
                     "medium": "Medium (~1.5GB - Recomendado)",
                     "large-v3-turbo": "Large v3 Turbo (~1.5GB - Excelente)",
-                    "large-v2": "Large v2 (~3GB - Máxima Precisão)"
+                    "large-v3": "Large v3 (~3GB - Máxima Precisão)",
+                    "large-v2": "Large v2 (~3GB - Alta Precisão)"
                 };
 
                 let isDownloading = false;
@@ -2085,10 +2090,12 @@
                     if (btnSubmit) btnSubmit.disabled = true;
 
                     updateTimelineUI(data.step || "");
-                } else if (data.status === "done") {
+                } else if (data.status === "done" || data.status === "idle") {
                     if (pollingInterval) clearInterval(pollingInterval);
                     processCard.style.display = "none";
-                    if (downloadBox) downloadBox.style.display = "block";
+                    if (data.status === "done" && data.original_filename && !data.original_filename.includes("Baixando")) {
+                        if (downloadBox) downloadBox.style.display = "block";
+                    }
                     if (btnSubmit) { btnSubmit.disabled = false; btnSubmit.innerHTML = '🎬 Criar Vídeo Karaokê'; }
                     await loadLibrary();
                 } else if (data.status === "error") {
