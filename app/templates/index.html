@@ -89,12 +89,36 @@
             font-weight: 800;
             font-size: 1.4rem;
             letter-spacing: -0.5px;
-            background: linear-gradient(135deg, #fff 0%, #d1d5db 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
+            color: #ffffff !important;
+            -webkit-text-fill-color: #ffffff !important;
+            text-shadow: 0 0 15px rgba(139, 92, 246, 0.6) !important;
             display: flex;
             align-items: center;
             gap: 0.5rem;
+        }
+
+        /* Animação para Etapas da Timeline */
+        .timeline-step.active {
+            color: #c084fc !important;
+            font-weight: 700 !important;
+        }
+        .timeline-step.active .step-dot {
+            background: #8b5cf6 !important;
+            box-shadow: 0 0 12px #8b5cf6 !important;
+            animation: pulseDot 1.2s infinite ease-in-out !important;
+        }
+        @keyframes pulseDot {
+            0% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.4); opacity: 0.6; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        .timeline-step.completed {
+            color: #34d399 !important;
+            font-weight: 600 !important;
+        }
+        .timeline-step.completed .step-dot {
+            background: #10b981 !important;
+            box-shadow: 0 0 6px #10b981 !important;
         }
 
         .header-actions {
@@ -909,7 +933,7 @@
 
         <!-- RODAPÉ DISCRETO DA PÁGINA -->
         <footer>
-            Sal0 Karaokê v3.0.2
+            Sal0 Karaokê v3.0.3
         </footer>
 
     </div> <!-- Container End -->
@@ -1077,6 +1101,10 @@
 
                 profileSelect.onchange = () => {
                     const selected = profileSelect.value;
+                    if (selected) {
+                        const nameInput = document.getElementById('newProfileName');
+                        if (nameInput) nameInput.value = selected;
+                    }
                     if (selected && allProfiles[selected]) {
                         const p = allProfiles[selected];
                         if (p.subtitle_mode) document.getElementById('subtitleMode').value = p.subtitle_mode;
@@ -1156,14 +1184,15 @@
                 const res = await authFetch('/api/models/download', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ model: modelName })
+                    body: JSON.stringify({ model_size: modelName, model: modelName })
                 });
                 if (res.ok) {
                     alert(`Download do modelo '${modelName}' iniciado no servidor!`);
                     fetchModelsStatus();
                 } else {
                     const err = await res.json();
-                    alert("Erro ao baixar modelo: " + (err.detail || "Falha no download"));
+                    const errMsg = typeof err.detail === 'string' ? err.detail : (err.detail ? JSON.stringify(err.detail) : "Falha no download");
+                    alert("Erro ao baixar modelo: " + errMsg);
                 }
             } catch (e) { alert("Erro ao baixar modelo: " + e.message); }
         }
@@ -1694,7 +1723,9 @@
             const btnSaveProfile = document.getElementById('btnSaveProfile');
             if (btnSaveProfile) {
                 btnSaveProfile.onclick = async () => {
-                    const name = document.getElementById('newProfileName').value.trim();
+                    const typedName = document.getElementById('newProfileName').value.trim();
+                    const selectedProfile = document.getElementById('profileSelect').value;
+                    const name = typedName || selectedProfile;
                     if (!name) { alert("Informe o nome do perfil."); return; }
                     const profileData = {
                         name: name,
@@ -1938,6 +1969,42 @@
             });
         }
 
+        
+        function updateTimelineUI(stepText) {
+            const steps = [
+                { id: 'step-Uploading', keys: ['uploading', 'downloading youtube'] },
+                { id: 'step-Extracting', keys: ['extracting', 'áudio'] },
+                { id: 'step-Separating', keys: ['separating', 'demucs', 'vocais'] },
+                { id: 'step-Transcribing', keys: ['transcribing', 'whisper'] },
+                { id: 'step-Subtitles', keys: ['subtitles', 'legenda', 'ass'] },
+                { id: 'step-Rendering', keys: ['rendering', 'renderizando'] },
+                { id: 'step-Cleaning', keys: ['cleaning', 'limpando'] },
+                { id: 'step-Done', keys: ['done', 'concluído', 'finalizado'] }
+            ];
+
+            const textLower = stepText.toLowerCase();
+            let currentIdx = -1;
+
+            steps.forEach((s, idx) => {
+                if (s.keys.some(k => textLower.includes(k))) {
+                    currentIdx = idx;
+                }
+            });
+
+            steps.forEach((s, idx) => {
+                const elem = document.getElementById(s.id);
+                if (!elem) return;
+                elem.classList.remove('active', 'completed');
+                if (currentIdx !== -1) {
+                    if (idx < currentIdx) {
+                        elem.classList.add('completed');
+                    } else if (idx === currentIdx) {
+                        elem.classList.add('active');
+                    }
+                }
+            });
+        }
+
         let pollingInterval = null;
         function startPolling() {
             if (pollingInterval) clearInterval(pollingInterval);
@@ -1963,6 +2030,8 @@
                     if (progressPercent) progressPercent.innerText = `${data.progress || 0}%`;
                     if (progressBarFill) progressBarFill.style.width = `${data.progress || 0}%`;
                     if (btnSubmit) btnSubmit.disabled = true;
+
+                    updateTimelineUI(data.step || "");
                 } else if (data.status === "done") {
                     if (pollingInterval) clearInterval(pollingInterval);
                     processCard.style.display = "none";

@@ -539,7 +539,8 @@ def save_telegram_config(config: TelegramModel):
 
 # Gerenciamento de Downloads de Modelos Whisper em Background
 class ModelDownloadRequest(BaseModel):
-    model_size: str
+    model_size: str = None
+    model: str = None
 
 class YouTubePresetModel(BaseModel):
     youtube_url: str
@@ -561,14 +562,31 @@ def resolve_whisper_repo(model_size: str) -> str:
 
 
 def is_model_downloaded(model_size: str) -> bool:
-    """Verifica de forma ultra leve (no disco) se o modelo Whisper já está baixado no servidor."""
-    possible_folders = [
-        f"models--Systran--faster-whisper-{model_size}",
-        f"models--deepdml--faster-whisper-{model_size}",
-        f"models--openai--whisper-{model_size}"
-    ]
+    """Verifica nos diretórios /data/output/models/whisper/ e /root/.cache/huggingface/hub/ a presença do modelo."""
+    keywords = [model_size]
     if model_size == "large-v3-turbo":
-        possible_folders.insert(0, "models--deepdml--faster-whisper-large-v3-turbo")
+        keywords.extend(["large-v3-turbo", "turbo", "large-v3"])
+    elif model_size == "large-v2":
+        keywords.extend(["large-v2", "large"])
+    elif model_size == "medium":
+        keywords.extend(["medium"])
+
+    search_roots = ["/data/output/models/whisper", "/root/.cache/huggingface/hub"]
+    for root in search_roots:
+        if not os.path.exists(root):
+            continue
+        try:
+            entries = os.listdir(root)
+            for entry in entries:
+                entry_path = os.path.join(root, entry)
+                if os.path.isdir(entry_path) and any(kw in entry.lower() for kw in keywords):
+                    # Verificar se contém arquivos de modelo
+                    for r, dirs, files in os.walk(entry_path):
+                        if any(f in files for f in ["model.bin", "model.safetensors", "config.json", "pytorch_model.bin"]):
+                            return True
+        except Exception as e:
+            logger.warning(f"Erro ao verificar modelos em {root}: {e}")
+    return False
 
     for folder_name in possible_folders:
         model_dir = os.path.join("/data/output/models/whisper", folder_name)
@@ -644,7 +662,7 @@ def get_models_status(current_user: dict = Depends(get_current_user)):
 @app.post("/api/models/download")
 def start_model_download(req: ModelDownloadRequest, current_user: dict = Depends(get_current_user)):
     """Dispara o download do modelo Whisper selecionado em background."""
-    model_size = req.model_size
+    model_size = req.model_size or req.model
     if model_size not in model_download_status:
         raise HTTPException(status_code=400, detail="Modelo inválido.")
         
@@ -918,7 +936,7 @@ def delete_lyrics_server(current_user: dict = Depends(get_current_user)):
 
 
 
-# Sistema de Logs de Diagnóstico v3.0.2
+# Sistema de Logs de Diagnóstico v3.0.3
 DIAGNOSTIC_LOG_FILE = "/data/output/app_diagnostic.log"
 
 def log_diagnostic(message: str, level: str = "INFO"):
@@ -1610,7 +1628,7 @@ def process_karaoke(
             if state.get("status") in ["idle", "error", "done"]:
                 try:
                     processing_lock.release()
-                    logger.info("Failsafe v3.0.2: Lock de concorrência obsoleto liberado com sucesso.")
+                    logger.info("Failsafe v3.0.3: Lock de concorrência obsoleto liberado com sucesso.")
                 except Exception:
                     pass
             else:
