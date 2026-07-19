@@ -1,4 +1,5 @@
 import socket
+import subprocess
 socket.setdefaulttimeout(120)  # Timeout de 120s para impedir travamentos de socket em downloads de IA
 import os
 import uuid
@@ -40,12 +41,8 @@ USERS_FILE = "/data/users.json"
 SESSIONS_FILE = "/data/sessions.json"
 
 def load_users():
-    """Carrega a lista de usuários de /data/users.json, /data/output/users.json ou varredura em /data."""
-    possible_paths = [
-        "/data/users.json",
-        "/data/output/users.json"
-    ]
-    for path in possible_paths:
+    """Carrega a lista de usuários de /data/users.json (padrão da v2.0 e v3.0)."""
+    for path in ["/data/users.json", "/data/output/users.json"]:
         if os.path.exists(path):
             try:
                 with open(path, "r", encoding="utf-8") as f:
@@ -54,23 +51,8 @@ def load_users():
                         return data
             except Exception:
                 pass
-                
-    if os.path.exists("/data"):
-        try:
-            for root, dirs, files in os.walk("/data"):
-                if "users.json" in files:
-                    u_path = os.path.join(root, "users.json")
-                    try:
-                        with open(u_path, "r", encoding="utf-8") as f:
-                            data = json.load(f)
-                            if isinstance(data, dict):
-                                return data
-                    except Exception:
-                        pass
-        except Exception:
-            pass
-            
     return {}
+
 
 def save_users(users):
     try:
@@ -664,25 +646,32 @@ def is_model_downloaded(model_size: str) -> bool:
         os.path.expanduser("~/.cache/huggingface/hub")
     ]
 
-    targets = [model_size]
-    if model_size == "large-v3-turbo":
-        targets.extend(["turbo", "large-v3-turbo"])
-    elif model_size == "large-v3":
-        targets.extend(["large-v3", "large_v3"])
-    elif model_size == "large-v2":
-        targets.extend(["large-v2", "large_v2"])
+    # Palavras-chave EXATAS por modelo — evita falso positivo large-v3 ao buscar large-v3-turbo
+    keyword_map = {
+        "base":         ["whisper-base", "faster-whisper-base"],
+        "small":        ["whisper-small", "faster-whisper-small"],
+        "medium":       ["whisper-medium", "faster-whisper-medium"],
+        "large-v2":     ["whisper-large-v2", "faster-whisper-large-v2"],
+        "large-v3":     ["whisper-large-v3"],
+        "large-v3-turbo": ["faster-whisper-large-v3-turbo", "whisper-large-v3-turbo"],
+    }
+    targets = keyword_map.get(model_size, [model_size])
 
     for w_dir in whisper_dirs:
         if not os.path.exists(w_dir):
             continue
         try:
-            entries = os.listdir(w_dir)
-            for entry in entries:
+            for entry in os.listdir(w_dir):
                 entry_path = os.path.join(w_dir, entry)
+                if not os.path.isdir(entry_path):
+                    continue
                 entry_lower = entry.lower()
-                if os.path.isdir(entry_path) and any(t in entry_lower for t in targets):
+                # Para large-v3 (não turbo), garantir que não bate com turbo
+                if model_size == "large-v3" and "turbo" in entry_lower:
+                    continue
+                if any(t in entry_lower for t in targets):
                     for root, dirs, files in os.walk(entry_path):
-                        if files and len(files) > 0:
+                        if files:
                             return True
         except Exception:
             pass
@@ -1022,7 +1011,7 @@ def delete_lyrics_server(current_user: dict = Depends(get_current_user)):
 
 
 
-# Sistema de Logs de Diagnóstico v3.0.14
+# Sistema de Logs de Diagnóstico v3.0.15
 DIAGNOSTIC_LOG_FILE = "/data/output/app_diagnostic.log"
 
 def log_diagnostic(message: str, level: str = "INFO"):
@@ -1099,7 +1088,7 @@ class ProfileModel(BaseModel):
     keep_first_line_visible: bool = False
 
 def load_profiles() -> dict:
-    """Carrega os perfis e consolida automaticamente QUALQUER arquivo de perfil encontrado recursivamente na pasta /data."""
+    """Carrega os perfis de /data/output/profiles.json e arquivos user_*_profiles.json da v2.0."""
     default_profiles = {
         "Padrão": {
             "whisper_model": "medium",
@@ -1119,33 +1108,46 @@ def load_profiles() -> dict:
             "keep_first_line_visible": False
         }
     }
-    
+
     profiles = {}
-    DATA_DIR = "/data"
-    if os.path.exists(DATA_DIR):
+
+    # 1. Carregar o arquivo principal de perfis
+    if os.path.exists(PROFILES_FILE):
         try:
-            for root, dirs, files in os.walk(DATA_DIR):
-                for fname in files:
-                    if fname.endswith("profiles.json") or "profile" in fname.lower():
-                        p_file = os.path.join(root, fname)
-                        try:
-                            with open(p_file, "r", encoding="utf-8") as f:
-                                import json
-                                p_json = json.load(f)
-                                if isinstance(p_json, dict):
-                                    for p_name, p_val in p_json.items():
-                                        if isinstance(p_val, dict) and p_name not in profiles:
-                                            profiles[p_name] = p_val
-                        except Exception:
-                            pass
+            with open(PROFILES_FILE, "r", encoding="utf-8") as f:
+                import json
+                data = json.load(f)
+                if isinstance(data, dict):
+                    profiles = data
         except Exception as e:
-            logger.error(f"Erro ao buscar perfis na pasta /data: {e}")
+            logger.error(f"Erro ao carregar profiles.json: {e}")
+
+    # 2. Importar perfis de arquivos user_*_profiles.json da v2.0 (sem os.walk agressivo)
+    output_dir = "/data/output"
+    if os.path.exists(output_dir):
+        try:
+            for fname in os.listdir(output_dir):
+                if fname.endswith("_profiles.json") and fname != "profiles.json":
+                    p_file = os.path.join(output_dir, fname)
+                    try:
+                        with open(p_file, "r", encoding="utf-8") as f:
+                            import json
+                            p_data = json.load(f)
+                            if isinstance(p_data, dict):
+                                for p_name, p_val in p_data.items():
+                                    if isinstance(p_val, dict) and p_name not in profiles:
+                                        profiles[p_name] = p_val
+                    except Exception:
+                        pass
+        except Exception:
+            pass
 
     if not profiles:
         profiles = default_profiles
 
-    for p_name, p_data in profiles.items():
-        if not isinstance(p_data, dict): continue
+    for p_name, p_data in list(profiles.items()):
+        if not isinstance(p_data, dict):
+            continue
         if "subtitle_mode" not in p_data: p_data["subtitle_mode"] = "syllable"
         if "words_per_line" not in p_data: p_data["words_per_line"] = 0
         if "max_chars_line" not in p_data: p_data["max_chars_line"] = 40
@@ -1378,11 +1380,21 @@ def login(data: dict):
     return {"status": "success", "token": token, "username": username, "role": user_data.get("role", "user")}
 
 @app.post("/api/logout")
-def logout(x_session_token: str = Header(None)):
-    if x_session_token:
+def logout(
+    x_session_token: str = Header(None),
+    authorization: str = Header(None),
+    token: str = Query(None)
+):
+    active_token = x_session_token or token
+    if not active_token and authorization:
+        if authorization.startswith("Bearer "):
+            active_token = authorization.split(" ")[1].strip()
+        else:
+            active_token = authorization.strip()
+    if active_token:
         sessions = load_sessions()
-        if x_session_token in sessions:
-            del sessions[x_session_token]
+        if active_token in sessions:
+            del sessions[active_token]
             save_sessions(sessions)
     return {"status": "success"}
 
@@ -1436,38 +1448,31 @@ LIBRARY_DIR = "/data/library"
 
 @app.get("/api/library")
 def get_library_files(current_user: dict = Depends(get_current_user)):
-    """Realiza varredura RECURSIVA EXCLUSIVA na pasta /data para encontrar todas as mídias e históricos (v2.0 e v3.0)."""
+    """Retorna arquivos das pastas exatas da v2.0: /data/library/videos, /photos, /history."""
     result = {"videos": [], "photos": [], "history": []}
     video_exts = {'.mp4', '.mkv', '.avi', '.mp3', '.wav', '.flac', '.m4a', '.webm'}
     photo_exts = {'.jpg', '.jpeg', '.png', '.webp', '.gif'}
-    
-    DATA_DIR = "/data"
-    if not os.path.exists(DATA_DIR):
-        return result
+    SKIP_FILES = {'temp.mp4', 'bg_yt_raw.mp4', 'dummy_signal.wav', 'vocals.wav', 'instrumental.wav'}
 
-    try:
-        for root, dirs, files in os.walk(DATA_DIR):
-            for f in files:
-                if f.startswith('.') or f in ['temp.mp4', 'bg_yt_raw.mp4', 'dummy_signal.wav']:
+    # Leitura exata das pastas da v2.0 dentro de /data/library/
+    section_map = {
+        "videos": video_exts,
+        "photos": photo_exts,
+        "history": video_exts
+    }
+    for section, valid_exts in section_map.items():
+        path = os.path.join(LIBRARY_DIR, section)
+        os.makedirs(path, exist_ok=True)
+        try:
+            for f in sorted(os.listdir(path)):
+                if f.startswith('.') or f in SKIP_FILES:
                     continue
-                ext = os.path.splitext(f)[1].lower()
-                root_lower = root.lower().replace('\\', '/')
-                
-                if 'history' in root_lower or 'final' in f.lower() or 'karaoke' in f.lower():
-                    if ext in video_exts and f not in result["history"]:
-                        result["history"].append(f)
-                elif 'photos' in root_lower or 'images' in root_lower or ext in photo_exts:
-                    if ext in photo_exts and f not in result["photos"]:
-                        result["photos"].append(f)
-                elif ext in video_exts:
-                    if f not in result["videos"]:
-                        result["videos"].append(f)
-    except Exception as e:
-        logger.error(f"Erro ao realizar varredura recursiva em /data: {e}")
+                if os.path.isfile(os.path.join(path, f)):
+                    if os.path.splitext(f)[1].lower() in valid_exts:
+                        result[section].append(f)
+        except Exception as e:
+            logger.error(f"Erro ao listar {section}: {e}")
 
-    result["videos"].sort()
-    result["photos"].sort()
-    result["history"].sort()
     return result
 
 @app.post("/api/library/upload")
@@ -1796,7 +1801,7 @@ def process_karaoke(
             if state.get("status") in ["idle", "error", "done"]:
                 try:
                     processing_lock.release()
-                    logger.info("Failsafe v3.0.14: Lock de concorrência obsoleto liberado com sucesso.")
+                    logger.info("Failsafe v3.0.15: Lock de concorrência obsoleto liberado com sucesso.")
                 except Exception:
                     pass
             else:
