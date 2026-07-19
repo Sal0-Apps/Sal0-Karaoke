@@ -933,7 +933,7 @@
 
         <!-- RODAPÉ DISCRETO DA PÁGINA -->
         <footer>
-            Sal0 Karaokê v3.0.3
+            Sal0 Karaokê v3.0.4
         </footer>
 
     </div> <!-- Container End -->
@@ -1145,8 +1145,11 @@
                     "large-v2": "Large v2 (~3GB - Máxima Precisão)"
                 };
 
+                let isDownloading = false;
                 Object.keys(friendlyNames).forEach(modelKey => {
-                    const isDownloaded = models[modelKey] === true;
+                    const mInfo = models[modelKey] || {};
+                    const isDownloaded = mInfo.status === 'done' || models[modelKey] === true;
+                    if (mInfo.status === 'downloading') isDownloading = true;
                     const card = document.createElement('div');
                     card.style.background = "rgba(0,0,0,0.25)";
                     card.style.border = "1px solid var(--glass-border)";
@@ -1173,6 +1176,7 @@
                     `;
                     container.appendChild(card);
                 });
+                if (isDownloading) setTimeout(fetchModelsStatus, 3000);
             } catch (e) {
                 console.error("Erro ao carregar modelos:", e);
             }

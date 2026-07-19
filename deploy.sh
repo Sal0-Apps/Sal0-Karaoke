@@ -5,9 +5,9 @@
 # ==============================================================================
 
 # ⚙️ DADOS DO AUTOR
-GIT_AUTHOR_NAME="VictorS4l0"
-GIT_AUTHOR_EMAIL="victormordecai@gmail.com"
-GITHUB_USER="VictorS4l0"
+GIT_AUTHOR_NAME="${GIT_AUTHOR_NAME:-Sal0-Dev}"
+GIT_AUTHOR_EMAIL="${GIT_AUTHOR_EMAIL:-sal0-dev@example.com}"
+GITHUB_USER="${GITHUB_USER:-Sal0-Apps}"
 
 # Tenta restaurar permissões da pasta .git se esteve sob posse do root
 sudo chown -R $USER:$USER . 2>/dev/null || true

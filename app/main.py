@@ -555,56 +555,52 @@ model_download_status = {
 }
 
 def resolve_whisper_repo(model_size: str) -> str:
-    """Mapeia nomes amigáveis para repositórios oficiais do Hugging Face."""
-    if model_size == "large-v3-turbo":
-        return "deepdml/faster-whisper-large-v3-turbo"
-    return model_size
-
+    """Mapeia nomes amigáveis de modelos para repositórios oficiais Hugging Face."""
+    mapping = {
+        "base": "Systran/faster-whisper-base",
+        "small": "Systran/faster-whisper-small",
+        "medium": "Systran/faster-whisper-medium",
+        "large-v3-turbo": "deepdml/faster-whisper-large-v3-turbo",
+        "large-v2": "Systran/faster-whisper-large-v2",
+        "large-v3": "Systran/faster-whisper-large-v3"
+    }
+    return mapping.get(model_size, model_size)
 
 def is_model_downloaded(model_size: str) -> bool:
-    """Verifica nos diretórios /data/output/models/whisper/ e /root/.cache/huggingface/hub/ a presença do modelo."""
-    keywords = [model_size]
-    if model_size == "large-v3-turbo":
-        keywords.extend(["large-v3-turbo", "turbo", "large-v3"])
-    elif model_size == "large-v2":
+    """Verifica nos diretórios locais se o modelo Whisper já foi baixado."""
+    key = model_size.lower().strip()
+    keywords = [key]
+    if key == "large-v3-turbo":
+        keywords.extend(["large-v3-turbo", "turbo"])
+    elif key == "large-v2":
         keywords.extend(["large-v2", "large"])
-    elif model_size == "medium":
+    elif key == "medium":
         keywords.extend(["medium"])
 
-    search_roots = ["/data/output/models/whisper", "/root/.cache/huggingface/hub"]
+    search_roots = [
+        "/data/output/models/whisper",
+        "/root/.cache/huggingface/hub",
+        "/root/.cache/whisper",
+        os.path.expanduser("~/.cache/huggingface/hub"),
+        os.path.expanduser("~/.cache/whisper")
+    ]
+
     for root in search_roots:
         if not os.path.exists(root):
             continue
         try:
-            entries = os.listdir(root)
-            for entry in entries:
+            for entry in os.listdir(root):
                 entry_path = os.path.join(root, entry)
                 if os.path.isdir(entry_path) and any(kw in entry.lower() for kw in keywords):
-                    # Verificar se contém arquivos de modelo
                     for r, dirs, files in os.walk(entry_path):
-                        if any(f in files for f in ["model.bin", "model.safetensors", "config.json", "pytorch_model.bin"]):
+                        if any(f in files for f in ["model.bin", "model.safetensors", "config.json", "pytorch_model.bin", "model.pt"]):
                             return True
         except Exception as e:
             logger.warning(f"Erro ao verificar modelos em {root}: {e}")
     return False
 
-    for folder_name in possible_folders:
-        model_dir = os.path.join("/data/output/models/whisper", folder_name)
-        if os.path.isdir(model_dir):
-            snapshots_dir = os.path.join(model_dir, "snapshots")
-            if os.path.isdir(snapshots_dir):
-                try:
-                    subdirs = [os.path.join(snapshots_dir, d) for d in os.listdir(snapshots_dir) if os.path.isdir(os.path.join(snapshots_dir, d))]
-                    for s_dir in subdirs:
-                        files = os.listdir(s_dir)
-                        if any(f in files for f in ["model.bin", "model.safetensors", "config.json"]):
-                            return True
-                except Exception:
-                    pass
-    return False
-
 def download_model_worker(model_size: str):
-    """Worker em background para baixar o modelo Whisper e liberar a RAM logo em seguida."""
+    """Worker em background para baixar o modelo Whisper e liberar a RAM."""
     try:
         from faster_whisper import WhisperModel
         import gc
@@ -612,32 +608,34 @@ def download_model_worker(model_size: str):
         model_download_status[model_size]["status"] = "downloading"
         model_download_status[model_size]["progress"] = 30
         
-        # Faz o download oficial com fallback para repo ID completo
-        target_name = "deepdml/faster-whisper-large-v3-turbo" if model_size == "large-v3-turbo" else model_size
+        repo_id = resolve_whisper_repo(model_size)
+        save_dir = "/data/output/models/whisper"
+        os.makedirs(save_dir, exist_ok=True)
+        
         try:
+            logger.info(f"Baixando repositório {repo_id} em {save_dir}...")
             model = WhisperModel(
-                target_name,
+                repo_id,
                 device="cpu",
                 compute_type="int8",
-                download_root="/data/output/models/whisper",
-                local_files_only=False
+                download_root=save_dir
             )
-        except Exception:
+            del model
+            gc.collect()
+        except Exception as e1:
+            logger.warning(f"Tentativa com {repo_id} retornou: {e1}, tentando {model_size}...")
             model = WhisperModel(
                 model_size,
                 device="cpu",
                 compute_type="int8",
-                download_root="/data/output/models/whisper",
-                local_files_only=False
+                download_root=save_dir
             )
-        
-        # Desaloca imediatamente para liberar os GBs de RAM que foram baixados
-        del model
-        gc.collect()
-        
+            del model
+            gc.collect()
+            
         model_download_status[model_size]["status"] = "done"
         model_download_status[model_size]["progress"] = 100
-        logger.info(f"Download do modelo Whisper {model_size} concluído com sucesso e RAM liberada!")
+        logger.info(f"Download do modelo Whisper {model_size} concluído com sucesso!")
     except Exception as ex:
         logger.error(f"Erro ao baixar modelo {model_size}: {ex}")
         model_download_status[model_size]["status"] = "error"
@@ -936,7 +934,7 @@ def delete_lyrics_server(current_user: dict = Depends(get_current_user)):
 
 
 
-# Sistema de Logs de Diagnóstico v3.0.3
+# Sistema de Logs de Diagnóstico v3.0.4
 DIAGNOSTIC_LOG_FILE = "/data/output/app_diagnostic.log"
 
 def log_diagnostic(message: str, level: str = "INFO"):
@@ -1628,7 +1626,7 @@ def process_karaoke(
             if state.get("status") in ["idle", "error", "done"]:
                 try:
                     processing_lock.release()
-                    logger.info("Failsafe v3.0.3: Lock de concorrência obsoleto liberado com sucesso.")
+                    logger.info("Failsafe v3.0.4: Lock de concorrência obsoleto liberado com sucesso.")
                 except Exception:
                     pass
             else:
