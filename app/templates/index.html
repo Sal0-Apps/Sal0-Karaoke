@@ -708,7 +708,8 @@
                         <div class="form-group" style="margin-top: 1rem;">
                             <span class="label">📝 Letra Personalizada (Opcional - Guia do Whisper)</span>
                             <textarea id="lyricsText" name="lyrics_text" placeholder="Cole a letra oficial da música aqui se desejar forçar a sincronização correta..." class="input-text" style="height: 90px; resize: vertical;"></textarea>
-                            <div style="display: flex; gap: 0.5rem; margin-top: 0.3rem;">
+                            <div id="lyricsBadge" style="display: none; margin-top: 0.4rem; background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.3); color: #34d399; padding: 0.4rem 0.7rem; border-radius: 8px; font-size: 0.78rem; font-weight: 600;"></div>
+                            <div style="display: flex; gap: 0.5rem; margin-top: 0.4rem;">
                                 <button type="button" id="btnSaveLyrics" class="btn-secondary" style="font-size: 0.75rem;">💾 Salvar Letra</button>
                                 <button type="button" id="btnClearLyrics" class="btn-secondary" style="font-size: 0.75rem; color: #fca5a5;">🗑️ Limpar Letra</button>
                             </div>
@@ -971,7 +972,7 @@
 
         <!-- RODAPÉ DISCRETO DA PÁGINA -->
         <footer>
-            Sal0 Karaokê v3.5.4
+            Sal0 Karaokê v3.5.5
         </footer>
 
     </div> <!-- Container End -->
@@ -1805,6 +1806,38 @@
             }
 
             // Salvar e Deletar Perfis (Nas Opções Avançadas)
+            
+            // Handlers de Salvar e Limpar Letra Personalizada
+            const btnSaveLyrics = document.getElementById('btnSaveLyrics');
+            const btnClearLyrics = document.getElementById('btnClearLyrics');
+            const lyricsText = document.getElementById('lyricsText');
+            const lyricsBadge = document.getElementById('lyricsBadge');
+
+            if (btnSaveLyrics) {
+                btnSaveLyrics.onclick = () => {
+                    const txt = lyricsText ? lyricsText.value.trim() : '';
+                    if (!txt) {
+                        alert("Digite ou cole a letra da música antes de salvar.");
+                        if (lyricsBadge) lyricsBadge.style.display = 'none';
+                        return;
+                    }
+                    const wordCount = txt.split(/\s+/).filter(Boolean).length;
+                    if (lyricsBadge) {
+                        lyricsBadge.innerText = `✓ Letra salva com sucesso! (${wordCount} palavras prontas para guiar o Whisper AI)`;
+                        lyricsBadge.style.display = 'block';
+                    }
+                    alert(`✓ Letra salva com sucesso (${wordCount} palavras)! Ela será enviada ao Whisper AI como guia para a sincronização.`);
+                };
+            }
+
+            if (btnClearLyrics) {
+                btnClearLyrics.onclick = () => {
+                    if (lyricsText) lyricsText.value = '';
+                    if (lyricsBadge) lyricsBadge.style.display = 'none';
+                };
+            }
+
+
             const btnSaveProfile = document.getElementById('btnSaveProfile');
             if (btnSaveProfile) {
                 btnSaveProfile.onclick = async () => {
