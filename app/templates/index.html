@@ -409,7 +409,7 @@
             to { opacity: 1; transform: translateY(0); }
         }
 
-        /* Novas Classes para Abas e Responsividade Mobile v3.0.0 */
+        /* Novas Classes para Abas e Responsividade Mobile v3.0.1 */
         .tab-btn {
             background: transparent;
             color: var(--text-muted);
@@ -507,7 +507,7 @@
             }
         }
 
-        /* ===== MODAIS RESPONSIVOS v3.0.0 ===== */
+        /* ===== MODAIS RESPONSIVOS v3.0.1 ===== */
         [id$="Modal"] > div,
         #helpModal > div,
         #correctionConfirmModal > div,
@@ -525,7 +525,7 @@
         #authOverlay > div#setupCard { width: min(420px, 95vw) !important; }
 
     
-        /* ===== STYLES RESPONSIVOS v3.0.0 DEFINITIVOS ===== */
+        /* ===== STYLES RESPONSIVOS v3.0.1 DEFINITIVOS ===== */
         html, body {
             overflow-x: hidden !important;
             max-width: 100vw !important;
@@ -616,7 +616,7 @@
         }
 
 
-        /* ===== TYPOGRAPHY E CONTRASTE MOBILE v3.0.0 ===== */
+        /* ===== TYPOGRAPHY E CONTRASTE MOBILE v3.0.1 ===== */
         @media (max-width: 600px) {
             h1#appTitle {
                 font-size: 1.45rem !important;
@@ -644,13 +644,14 @@
                 <p style="margin: 0; font-size: 0.85rem; color: var(--text-muted);">Separação de áudio e geração de vídeos de karaokê locais via IA</p>
             </div>
         </header>
-        <!-- Barra de Abas e Controles do Cabeçalho v3.0.0 -->
+        <!-- Barra de Abas e Controles do Cabeçalho v3.0.1 -->
         <div style="display: flex; gap: 0.8rem; align-items: center; margin-bottom: 1.5rem; justify-content: space-between; flex-wrap: wrap; width: 100%;">
             <div class="tabs-nav" style="display: flex; gap: 0.4rem; background: rgba(255, 255, 255, 0.03); border: 1px solid var(--glass-border); padding: 0.35rem; border-radius: 12px; flex: 1; max-width: 440px; margin: 0;">
                 <button type="button" id="tabBtnCreate" class="tab-btn active" style="flex: 1; padding: 0.65rem; border-radius: 8px; border: none; font-weight: 700; font-size: 0.85rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.4rem; transition: all 0.2s;">🎙️ Criar Karaokê</button>
                 <button type="button" id="tabBtnLibrary" class="tab-btn" style="flex: 1; padding: 0.65rem; border-radius: 8px; border: none; font-weight: 700; font-size: 0.85rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.4rem; transition: all 0.2s;">📚 Biblioteca & Histórico</button>
             </div>
-            <div style="display: flex; gap: 0.4rem; align-items: center; flex-wrap: wrap;">
+            <div style="display: flex; gap: 0.4rem; align-items: center; flex-wrap: wrap;" class="header-tools-row">
+                <button type="button" class="btn-secondary" id="btnHeaderActiveMedia" title="Ver Mídia Selecionada para Produção" style="background: rgba(139, 92, 246, 0.15); border-color: rgba(139, 92, 246, 0.35); color: #c084fc; font-weight: 600; padding: 0.45rem 0.7rem; border-radius: 10px; font-size: 0.78rem; cursor: pointer;">[NOTE] Mídia Ativa: <span id="headerActiveMediaText" style="margin-left: 0.2rem; font-weight: 500; color: #e9d5ff;">Nenhuma</span></button>
                 <span style="font-size: 0.78rem; color: var(--text-muted); font-weight: 500;">Perfil:</span>
                 <select id="profileSelect" class="btn-secondary" style="border: 1px solid var(--glass-border); padding: 0.45rem 0.65rem; background: #141226; color: var(--text-main); border-radius: 10px; cursor: pointer; outline: none; font-size: 0.78rem; font-weight: 600;">
                     <!-- Preenchido via JS -->
@@ -672,7 +673,7 @@
 
         <div id="createTabContent">        <!-- Formulário de Processamento -->
         <form id="karaokêForm">
-            <!-- Banner de Mídia Ativa Selecionada v3.0.0 -->
+            <!-- Banner de Mídia Ativa Selecionada v3.0.1 -->
             <div id="activeMediaBanner" style="background: rgba(139, 92, 246, 0.12); border: 1px solid rgba(139, 92, 246, 0.3); border-radius: 14px; padding: 0.9rem 1.2rem; margin-bottom: 1.2rem; display: flex; align-items: center; justify-content: space-between; gap: 0.8rem; flex-wrap: wrap; box-shadow: 0 4px 16px rgba(0,0,0,0.2);">
                 <div style="display: flex; align-items: center; gap: 0.75rem;">
                     <span id="activeMediaIcon" style="font-size: 1.6rem;">🎵</span>
@@ -989,15 +990,32 @@
             <button type="submit" class="btn-primary" id="btnSubmit" style="margin-top: 1.5rem;">🎬 Criar Vídeo Karaokê</button>
         </form>
 
-        <!-- Painel de Status / Progresso -->
+        <!-- Painel de Status / Progresso (Modo Foco v3.0.1) -->
         <div class="process-card" id="processCard">
-            <div class="progress-container">
-                <div class="progress-info">
-                    <span id="statusMessage">Iniciando processamento...</span>
-                    <span id="progressPercent">0%</span>
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem;">
+                <span style="font-weight: 700; font-size: 0.95rem; color: #c084fc;">⚡ Produção em Andamento (Modo Foco)</span>
+                <button type="button" id="btnToggleFormView" class="btn-secondary" style="font-size: 0.75rem; padding: 0.3rem 0.65rem; background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.2); cursor: pointer; border-radius: 8px;">👁️ Mostrar Formulário</button>
+            </div>
+
+            <!-- Barra 1: Progresso Geral do Karaokê -->
+            <div style="margin-bottom: 0.8rem;">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 0.3rem;">
+                    <span style="font-size: 0.8rem; font-weight: 600; color: var(--text-muted);">Progresso Geral (Todas as Etapas)</span>
+                    <span id="progressPercent" style="font-size: 0.82rem; font-weight: 700; color: #c084fc;">0%</span>
                 </div>
-                <div class="progress-bar-bg">
-                    <div class="progress-bar-fill" id="progressBarFill"></div>
+                <div class="progress-bar-bg" style="height: 10px; margin-bottom: 0.5rem;">
+                    <div class="progress-bar-fill" id="progressBarFill" style="width: 0%; background: linear-gradient(90deg, #8b5cf6 0%, #ec4899 100%);"></div>
+                </div>
+            </div>
+
+            <!-- Barra 2: Progresso da Etapa Atual em Tempo Real -->
+            <div style="margin-bottom: 1.5rem; background: rgba(0,0,0,0.2); padding: 0.75rem; border-radius: 10px; border: 1px solid rgba(255,255,255,0.05);">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 0.3rem;">
+                    <span id="statusMessage" style="font-size: 0.82rem; font-weight: 600; color: #34d399;">Etapa Atual: Iniciando...</span>
+                    <span id="stepProgressPercent" style="font-size: 0.82rem; font-weight: 700; color: #34d399;">0%</span>
+                </div>
+                <div class="progress-bar-bg" style="height: 8px;">
+                    <div class="progress-bar-fill" id="stepProgressBarFill" style="width: 0%; background: linear-gradient(90deg, #10b981 0%, #3b82f6 100%);"></div>
                 </div>
             </div>
 
@@ -1192,7 +1210,7 @@
 
         <!-- Rodapé com Versão Oculta -->
         <footer style="text-align: center; margin-top: 3rem; margin-bottom: 1.5rem; font-size: 0.72rem; color: rgba(255,255,255,0.18); font-weight: 500; letter-spacing: 0.05em;">
-            Sal0 Karaokê v3.0.0 &copy; 2026
+            Sal0 Karaokê v3.0.1 &copy; 2026
         </footer>
         </div>
 
@@ -1244,7 +1262,7 @@
                     <p style="margin-bottom: 0.8rem; color: var(--text-muted);">Preencha o Token do Bot e ID do Chat para receber o progresso detalhado de renderização e **receber o vídeo MP4 final diretamente** no seu canal ou grupo do Telegram assim que concluído.</p>
                     
                     <h4 style="color: #60a5fa; margin-top: 1rem; margin-bottom: 0.3rem;">6. Biblioteca de Mídias & YouTube</h4>
-                    <p style="margin-bottom: 0.8rem; color: var(--text-muted);">A partir da v3.0.0, você pode salvar arquivos permanentemente em <code>/data/library/</code> (organizados em Músicas, Fundo e Histórico), carregar links do YouTube (o servidor baixa via yt-dlp) e usar vídeos de plano de fundo em loop ou cortados no tempo do áudio instrumental.</p>
+                    <p style="margin-bottom: 0.8rem; color: var(--text-muted);">A partir da v3.0.1, você pode salvar arquivos permanentemente em <code>/data/library/</code> (organizados em Músicas, Fundo e Histórico), carregar links do YouTube (o servidor baixa via yt-dlp) e usar vídeos de plano de fundo em loop ou cortados no tempo do áudio instrumental.</p>
                 </div>
                 
                 <button type="button" id="btnHelpDismiss" class="btn-success" style="margin-top: 1.2rem; width: 100%; padding: 0.7rem; border-radius: 8px; font-weight: 600; cursor: pointer; outline: none; border: 1px solid rgba(16, 185, 129, 0.3);">Entendi</button>
@@ -1666,7 +1684,7 @@
             bgBadge.style.display = "inline-flex";
         }
 
-        // ── Botões de Salvar / Limpar a Letra (Servidor + LocalStorage v3.0.0) ───────────
+        // ── Botões de Salvar / Limpar a Letra (Servidor + LocalStorage v3.0.1) ───────────
         const lyricsText = document.getElementById('lyricsText');
         const btnSaveLyrics = document.getElementById('btnSaveLyrics');
         const btnClearLyrics = document.getElementById('btnClearLyrics');
@@ -1733,7 +1751,7 @@
         }
         // ──────────────────────────────────────────────────────────────────────
 
-        // Envio do formulário via AJAX v3.0.0
+        // Envio do formulário via AJAX v3.0.1
         form.addEventListener('submit', (e) => {
             e.preventDefault();
             
@@ -2891,7 +2909,7 @@ window.addEventListener('DOMContentLoaded', async () => {
             if (pollingInterval) clearInterval(pollingInterval);
         }
 
-        // --- CÓDIGO DA BIBLIOTECA & PREVIEW AVANÇADO v3.0.0 ---
+        // --- CÓDIGO DA BIBLIOTECA & PREVIEW AVANÇADO v3.0.1 ---
         const tabBtnCreate = document.getElementById('tabBtnCreate');
         const tabBtnLibrary = document.getElementById('tabBtnLibrary');
         const createTabContent = document.getElementById('createTabContent');
@@ -2912,7 +2930,7 @@ window.addEventListener('DOMContentLoaded', async () => {
             loadLibrary();
         });
 
-        // Alternador de sub-modos (Upload / YouTube) para Música v3.0.0
+        // Alternador de sub-modos (Upload / YouTube) para Música v3.0.1
         const btnAudioModeUpload = document.getElementById('btnAudioModeUpload');
         const btnAudioModeYoutube = document.getElementById('btnAudioModeYoutube');
         const audioUploadContainer = document.getElementById('audioUploadContainer');
@@ -2992,7 +3010,7 @@ window.addEventListener('DOMContentLoaded', async () => {
 
         // btnAudioModeLibrary removido do form
 
-        // Alternador de sub-modos (Upload / YouTube / Biblioteca) para Fundo v3.0.0
+        // Alternador de sub-modos (Upload / YouTube / Biblioteca) para Fundo v3.0.1
         const btnBgModeUpload = document.getElementById('btnBgModeUpload');
         const btnBgModeYoutube = document.getElementById('btnBgModeYoutube');
         const btnBgModeLibrary = document.getElementById('btnBgModeLibrary');
@@ -3208,10 +3226,122 @@ window.addEventListener('DOMContentLoaded', async () => {
         };
 
         
-        // ── SISTEMA DE FONTE ÚNICA DE VERDADE PARA MÍDIA DE ÁUDIO v3.0.0 ──────
+        // ── SISTEMA DE FONTE ÚNICA DE VERDADE PARA MÍDIA DE ÁUDIO v3.0.1 ──────
         let currentAudioSource = { type: 'none', title: '', value: '' };
 
-        function setAudioSource(type, data) {
+        
+        // Lógica do Modo Foco v3.0.1 (Ocultar Formulário durante o Processamento)
+        let isFormForcedVisible = false;
+
+        const btnToggleFormView = document.getElementById('btnToggleFormView');
+        if (btnToggleFormView) {
+            btnToggleFormView.addEventListener('click', () => {
+                const formCard = document.getElementById('karaokêForm');
+                if (!formCard) return;
+                if (formCard.style.display === 'none' || formCard.style.display === '') {
+                    formCard.style.display = 'block';
+                    btnToggleFormView.innerText = '🙈 Ocultar Formulário';
+                    isFormForcedVisible = true;
+                } else {
+                    formCard.style.display = 'none';
+                    btnToggleFormView.innerText = '👁️ Mostrar Formulário';
+                    isFormForcedVisible = false;
+                }
+            });
+        }
+
+        // Modal de Mídia Ativa no Cabeçalho
+        const btnHeaderActiveMedia = document.getElementById('btnHeaderActiveMedia');
+        const activeMediaModal = document.getElementById('activeMediaModal');
+        const btnCloseActiveMediaModal = document.getElementById('btnCloseActiveMediaModal');
+        const btnConfirmActiveMediaModal = document.getElementById('btnConfirmActiveMediaModal');
+
+        if (btnHeaderActiveMedia && activeMediaModal) {
+            btnHeaderActiveMedia.addEventListener('click', () => {
+                activeMediaModal.style.display = 'flex';
+            });
+        }
+        if (btnCloseActiveMediaModal) {
+            btnCloseActiveMediaModal.addEventListener('click', () => {
+                activeMediaModal.style.display = 'none';
+            });
+        }
+        if (btnConfirmActiveMediaModal) {
+            btnConfirmActiveMediaModal.addEventListener('click', () => {
+                activeMediaModal.style.display = 'none';
+            });
+        }
+
+        // Atualizador da Mídia Ativa no Cabeçalho e no Modal
+        function syncActiveMediaHeader(title, source) {
+            const headerText = document.getElementById('headerActiveMediaText');
+            const modalTitle = document.getElementById('modalActiveMediaTitle');
+            const modalSource = document.getElementById('modalActiveMediaSource');
+            
+            if (headerText) headerText.innerText = title ? (title.length > 22 ? title.substring(0, 22) + '...' : title) : 'Nenhuma';
+            if (modalTitle) modalTitle.innerText = title || 'Nenhuma mídia selecionada';
+            if (modalSource) modalSource.innerText = source || 'Nenhuma';
+        }
+
+        // Listener para mudanças no select de áudio da biblioteca
+        const libraryAudioSelect = document.getElementById('libraryAudioSelect');
+        if (libraryAudioSelect) {
+            libraryAudioSelect.addEventListener('change', () => {
+                const selectedVal = libraryAudioSelect.value;
+                if (selectedVal) {
+                    const libHidden = document.getElementById('libraryAudioHidden');
+                    if (libHidden) libHidden.value = selectedVal;
+                    setAudioSource('library', selectedVal);
+                }
+            });
+        }
+
+        // Evento de Download do Vídeo Resultante via /api/download
+        const btnDownloadResultFix = document.getElementById('btnDownloadResult');
+        if (btnDownloadResultFix) {
+            btnDownloadResultFix.onclick = async () => {
+                try {
+                    const res = await authFetch('/api/download');
+                    if (!res.ok) throw new Error("Erro ao baixar o vídeo.");
+                    const blob = await res.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'sal0_karaoke_video_final.mp4';
+                    document.body.appendChild(a);
+                    a.click();
+                    a.remove();
+                    window.URL.revokeObjectURL(url);
+                } catch (err) {
+                    alert("Erro ao baixar vídeo: " + err.message);
+                }
+            };
+        }
+
+        // Evento de Download dos Logs via /api/logs/download
+        const btnDownloadLogsFix = document.getElementById('btnDownloadLogs');
+        if (btnDownloadLogsFix) {
+            btnDownloadLogsFix.onclick = async () => {
+                try {
+                    const res = await authFetch('/api/logs/download');
+                    if (!res.ok) throw new Error("Erro ao baixar logs de diagnóstico.");
+                    const blob = await res.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'sal0_karaoke_diagnostic_logs.txt';
+                    document.body.appendChild(a);
+                    a.click();
+                    a.remove();
+                    window.URL.revokeObjectURL(url);
+                } catch (err) {
+                    alert("Erro ao baixar logs: " + err.message);
+                }
+            };
+        }
+
+
+function setAudioSource(type, data) {
             const hiddenLib = document.getElementById('libraryAudioHidden');
             const ytInput = document.getElementById('youtubeUrl');
             const audioFileInput = document.getElementById('audioFile');
@@ -3473,5 +3603,29 @@ window.addEventListener('DOMContentLoaded', async () => {
             }
         });
     </script>
+
+    <!-- Modal de Detalhes da Mídia Ativa (v3.0.1) -->
+    <div id="activeMediaModal" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.75); z-index: 9999; justify-content: center; align-items: center; backdrop-filter: blur(4px);">
+        <div style="background: #141226; border: 1px solid var(--glass-border); border-radius: 16px; padding: 1.5rem; width: 90vw; max-width: 460px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                <h3 style="margin: 0; font-size: 1.1rem; color: #c084fc; display: flex; align-items: center; gap: 0.4rem;">[NOTE] Mídia Selecionada para a Produção</h3>
+                <button type="button" id="btnCloseActiveMediaModal" style="background: none; border: none; color: var(--text-muted); font-size: 1.2rem; cursor: pointer;">✕</button>
+            </div>
+            <div style="background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.05); padding: 1rem; border-radius: 12px; margin-bottom: 1.2rem;">
+                <div style="margin-bottom: 0.8rem;">
+                    <span style="font-size: 0.72rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase;">Título do Áudio/Música:</span>
+                    <p id="modalActiveMediaTitle" style="margin: 0.2rem 0 0 0; font-size: 0.95rem; font-weight: 700; color: #ffffff; word-break: break-word;">Nenhuma mídia selecionada</p>
+                </div>
+                <div>
+                    <span style="font-size: 0.72rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase;">Origem da Mídia:</span>
+                    <span id="modalActiveMediaSource" style="display: inline-block; margin-top: 0.2rem; background: rgba(139, 92, 246, 0.2); color: #c084fc; padding: 0.25rem 0.6rem; border-radius: 6px; font-size: 0.8rem; font-weight: 600;">Nenhuma</span>
+                </div>
+            </div>
+            <div style="text-align: right;">
+                <button type="button" class="btn-primary" id="btnConfirmActiveMediaModal" style="padding: 0.5rem 1.2rem; font-size: 0.85rem;">OK</button>
+            </div>
+        </div>
+    </div>
+
 </body>
 </html>

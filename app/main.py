@@ -965,7 +965,7 @@ def delete_lyrics_server(current_user: dict = Depends(get_current_user)):
 
 
 
-# Sistema de Logs de Diagnóstico v3.0.0
+# Sistema de Logs de Diagnóstico v3.0.1
 DIAGNOSTIC_LOG_FILE = "/data/output/app_diagnostic.log"
 
 def log_diagnostic(message: str, level: str = "INFO"):
@@ -1676,7 +1676,7 @@ def process_karaoke(
             if state.get("status") in ["idle", "error", "done"]:
                 try:
                     processing_lock.release()
-                    logger.info("Failsafe v3.0.0: Lock de concorrência obsoleto liberado com sucesso.")
+                    logger.info("Failsafe v3.0.1: Lock de concorrência obsoleto liberado com sucesso.")
                 except Exception:
                     pass
             else:
