@@ -578,8 +578,23 @@
                         </div>
                     </div>
 
-                    <!-- Opções Avançadas Expansíveis -->
+                    <!-- OPÇÕES AVANÇADAS EXPANSÍVEIS -->
                     <div id="advancedContent" style="display: none; margin-top: 1.2rem; padding-top: 1.2rem; border-top: 1px solid var(--glass-border);">
+                        
+                        <!-- SEÇÃO DE SALVAR E GERENCIAR PERFIS (DENTRO DAS OPÇÕES AVANÇADAS) -->
+                        <div style="background: rgba(0,0,0,0.2); border: 1px solid var(--glass-border); padding: 1rem; border-radius: var(--radius-md); margin-bottom: 1.2rem;">
+                            <span class="label" style="font-size: 0.88rem; color: #fff; margin-bottom: 0.6rem;">💾 Salvar / Gerenciar Novo Perfil de Ajustes</span>
+                            <div class="form-grid">
+                                <div class="form-group">
+                                    <input type="text" id="newProfileName" placeholder="Nome do perfil (Ex: Festas Anos 80)" class="input-text">
+                                </div>
+                                <div style="display: flex; gap: 0.5rem; align-items: flex-end;">
+                                    <button type="button" id="btnSaveProfile" class="btn-primary" style="height: 38px;">💾 Salvar Perfil</button>
+                                    <button type="button" id="btnDeleteProfile" class="btn-secondary" style="height: 38px; color: #fca5a5;">🗑️ Excluir</button>
+                                </div>
+                            </div>
+                        </div>
+
                         <div class="form-grid">
                             <div class="form-group">
                                 <span class="label">Posição do Texto</span>
@@ -731,23 +746,6 @@
         <!-- ABA 2: AJUSTES & CONFIGURAÇÕES -->
         <!-- ============================================================= -->
         <div id="settingsTabContent" style="display: none;">
-            <!-- Perfis de Legenda -->
-            <div class="card">
-                <div class="card-header">
-                    <span class="card-title">⚙️ Salvar / Gerenciar Perfis de Legenda</span>
-                </div>
-                <div class="form-grid">
-                    <div class="form-group">
-                        <span class="label">Nome do Perfil</span>
-                        <input type="text" id="newProfileName" placeholder="Ex: Meu Perfil Festas" class="input-text">
-                    </div>
-                    <div style="display: flex; gap: 0.5rem; align-items: flex-end;">
-                        <button type="button" id="btnSaveProfile" class="btn-primary" style="height: 38px;">💾 Salvar Perfil</button>
-                        <button type="button" id="btnDeleteProfile" class="btn-secondary" style="height: 38px; color: #fca5a5;">🗑️ Excluir Perfil</button>
-                    </div>
-                </div>
-            </div>
-
             <!-- Gerenciador de Modelos Whisper -->
             <div class="card">
                 <div class="card-header">
@@ -851,10 +849,10 @@
         </div>
 
         <!-- ============================================================= -->
-        <!-- ABA 3: BIBLIOTECA & HISTÓRICO (DESIGN E ESTRUTURA 100% v3.0.1) -->
+        <!-- ABA 3: BIBLIOTECA & HISTÓRICO (DESIGN E ESTRUTURA 100% v2.2.4) -->
         <!-- ============================================================= -->
         <div id="libraryTabContent" style="display: none; flex-direction: column; gap: 1.5rem;">
-            <!-- Grid de Envio Rápido para a Biblioteca (v3.0.1) -->
+            <!-- Grid de Envio Rápido para a Biblioteca (v2.2.4) -->
             <div style="background: rgba(30, 27, 57, 0.4); border: 1px solid var(--glass-border); padding: 1.2rem; border-radius: 12px; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr)); gap: 1rem;">
                 <div>
                     <h4 style="margin: 0 0 0.5rem 0; font-size: 0.9rem; color: #fff;">➕ Adicionar Mídia de Áudio/Vídeo</h4>
@@ -878,7 +876,7 @@
                 </div>
             </div>
 
-            <!-- Seção 1: Músicas e Vídeos Originais (v3.0.1) -->
+            <!-- Seção 1: Músicas e Vídeos Originais (v2.2.4) -->
             <div class="card" style="margin: 0;">
                 <div class="card-header">
                     <span class="card-title">🎵 Músicas & Vídeos Originais</span>
@@ -888,7 +886,7 @@
                 </div>
             </div>
 
-            <!-- Seção 2: Imagens e Vídeos de Fundo (v3.0.1) -->
+            <!-- Seção 2: Imagens e Vídeos de Fundo (v2.2.4) -->
             <div class="card" style="margin: 0;">
                 <div class="card-header">
                     <span class="card-title">🖼️ Imagens & Vídeos de Fundo</span>
@@ -898,7 +896,7 @@
                 </div>
             </div>
 
-            <!-- Seção 3: Karaokês Renderizados no Histórico (v3.0.1) -->
+            <!-- Seção 3: Karaokês Renderizados no Histórico (v2.2.4) -->
             <div class="card" style="margin: 0;">
                 <div class="card-header">
                     <span class="card-title">🎬 Karaokês Renderizados no Histórico</span>
@@ -911,22 +909,39 @@
 
         <!-- RODAPÉ DISCRETO DA PÁGINA -->
         <footer>
-            Sal0 Karaokê v3.0.1
+            Sal0 Karaokê v3.0.2
         </footer>
 
     </div> <!-- Container End -->
 
-    <!-- MODAL MANUAL / AJUDA -->
+    <!-- MODAL MANUAL E TUTORIAL PARA INICIANTES -->
     <div id="helpModal" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(10,9,20,0.9); backdrop-filter: blur(12px); z-index: 9999; justify-content: center; align-items: center; padding: 1rem;">
-        <div style="background: #141226; border: 1px solid var(--glass-border); border-radius: 20px; padding: 2rem; max-width: 600px; width: 100%; max-height: 85vh; overflow-y: auto;">
-            <h3 style="color: #fff; margin-bottom: 1rem;">📖 Manual & Dicas do Sal0 Karaokê</h3>
-            <p style="font-size: 0.85rem; color: var(--text-muted); line-height: 1.6; margin-bottom: 1rem;">
-                1. <b>Upload de Áudio/Vídeo:</b> Envie qualquer arquivo de música ou vídeo original.<br>
-                2. <b>Imagens e Vídeos de Fundo:</b> Você pode personalizar o vídeo final usando fundos personalizados ou deixá-los em loop.<br>
-                3. <b>Whisper AI:</b> A inteligência artificial transcreve a letra com carimbo de tempo automático.<br>
-                4. <b>Biblioteca:</b> Arquivos salvos na biblioteca ficam disponíveis no servidor para reuso rápido.
-            </p>
-            <button type="button" id="btnCloseHelpModal" class="btn-primary" style="margin-top: 1rem;">Entendido</button>
+        <div style="background: #141226; border: 1px solid var(--glass-border); border-radius: 20px; padding: 1.8rem; max-width: 620px; width: 100%; max-height: 85vh; overflow-y: auto;">
+            <h3 style="color: #fff; margin-bottom: 1rem; font-family: 'Outfit', sans-serif;">📖 Manual & Tutorial do Sal0 Karaokê</h3>
+            
+            <div style="display: flex; flex-direction: column; gap: 0.8rem; font-size: 0.85rem; color: var(--text-muted); line-height: 1.5;">
+                <p><strong style="color: #fff;">O que é o Sal0 Karaokê?</strong><br>
+                É uma ferramenta simples e funcional que roda localmente no seu computador ou servidor para remover a voz de músicas e criar vídeos de karaokê com legendas sincronizadas.</p>
+
+                <p><strong style="color: #fff;">Tutorial Passo a Passo para Iniciantes:</strong></p>
+                <ol style="margin-left: 1.2rem; display: flex; flex-direction: column; gap: 0.5rem;">
+                    <li><strong style="color: #c084fc;">1. Selecione a Música:</strong> Clique na caixa de envio para escolher uma música/vídeo do seu computador, insira um link do YouTube ou escolha uma música já salva na sua Biblioteca.</li>
+                    <li><strong style="color: #c084fc;">2. Escolha o Fundo (Opcional):</strong> Envie uma imagem ou vídeo para usar como fundo do karaokê. Se não escolher, o sistema usará um fundo padrão escuro.</li>
+                    <li><strong style="color: #c084fc;">3. Personalize a Legenda (Opcional):</strong> Nas "Opções Avançadas", você pode alterar o tamanho da fonte, a cor do texto, a posição da legenda e o modelo de IA.</li>
+                    <li><strong style="color: #c084fc;">4. Clique em "Criar Vídeo Karaokê":</strong> O servidor vai separar o vocal do instrumental com IA e transcrever a letra sincronizada.</li>
+                    <li><strong style="color: #c084fc;">5. Baixe o Vídeo Pronto:</strong> Ao finalizar, clique no botão verde de download ou acesse a aba "Biblioteca & Histórico".</li>
+                </ol>
+
+                <p><strong style="color: #fff;">Resumo dos Recursos:</strong></p>
+                <ul style="margin-left: 1.2rem; display: flex; flex-direction: column; gap: 0.3rem;">
+                    <li>• <strong>Processamento Local:</strong> Roda inteiramente no seu servidor, sem depender de assinaturas externas.</li>
+                    <li>• <strong>Biblioteca Permanente:</strong> Suas mídias ficam salvas para reuso sem precisar enviar novamente.</li>
+                    <li>• <strong>Envio via Telegram:</strong> Pode enviar o vídeo finalizado automaticamente para o seu bot no Telegram.</li>
+                    <li>• <strong>Perfis de Estilo:</strong> Salve seus ajustes favoritos para usar em um clique nas próximas criações.</li>
+                </ul>
+            </div>
+
+            <button type="button" id="btnCloseHelpModal" class="btn-primary" style="margin-top: 1.5rem;">Entendido</button>
         </div>
     </div>
 
@@ -957,10 +972,11 @@
         </div>
     </div>
 
-    <!-- JAVASCRIPT COMPLETO E 100% CONECTADO COM TODOS OS LISTENERS -->
+    <!-- JAVASCRIPT COMPLETO COM TODAS AS FUNÇÕES DE BUSCA E MANIPULAÇÃO DE DADOS -->
     <script>
         const authToken = localStorage.getItem('karaoke_token') || localStorage.getItem('auth_token') || '';
         let currentUser = null;
+        let allProfiles = {};
 
         async function authFetch(url, options = {}) {
             options.headers = options.headers || {};
@@ -1035,7 +1051,207 @@
         if (tabBtnSettings) tabBtnSettings.onclick = () => switchTab('settings');
         if (tabBtnLibrary) tabBtnLibrary.onclick = () => switchTab('library');
 
-        // FUNÇÃO PARA CARREGAR E RENDERIZAR A BIBLIOTECA (100% DESIGN v3.0.1)
+        // FUNÇÃO PARA CARREGAR PERFIS SALVOS
+        async function fetchProfiles() {
+            try {
+                const res = await authFetch('/api/profiles');
+                if (!res.ok) return;
+                allProfiles = await res.json();
+                
+                const profileSelect = document.getElementById('profileSelect');
+                if (!profileSelect) return;
+                
+                const currentVal = profileSelect.value;
+                profileSelect.innerHTML = '<option value="">Selecione um perfil salvo...</option>';
+                
+                Object.keys(allProfiles).forEach(name => {
+                    const opt = document.createElement('option');
+                    opt.value = name;
+                    opt.textContent = name;
+                    profileSelect.appendChild(opt);
+                });
+
+                if (currentVal && allProfiles[currentVal]) {
+                    profileSelect.value = currentVal;
+                }
+
+                profileSelect.onchange = () => {
+                    const selected = profileSelect.value;
+                    if (selected && allProfiles[selected]) {
+                        const p = allProfiles[selected];
+                        if (p.subtitle_mode) document.getElementById('subtitleMode').value = p.subtitle_mode;
+                        if (p.whisper_model) document.getElementById('whisperModel').value = p.whisper_model;
+                        if (p.text_position) document.getElementById('textPosition').value = p.text_position;
+                        if (p.text_color) document.getElementById('textColor').value = p.text_color;
+                        if (p.font_size) document.getElementById('fontSize').value = p.font_size;
+                        if (p.background_mode) document.getElementById('backgroundMode').value = p.background_mode;
+                        if (p.words_per_line !== undefined) document.getElementById('wordsPerLine').value = p.words_per_line;
+                        if (p.max_chars_line !== undefined) document.getElementById('maxCharsLine').value = p.max_chars_line;
+                        if (p.transcribe_source) document.getElementById('transcribeSource').value = p.transcribe_source;
+                        if (p.show_next_line_preview !== undefined) document.getElementById('showNextLinePreview').value = String(p.show_next_line_preview);
+                        if (p.keep_first_line_visible !== undefined) document.getElementById('keepFirstLineVisible').value = String(p.keep_first_line_visible);
+                    }
+                };
+            } catch (e) {
+                console.error("Erro ao carregar perfis:", e);
+            }
+        }
+
+        // FUNÇÃO PARA CARREGAR MODELOS WHISPER SALVOS/BAIXADOS
+        async function fetchModelsStatus() {
+            try {
+                const res = await authFetch('/api/models');
+                if (!res.ok) return;
+                const models = await res.json();
+                
+                const container = document.getElementById('modelsListContainer');
+                if (!container) return;
+                
+                container.innerHTML = "";
+                
+                const friendlyNames = {
+                    "base": "Base (~140MB - Ultrarrápido)",
+                    "small": "Small (~460MB - Rápido)",
+                    "medium": "Medium (~1.5GB - Recomendado)",
+                    "large-v3-turbo": "Large v3 Turbo (~1.5GB - Excelente)",
+                    "large-v2": "Large v2 (~3GB - Máxima Precisão)"
+                };
+
+                Object.keys(friendlyNames).forEach(modelKey => {
+                    const isDownloaded = models[modelKey] === true;
+                    const card = document.createElement('div');
+                    card.style.background = "rgba(0,0,0,0.25)";
+                    card.style.border = "1px solid var(--glass-border)";
+                    card.style.padding = "0.9rem";
+                    card.style.borderRadius = "10px";
+                    card.style.display = "flex";
+                    card.style.flexDirection = "column";
+                    card.style.justifyContent = "space-between";
+                    card.style.gap = "0.6rem";
+
+                    card.innerHTML = `
+                        <div>
+                            <strong style="color: #fff; font-size: 0.88rem; display: block;">${friendlyNames[modelKey]}</strong>
+                            <span style="font-size: 0.75rem; color: ${isDownloaded ? '#34d399' : 'var(--text-muted)'};">
+                                ${isDownloaded ? '✓ Modelo Instalado e Pronto' : '⚠️ Não baixado no servidor'}
+                            </span>
+                        </div>
+                        <div>
+                            ${isDownloaded 
+                                ? `<button type="button" class="btn-secondary" disabled style="width: 100%; opacity: 0.6; cursor: default;">✓ Pronto para Uso</button>`
+                                : `<button type="button" class="btn-primary" style="width: 100%; font-size: 0.78rem; padding: 0.45rem;" onclick="downloadModel('${modelKey}', this)">📥 Baixar Modelo</button>`
+                            }
+                        </div>
+                    `;
+                    container.appendChild(card);
+                });
+            } catch (e) {
+                console.error("Erro ao carregar modelos:", e);
+            }
+        }
+
+        async function downloadModel(modelName, btnElem) {
+            if (btnElem) { btnElem.disabled = true; btnElem.innerText = '⏳ Baixando no servidor...'; }
+            try {
+                const res = await authFetch('/api/models/download', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ model: modelName })
+                });
+                if (res.ok) {
+                    alert(`Download do modelo '${modelName}' iniciado no servidor!`);
+                    fetchModelsStatus();
+                } else {
+                    const err = await res.json();
+                    alert("Erro ao baixar modelo: " + (err.detail || "Falha no download"));
+                }
+            } catch (e) { alert("Erro ao baixar modelo: " + e.message); }
+        }
+
+        // FUNÇÃO PARA CARREGAR CONFIGURAÇÃO DO TELEGRAM
+        async function fetchTelegramConfig() {
+            try {
+                const res = await authFetch('/api/telegram');
+                if (res.ok) {
+                    const data = await res.json();
+                    const tokenInput = document.getElementById('telegramTokenInput');
+                    const chatIdInput = document.getElementById('telegramChatIdInput');
+                    const badge = document.getElementById('telegramConfiguredBadge');
+                    const inputsDiv = document.getElementById('telegramInputsDiv');
+
+                    if (tokenInput) tokenInput.value = data.telegram_token || '';
+                    if (chatIdInput) chatIdInput.value = data.telegram_chat_id || '';
+
+                    if (data.telegram_token && data.telegram_chat_id) {
+                        if (badge) badge.style.display = 'flex';
+                        if (inputsDiv) inputsDiv.style.display = 'none';
+                    } else {
+                        if (badge) badge.style.display = 'none';
+                        if (inputsDiv) inputsDiv.style.display = 'grid';
+                    }
+                }
+            } catch (e) { console.error("Erro ao carregar Telegram:", e); }
+        }
+
+        // FUNÇÃO PARA CARREGAR IP EXTERNO
+        async function fetchExternalUrlConfig() {
+            try {
+                const res = await authFetch('/api/external_url');
+                if (res.ok) {
+                    const data = await res.json();
+                    const input = document.getElementById('externalUrlInput');
+                    const badge = document.getElementById('externalUrlConfiguredBadge');
+                    const text = document.getElementById('externalUrlValText');
+                    const inputsDiv = document.getElementById('externalUrlInputsDiv');
+
+                    if (input) input.value = data.external_url || '';
+                    if (data.external_url) {
+                        if (text) text.innerText = `✓ URL Externa Configurada: ${data.external_url}`;
+                        if (badge) badge.style.display = 'block';
+                        if (inputsDiv) inputsDiv.style.display = 'none';
+                    } else {
+                        if (badge) badge.style.display = 'none';
+                        if (inputsDiv) inputsDiv.style.display = 'grid';
+                    }
+                }
+            } catch (e) { console.error("Erro ao carregar URL Externa:", e); }
+        }
+
+        // FUNÇÃO PARA CARREGAR USUÁRIOS
+        async function fetchUsers() {
+            try {
+                const res = await authFetch('/api/users');
+                if (!res.ok) return;
+                const users = await res.json();
+                const container = document.getElementById('usersListContainer');
+                if (!container) return;
+                
+                container.innerHTML = "";
+                
+                users.forEach(u => {
+                    const row = document.createElement('div');
+                    row.className = "library-item";
+                    row.style.padding = "0.6rem 0.9rem";
+                    
+                    const roleBadge = u.role === 'admin' 
+                        ? `<span style="background: var(--accent); color: white; padding: 0.15rem 0.5rem; border-radius: 20px; font-size: 0.7rem;">👑 Admin</span>`
+                        : `<span style="background: rgba(255,255,255,0.1); color: var(--text-muted); padding: 0.15rem 0.5rem; border-radius: 20px; font-size: 0.7rem;">👤 Usuário</span>`;
+                    
+                    row.innerHTML = `
+                        <div class="info">
+                            <span style="font-weight: 600; color: #fff;">${u.username}</span>
+                            ${roleBadge}
+                        </div>
+                        <div class="actions">
+                            ${u.username !== 'admin' ? `<button type="button" class="btn-delete" onclick="deleteUser('${u.username}')">🗑️ Deletar</button>` : ''}
+                        </div>
+                    `;
+                    container.appendChild(row);
+                });
+            } catch (e) { console.error("Erro ao carregar usuários:", e); }
+        }
+
+        // CARREGAR A BIBLIOTECA
         async function loadLibrary() {
             try {
                 const res = await authFetch('/api/library');
@@ -1158,7 +1374,7 @@
             }
         }
 
-        // INITIALIZATION AND EVENT LISTENERS FOR ALL BUTTONS & INPUTS
+        // INICIALIZAÇÃO E LISTENERS DE EVENTOS
         window.addEventListener('DOMContentLoaded', async () => {
             // Modais de Ajuda
             const btnOpenHelp = document.getElementById('btnOpenHelp');
@@ -1295,7 +1511,7 @@
                 };
             }
 
-            // Uploads Diretos na Aba Biblioteca (v3.0.1)
+            // Uploads Diretos na Aba Biblioteca (v2.2.4)
             const libAudioUploadArea = document.getElementById('libAudioUploadArea');
             const libAudioFile = document.getElementById('libAudioFile');
             if (libAudioUploadArea && libAudioFile) {
@@ -1318,7 +1534,7 @@
                 };
             }
 
-            // Submit handlers dos formulários da biblioteca (v3.0.1)
+            // Submit handlers dos formulários da biblioteca (v2.2.4)
             const libAudioUploadForm = document.getElementById('libAudioUploadForm');
             if (libAudioUploadForm) {
                 libAudioUploadForm.onsubmit = async (e) => {
@@ -1371,7 +1587,7 @@
                 };
             }
 
-            // Buttons: Downloads do YouTube
+            // Downloads do YouTube
             const btnDownloadYoutube = document.getElementById('btnDownloadYoutube');
             if (btnDownloadYoutube) {
                 btnDownloadYoutube.onclick = async () => {
@@ -1416,7 +1632,7 @@
                 };
             }
 
-            // Botão Cancelar Processamento
+            // Cancelar Processamento
             document.querySelectorAll('.btn-cancel-task').forEach(btn => {
                 btn.onclick = async () => {
                     if (!confirm("Deseja realmente cancelar a tarefa atual?")) return;
@@ -1434,7 +1650,7 @@
                 };
             });
 
-            // Botão Download Result
+            // Download Result
             const btnDownloadResult = document.getElementById('btnDownloadResult');
             if (btnDownloadResult) {
                 btnDownloadResult.onclick = async () => {
@@ -1454,7 +1670,7 @@
                 };
             }
 
-            // Botão Download Logs
+            // Download Logs
             const btnDownloadLogs = document.getElementById('btnDownloadLogs');
             if (btnDownloadLogs) {
                 btnDownloadLogs.onclick = async () => {
@@ -1474,7 +1690,7 @@
                 };
             }
 
-            // Salvar e Deletar Perfis
+            // Salvar e Deletar Perfis (Nas Opções Avançadas)
             const btnSaveProfile = document.getElementById('btnSaveProfile');
             if (btnSaveProfile) {
                 btnSaveProfile.onclick = async () => {
@@ -1672,7 +1888,7 @@
             const isAuthenticated = await checkAuth();
             if (!isAuthenticated) return;
 
-            // Carregar dados iniciais
+            // CARREGAR DADOS SALVOS NO SERVIDOR
             await fetchTelegramConfig();
             await fetchExternalUrlConfig();
             await fetchProfiles();
@@ -1735,7 +1951,6 @@
                 const data = await res.json();
 
                 const processCard = document.getElementById('processCard');
-                const karaokêForm = document.getElementById('karaokêForm');
                 const progressPercent = document.getElementById('progressPercent');
                 const progressBarFill = document.getElementById('progressBarFill');
                 const statusMessage = document.getElementById('statusMessage');
