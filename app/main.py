@@ -980,7 +980,7 @@ def delete_lyrics_server(current_user: dict = Depends(get_current_user)):
 
 
 
-# Sistema de Logs de Diagnóstico v3.5.3
+# Sistema de Logs de Diagnóstico v3.5.4
 DIAGNOSTIC_LOG_FILE = "/data/output/app_diagnostic.log"
 
 def log_diagnostic(message: str, level: str = "INFO"):
@@ -1094,6 +1094,8 @@ def load_profiles() -> dict:
                     p_data["show_next_line_preview"] = False
                 if "keep_first_line_visible" not in p_data:
                     p_data["keep_first_line_visible"] = False
+                if "pause_for_editing" not in p_data:
+                    p_data["pause_for_editing"] = False
             return profiles
     except Exception as e:
         logger.error(f"Erro ao carregar arquivo de perfis: {e}")
@@ -1657,7 +1659,7 @@ def process_karaoke(
     lyrics_text: str = Form(None),
     enable_correction: bool = Form(True),
     keep_first_line_visible: bool = Form(False),
-    pause_for_editing: bool = Form(True),
+    pause_for_editing: bool = Form(False),
     youtube_url: str = Form(None),
     library_audio: str = Form(None),
     library_bg: str = Form(None),
@@ -1673,7 +1675,7 @@ def process_karaoke(
             if state.get("status") in ["idle", "error", "done"]:
                 try:
                     processing_lock.release()
-                    logger.info("Failsafe v3.5.3: Lock de concorrência obsoleto liberado com sucesso.")
+                    logger.info("Failsafe v3.5.4: Lock de concorrência obsoleto liberado com sucesso.")
                 except Exception:
                     pass
             else:

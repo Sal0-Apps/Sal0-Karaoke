@@ -680,7 +680,7 @@
 
                         <div style="margin-top: 1rem; display: flex; flex-direction: column; gap: 0.4rem;">
                             <label style="font-size: 0.82rem; color: var(--text-main); font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 0.5rem; background: rgba(139, 92, 246, 0.1); padding: 0.5rem 0.8rem; border-radius: 8px; border: 1px solid var(--glass-border);">
-                                <input type="checkbox" id="pauseForEditing" name="pause_for_editing" checked style="accent-color: var(--accent);">
+                                <input type="checkbox" id="pauseForEditing" name="pause_for_editing" style="accent-color: var(--accent);">
                                 ✏️ Pausar a 75% para revisar/editar a legenda antes da renderização final
                             </label>
                             <label style="font-size: 0.82rem; color: var(--text-main); cursor: pointer; display: flex; align-items: center; gap: 0.5rem;">
@@ -971,7 +971,7 @@
 
         <!-- RODAPÉ DISCRETO DA PÁGINA -->
         <footer>
-            Sal0 Karaokê v3.5.3
+            Sal0 Karaokê v3.5.4
         </footer>
 
     </div> <!-- Container End -->
@@ -1176,6 +1176,7 @@
                         if (p.transcribe_source) document.getElementById('transcribeSource').value = p.transcribe_source;
                         if (p.show_next_line_preview !== undefined) document.getElementById('showNextLinePreview').value = String(p.show_next_line_preview);
                         if (p.keep_first_line_visible !== undefined) document.getElementById('keepFirstLineVisible').value = String(p.keep_first_line_visible);
+                        if (p.pause_for_editing !== undefined) document.getElementById('pauseForEditing').checked = Boolean(p.pause_for_editing);
                     }
                 };
             } catch (e) {
@@ -1823,7 +1824,8 @@
                         max_chars_line: parseInt(document.getElementById('maxCharsLine').value) || 40,
                         transcribe_source: document.getElementById('transcribeSource').value,
                         show_next_line_preview: document.getElementById('showNextLinePreview').value === 'true',
-                        keep_first_line_visible: document.getElementById('keepFirstLineVisible').value === 'true'
+                        keep_first_line_visible: document.getElementById('keepFirstLineVisible').value === 'true',
+                        pause_for_editing: document.getElementById('pauseForEditing').checked
                     };
                     try {
                         const res = await authFetch('/api/profiles', {
