@@ -5,7 +5,7 @@
     <meta name="color-scheme" content="dark">
     <meta name="supported-color-schemes" content="dark">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Sal0 Karaokê v3.0.5 - Gerador Automático de Vídeos</title>
+    <title>Sal0 Karaokê v3.0.7 - Gerador Automático de Vídeos</title>
     <link rel="icon" type="image/png" href="/favicon.png">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -420,7 +420,7 @@
                     <textarea id="lyricsText" name="lyrics_text" placeholder="Cole a letra oficial aqui..." style="width: 100%; min-height: 90px; border: 1px solid var(--glass-border); padding: 0.7rem; background: rgba(0,0,0,0.15); color: #fff; border-radius: 12px; font-size: 0.85rem; outline: none; resize: vertical;"></textarea>
                 </div>
 
-                <!-- Painel de Ajustes Avançados Restaurado (TODAS AS OPÇÕES v3.0.5) -->
+                <!-- Painel de Ajustes Avançados Restaurado (TODAS AS OPÇÕES v3.0.7) -->
                 <div id="advancedContent" style="display: none; margin-top: 1.2rem; background: rgba(255,255,255,0.015); border: 1px solid var(--glass-border); border-radius: 14px; padding: 1rem;">
                     
                     <!-- Perfis -->
@@ -446,7 +446,7 @@
                         </select>
                     </div>
 
-                    <!-- Gerenciador de Modelos de IA Pré-renderizado v3.0.5 -->
+                    <!-- Gerenciador de Modelos de IA Pré-renderizado v3.0.7 -->
                     <div style="border: 1px solid rgba(255,255,255,0.05); border-radius: 10px; padding: 0.8rem; background: rgba(0,0,0,0.15); margin-bottom: 1rem;">
                         <span class="label">🤖 Gerenciador de Modelos de IA (Cache Local no Servidor)</span>
                         <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.6rem;">
@@ -559,7 +559,7 @@
                         </div>
                     </div>
 
-                    <!-- Configuração de IP / URL Externa com Estado Oculto v3.0.5 -->
+                    <!-- Configuração de IP / URL Externa com Estado Oculto v3.0.7 -->
                     <div style="border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 0.8rem; background: rgba(0,0,0,0.15); margin-bottom: 1rem;">
                         <span class="label" style="color: #34d399;">🌐 Configuração de IP / URL Externa (Acesso Remoto)</span>
                         
@@ -579,7 +579,7 @@
                         </div>
                     </div>
 
-                    <!-- Telegram Config com Estado Oculto v3.0.5 -->
+                    <!-- Telegram Config com Estado Oculto v3.0.7 -->
                     <div style="border: 1px solid rgba(255,255,255,0.05); border-radius: 10px; padding: 0.8rem; background: rgba(0,0,0,0.15); margin-bottom: 1rem;">
                         <span class="label">🤖 Telegram Bot (Notificações e Envio de Vídeo)</span>
                         
@@ -613,7 +613,7 @@
             </form>
         </div>
 
-        <!-- Modo Foco / Painel de Progresso v3.0.5 -->
+        <!-- Modo Foco / Painel de Progresso v3.0.7 -->
         <div class="process-card" id="processCard">
             <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem;">
                 <span style="font-weight: 800; font-size: 0.95rem; color: #c084fc;">⚡ Produção em Andamento (Modo Foco)</span>
@@ -670,17 +670,33 @@
         <!-- Card de Erro -->
         <div id="errorCard" style="display: none; margin-top: 1.2rem; background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.3); padding: 1rem; border-radius: 12px; color: #fca5a5; font-size: 0.85rem;"></div>
 
-        <!-- Conteúdo da Aba Biblioteca -->
+        <!-- Conteúdo da Aba Biblioteca com Upload Direto e Exclusão v3.0.7 -->
         <div id="libraryTabContent" style="display: none;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
                 <h3 style="margin: 0; font-size: 1.1rem; color: #c084fc;">📚 Sua Biblioteca de Mídia e Histórico</h3>
                 <button type="button" id="btnRefreshLibrary" class="header-btn">🔄 Atualizar</button>
             </div>
+
+            <!-- Card de Upload Direto para a Biblioteca -->
+            <div style="background: rgba(255,255,255,0.02); border: 1px dashed var(--glass-border); border-radius: 14px; padding: 1rem; margin-bottom: 1.2rem;">
+                <span class="label" style="color: #c084fc; font-weight: 700;">➕ Adicionar Novo Arquivo à Biblioteca</span>
+                <form id="libraryUploadForm" style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.5rem; align-items: center;">
+                    <select id="libraryUploadSection" name="section" style="border: 1px solid var(--glass-border); padding: 0.5rem 0.75rem; background: #141226; color: #fff; border-radius: 8px; font-size: 0.8rem; outline: none; font-weight: 600;">
+                        <option value="videos">🎵 Música / Vídeo Original</option>
+                        <option value="photos">🖼️ Imagem / Vídeo de Fundo</option>
+                    </select>
+                    <input type="file" id="libraryUploadFile" name="file" required style="flex: 1; min-width: 180px; font-size: 0.8rem; color: var(--text-muted);">
+                    <button type="submit" id="btnLibraryUploadSubmit" class="btn-secondary" style="background: rgba(139, 92, 246, 0.25); color: #c084fc; border-color: rgba(139, 92, 246, 0.4); font-weight: 700; height: 36px; padding: 0 1rem; border-radius: 8px; cursor: pointer;">
+                        📤 Enviar para Biblioteca
+                    </button>
+                </form>
+            </div>
+
             <div id="libraryItemsContainer" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 1rem;"></div>
         </div>
     </div>
 
-    <!-- Modal de Mídia Ativa (v3.0.5) -->
+    <!-- Modal de Mídia Ativa (v3.0.7) -->
     <div id="activeMediaModal" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.75); z-index: 9999; justify-content: center; align-items: center; backdrop-filter: blur(4px);">
         <div style="background: #141226; border: 1px solid var(--glass-border); border-radius: 16px; padding: 1.5rem; width: 90vw; max-width: 460px;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
@@ -703,7 +719,7 @@
         </div>
     </div>
 
-    <!-- Modal de Manual e Tutorial Completo v3.0.5 -->
+    <!-- Modal de Manual e Tutorial Completo v3.0.7 -->
     <div id="helpModal" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.8); z-index: 9999; justify-content: center; align-items: center; backdrop-filter: blur(5px);">
         <div style="background: #141226; border: 1px solid var(--glass-border); border-radius: 18px; padding: 1.6rem; width: 92vw; max-width: 650px; max-height: 85vh; overflow-y: auto; box-shadow: 0 10px 30px rgba(0,0,0,0.6);">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.2rem; padding-bottom: 0.6rem; border-bottom: 1px solid rgba(255,255,255,0.08);">
@@ -980,7 +996,7 @@
             };
         }
 
-        // Ler e Salvar Telegram Config com Estado Oculto v3.0.5
+        // Ler e Salvar Telegram Config com Estado Oculto v3.0.7
         async function fetchTelegramConfig() {
             try {
                 const res = await authFetch('/api/telegram');
@@ -1032,7 +1048,7 @@
             };
         }
 
-        // Ler e Salvar URL Externa com Estado Oculto v3.0.5
+        // Ler e Salvar URL Externa com Estado Oculto v3.0.7
         async function fetchExternalUrlConfig() {
             try {
                 const res = await authFetch('/api/external_url');
@@ -1175,9 +1191,9 @@
                 if (container) {
                     container.innerHTML = '';
                     const allItems = [
-                        ...(data.videos || []).map(v => ({ name: v, type: 'video' })),
-                        ...(data.photos || []).map(p => ({ name: p, type: 'photo' })),
-                        ...(data.history || []).map(h => ({ name: h, type: 'history' }))
+                        ...(data.videos || []).map(v => ({ name: v, section: 'videos', label: '🎵 Áudio / Vídeo' })),
+                        ...(data.photos || []).map(p => ({ name: p, section: 'photos', label: '🖼️ Imagem / Fundo' })),
+                        ...(data.history || []).map(h => ({ name: h, section: 'history', label: '🎬 Histórico Final' }))
                     ];
                     
                     if (allItems.length === 0) {
@@ -1197,12 +1213,13 @@
                         
                         card.innerHTML = `
                             <div style="margin-bottom: 0.6rem;">
-                                <span style="font-size: 0.7rem; color: #c084fc; font-weight: 700; text-transform: uppercase;">${item.type}</span>
+                                <span style="font-size: 0.7rem; color: #c084fc; font-weight: 700;">${item.label}</span>
                                 <p style="margin: 0.2rem 0 0 0; font-size: 0.82rem; font-weight: 600; word-break: break-word;">${item.name}</p>
                             </div>
                             <div style="display: flex; gap: 0.3rem; flex-wrap: wrap;">
                                 <button type="button" class="btn-secondary" style="font-size: 0.72rem; padding: 0.25rem 0.5rem;" onclick="setAudioSource('library', '${item.name}')">🎵 Usar Áudio</button>
                                 <button type="button" class="btn-secondary" style="font-size: 0.72rem; padding: 0.25rem 0.5rem;" onclick="document.getElementById('libraryBgSelect').value='${item.name}'">🖼️ Usar Fundo</button>
+                                <button type="button" class="btn-secondary" style="font-size: 0.72rem; padding: 0.25rem 0.5rem; background: rgba(239,68,68,0.15); color: #fca5a5;" onclick="deleteFromLibrary('${item.section}', '${item.name}')">🗑️ Excluir</button>
                             </div>
                         `;
                         container.appendChild(card);
@@ -1224,7 +1241,7 @@
             } catch (e) {}
         }
 
-        // Modelos de IA com Sincronização Dinâmica v3.0.5
+        // Modelos de IA com Sincronização Dinâmica v3.0.7
         async function fetchModelsStatus() {
             try {
                 const res = await authFetch('/api/models');
@@ -1362,7 +1379,69 @@
         }
 
         // Inicialização Completa ao Carregar a Página (Restauração Total)
-        window.addEventListener('DOMContentLoaded', async () => {
+        
+        // Excluir Arquivo da Biblioteca
+        async function deleteFromLibrary(section, filename) {
+            if (!confirm(`Deseja realmente excluir '${filename}' da biblioteca?`)) return;
+            try {
+                const res = await authFetch(`/api/library/${section}/${encodeURIComponent(filename)}`, {
+                    method: 'DELETE'
+                });
+                if (res.ok) {
+                    await fetchLibrary();
+                } else {
+                    const err = await res.json();
+                    alert("Erro ao excluir: " + (err.detail || "Falha na exclusão"));
+                }
+            } catch (e) {
+                alert("Erro ao excluir: " + e.message);
+            }
+        }
+
+        // Submissão do Formulário de Upload Direto para a Biblioteca
+        const libraryUploadForm = document.getElementById('libraryUploadForm');
+        if (libraryUploadForm) {
+            libraryUploadForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const btn = document.getElementById('btnLibraryUploadSubmit');
+                const fileInput = document.getElementById('libraryUploadFile');
+                if (!fileInput.files || fileInput.files.length === 0) return;
+                
+                btn.disabled = true;
+                btn.innerText = '⏳ Enviando...';
+                
+                const formData = new FormData(libraryUploadForm);
+                try {
+                    const res = await authFetch('/api/library/upload', {
+                        method: 'POST',
+                        body: formData
+                    });
+                    if (res.ok) {
+                        alert("Arquivo adicionado com sucesso à biblioteca!");
+                        libraryUploadForm.reset();
+                        await fetchLibrary();
+                    } else {
+                        const err = await res.json();
+                        throw new Error(err.detail || "Erro no upload para biblioteca.");
+                    }
+                } catch (err) {
+                    alert("Erro ao enviar: " + err.message);
+                } finally {
+                    btn.disabled = false;
+                    btn.innerText = '📤 Enviar para Biblioteca';
+                }
+            });
+        }
+
+
+
+        const btnRefreshLibrary = document.getElementById('btnRefreshLibrary');
+        if (btnRefreshLibrary) {
+            btnRefreshLibrary.onclick = () => fetchLibrary();
+        }
+
+
+window.addEventListener('DOMContentLoaded', async () => {
             await fetchTelegramConfig();
             await fetchExternalUrlConfig();
             await fetchProfiles();

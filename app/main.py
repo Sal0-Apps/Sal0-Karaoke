@@ -608,28 +608,52 @@ def resolve_whisper_repo(model_size: str) -> str:
 
 
 def is_model_downloaded(model_size: str) -> bool:
-    """Verifica de forma ultra leve (no disco) se o modelo Whisper já está baixado no servidor."""
+    """Verifica em múltiplos caminhos do disco se o modelo Whisper já existe (Docker ou Cache Local)."""
+    search_base_dirs = [
+        "/data/output/models/whisper",
+        "/root/.cache/huggingface/hub",
+        os.path.expanduser("~/.cache/huggingface/hub"),
+        "/data/cache",
+        "/data/models"
+    ]
+
     possible_folders = [
         f"models--Systran--faster-whisper-{model_size}",
         f"models--deepdml--faster-whisper-{model_size}",
-        f"models--openai--whisper-{model_size}"
+        f"models--openai--whisper-{model_size}",
+        f"faster-whisper-{model_size}",
+        model_size
     ]
     if model_size == "large-v3-turbo":
         possible_folders.insert(0, "models--deepdml--faster-whisper-large-v3-turbo")
+        possible_folders.insert(1, "faster-whisper-large-v3-turbo")
 
-    for folder_name in possible_folders:
-        model_dir = os.path.join("/data/output/models/whisper", folder_name)
-        if os.path.isdir(model_dir):
-            snapshots_dir = os.path.join(model_dir, "snapshots")
-            if os.path.isdir(snapshots_dir):
+    for base_dir in search_base_dirs:
+        if not os.path.exists(base_dir):
+            continue
+        for folder_name in possible_folders:
+            model_dir = os.path.join(base_dir, folder_name)
+            if os.path.isdir(model_dir):
+                # Caso 1: Estrutura padrão HuggingFace Hub (snapshots)
+                snapshots_dir = os.path.join(model_dir, "snapshots")
+                if os.path.isdir(snapshots_dir):
+                    try:
+                        subdirs = [os.path.join(snapshots_dir, d) for d in os.listdir(snapshots_dir) if os.path.isdir(os.path.join(snapshots_dir, d))]
+                        for s_dir in subdirs:
+                            files = os.listdir(s_dir)
+                            if any(f in files for f in ["model.bin", "model.safetensors", "config.json"]):
+                                return True
+                    except Exception:
+                        pass
+
+                # Caso 2: Arquivos diretos na pasta do modelo
                 try:
-                    subdirs = [os.path.join(snapshots_dir, d) for d in os.listdir(snapshots_dir) if os.path.isdir(os.path.join(snapshots_dir, d))]
-                    for s_dir in subdirs:
-                        files = os.listdir(s_dir)
-                        if any(f in files for f in ["model.bin", "model.safetensors", "config.json"]):
-                            return True
+                    files = os.listdir(model_dir)
+                    if any(f in files for f in ["model.bin", "model.safetensors", "config.json"]):
+                        return True
                 except Exception:
                     pass
+
     return False
 
 def download_model_worker(model_size: str):
@@ -965,7 +989,7 @@ def delete_lyrics_server(current_user: dict = Depends(get_current_user)):
 
 
 
-# Sistema de Logs de Diagnóstico v3.0.5
+# Sistema de Logs de Diagnóstico v3.0.7
 DIAGNOSTIC_LOG_FILE = "/data/output/app_diagnostic.log"
 
 def log_diagnostic(message: str, level: str = "INFO"):
@@ -1042,7 +1066,7 @@ class ProfileModel(BaseModel):
     keep_first_line_visible: bool = False
 
 def load_profiles() -> dict:
-    """Carrega os perfis do arquivo JSON ou inicializa com valores padrão se não existir."""
+    """Carrega os perfis e consolida automaticamente perfis legados do v2.0 em /data/output/profiles.json."""
     default_profiles = {
         "Padrão": {
             "whisper_model": "medium",
@@ -1063,45 +1087,63 @@ def load_profiles() -> dict:
         }
     }
     
-    if not os.path.exists(PROFILES_FILE):
+    profiles = {}
+    if os.path.exists(PROFILES_FILE):
         try:
-            os.makedirs(os.path.dirname(PROFILES_FILE), exist_ok=True)
-            with open(PROFILES_FILE, "w", encoding="utf-8") as f:
+            with open(PROFILES_FILE, "r", encoding="utf-8") as f:
                 import json
-                json.dump(default_profiles, f, indent=4, ensure_ascii=False)
-            return default_profiles
+                profiles = json.load(f)
         except Exception as e:
-            logger.error(f"Erro ao criar arquivo de perfis padrão: {e}")
-            return default_profiles
-            
+            logger.error(f"Erro ao carregar arquivo principal de perfis: {e}")
+
+    # Migração e consolidação automática de perfis legados (user_*_profiles.json)
+    output_dir = os.path.dirname(PROFILES_FILE)
+    if os.path.exists(output_dir):
+        try:
+            for fname in os.listdir(output_dir):
+                if fname.endswith("_profiles.json") and fname != "profiles.json":
+                    legacy_file = os.path.join(output_dir, fname)
+                    try:
+                        with open(legacy_file, "r", encoding="utf-8") as lf:
+                            import json
+                            leg_data = json.load(lf)
+                            if isinstance(leg_data, dict):
+                                for p_name, p_val in leg_data.items():
+                                    if p_name not in profiles:
+                                        profiles[p_name] = p_val
+                                        logger.info(f"Perfil legado '{p_name}' migrado de {fname}.")
+                    except Exception as err:
+                        logger.error(f"Erro ao ler perfil legado {fname}: {err}")
+        except Exception as e:
+            logger.error(f"Erro ao escanear perfis legados: {e}")
+
+    if not profiles:
+        profiles = default_profiles
+
+    # Garantir retrocompatibilidade preenchendo campos ausentes em todos os perfis
+    for p_name, p_data in profiles.items():
+        if not isinstance(p_data, dict):
+            continue
+        if "subtitle_mode" not in p_data: p_data["subtitle_mode"] = "syllable"
+        if "words_per_line" not in p_data: p_data["words_per_line"] = 0
+        if "max_chars_line" not in p_data: p_data["max_chars_line"] = 40
+        if "break_on_punctuation" not in p_data: p_data["break_on_punctuation"] = True
+        if "background_mode" not in p_data: p_data["background_mode"] = "image"
+        if "show_instrumental" not in p_data: p_data["show_instrumental"] = True
+        if "transcribe_source" not in p_data: p_data["transcribe_source"] = "vocals"
+        if "show_next_line_preview" not in p_data: p_data["show_next_line_preview"] = False
+        if "keep_first_line_visible" not in p_data: p_data["keep_first_line_visible"] = False
+
+    # Salvar o arquivo consolidado para persistência permanente
     try:
-        with open(PROFILES_FILE, "r", encoding="utf-8") as f:
+        os.makedirs(os.path.dirname(PROFILES_FILE), exist_ok=True)
+        with open(PROFILES_FILE, "w", encoding="utf-8") as f:
             import json
-            profiles = json.load(f)
-            # Garantir retrocompatibilidade preenchendo campos ausentes
-            for p_name, p_data in profiles.items():
-                if "subtitle_mode" not in p_data:
-                    p_data["subtitle_mode"] = "syllable"
-                if "words_per_line" not in p_data:
-                    p_data["words_per_line"] = 0
-                if "max_chars_line" not in p_data:
-                    p_data["max_chars_line"] = 40
-                if "break_on_punctuation" not in p_data:
-                    p_data["break_on_punctuation"] = True
-                if "background_mode" not in p_data:
-                    p_data["background_mode"] = "image"
-                if "show_instrumental" not in p_data:
-                    p_data["show_instrumental"] = True
-                if "transcribe_source" not in p_data:
-                    p_data["transcribe_source"] = "vocals"
-                if "show_next_line_preview" not in p_data:
-                    p_data["show_next_line_preview"] = False
-                if "keep_first_line_visible" not in p_data:
-                    p_data["keep_first_line_visible"] = False
-            return profiles
+            json.dump(profiles, f, indent=4, ensure_ascii=False)
     except Exception as e:
-        logger.error(f"Erro ao carregar arquivo de perfis: {e}")
-        return default_profiles
+        logger.error(f"Erro ao salvar perfis consolidados: {e}")
+
+    return profiles
 
 @app.get("/api/profiles")
 def get_profiles(current_user: dict = Depends(get_current_user)):
@@ -1695,7 +1737,7 @@ def process_karaoke(
             if state.get("status") in ["idle", "error", "done"]:
                 try:
                     processing_lock.release()
-                    logger.info("Failsafe v3.0.5: Lock de concorrência obsoleto liberado com sucesso.")
+                    logger.info("Failsafe v3.0.7: Lock de concorrência obsoleto liberado com sucesso.")
                 except Exception:
                     pass
             else:
