@@ -459,7 +459,7 @@
             <div class="logo-area">
                 <span class="logo-icon">🎙️</span>
                 <div>
-                    <h1>Sal0 Karaokê <span class="version-badge">v2.2.4 (Backup Estável)</span></h1>
+                    <h1>Sal0 Karaokê <span class="version-badge">v3.0.0</span></h1>
                 </div>
             </div>
             <div class="header-actions">
@@ -818,10 +818,10 @@
         </div>
 
         <!-- ============================================================= -->
-        <!-- ABA 3: BIBLIOTECA & HISTÓRICO (DESIGN E ESTRUTURA 100% v2.2.4) -->
+        <!-- ABA 3: BIBLIOTECA & HISTÓRICO (DESIGN E ESTRUTURA 100% v3.0.0) -->
         <!-- ============================================================= -->
         <div id="libraryTabContent" style="display: none; flex-direction: column; gap: 1.5rem;">
-            <!-- Grid de Envio Rápido para a Biblioteca (v2.2.4) -->
+            <!-- Grid de Envio Rápido para a Biblioteca (v3.0.0) -->
             <div style="background: rgba(30, 27, 57, 0.4); border: 1px solid var(--glass-border); padding: 1.2rem; border-radius: 12px; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr)); gap: 1rem;">
                 <div>
                     <h4 style="margin: 0 0 0.5rem 0; font-size: 0.9rem; color: #fff;">➕ Adicionar Mídia de Áudio/Vídeo</h4>
@@ -845,7 +845,7 @@
                 </div>
             </div>
 
-            <!-- Seção 1: Músicas e Vídeos Originais (v2.2.4) -->
+            <!-- Seção 1: Músicas e Vídeos Originais (v3.0.0) -->
             <div class="card" style="margin: 0;">
                 <div class="card-header">
                     <span class="card-title">🎵 Músicas & Vídeos Originais</span>
@@ -855,7 +855,7 @@
                 </div>
             </div>
 
-            <!-- Seção 2: Imagens e Vídeos de Fundo (v2.2.4) -->
+            <!-- Seção 2: Imagens e Vídeos de Fundo (v3.0.0) -->
             <div class="card" style="margin: 0;">
                 <div class="card-header">
                     <span class="card-title">🖼️ Imagens & Vídeos de Fundo</span>
@@ -865,7 +865,7 @@
                 </div>
             </div>
 
-            <!-- Seção 3: Karaokês Renderizados no Histórico (v2.2.4) -->
+            <!-- Seção 3: Karaokês Renderizados no Histórico (v3.0.0) -->
             <div class="card" style="margin: 0;">
                 <div class="card-header">
                     <span class="card-title">🎬 Karaokês Renderizados no Histórico</span>
@@ -983,7 +983,7 @@
         if (tabBtnSettings) tabBtnSettings.onclick = () => switchTab('settings');
         if (tabBtnLibrary) tabBtnLibrary.onclick = () => switchTab('library');
 
-        // FUNÇÃO PARA CARREGAR E RENDERIZAR A BIBLIOTECA (100% DESIGN E RECURSOS DA v2.2.4)
+        // FUNÇÃO PARA CARREGAR E RENDERIZAR A BIBLIOTECA (100% DESIGN E RECURSOS DA v3.0.0)
         async function loadLibrary() {
             try {
                 const res = await authFetch('/api/library');
