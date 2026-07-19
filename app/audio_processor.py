@@ -23,17 +23,6 @@ def get_file_duration(file_path: str) -> float:
 
 def extract_audio(input_path: str, output_wav_path: str) -> str:
     """Extrai ou converte o áudio do arquivo de entrada para um WAV estéreo de 44.1kHz 16-bit."""
-    # Resiliência caso input_path não exista com extensão exata
-    if not os.path.exists(input_path):
-        cache_folder = os.path.dirname(input_path)
-        if os.path.exists(cache_folder):
-            for f in os.listdir(cache_folder):
-                if f.startswith("original_input."):
-                    candidate = os.path.join(cache_folder, f)
-                    if os.path.isfile(candidate) and not f.endswith(".wav"):
-                        input_path = candidate
-                        logger.info(f"Recuperado arquivo de entrada do cache: {input_path}")
-                        break
     logger.info(f"Iniciando extração/conversão de áudio do arquivo: {input_path}")
     
     # Comando FFmpeg para extrair apenas áudio e converter para WAV 16-bit 44.1kHz estéreo

@@ -1,5 +1,4 @@
 import socket
-import subprocess
 socket.setdefaulttimeout(120)  # Timeout de 120s para impedir travamentos de socket em downloads de IA
 import os
 import uuid
@@ -41,18 +40,13 @@ USERS_FILE = "/data/users.json"
 SESSIONS_FILE = "/data/sessions.json"
 
 def load_users():
-    """Carrega a lista de usuários de /data/users.json (padrão da v2.0 e v3.0)."""
-    for path in ["/data/users.json", "/data/output/users.json"]:
-        if os.path.exists(path):
-            try:
-                with open(path, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-                    if isinstance(data, dict):
-                        return data
-            except Exception:
-                pass
-    return {}
-
+    if not os.path.exists(USERS_FILE):
+        return {}
+    try:
+        with open(USERS_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return {}
 
 def save_users(users):
     try:
@@ -139,23 +133,13 @@ def download_youtube(url: str, cache_dir: str) -> tuple[str, str]:
                 break
     return file_path, title
 
-def get_current_user(
-    x_session_token: str = Header(None),
-    authorization: str = Header(None),
-    token: str = Query(None)
-):
+def get_current_user(x_session_token: str = Header(None), token: str = Query(None)):
     users = load_users()
     if not users:
         # Modo Setup: Sem usuários criados ainda
         return {"username": "setup_mode", "role": "setup"}
     
     active_token = x_session_token or token
-    if not active_token and authorization:
-        if authorization.startswith("Bearer "):
-            active_token = authorization.split(" ")[1].strip()
-        else:
-            active_token = authorization.strip()
-
     if not active_token:
         raise HTTPException(status_code=401, detail="Sessão não fornecida.")
         
@@ -410,13 +394,12 @@ def align_lyrics(official_lyrics_text: str, transcribed_segments: list[dict]) ->
             
     return new_segments
 
-def update_state(status: str, step: str, progress: int, error_message: str = "", result_file: str = None, original_filename: str = None, step_progress: int = None):
+def update_state(status: str, step: str, progress: int, error_message: str = "", result_file: str = None, original_filename: str = None):
     """Atualiza o estado global da aplicação de forma thread-safe e persiste no disco."""
     with state_lock:
         state["status"] = status
         state["step"] = step
         state["progress"] = progress
-        state["step_progress"] = step_progress if step_progress is not None else progress
         state["error_message"] = error_message
         state["result_file"] = result_file
         if original_filename is not None:
@@ -522,76 +505,17 @@ class TelegramModel(BaseModel):
     telegram_token: str
     telegram_chat_id: str
 
-
-EXTERNAL_URL_FILE = "/data/output/external_url.json"
-
-class ExternalUrlModel(BaseModel):
-    external_url: str
-
-def get_internal_ip() -> str:
-    """Retorna o endereço IP interno da máquina na rede local."""
-    try:
-        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        s.connect(('8.8.8.8', 80))
-        ip = s.getsockname()[0]
-        s.close()
-        return ip
-    except Exception:
-        return "localhost"
-
-def load_external_url_config() -> dict:
-    """Carrega a URL/IP externo do disco (v2.0 e v3.0)."""
-    possible_paths = [
-        "/data/output/external_url.json",
-        "/data/external_url.json"
-    ]
-    for path in possible_paths:
-        if os.path.exists(path):
-            try:
-                with open(path, "r", encoding="utf-8") as f:
-                    import json
-                    data = json.load(f)
-                    if data.get("external_url"):
-                        return data
-            except Exception:
-                pass
-    return {"external_url": ""}
-
-@app.get("/api/external_url")
-def get_external_url_config():
-    """Endpoint para ler a URL/IP externo configurado."""
-    return load_external_url_config()
-
-@app.post("/api/external_url")
-def save_external_url_config(config: ExternalUrlModel):
-    """Endpoint para salvar a URL/IP externo configurado."""
-    try:
-        os.makedirs(os.path.dirname(EXTERNAL_URL_FILE), exist_ok=True)
-        with open(EXTERNAL_URL_FILE, "w", encoding="utf-8") as f:
-            import json
-            json.dump({"external_url": config.external_url.strip()}, f, indent=4)
-        return {"status": "success"}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Erro ao salvar URL externa: {e}")
-
-
 def load_telegram_config() -> dict:
-    """Carrega as credenciais globais do Telegram do disco (v2.0 e v3.0)."""
-    possible_paths = [
-        "/data/output/telegram.json",
-        "/data/telegram.json"
-    ]
-    for path in possible_paths:
-        if os.path.exists(path):
-            try:
-                with open(path, "r", encoding="utf-8") as f:
-                    import json
-                    data = json.load(f)
-                    if data.get("telegram_token") or data.get("telegram_chat_id"):
-                        return data
-            except Exception as e:
-                logger.error(f"Erro ao carregar configurações do Telegram de {path}: {e}")
-    return {"telegram_token": "", "telegram_chat_id": ""}
+    """Carrega as credenciais globais do Telegram do disco."""
+    if not os.path.exists(TELEGRAM_FILE):
+        return {"telegram_token": "", "telegram_chat_id": ""}
+    try:
+        with open(TELEGRAM_FILE, "r", encoding="utf-8") as f:
+            import json
+            return json.load(f)
+    except Exception as e:
+        logger.error(f"Erro ao carregar configurações do Telegram: {e}")
+        return {"telegram_token": "", "telegram_chat_id": ""}
 
 @app.get("/api/telegram")
 def get_telegram_config():
@@ -637,45 +561,28 @@ def resolve_whisper_repo(model_size: str) -> str:
 
 
 def is_model_downloaded(model_size: str) -> bool:
-    """Verifica se o modelo Whisper existe na pasta /data/output/models/whisper ou no cache do sistema."""
-    whisper_dirs = [
-        "/data/output/models/whisper",
-        "/data/models/whisper",
-        "/data/models",
-        "/root/.cache/huggingface/hub",
-        os.path.expanduser("~/.cache/huggingface/hub")
+    """Verifica de forma ultra leve (no disco) se o modelo Whisper já está baixado no servidor."""
+    possible_folders = [
+        f"models--Systran--faster-whisper-{model_size}",
+        f"models--deepdml--faster-whisper-{model_size}",
+        f"models--openai--whisper-{model_size}"
     ]
+    if model_size == "large-v3-turbo":
+        possible_folders.insert(0, "models--deepdml--faster-whisper-large-v3-turbo")
 
-    # Palavras-chave EXATAS por modelo — evita falso positivo large-v3 ao buscar large-v3-turbo
-    keyword_map = {
-        "base":         ["whisper-base", "faster-whisper-base"],
-        "small":        ["whisper-small", "faster-whisper-small"],
-        "medium":       ["whisper-medium", "faster-whisper-medium"],
-        "large-v2":     ["whisper-large-v2", "faster-whisper-large-v2"],
-        "large-v3":     ["whisper-large-v3"],
-        "large-v3-turbo": ["faster-whisper-large-v3-turbo", "whisper-large-v3-turbo"],
-    }
-    targets = keyword_map.get(model_size, [model_size])
-
-    for w_dir in whisper_dirs:
-        if not os.path.exists(w_dir):
-            continue
-        try:
-            for entry in os.listdir(w_dir):
-                entry_path = os.path.join(w_dir, entry)
-                if not os.path.isdir(entry_path):
-                    continue
-                entry_lower = entry.lower()
-                # Para large-v3 (não turbo), garantir que não bate com turbo
-                if model_size == "large-v3" and "turbo" in entry_lower:
-                    continue
-                if any(t in entry_lower for t in targets):
-                    for root, dirs, files in os.walk(entry_path):
-                        if files:
+    for folder_name in possible_folders:
+        model_dir = os.path.join("/data/output/models/whisper", folder_name)
+        if os.path.isdir(model_dir):
+            snapshots_dir = os.path.join(model_dir, "snapshots")
+            if os.path.isdir(snapshots_dir):
+                try:
+                    subdirs = [os.path.join(snapshots_dir, d) for d in os.listdir(snapshots_dir) if os.path.isdir(os.path.join(snapshots_dir, d))]
+                    for s_dir in subdirs:
+                        files = os.listdir(s_dir)
+                        if any(f in files for f in ["model.bin", "model.safetensors", "config.json"]):
                             return True
-        except Exception:
-            pass
-
+                except Exception:
+                    pass
     return False
 
 def download_model_worker(model_size: str):
@@ -1011,7 +918,7 @@ def delete_lyrics_server(current_user: dict = Depends(get_current_user)):
 
 
 
-# Sistema de Logs de Diagnóstico v3.0.18
+# Sistema de Logs de Diagnóstico v2.2.4
 DIAGNOSTIC_LOG_FILE = "/data/output/app_diagnostic.log"
 
 def log_diagnostic(message: str, level: str = "INFO"):
@@ -1026,25 +933,6 @@ def log_diagnostic(message: str, level: str = "INFO"):
             f.write(formatted_msg)
     except Exception:
         pass
-
-
-@app.get("/api/download")
-def download_result_file(file: str = Query(None), current_user: dict = Depends(get_current_user)):
-    """Endpoint universal para baixar arquivos de vídeo de resultado da pasta /data/output ou /data/library."""
-    if not file:
-        with state_lock:
-            file = state.get("result_file")
-            
-    if not file or not os.path.exists(file):
-        raise HTTPException(status_code=404, detail="Arquivo de resultado não encontrado no servidor.")
-        
-    filename = os.path.basename(file)
-    return FileResponse(
-        file,
-        media_type="video/mp4",
-        filename=filename
-    )
-
 
 @app.get("/api/logs/download")
 def download_diagnostic_logs(current_user: dict = Depends(get_current_user)):
@@ -1088,7 +976,7 @@ class ProfileModel(BaseModel):
     keep_first_line_visible: bool = False
 
 def load_profiles() -> dict:
-    """Carrega os perfis de /data/output/profiles.json e arquivos user_*_profiles.json da v2.0."""
+    """Carrega os perfis do arquivo JSON ou inicializa com valores padrão se não existir."""
     default_profiles = {
         "Padrão": {
             "whisper_model": "medium",
@@ -1108,65 +996,46 @@ def load_profiles() -> dict:
             "keep_first_line_visible": False
         }
     }
-
-    profiles = {}
-
-    # 1. Carregar o arquivo principal de perfis
-    if os.path.exists(PROFILES_FILE):
+    
+    if not os.path.exists(PROFILES_FILE):
         try:
-            with open(PROFILES_FILE, "r", encoding="utf-8") as f:
+            os.makedirs(os.path.dirname(PROFILES_FILE), exist_ok=True)
+            with open(PROFILES_FILE, "w", encoding="utf-8") as f:
                 import json
-                data = json.load(f)
-                if isinstance(data, dict):
-                    profiles = data
+                json.dump(default_profiles, f, indent=4, ensure_ascii=False)
+            return default_profiles
         except Exception as e:
-            logger.error(f"Erro ao carregar profiles.json: {e}")
-
-    # 2. Importar perfis de arquivos user_*_profiles.json da v2.0 (sem os.walk agressivo)
-    output_dir = "/data/output"
-    if os.path.exists(output_dir):
-        try:
-            for fname in os.listdir(output_dir):
-                if fname.endswith("_profiles.json") and fname != "profiles.json":
-                    p_file = os.path.join(output_dir, fname)
-                    try:
-                        with open(p_file, "r", encoding="utf-8") as f:
-                            import json
-                            p_data = json.load(f)
-                            if isinstance(p_data, dict):
-                                for p_name, p_val in p_data.items():
-                                    if isinstance(p_val, dict) and p_name not in profiles:
-                                        profiles[p_name] = p_val
-                    except Exception:
-                        pass
-        except Exception:
-            pass
-
-    if not profiles:
-        profiles = default_profiles
-
-    for p_name, p_data in list(profiles.items()):
-        if not isinstance(p_data, dict):
-            continue
-        if "subtitle_mode" not in p_data: p_data["subtitle_mode"] = "syllable"
-        if "words_per_line" not in p_data: p_data["words_per_line"] = 0
-        if "max_chars_line" not in p_data: p_data["max_chars_line"] = 40
-        if "break_on_punctuation" not in p_data: p_data["break_on_punctuation"] = True
-        if "background_mode" not in p_data: p_data["background_mode"] = "image"
-        if "show_instrumental" not in p_data: p_data["show_instrumental"] = True
-        if "transcribe_source" not in p_data: p_data["transcribe_source"] = "vocals"
-        if "show_next_line_preview" not in p_data: p_data["show_next_line_preview"] = False
-        if "keep_first_line_visible" not in p_data: p_data["keep_first_line_visible"] = False
-
+            logger.error(f"Erro ao criar arquivo de perfis padrão: {e}")
+            return default_profiles
+            
     try:
-        os.makedirs(os.path.dirname(PROFILES_FILE), exist_ok=True)
-        with open(PROFILES_FILE, "w", encoding="utf-8") as f:
+        with open(PROFILES_FILE, "r", encoding="utf-8") as f:
             import json
-            json.dump(profiles, f, indent=4, ensure_ascii=False)
-    except Exception:
-        pass
-
-    return profiles
+            profiles = json.load(f)
+            # Garantir retrocompatibilidade preenchendo campos ausentes
+            for p_name, p_data in profiles.items():
+                if "subtitle_mode" not in p_data:
+                    p_data["subtitle_mode"] = "syllable"
+                if "words_per_line" not in p_data:
+                    p_data["words_per_line"] = 0
+                if "max_chars_line" not in p_data:
+                    p_data["max_chars_line"] = 40
+                if "break_on_punctuation" not in p_data:
+                    p_data["break_on_punctuation"] = True
+                if "background_mode" not in p_data:
+                    p_data["background_mode"] = "image"
+                if "show_instrumental" not in p_data:
+                    p_data["show_instrumental"] = True
+                if "transcribe_source" not in p_data:
+                    p_data["transcribe_source"] = "vocals"
+                if "show_next_line_preview" not in p_data:
+                    p_data["show_next_line_preview"] = False
+                if "keep_first_line_visible" not in p_data:
+                    p_data["keep_first_line_visible"] = False
+            return profiles
+    except Exception as e:
+        logger.error(f"Erro ao carregar arquivo de perfis: {e}")
+        return default_profiles
 
 @app.get("/api/profiles")
 def get_profiles(current_user: dict = Depends(get_current_user)):
@@ -1255,30 +1124,16 @@ def get_favicon():
     return HTMLResponse(status_code=404)
 
 @app.get("/api/auth_status")
-def auth_status(
-    x_session_token: str = Header(None),
-    authorization: str = Header(None),
-    token: str = Query(None)
-):
+def auth_status(x_session_token: str = Header(None)):
     users = load_users()
     if not users:
         return {"status": "setup"}
-        
-    active_token = x_session_token or token
-    if not active_token and authorization:
-        if authorization.startswith("Bearer "):
-            active_token = authorization.split(" ")[1].strip()
-        else:
-            active_token = authorization.strip()
-
-    if not active_token:
+    if not x_session_token:
         return {"status": "login"}
-
     sessions = load_sessions()
-    session = sessions.get(active_token)
+    session = sessions.get(x_session_token)
     if not session:
         return {"status": "login"}
-
     return {
         "status": "authenticated",
         "username": session.get("username"),
@@ -1324,77 +1179,46 @@ def login(data: dict):
     if not username or not password:
         raise HTTPException(status_code=400, detail="Usuário e senha são obrigatórios.")
         
-    user_data = users.get(username)
-    if not user_data:
+    user = users.get(username)
+    if not user:
         raise HTTPException(status_code=401, detail="Usuário ou senha incorretos.")
         
-    # Caso 1: Formato Legado v2.0 onde o valor era uma string direta com o hash SHA-256
-    if isinstance(user_data, str):
+    # Lógica de migração automática do SHA-256 legado para PBKDF2
+    salt = user.get("salt")
+    if not salt:
+        # Tentar validar usando o sha256 simples antigo
         legacy_hash = hashlib.sha256(password.encode("utf-8")).hexdigest()
-        if user_data != legacy_hash:
+        if user.get("password_hash") != legacy_hash:
             raise HTTPException(status_code=401, detail="Usuário ou senha incorretos.")
-        # Migração transparente para PBKDF2
+        # Se validado com sucesso, migramos imediatamente!
         pw_hash, new_salt = hash_password(password)
-        user_info = {
-            "password_hash": pw_hash,
-            "salt": new_salt,
-            "role": "admin" if username in ["admin", "root"] else "user"
-        }
-        users[username] = user_info
+        user["password_hash"] = pw_hash
+        user["salt"] = new_salt
+        users[username] = user
         save_users(users)
-        logger.info(f"Usuário '{username}' migrado com sucesso do formato string SHA-256 para PBKDF2.")
-        user_data = user_info
-        
-    # Caso 2: Formato de dicionário (v2.0 / v3.0)
-    elif isinstance(user_data, dict):
-        pw_hash_stored = user_data.get("password_hash") or user_data.get("password")
-        salt = user_data.get("salt")
-        
-        if not salt:
-            legacy_hash = hashlib.sha256(password.encode("utf-8")).hexdigest()
-            if pw_hash_stored != legacy_hash:
-                raise HTTPException(status_code=401, detail="Usuário ou senha incorretos.")
-            pw_hash, new_salt = hash_password(password)
-            user_data["password_hash"] = pw_hash
-            user_data["salt"] = new_salt
-            if "role" not in user_data:
-                user_data["role"] = "admin" if username in ["admin", "root"] else "user"
-            users[username] = user_data
-            save_users(users)
-            logger.info(f"Usuário '{username}' migrado com sucesso de dicionário sem salt para PBKDF2.")
-        else:
-            check_hash, _ = hash_password(password, salt=salt)
-            if pw_hash_stored != check_hash:
-                raise HTTPException(status_code=401, detail="Usuário ou senha incorretos.")
+        logger.info(f"Usuário {username} migrado com sucesso para criptografia PBKDF2.")
     else:
-        raise HTTPException(status_code=401, detail="Formato de dados do usuário inválido.")
+        # Validar usando PBKDF2 com o salt correspondente
+        check_hash, _ = hash_password(password, salt=salt)
+        if user.get("password_hash") != check_hash:
+            raise HTTPException(status_code=401, detail="Usuário ou senha incorretos.")
         
     token = str(uuid.uuid4())
     sessions = load_sessions()
     sessions[token] = {
         "username": username,
-        "role": user_data.get("role", "admin" if username in ["admin", "root"] else "user")
+        "role": user.get("role", "user")
     }
     save_sessions(sessions)
     
-    return {"status": "success", "token": token, "username": username, "role": user_data.get("role", "user")}
+    return {"status": "success", "token": token, "username": username, "role": user.get("role", "user")}
 
 @app.post("/api/logout")
-def logout(
-    x_session_token: str = Header(None),
-    authorization: str = Header(None),
-    token: str = Query(None)
-):
-    active_token = x_session_token or token
-    if not active_token and authorization:
-        if authorization.startswith("Bearer "):
-            active_token = authorization.split(" ")[1].strip()
-        else:
-            active_token = authorization.strip()
-    if active_token:
+def logout(x_session_token: str = Header(None)):
+    if x_session_token:
         sessions = load_sessions()
-        if active_token in sessions:
-            del sessions[active_token]
+        if x_session_token in sessions:
+            del sessions[x_session_token]
             save_sessions(sessions)
     return {"status": "success"}
 
@@ -1448,31 +1272,16 @@ LIBRARY_DIR = "/data/library"
 
 @app.get("/api/library")
 def get_library_files(current_user: dict = Depends(get_current_user)):
-    """Retorna arquivos das pastas exatas da v2.0: /data/library/videos, /photos, /history."""
+    """Retorna as listas de arquivos disponíveis na biblioteca (videos, photos, history)."""
     result = {"videos": [], "photos": [], "history": []}
-    video_exts = {'.mp4', '.mkv', '.avi', '.mp3', '.wav', '.flac', '.m4a', '.webm'}
-    photo_exts = {'.jpg', '.jpeg', '.png', '.webp', '.gif'}
-    SKIP_FILES = {'temp.mp4', 'bg_yt_raw.mp4', 'dummy_signal.wav', 'vocals.wav', 'instrumental.wav'}
-
-    # Leitura exata das pastas da v2.0 dentro de /data/library/
-    section_map = {
-        "videos": video_exts,
-        "photos": photo_exts,
-        "history": video_exts
-    }
-    for section, valid_exts in section_map.items():
+    for section in ["videos", "photos", "history"]:
         path = os.path.join(LIBRARY_DIR, section)
-        os.makedirs(path, exist_ok=True)
-        try:
-            for f in sorted(os.listdir(path)):
-                if f.startswith('.') or f in SKIP_FILES:
-                    continue
-                if os.path.isfile(os.path.join(path, f)):
-                    if os.path.splitext(f)[1].lower() in valid_exts:
-                        result[section].append(f)
-        except Exception as e:
-            logger.error(f"Erro ao listar {section}: {e}")
-
+        if os.path.exists(path):
+            try:
+                files = sorted(os.listdir(path))
+                result[section] = [f for f in files if os.path.isfile(os.path.join(path, f)) and not f.startswith('.')]
+            except Exception as e:
+                logger.error(f"Erro ao listar biblioteca {section}: {e}")
     return result
 
 @app.post("/api/library/upload")
@@ -1801,7 +1610,7 @@ def process_karaoke(
             if state.get("status") in ["idle", "error", "done"]:
                 try:
                     processing_lock.release()
-                    logger.info("Failsafe v3.0.18: Lock de concorrência obsoleto liberado com sucesso.")
+                    logger.info("Failsafe v2.2.4: Lock de concorrência obsoleto liberado com sucesso.")
                 except Exception:
                     pass
             else:
@@ -1943,7 +1752,7 @@ def process_karaoke(
                 raise HTTPException(status_code=400, detail=err_detail)
             
         orig_name = os.path.splitext(library_audio)[0]
-        audio_ext = os.path.splitext(library_audio)[1] or ".mp4" 
+        audio_ext = os.path.splitext(library_audio)[1]
         
         logger.info("Nova música da biblioteca selecionada. Limpando cache anterior...")
         for f_name in os.listdir(cache_dir):
@@ -1996,7 +1805,7 @@ def process_karaoke(
 
     elif audio_file:
         orig_name = os.path.splitext(audio_file.filename)[0]
-        audio_ext = os.path.splitext(audio_file.filename)[1] or ".mp4" 
+        audio_ext = os.path.splitext(audio_file.filename)[1]
         
         logger.info("Novo upload recebido. Limpando cache anterior...")
         for f_name in os.listdir(cache_dir):
@@ -2061,7 +1870,7 @@ def process_karaoke(
                 pass
                 
         orig_name = cached_meta.get("original_filename")
-        input_ext = cached_meta.get("input_ext") or ".mp4" 
+        input_ext = cached_meta.get("input_ext")
         
         if not orig_name or not input_ext:
             raise HTTPException(
@@ -2345,18 +2154,6 @@ def run_pipeline(
                         import json
                         json.dump(cached_meta, f, indent=4)
                         
-                    # GARANTIA V3.0.18: Copiar vídeo do YouTube baixado para a biblioteca de vídeos
-                    try:
-                        lib_video_dir = "/data/library/videos"
-                        os.makedirs(lib_video_dir, exist_ok=True)
-                        ext_yt = os.path.splitext(input_audio_path)[1] or ".mp4"
-                        safe_yt_name = "".join([c for c in orig_name if c.isalnum() or c in ' ._-']).strip() or "youtube_download"
-                        dest_yt_file = os.path.join(lib_video_dir, f"{safe_yt_name}{ext_yt}")
-                        shutil.copy2(input_audio_path, dest_yt_file)
-                        logger.info(f"Vídeo do YouTube adicionado à biblioteca: {dest_yt_file}")
-                    except Exception as yt_copy_err:
-                        logger.error(f"Erro ao salvar vídeo do YouTube na biblioteca: {yt_copy_err}")
-
                     send_telegram_notification(
                         telegram_token, 
                         telegram_chat_id, 
@@ -2409,12 +2206,6 @@ def run_pipeline(
                 pm.check_cancelled()
                 update_state("processing", "Extracting audio", 15)
                 send_telegram_notification(telegram_token, telegram_chat_id, "🎵 <b>Sal0 Karaokê</b>: Extraindo áudio (15%)")
-                if not os.path.exists(input_audio_path):
-                    for f in os.listdir(cache_dir):
-                        if f.startswith("original_input."):
-                            input_audio_path = os.path.join(cache_dir, f)
-                            logger.info(f"Ajustado input_audio_path para arquivo existente no cache: {input_audio_path}")
-                            break
                 extract_audio(input_audio_path, converted_wav)
             
             pm.check_cancelled()
@@ -2596,23 +2387,6 @@ def run_pipeline(
             # Salvar opcionalmente a legenda ASS final gerada junto com o MP4
             shutil.copy(ass_path, final_ass_path)
             
-            # GARANTIA V3.0.18: Copiar vídeo final de karaokê renderizado para a biblioteca de histórico
-            try:
-                lib_history_dir = "/data/library/history"
-                os.makedirs(lib_history_dir, exist_ok=True)
-                safe_hist_name = "".join([c for c in orig_name if c.isalnum() or c in ' ._-']).strip() or "video_final"
-                dest_hist_filename = f"{safe_hist_name}.mp4"
-                dest_hist_path = os.path.join(lib_history_dir, dest_hist_filename)
-                counter = 1
-                while os.path.exists(dest_hist_path):
-                    dest_hist_filename = f"{safe_hist_name}_{counter}.mp4"
-                    dest_hist_path = os.path.join(lib_history_dir, dest_hist_filename)
-                    counter += 1
-                shutil.copy2(final_mp4_path, dest_hist_path)
-                logger.info(f"Vídeo final de karaokê salvo na biblioteca de histórico: {dest_hist_path}")
-            except Exception as hist_err:
-                logger.error(f"Erro ao salvar vídeo final na biblioteca de histórico: {hist_err}")
-
             # Passo 6: Limpar arquivos temporários (não removemos os uploads do cache)
             update_state("processing", "Cleaning temporary files", 98)
             logger.info("Preservando arquivos de entrada no cache para futuros reprocessamentos.")
