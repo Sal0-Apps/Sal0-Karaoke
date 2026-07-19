@@ -524,15 +524,22 @@ def get_internal_ip() -> str:
         return "localhost"
 
 def load_external_url_config() -> dict:
-    """Carrega a URL/IP externo do disco."""
-    if not os.path.exists(EXTERNAL_URL_FILE):
-        return {"external_url": ""}
-    try:
-        with open(EXTERNAL_URL_FILE, "r", encoding="utf-8") as f:
-            import json
-            return json.load(f)
-    except Exception:
-        return {"external_url": ""}
+    """Carrega a URL/IP externo do disco (v2.0 e v3.0)."""
+    possible_paths = [
+        "/data/output/external_url.json",
+        "/data/external_url.json"
+    ]
+    for path in possible_paths:
+        if os.path.exists(path):
+            try:
+                with open(path, "r", encoding="utf-8") as f:
+                    import json
+                    data = json.load(f)
+                    if data.get("external_url"):
+                        return data
+            except Exception:
+                pass
+    return {"external_url": ""}
 
 @app.get("/api/external_url")
 def get_external_url_config():
@@ -553,16 +560,22 @@ def save_external_url_config(config: ExternalUrlModel):
 
 
 def load_telegram_config() -> dict:
-    """Carrega as credenciais globais do Telegram do disco."""
-    if not os.path.exists(TELEGRAM_FILE):
-        return {"telegram_token": "", "telegram_chat_id": ""}
-    try:
-        with open(TELEGRAM_FILE, "r", encoding="utf-8") as f:
-            import json
-            return json.load(f)
-    except Exception as e:
-        logger.error(f"Erro ao carregar configurações do Telegram: {e}")
-        return {"telegram_token": "", "telegram_chat_id": ""}
+    """Carrega as credenciais globais do Telegram do disco (v2.0 e v3.0)."""
+    possible_paths = [
+        "/data/output/telegram.json",
+        "/data/telegram.json"
+    ]
+    for path in possible_paths:
+        if os.path.exists(path):
+            try:
+                with open(path, "r", encoding="utf-8") as f:
+                    import json
+                    data = json.load(f)
+                    if data.get("telegram_token") or data.get("telegram_chat_id"):
+                        return data
+            except Exception as e:
+                logger.error(f"Erro ao carregar configurações do Telegram de {path}: {e}")
+    return {"telegram_token": "", "telegram_chat_id": ""}
 
 @app.get("/api/telegram")
 def get_telegram_config():
@@ -989,7 +1002,7 @@ def delete_lyrics_server(current_user: dict = Depends(get_current_user)):
 
 
 
-# Sistema de Logs de Diagnóstico v3.0.7
+# Sistema de Logs de Diagnóstico v3.0.8
 DIAGNOSTIC_LOG_FILE = "/data/output/app_diagnostic.log"
 
 def log_diagnostic(message: str, level: str = "INFO"):
@@ -1380,8 +1393,10 @@ LIBRARY_DIR = "/data/library"
 
 @app.get("/api/library")
 def get_library_files(current_user: dict = Depends(get_current_user)):
-    """Retorna as listas de arquivos disponíveis na biblioteca (videos, photos, history) e arquivos soltos em /data/library."""
+    """Retorna as listas de arquivos disponíveis na biblioteca e histórico (v2.0 e v3.0)."""
     result = {"videos": [], "photos": [], "history": []}
+    
+    # 1. Escanear subpastas padrão em /data/library/
     for section in ["videos", "photos", "history"]:
         path = os.path.join(LIBRARY_DIR, section)
         os.makedirs(path, exist_ok=True)
@@ -1391,7 +1406,7 @@ def get_library_files(current_user: dict = Depends(get_current_user)):
         except Exception as e:
             logger.error(f"Erro ao listar biblioteca {section}: {e}")
 
-    # Escanear arquivos soltos diretamente em /data/library/
+    # 2. Escanear arquivos soltos diretamente em /data/library/
     if os.path.exists(LIBRARY_DIR):
         try:
             loose_files = sorted(os.listdir(LIBRARY_DIR))
@@ -1408,6 +1423,19 @@ def get_library_files(current_user: dict = Depends(get_current_user)):
                         result["photos"].append(f)
         except Exception as e:
             logger.error(f"Erro ao listar arquivos soltos em {LIBRARY_DIR}: {e}")
+
+    # 3. Escanear históricos e vídeos legados do v2.0 em /data/output/ e /data/output/history/
+    legacy_output_dirs = ["/data/output", "/data/output/history"]
+    for out_dir in legacy_output_dirs:
+        if os.path.exists(out_dir):
+            try:
+                out_files = sorted(os.listdir(out_dir))
+                for f in out_files:
+                    if f.endswith(".mp4") and not f.startswith(".") and f not in result["history"]:
+                        if f not in ["temp.mp4", "bg_yt_raw.mp4"]:
+                            result["history"].append(f)
+            except Exception as e:
+                logger.error(f"Erro ao escanear histórico legado em {out_dir}: {e}")
 
     return result
 
@@ -1737,7 +1765,7 @@ def process_karaoke(
             if state.get("status") in ["idle", "error", "done"]:
                 try:
                     processing_lock.release()
-                    logger.info("Failsafe v3.0.7: Lock de concorrência obsoleto liberado com sucesso.")
+                    logger.info("Failsafe v3.0.8: Lock de concorrência obsoleto liberado com sucesso.")
                 except Exception:
                     pass
             else:
