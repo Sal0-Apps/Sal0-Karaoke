@@ -1011,7 +1011,7 @@ def delete_lyrics_server(current_user: dict = Depends(get_current_user)):
 
 
 
-# Sistema de Logs de Diagnóstico v3.0.16
+# Sistema de Logs de Diagnóstico v3.0.18
 DIAGNOSTIC_LOG_FILE = "/data/output/app_diagnostic.log"
 
 def log_diagnostic(message: str, level: str = "INFO"):
@@ -1801,7 +1801,7 @@ def process_karaoke(
             if state.get("status") in ["idle", "error", "done"]:
                 try:
                     processing_lock.release()
-                    logger.info("Failsafe v3.0.16: Lock de concorrência obsoleto liberado com sucesso.")
+                    logger.info("Failsafe v3.0.18: Lock de concorrência obsoleto liberado com sucesso.")
                 except Exception:
                     pass
             else:
@@ -1943,7 +1943,7 @@ def process_karaoke(
                 raise HTTPException(status_code=400, detail=err_detail)
             
         orig_name = os.path.splitext(library_audio)[0]
-        audio_ext = os.path.splitext(library_audio)[1]
+        audio_ext = os.path.splitext(library_audio)[1] or ".mp4" 
         
         logger.info("Nova música da biblioteca selecionada. Limpando cache anterior...")
         for f_name in os.listdir(cache_dir):
@@ -1996,7 +1996,7 @@ def process_karaoke(
 
     elif audio_file:
         orig_name = os.path.splitext(audio_file.filename)[0]
-        audio_ext = os.path.splitext(audio_file.filename)[1]
+        audio_ext = os.path.splitext(audio_file.filename)[1] or ".mp4" 
         
         logger.info("Novo upload recebido. Limpando cache anterior...")
         for f_name in os.listdir(cache_dir):
@@ -2061,7 +2061,7 @@ def process_karaoke(
                 pass
                 
         orig_name = cached_meta.get("original_filename")
-        input_ext = cached_meta.get("input_ext")
+        input_ext = cached_meta.get("input_ext") or ".mp4" 
         
         if not orig_name or not input_ext:
             raise HTTPException(
@@ -2345,6 +2345,18 @@ def run_pipeline(
                         import json
                         json.dump(cached_meta, f, indent=4)
                         
+                    # GARANTIA V3.0.18: Copiar vídeo do YouTube baixado para a biblioteca de vídeos
+                    try:
+                        lib_video_dir = "/data/library/videos"
+                        os.makedirs(lib_video_dir, exist_ok=True)
+                        ext_yt = os.path.splitext(input_audio_path)[1] or ".mp4"
+                        safe_yt_name = "".join([c for c in orig_name if c.isalnum() or c in ' ._-']).strip() or "youtube_download"
+                        dest_yt_file = os.path.join(lib_video_dir, f"{safe_yt_name}{ext_yt}")
+                        shutil.copy2(input_audio_path, dest_yt_file)
+                        logger.info(f"Vídeo do YouTube adicionado à biblioteca: {dest_yt_file}")
+                    except Exception as yt_copy_err:
+                        logger.error(f"Erro ao salvar vídeo do YouTube na biblioteca: {yt_copy_err}")
+
                     send_telegram_notification(
                         telegram_token, 
                         telegram_chat_id, 
@@ -2397,6 +2409,12 @@ def run_pipeline(
                 pm.check_cancelled()
                 update_state("processing", "Extracting audio", 15)
                 send_telegram_notification(telegram_token, telegram_chat_id, "🎵 <b>Sal0 Karaokê</b>: Extraindo áudio (15%)")
+                if not os.path.exists(input_audio_path):
+                    for f in os.listdir(cache_dir):
+                        if f.startswith("original_input."):
+                            input_audio_path = os.path.join(cache_dir, f)
+                            logger.info(f"Ajustado input_audio_path para arquivo existente no cache: {input_audio_path}")
+                            break
                 extract_audio(input_audio_path, converted_wav)
             
             pm.check_cancelled()
@@ -2578,6 +2596,23 @@ def run_pipeline(
             # Salvar opcionalmente a legenda ASS final gerada junto com o MP4
             shutil.copy(ass_path, final_ass_path)
             
+            # GARANTIA V3.0.18: Copiar vídeo final de karaokê renderizado para a biblioteca de histórico
+            try:
+                lib_history_dir = "/data/library/history"
+                os.makedirs(lib_history_dir, exist_ok=True)
+                safe_hist_name = "".join([c for c in orig_name if c.isalnum() or c in ' ._-']).strip() or "video_final"
+                dest_hist_filename = f"{safe_hist_name}.mp4"
+                dest_hist_path = os.path.join(lib_history_dir, dest_hist_filename)
+                counter = 1
+                while os.path.exists(dest_hist_path):
+                    dest_hist_filename = f"{safe_hist_name}_{counter}.mp4"
+                    dest_hist_path = os.path.join(lib_history_dir, dest_hist_filename)
+                    counter += 1
+                shutil.copy2(final_mp4_path, dest_hist_path)
+                logger.info(f"Vídeo final de karaokê salvo na biblioteca de histórico: {dest_hist_path}")
+            except Exception as hist_err:
+                logger.error(f"Erro ao salvar vídeo final na biblioteca de histórico: {hist_err}")
+
             # Passo 6: Limpar arquivos temporários (não removemos os uploads do cache)
             update_state("processing", "Cleaning temporary files", 98)
             logger.info("Preservando arquivos de entrada no cache para futuros reprocessamentos.")
