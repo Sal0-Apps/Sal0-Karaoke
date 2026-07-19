@@ -980,7 +980,7 @@ def delete_lyrics_server(current_user: dict = Depends(get_current_user)):
 
 
 
-# Sistema de Logs de Diagnóstico v3.5.9
+# Sistema de Logs de Diagnóstico v3.6.0
 DIAGNOSTIC_LOG_FILE = "/data/output/app_diagnostic.log"
 
 def log_diagnostic(message: str, level: str = "INFO"):
@@ -1666,9 +1666,8 @@ def process_karaoke(
     transcribe_source: str = Form("vocals"),
     show_next_line_preview: bool = Form(False),
     lyrics_text: str = Form(None),
-    enable_correction: bool = Form(True),
-    keep_first_line_visible: bool = Form(False),
     enable_correction: bool = Form(False),
+    keep_first_line_visible: bool = Form(False),
     pause_for_editing: bool = Form(False),
     youtube_url: str = Form(None),
     library_audio: str = Form(None),
@@ -1685,7 +1684,7 @@ def process_karaoke(
             if state.get("status") in ["idle", "error", "done"]:
                 try:
                     processing_lock.release()
-                    logger.info("Failsafe v3.5.9: Lock de concorrência obsoleto liberado com sucesso.")
+                    logger.info("Failsafe v3.6.0: Lock de concorrência obsoleto liberado com sucesso.")
                 except Exception:
                     pass
             else:

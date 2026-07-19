@@ -37,7 +37,7 @@ def split_and_wrap_segments(
     max_chars_line: int = 40,
     break_on_punctuation: bool = True
 ) -> list[dict]:
-    """
+    r"""
     Divide os segmentos de transcrição em partes menores com base nas restrições de:
     - Quantidade máxima de palavras por linha (words_per_line)
     - Limite de caracteres por linha (max_chars_line)
