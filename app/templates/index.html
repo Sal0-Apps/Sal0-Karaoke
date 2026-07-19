@@ -5,7 +5,7 @@
     <meta name="color-scheme" content="dark">
     <meta name="supported-color-schemes" content="dark">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Sal0 Karaokê v3.0.2 - Gerador Automático de Vídeos</title>
+    <title>Sal0 Karaokê v3.0.3 - Gerador Automático de Vídeos</title>
     <link rel="icon" type="image/png" href="/favicon.png">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -46,14 +46,14 @@
 
         body {
             display: flex;
-            align-items: center;
             justify-content: center;
-            padding: 1rem 0.5rem;
+            align-items: flex-start;
+            padding: 1.5rem 0.75rem;
         }
 
         .container {
             width: 100%;
-            max-width: 840px;
+            max-width: 860px;
             background: var(--glass-bg);
             backdrop-filter: blur(20px);
             -webkit-backdrop-filter: blur(20px);
@@ -63,9 +63,10 @@
             box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.6);
             position: relative;
             z-index: 1;
+            margin: 0 auto;
         }
 
-        /* Cabeçalho Responsivo */
+        /* Cabeçalho */
         .app-header {
             display: flex;
             align-items: center;
@@ -134,7 +135,6 @@
 
         .header-btn:hover {
             background: rgba(255, 255, 255, 0.12);
-            transform: translateY(-1px);
         }
 
         /* Abas Principais */
@@ -216,6 +216,17 @@
             cursor: not-allowed;
         }
 
+        .btn-secondary {
+            border: 1px solid var(--glass-border);
+            padding: 0.45rem 0.7rem;
+            border-radius: 8px;
+            background: rgba(255,255,255,0.05);
+            color: #fff;
+            font-size: 0.8rem;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
         /* Timeline e Progresso */
         .process-card {
             display: none;
@@ -256,26 +267,10 @@
             background: rgba(255, 255, 255, 0.2);
         }
 
-        .timeline-step.completed {
-            color: #34d399 !important;
-            font-weight: 500;
-        }
-
-        .timeline-step.completed .step-dot {
-            background: #10b981 !important;
-            box-shadow: 0 0 8px rgba(16, 185, 129, 0.5) !important;
-        }
-
-        .timeline-step.active {
-            color: #c084fc !important;
-            font-weight: 700;
-        }
-
-        .timeline-step.active .step-dot {
-            background: #8b5cf6 !important;
-            box-shadow: 0 0 12px rgba(139, 92, 246, 0.8) !important;
-            animation: pulseDot 1.5s infinite;
-        }
+        .timeline-step.completed { color: #34d399 !important; font-weight: 500; }
+        .timeline-step.completed .step-dot { background: #10b981 !important; box-shadow: 0 0 8px rgba(16, 185, 129, 0.5) !important; }
+        .timeline-step.active { color: #c084fc !important; font-weight: 700; }
+        .timeline-step.active .step-dot { background: #8b5cf6 !important; box-shadow: 0 0 12px rgba(139, 92, 246, 0.8) !important; animation: pulseDot 1.5s infinite; }
 
         @keyframes pulseDot {
             0% { transform: scale(1); }
@@ -292,7 +287,7 @@
 </head>
 <body>
     <div class="container">
-        <!-- Cabeçalho Limpo v3.0.2 -->
+        <!-- Cabeçalho -->
         <header class="app-header">
             <div class="header-brand">
                 <img src="/favicon.png" alt="Logo">
@@ -391,9 +386,9 @@
                             </select>
                         </div>
 
-                        <div style="margin-top: 0.6rem;">
-                            <span style="font-size: 0.72rem; color: var(--text-muted); display: block; margin-bottom: 0.2rem;">Exibição no Vídeo</span>
-                            <select id="backgroundMode" name="background_mode" style="width: 100%; border: 1px solid var(--glass-border); padding: 0.5rem 0.75rem; background: #141226; color: #fff; border-radius: 10px; font-size: 0.8rem; cursor: pointer; outline: none;">
+                        <div style="margin-top: 0.6rem; width: 100%;">
+                            <span style="font-size: 0.72rem; color: var(--text-muted); display: block; margin-bottom: 0.2rem; text-align: left;">Exibição no Vídeo</span>
+                            <select id="backgroundMode" name="background_mode" style="width: 100%; border: 1px solid var(--glass-border); padding: 0.55rem 0.75rem; background: #141226; color: #fff; border-radius: 10px; font-size: 0.8rem; cursor: pointer; outline: none; font-weight: 600;">
                                 <option value="random_landscape" selected>🏞️ Paisagem Aleatória (Padrão)</option>
                                 <option value="image">🖼️ Usar Fundo Enviado/Biblioteca</option>
                                 <option value="original_video">🎥 Usar Vídeo Original (Música)</option>
@@ -425,15 +420,16 @@
                     <textarea id="lyricsText" name="lyrics_text" placeholder="Cole a letra oficial aqui..." style="width: 100%; min-height: 90px; border: 1px solid var(--glass-border); padding: 0.7rem; background: rgba(0,0,0,0.15); color: #fff; border-radius: 12px; font-size: 0.85rem; outline: none; resize: vertical;"></textarea>
                 </div>
 
-                <!-- Painel Avançado Colapsável -->
+                <!-- Painel de Ajustes Avançados Restaurado (TODAS AS OPÇÕES v3.0.3) -->
                 <div id="advancedContent" style="display: none; margin-top: 1.2rem; background: rgba(255,255,255,0.015); border: 1px solid var(--glass-border); border-radius: 14px; padding: 1rem;">
+                    
                     <!-- Perfis -->
                     <div style="border: 1px solid rgba(255,255,255,0.05); border-radius: 10px; padding: 0.8rem; background: rgba(0,0,0,0.15); margin-bottom: 1rem;">
                         <span class="label">Salvar ou Excluir Perfil Atual</span>
                         <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.4rem;">
                             <input type="text" id="profileNameInput" placeholder="Nome do perfil" style="flex: 1; min-width: 150px; border: 1px solid var(--glass-border); padding: 0.5rem; background: #141226; color: #fff; border-radius: 8px; font-size: 0.82rem; outline: none;">
-                            <button type="button" id="btnSaveProfile" style="background: rgba(139,92,246,0.2); border: 1px solid rgba(139,92,246,0.4); color: #c084fc; padding: 0.4rem 0.8rem; border-radius: 8px; font-size: 0.8rem; cursor: pointer;">💾 Salvar</button>
-                            <button type="button" id="btnDeleteProfile" style="background: rgba(239,68,68,0.15); border: 1px solid rgba(239,68,68,0.3); color: #fca5a5; padding: 0.4rem 0.8rem; border-radius: 8px; font-size: 0.8rem; cursor: pointer;">🗑️ Excluir</button>
+                            <button type="button" id="btnSaveProfile" class="btn-secondary" style="background: rgba(139,92,246,0.2); color: #c084fc;">💾 Salvar</button>
+                            <button type="button" id="btnDeleteProfile" class="btn-secondary" style="background: rgba(239,68,68,0.15); color: #fca5a5;">🗑️ Excluir</button>
                         </div>
                     </div>
 
@@ -456,7 +452,7 @@
                         <div id="modelsListContainer" style="display: grid; gap: 0.6rem; margin-top: 0.5rem;"></div>
                     </div>
 
-                    <!-- Configurações Estéticas da Legenda -->
+                    <!-- Estilização da Legenda -->
                     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 0.8rem; border: 1px solid rgba(255,255,255,0.05); border-radius: 10px; padding: 0.8rem; background: rgba(0,0,0,0.15); margin-bottom: 1rem;">
                         <div>
                             <span class="label">Tamanho da Fonte</span>
@@ -476,6 +472,65 @@
                         </div>
                     </div>
 
+                    <!-- Estilo e Regras da Legenda -->
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 0.8rem; border: 1px solid rgba(255,255,255,0.05); border-radius: 10px; padding: 0.8rem; background: rgba(0,0,0,0.15); margin-bottom: 1rem;">
+                        <div>
+                            <span class="label">Tipo de Legenda</span>
+                            <select id="subtitleMode" name="subtitle_mode" style="width: 100%; border: 1px solid var(--glass-border); padding: 0.45rem; background: #141226; color: #fff; border-radius: 8px; outline: none; cursor: pointer;">
+                                <option value="syllable" selected>Seguir Sílabas (Karaokê)</option>
+                                <option value="word">Palavra por Palavra</option>
+                                <option value="line">Frase Completa por Vez</option>
+                            </select>
+                        </div>
+                        <div>
+                            <span class="label">Palavras por Linha</span>
+                            <input type="number" id="wordsPerLine" name="words_per_line" value="0" min="0" max="20" style="width: 100%; border: 1px solid var(--glass-border); padding: 0.45rem; background: #141226; color: #fff; border-radius: 8px; outline: none; text-align: center;">
+                        </div>
+                        <div>
+                            <span class="label">Máx. Caracteres</span>
+                            <input type="number" id="maxCharsLine" name="max_chars_line" value="40" min="10" max="100" style="width: 100%; border: 1px solid var(--glass-border); padding: 0.45rem; background: #141226; color: #fff; border-radius: 8px; outline: none; text-align: center;">
+                        </div>
+                        <div>
+                            <span class="label">Quebrar em Pontuação</span>
+                            <select id="breakOnPunctuation" name="break_on_punctuation" style="width: 100%; border: 1px solid var(--glass-border); padding: 0.45rem; background: #141226; color: #fff; border-radius: 8px; outline: none; cursor: pointer;">
+                                <option value="true" selected>Sim (Padrão)</option>
+                                <option value="false">Não</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Configurações de Áudio e Pré-Visualização -->
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 0.8rem; border: 1px solid rgba(255,255,255,0.05); border-radius: 10px; padding: 0.8rem; background: rgba(0,0,0,0.15); margin-bottom: 1rem;">
+                        <div>
+                            <span class="label">🎸 Instrumental nas Pausas</span>
+                            <select id="showInstrumental" name="show_instrumental" style="width: 100%; border: 1px solid var(--glass-border); padding: 0.45rem; background: #141226; color: #fff; border-radius: 8px; outline: none; cursor: pointer;">
+                                <option value="true" selected>Sim (Padrão)</option>
+                                <option value="false">Não</option>
+                            </select>
+                        </div>
+                        <div>
+                            <span class="label">🎤 Fonte de Transcrição</span>
+                            <select id="transcribeSource" name="transcribe_source" style="width: 100%; border: 1px solid var(--glass-border); padding: 0.45rem; background: #141226; color: #fff; border-radius: 8px; outline: none; cursor: pointer;">
+                                <option value="vocals" selected>Voz Isolada (Recomendado)</option>
+                                <option value="original">Áudio Original Completo</option>
+                            </select>
+                        </div>
+                        <div>
+                            <span class="label">👁️ Pré-visualizar Próxima Linha</span>
+                            <select id="showNextLinePreview" name="show_next_line_preview" style="width: 100%; border: 1px solid var(--glass-border); padding: 0.45rem; background: #141226; color: #fff; border-radius: 8px; outline: none; cursor: pointer;">
+                                <option value="false" selected>Não (Padrão)</option>
+                                <option value="true">Sim (Ofuscada)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <span class="label">📄 Letra Visível no Início</span>
+                            <select id="keepFirstLineVisible" name="keep_first_line_visible" style="width: 100%; border: 1px solid var(--glass-border); padding: 0.45rem; background: #141226; color: #fff; border-radius: 8px; outline: none; cursor: pointer;">
+                                <option value="false" selected>Não (Padrão)</option>
+                                <option value="true">Sim</option>
+                            </select>
+                        </div>
+                    </div>
+
                     <!-- Configuração de IP / URL Externa -->
                     <div style="border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 0.8rem; background: rgba(0,0,0,0.15); margin-bottom: 1rem;">
                         <span class="label" style="color: #34d399;">🌐 Configuração de IP / URL Externa (Acesso Remoto)</span>
@@ -484,7 +539,7 @@
                         </div>
                         <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
                             <input type="text" id="externalUrlInput" placeholder="http://meuservidor.ddns.net:7885" style="flex: 1; min-width: 200px; border: 1px solid var(--glass-border); padding: 0.5rem 0.7rem; background: #141226; color: #fff; border-radius: 8px; font-size: 0.82rem; outline: none;">
-                            <button type="button" id="btnSaveExternalUrl" style="background: rgba(16,185,129,0.2); border: 1px solid rgba(16,185,129,0.4); color: #34d399; font-weight: 700; height: 34px; padding: 0 0.8rem; border-radius: 8px; cursor: pointer;">💾 Salvar URL Externa</button>
+                            <button type="button" id="btnSaveExternalUrl" class="btn-secondary" style="background: rgba(16,185,129,0.2); color: #34d399;">💾 Salvar URL Externa</button>
                         </div>
                     </div>
 
@@ -494,8 +549,20 @@
                         <div style="display: grid; gap: 0.5rem; margin-top: 0.4rem;">
                             <input type="text" id="telegramTokenInput" placeholder="Token do Bot" style="border: 1px solid var(--glass-border); padding: 0.5rem; background: #141226; color: #fff; border-radius: 8px; font-size: 0.8rem; outline: none;">
                             <input type="text" id="telegramChatIdInput" placeholder="Chat ID" style="border: 1px solid var(--glass-border); padding: 0.5rem; background: #141226; color: #fff; border-radius: 8px; font-size: 0.8rem; outline: none;">
-                            <button type="button" id="btnSaveTelegram" style="background: rgba(59,130,246,0.2); border: 1px solid rgba(59,130,246,0.4); color: #60a5fa; font-weight: 700; height: 34px; border-radius: 8px; cursor: pointer;">💾 Salvar Telegram</button>
+                            <button type="button" id="btnSaveTelegram" class="btn-secondary" style="background: rgba(59,130,246,0.2); color: #60a5fa;">💾 Salvar Telegram</button>
                         </div>
+                    </div>
+
+                    <!-- Gerenciamento de Contas Locais -->
+                    <div style="border: 1px solid rgba(255,255,255,0.05); border-radius: 10px; padding: 0.8rem; background: rgba(0,0,0,0.15);">
+                        <span class="label">👤 Gerenciamento de Contas Locais</span>
+                        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.4rem; margin-bottom: 0.8rem;">
+                            <input type="text" id="newUsername" placeholder="Novo Usuário" style="flex: 1; min-width: 120px; border: 1px solid var(--glass-border); padding: 0.5rem; background: #141226; color: #fff; border-radius: 8px; font-size: 0.8rem; outline: none;">
+                            <input type="password" id="newPassword" placeholder="Sua senha" style="flex: 1; min-width: 120px; border: 1px solid var(--glass-border); padding: 0.5rem; background: #141226; color: #fff; border-radius: 8px; font-size: 0.8rem; outline: none;">
+                            <button type="button" id="btnAddUser" class="btn-secondary" style="background: rgba(139,92,246,0.2); color: #c084fc;">➕ Adicionar</button>
+                        </div>
+                        <span style="font-size: 0.72rem; color: var(--text-muted); display: block; margin-bottom: 0.4rem;">Usuários Cadastrados:</span>
+                        <div id="usersListContainer" style="display: flex; flex-direction: column; gap: 0.4rem; max-height: 140px; overflow-y: auto;"></div>
                     </div>
                 </div>
 
@@ -504,11 +571,11 @@
             </form>
         </div>
 
-        <!-- Modo Foco / Painel de Progresso v3.0.2 -->
+        <!-- Modo Foco / Painel de Progresso v3.0.3 -->
         <div class="process-card" id="processCard">
             <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem;">
                 <span style="font-weight: 800; font-size: 0.95rem; color: #c084fc;">⚡ Produção em Andamento (Modo Foco)</span>
-                <button type="button" id="btnToggleFormView" style="font-size: 0.75rem; padding: 0.3rem 0.65rem; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.2); color: #fff; border-radius: 8px; cursor: pointer;">👁️ Mostrar Formulário</button>
+                <button type="button" id="btnToggleFormView" class="btn-secondary" style="font-size: 0.75rem; padding: 0.3rem 0.65rem;">👁️ Mostrar Formulário</button>
             </div>
 
             <!-- Barra 1: Progresso Geral -->
@@ -535,7 +602,7 @@
 
             <!-- Cancelar -->
             <div style="text-align: center; margin-bottom: 1rem;">
-                <button type="button" class="btn-cancel-task" style="background: rgba(239,68,68,0.15); border: 1px solid rgba(239,68,68,0.3); color: #fca5a5; font-size: 0.78rem; padding: 0.4rem 0.8rem; border-radius: 8px; cursor: pointer;">🛑 Cancelar Processamento</button>
+                <button type="button" class="btn-cancel-task btn-secondary" style="background: rgba(239,68,68,0.15); color: #fca5a5;">🛑 Cancelar Processamento</button>
             </div>
 
             <!-- Linha do Tempo de Etapas -->
@@ -571,7 +638,7 @@
         </div>
     </div>
 
-    <!-- Modal de Mídia Ativa (v3.0.2) -->
+    <!-- Modal de Mídia Ativa (v3.0.3) -->
     <div id="activeMediaModal" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.75); z-index: 9999; justify-content: center; align-items: center; backdrop-filter: blur(4px);">
         <div style="background: #141226; border: 1px solid var(--glass-border); border-radius: 16px; padding: 1.5rem; width: 90vw; max-width: 460px;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
@@ -598,7 +665,7 @@
     <div id="helpModal" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.75); z-index: 9999; justify-content: center; align-items: center; backdrop-filter: blur(4px);">
         <div style="background: #141226; border: 1px solid var(--glass-border); border-radius: 16px; padding: 1.5rem; width: 90vw; max-width: 600px; max-height: 80vh; overflow-y: auto;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-                <h3 style="margin: 0; color: #60a5fa;">📖 Manual de Instruções Sal0 Karaokê v3.0.2</h3>
+                <h3 style="margin: 0; color: #60a5fa;">📖 Manual de Instruções Sal0 Karaokê v3.0.3</h3>
                 <button type="button" id="btnCloseHelpModal" style="background: none; border: none; color: #fff; font-size: 1.2rem; cursor: pointer;">✕</button>
             </div>
             <div style="font-size: 0.85rem; line-height: 1.6; color: var(--text-muted);">
@@ -612,7 +679,6 @@
 
     <!-- Script Principal JS -->
     <script>
-        // Token JWT e Autenticação
         const authToken = localStorage.getItem('karaoke_token') || '';
 
         async function authFetch(url, options = {}) {
@@ -623,7 +689,6 @@
             return fetch(url, options);
         }
 
-        // Estado da Mídia Ativa
         let activeTitle = 'Nenhuma';
         let activeSource = 'Nenhuma';
 
@@ -635,34 +700,34 @@
             const modalTitle = document.getElementById('modalActiveMediaTitle');
             const modalSource = document.getElementById('modalActiveMediaSource');
             
-            if (textEl) textEl.innerText = activeTitle.length > 20 ? activeTitle.substring(0, 20) + '...' : activeTitle;
+            if (textEl) textEl.innerText = activeTitle.length > 18 ? activeTitle.substring(0, 18) + '...' : activeTitle;
             if (modalTitle) modalTitle.innerText = activeTitle;
             if (modalSource) modalSource.innerText = activeSource;
         }
 
-        // Navegação de Abas
+        // Navegação de Abas Principais
         const tabBtnCreate = document.getElementById('tabBtnCreate');
         const tabBtnLibrary = document.getElementById('tabBtnLibrary');
         const createTabContent = document.getElementById('createTabContent');
         const libraryTabContent = document.getElementById('libraryTabContent');
 
         if (tabBtnCreate && tabBtnLibrary) {
-            tabBtnCreate.addEventListener('click', () => {
+            tabBtnCreate.onclick = () => {
                 tabBtnCreate.classList.add('active');
                 tabBtnLibrary.classList.remove('active');
                 createTabContent.style.display = 'block';
                 libraryTabContent.style.display = 'none';
-            });
-            tabBtnLibrary.addEventListener('click', () => {
+            };
+            tabBtnLibrary.onclick = () => {
                 tabBtnLibrary.classList.add('active');
                 tabBtnCreate.classList.remove('active');
                 createTabContent.style.display = 'none';
                 libraryTabContent.style.display = 'block';
                 fetchLibrary();
-            });
+            };
         }
 
-        // Alternadores de Modo Áudio (Upload / YouTube / Biblioteca)
+        // Alternadores de Modo Áudio
         const btnAudioModeUpload = document.getElementById('btnAudioModeUpload');
         const btnAudioModeYoutube = document.getElementById('btnAudioModeYoutube');
         const btnAudioModeLibrary = document.getElementById('btnAudioModeLibrary');
@@ -671,27 +736,27 @@
         const audioLibraryContainer = document.getElementById('audioLibraryContainer');
 
         if (btnAudioModeUpload) {
-            btnAudioModeUpload.addEventListener('click', () => {
+            btnAudioModeUpload.onclick = () => {
                 btnAudioModeUpload.classList.add('active');
                 if (btnAudioModeYoutube) btnAudioModeYoutube.classList.remove('active');
                 if (btnAudioModeLibrary) btnAudioModeLibrary.classList.remove('active');
                 audioUploadContainer.style.display = 'block';
                 audioYoutubeContainer.style.display = 'none';
                 audioLibraryContainer.style.display = 'none';
-            });
+            };
         }
         if (btnAudioModeYoutube) {
-            btnAudioModeYoutube.addEventListener('click', () => {
+            btnAudioModeYoutube.onclick = () => {
                 btnAudioModeYoutube.classList.add('active');
                 if (btnAudioModeUpload) btnAudioModeUpload.classList.remove('active');
                 if (btnAudioModeLibrary) btnAudioModeLibrary.classList.remove('active');
                 audioUploadContainer.style.display = 'none';
                 audioYoutubeContainer.style.display = 'block';
                 audioLibraryContainer.style.display = 'none';
-            });
+            };
         }
         if (btnAudioModeLibrary) {
-            btnAudioModeLibrary.addEventListener('click', () => {
+            btnAudioModeLibrary.onclick = () => {
                 btnAudioModeLibrary.classList.add('active');
                 if (btnAudioModeUpload) btnAudioModeUpload.classList.remove('active');
                 if (btnAudioModeYoutube) btnAudioModeYoutube.classList.remove('active');
@@ -699,10 +764,10 @@
                 audioYoutubeContainer.style.display = 'none';
                 audioLibraryContainer.style.display = 'block';
                 fetchLibrary();
-            });
+            };
         }
 
-        // Alternadores de Modo Fundo (Upload / YouTube / Biblioteca)
+        // Alternadores de Modo Fundo
         const btnBgModeUpload = document.getElementById('btnBgModeUpload');
         const btnBgModeYoutube = document.getElementById('btnBgModeYoutube');
         const btnBgModeLibrary = document.getElementById('btnBgModeLibrary');
@@ -711,27 +776,27 @@
         const bgLibraryContainer = document.getElementById('bgLibraryContainer');
 
         if (btnBgModeUpload) {
-            btnBgModeUpload.addEventListener('click', () => {
+            btnBgModeUpload.onclick = () => {
                 btnBgModeUpload.classList.add('active');
                 if (btnBgModeYoutube) btnBgModeYoutube.classList.remove('active');
                 if (btnBgModeLibrary) btnBgModeLibrary.classList.remove('active');
                 bgUploadContainer.style.display = 'block';
                 bgYoutubeContainer.style.display = 'none';
                 bgLibraryContainer.style.display = 'none';
-            });
+            };
         }
         if (btnBgModeYoutube) {
-            btnBgModeYoutube.addEventListener('click', () => {
+            btnBgModeYoutube.onclick = () => {
                 btnBgModeYoutube.classList.add('active');
                 if (btnBgModeUpload) btnBgModeUpload.classList.remove('active');
                 if (btnBgModeLibrary) btnBgModeLibrary.classList.remove('active');
                 bgUploadContainer.style.display = 'none';
                 bgYoutubeContainer.style.display = 'block';
                 bgLibraryContainer.style.display = 'none';
-            });
+            };
         }
         if (btnBgModeLibrary) {
-            btnBgModeLibrary.addEventListener('click', () => {
+            btnBgModeLibrary.onclick = () => {
                 btnBgModeLibrary.classList.add('active');
                 if (btnBgModeUpload) btnBgModeUpload.classList.remove('active');
                 if (btnBgModeYoutube) btnBgModeYoutube.classList.remove('active');
@@ -739,19 +804,19 @@
                 bgYoutubeContainer.style.display = 'none';
                 bgLibraryContainer.style.display = 'block';
                 fetchLibrary();
-            });
+            };
         }
 
         // Select de Áudio da Biblioteca
         const libraryAudioSelect = document.getElementById('libraryAudioSelect');
         if (libraryAudioSelect) {
-            libraryAudioSelect.addEventListener('change', () => {
+            libraryAudioSelect.onchange = () => {
                 const val = libraryAudioSelect.value;
                 if (val) {
                     document.getElementById('libraryAudioHidden').value = val;
                     setAudioSource('library', val);
                 }
-            });
+            };
         }
 
         // Modais de Mídia Ativa e Manual
@@ -760,9 +825,7 @@
         const btnCloseActiveMediaModal = document.getElementById('btnCloseActiveMediaModal');
         const btnConfirmActiveMediaModal = document.getElementById('btnConfirmActiveMediaModal');
 
-        if (btnHeaderActiveMedia && activeMediaModal) {
-            btnHeaderActiveMedia.onclick = () => activeMediaModal.style.display = 'flex';
-        }
+        if (btnHeaderActiveMedia && activeMediaModal) btnHeaderActiveMedia.onclick = () => activeMediaModal.style.display = 'flex';
         if (btnCloseActiveMediaModal) btnCloseActiveMediaModal.onclick = () => activeMediaModal.style.display = 'none';
         if (btnConfirmActiveMediaModal) btnConfirmActiveMediaModal.onclick = () => activeMediaModal.style.display = 'none';
 
@@ -816,9 +879,7 @@
                     a.click();
                     a.remove();
                     window.URL.revokeObjectURL(url);
-                } catch (err) {
-                    alert("Erro ao baixar vídeo: " + err.message);
-                }
+                } catch (err) { alert("Erro ao baixar vídeo: " + err.message); }
             };
         }
 
@@ -838,9 +899,36 @@
                     a.click();
                     a.remove();
                     window.URL.revokeObjectURL(url);
-                } catch (err) {
-                    alert("Erro ao baixar logs: " + err.message);
+                } catch (err) { alert("Erro ao baixar logs: " + err.message); }
+            };
+        }
+
+        // Ler e Salvar Telegram Config
+        async function fetchTelegramConfig() {
+            try {
+                const res = await authFetch('/api/telegram');
+                if (res.ok) {
+                    const data = await res.json();
+                    const tokenIn = document.getElementById('telegramTokenInput');
+                    const chatIn = document.getElementById('telegramChatIdInput');
+                    if (tokenIn && data.telegram_token) tokenIn.value = data.telegram_token;
+                    if (chatIn && data.telegram_chat_id) chatIn.value = data.telegram_chat_id;
                 }
+            } catch (e) {}
+        }
+        const btnSaveTelegram = document.getElementById('btnSaveTelegram');
+        if (btnSaveTelegram) {
+            btnSaveTelegram.onclick = async () => {
+                const token = document.getElementById('telegramTokenInput').value.trim();
+                const chatId = document.getElementById('telegramChatIdInput').value.trim();
+                try {
+                    const res = await authFetch('/api/telegram', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ telegram_token: token, telegram_chat_id: chatId })
+                    });
+                    if (res.ok) alert("Configurações do Telegram salvas!");
+                } catch (e) { alert("Erro: " + e.message); }
             };
         }
 
@@ -870,7 +958,64 @@
             };
         }
 
-        // Buscar Biblioteca
+        // Buscar Perfis
+        let allProfiles = {};
+        async function fetchProfiles() {
+            try {
+                const res = await authFetch('/api/profiles');
+                if (res.ok) {
+                    allProfiles = await res.json();
+                    const sel = document.getElementById('profileSelect');
+                    if (sel) {
+                        sel.innerHTML = '';
+                        Object.keys(allProfiles).forEach(pName => {
+                            const opt = document.createElement('option');
+                            opt.value = pName;
+                            opt.innerText = pName;
+                            sel.appendChild(opt);
+                        });
+                    }
+                }
+            } catch (e) {}
+        }
+
+        // Buscar Contas de Usuários
+        async function fetchUsers() {
+            try {
+                const res = await authFetch('/api/users');
+                if (res.ok) {
+                    const users = await res.json();
+                    const container = document.getElementById('usersListContainer');
+                    if (container) {
+                        container.innerHTML = '';
+                        users.forEach(u => {
+                            const row = document.createElement('div');
+                            row.style.display = 'flex';
+                            row.style.justifyContent = 'space-between';
+                            row.style.alignItems = 'center';
+                            row.style.padding = '0.3rem 0.6rem';
+                            row.style.background = 'rgba(0,0,0,0.2)';
+                            row.style.borderRadius = '6px';
+                            row.style.fontSize = '0.8rem';
+                            row.innerHTML = `<span>${u.username} (${u.role})</span>`;
+                            if (u.role !== 'admin') {
+                                const btnDel = document.createElement('button');
+                                btnDel.type = 'button';
+                                btnDel.innerText = '🗑️';
+                                btnDel.style.background = 'none';
+                                btnDel.style.border = 'none';
+                                btnDel.style.cursor = 'pointer';
+                                btnDel.onclick = () => deleteUser(u.username);
+                                row.appendChild(btnDel);
+                            }
+                            container.appendChild(row);
+                        });
+                    }
+                }
+            } catch (e) {}
+        }
+
+        // Buscar e Renderizar a Biblioteca Completa
         async function fetchLibrary() {
             try {
                 const res = await authFetch('/api/library');
@@ -879,6 +1024,7 @@
                 
                 const libAudioSel = document.getElementById('libraryAudioSelect');
                 const libBgSel = document.getElementById('libraryBgSelect');
+                const container = document.getElementById('libraryItemsContainer');
                 
                 if (libAudioSel && data.videos) {
                     libAudioSel.innerHTML = '<option value="">Selecione uma música da biblioteca...</option>';
@@ -900,15 +1046,123 @@
                         libBgSel.appendChild(opt);
                     });
                 }
+
+                if (container) {
+                    container.innerHTML = '';
+                    const allItems = [
+                        ...(data.videos || []).map(v => ({ name: v, type: 'video' })),
+                        ...(data.photos || []).map(p => ({ name: p, type: 'photo' })),
+                        ...(data.history || []).map(h => ({ name: h, type: 'history' }))
+                    ];
+                    
+                    if (allItems.length === 0) {
+                        container.innerHTML = '<p style="color: var(--text-muted); font-size: 0.85rem; grid-column: 1/-1;">Nenhum arquivo na biblioteca ainda.</p>';
+                        return;
+                    }
+                    
+                    allItems.forEach(item => {
+                        const card = document.createElement('div');
+                        card.style.background = 'rgba(0,0,0,0.25)';
+                        card.style.border = '1px solid var(--glass-border)';
+                        card.style.borderRadius = '12px';
+                        card.style.padding = '0.8rem';
+                        card.style.display = 'flex';
+                        card.style.flexDirection = 'column';
+                        card.style.justifyContent = 'space-between';
+                        
+                        card.innerHTML = `
+                            <div style="margin-bottom: 0.6rem;">
+                                <span style="font-size: 0.7rem; color: #c084fc; font-weight: 700; text-transform: uppercase;">${item.type}</span>
+                                <p style="margin: 0.2rem 0 0 0; font-size: 0.82rem; font-weight: 600; word-break: break-word;">${item.name}</p>
+                            </div>
+                            <div style="display: flex; gap: 0.3rem; flex-wrap: wrap;">
+                                <button type="button" class="btn-secondary" style="font-size: 0.72rem; padding: 0.25rem 0.5rem;" onclick="setAudioSource('library', '${item.name}')">🎵 Usar Áudio</button>
+                                <button type="button" class="btn-secondary" style="font-size: 0.72rem; padding: 0.25rem 0.5rem;" onclick="document.getElementById('libraryBgSelect').value='${item.name}'">🖼️ Usar Fundo</button>
+                            </div>
+                        `;
+                        container.appendChild(card);
+                    });
+                }
             } catch (e) {}
         }
 
-        // Submissão do Formulário Principal
+        // Checar Cache Existente no Servidor
+        async function checkCache() {
+            try {
+                const res = await authFetch('/api/cache_info');
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.has_cache && data.audio_filename) {
+                        setAudioSource('cache', data.audio_filename);
+                    }
+                }
+            } catch (e) {}
+        }
+
+        // Modelos
+        async function fetchModelsStatus() {
+            try {
+                const res = await authFetch('/api/models');
+                if (!res.ok) return;
+                const data = await res.json();
+                const container = document.getElementById('modelsListContainer');
+                if (!container) return;
+                container.innerHTML = '';
+                
+                const friendlyNames = {
+                    "base": "Base (Mais Leve - ~140MB)",
+                    "small": "Small (Leve - ~460MB)",
+                    "medium": "Medium (Recomendado - ~1.5GB)",
+                    "large-v3-turbo": "Large v3 Turbo (Super Rápido & Alta Precisão - ~1.5GB)",
+                    "large-v2": "Large v2 (Muito Preciso - ~3GB)",
+                    "large-v3": "Large v3 (Precisão Máxima - ~3GB)"
+                };
+
+                Object.keys(data).forEach(size => {
+                    const m = data[size];
+                    const row = document.createElement('div');
+                    row.style.display = 'flex';
+                    row.style.justifyContent = 'space-between';
+                    row.style.alignItems = 'center';
+                    row.style.padding = '0.4rem 0.6rem';
+                    row.style.background = 'rgba(0,0,0,0.2)';
+                    row.style.borderRadius = '8px';
+                    row.style.fontSize = '0.8rem';
+                    row.innerHTML = `<span>${friendlyNames[size] || size}</span>`;
+                    
+                    if (m.status === 'done') {
+                        row.innerHTML += '<span style="color: #10b981; font-weight: 600;">✓ Baixado no Servidor</span>';
+                    } else if (m.status === 'downloading') {
+                        row.innerHTML += `<span style="color: #c084fc; font-weight: 600;">⏳ Baixando (${m.progress}%)</span>`;
+                    } else {
+                        const btn = document.createElement('button');
+                        btn.type = 'button';
+                        btn.className = 'btn-secondary';
+                        btn.innerText = '⬇️ Baixar';
+                        btn.onclick = () => triggerModelDownload(size);
+                        row.appendChild(btn);
+                    }
+                    container.appendChild(row);
+                });
+            } catch (e) {}
+        }
+
+        async function triggerModelDownload(size) {
+            try {
+                await authFetch('/api/models/download', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ model_size: size })
+                });
+                await fetchModelsStatus();
+            } catch (e) {}
+        }
+
+        // Submissão do Formulário
         const karaokêForm = document.getElementById('karaokêForm');
         if (karaokêForm) {
             karaokêForm.addEventListener('submit', async (e) => {
                 e.preventDefault();
-                
                 const btnSubmit = document.getElementById('btnSubmit');
                 const processCard = document.getElementById('processCard');
                 
@@ -919,12 +1173,8 @@
                 if (!isFormForcedVisible) karaokêForm.style.display = 'none';
                 
                 const formData = new FormData(karaokêForm);
-                
                 try {
-                    const res = await authFetch('/api/process', {
-                        method: 'POST',
-                        body: formData
-                    });
+                    const res = await authFetch('/api/process', { method: 'POST', body: formData });
                     if (!res.ok) {
                         const err = await res.json();
                         throw new Error(err.detail || "Erro ao iniciar produção.");
@@ -939,7 +1189,6 @@
             });
         }
 
-        // Polling de Status
         let pollingInterval = null;
         function startPolling() {
             if (pollingInterval) clearInterval(pollingInterval);
@@ -997,9 +1246,14 @@
             } catch (e) {}
         }
 
-        // DOMContentLoaded
+        // Inicialização Completa ao Carregar a Página (Restauração Total)
         window.addEventListener('DOMContentLoaded', async () => {
+            await fetchTelegramConfig();
             await fetchExternalUrlConfig();
+            await fetchProfiles();
+            await fetchUsers();
+            await checkCache();
+            await fetchModelsStatus();
             await fetchLibrary();
             await fetchStatus();
         });
