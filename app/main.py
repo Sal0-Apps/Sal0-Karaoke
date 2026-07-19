@@ -621,51 +621,46 @@ def resolve_whisper_repo(model_size: str) -> str:
 
 
 def is_model_downloaded(model_size: str) -> bool:
-    """Verifica em múltiplos caminhos do disco se o modelo Whisper já existe (Docker ou Cache Local)."""
-    search_base_dirs = [
+    """Verifica se o modelo Whisper existe na pasta /data/output/models/whisper da v2.0 ou no cache do sistema."""
+    whisper_dirs = [
         "/data/output/models/whisper",
+        "/data/models/whisper",
+        "/data/models",
         "/root/.cache/huggingface/hub",
-        os.path.expanduser("~/.cache/huggingface/hub"),
-        "/data/cache",
-        "/data/models"
+        os.path.expanduser("~/.cache/huggingface/hub")
     ]
 
-    possible_folders = [
-        f"models--Systran--faster-whisper-{model_size}",
-        f"models--deepdml--faster-whisper-{model_size}",
-        f"models--openai--whisper-{model_size}",
-        f"faster-whisper-{model_size}",
-        model_size
-    ]
+    keywords = [model_size]
     if model_size == "large-v3-turbo":
-        possible_folders.insert(0, "models--deepdml--faster-whisper-large-v3-turbo")
-        possible_folders.insert(1, "faster-whisper-large-v3-turbo")
+        keywords.extend(["turbo", "large-v3-turbo"])
+    elif model_size == "large-v3":
+        keywords.extend(["large-v3", "large_v3"])
+    elif model_size == "large-v2":
+        keywords.extend(["large-v2", "large_v2"])
 
-    for base_dir in search_base_dirs:
-        if not os.path.exists(base_dir):
+    for w_dir in whisper_dirs:
+        if not os.path.exists(w_dir):
             continue
-        for folder_name in possible_folders:
-            model_dir = os.path.join(base_dir, folder_name)
-            if os.path.isdir(model_dir):
-                # Caso 1: Estrutura padrão HuggingFace Hub (snapshots)
-                snapshots_dir = os.path.join(model_dir, "snapshots")
-                if os.path.isdir(snapshots_dir):
-                    try:
-                        subdirs = [os.path.join(snapshots_dir, d) for d in os.listdir(snapshots_dir) if os.path.isdir(os.path.join(snapshots_dir, d))]
-                        for s_dir in subdirs:
-                            files = os.listdir(s_dir)
-                            if any(f in files for f in ["model.bin", "model.safetensors", "config.json"]):
-                                return True
-                    except Exception:
-                        pass
-
-                # Caso 2: Arquivos diretos na pasta do modelo
-                try:
-                    files = os.listdir(model_dir)
-                    if any(f in files for f in ["model.bin", "model.safetensors", "config.json"]):
-                        return True
-                except Exception:
-                    pass
+        try:
+            entries = os.listdir(w_dir)
+            for entry in entries:
+                entry_path = os.path.join(w_dir, entry)
+                if not os.path.isdir(entry_path):
+                    continue
+                entry_lower = entry.lower()
+                if any(kw in entry_lower for kw in keywords):
+                    # Verificar se a pasta contém arquivos de peso/configuração do modelo
+                    for root, dirs, files in os.walk(entry_path):
+                        if any(f in files for f in ["model.bin", "model.safetensors", "config.json", "tokenizer.json", "vocabulary.txt", "pytorch_model.bin"]):
+                            return True
+                        for f in files:
+                            try:
+                                if os.path.getsize(os.path.join(root, f)) > 10 * 1024 * 1024:
+                                    return True
+                            except Exception:
+                                pass
+        except Exception:
+            pass
 
     return False
 
@@ -1002,7 +997,7 @@ def delete_lyrics_server(current_user: dict = Depends(get_current_user)):
 
 
 
-# Sistema de Logs de Diagnóstico v3.0.8
+# Sistema de Logs de Diagnóstico v3.0.10
 DIAGNOSTIC_LOG_FILE = "/data/output/app_diagnostic.log"
 
 def log_diagnostic(message: str, level: str = "INFO"):
@@ -1079,7 +1074,7 @@ class ProfileModel(BaseModel):
     keep_first_line_visible: bool = False
 
 def load_profiles() -> dict:
-    """Carrega os perfis e consolida automaticamente perfis legados do v2.0 em /data/output/profiles.json."""
+    """Carrega os perfis e consolida automaticamente QUALQUER arquivo de perfil encontrado recursivamente na pasta /data."""
     default_profiles = {
         "Padrão": {
             "whisper_model": "medium",
@@ -1101,42 +1096,31 @@ def load_profiles() -> dict:
     }
     
     profiles = {}
-    if os.path.exists(PROFILES_FILE):
+    DATA_DIR = "/data"
+    if os.path.exists(DATA_DIR):
         try:
-            with open(PROFILES_FILE, "r", encoding="utf-8") as f:
-                import json
-                profiles = json.load(f)
+            for root, dirs, files in os.walk(DATA_DIR):
+                for fname in files:
+                    if fname.endswith("profiles.json") or "profile" in fname.lower():
+                        p_file = os.path.join(root, fname)
+                        try:
+                            with open(p_file, "r", encoding="utf-8") as f:
+                                import json
+                                p_json = json.load(f)
+                                if isinstance(p_json, dict):
+                                    for p_name, p_val in p_json.items():
+                                        if isinstance(p_val, dict) and p_name not in profiles:
+                                            profiles[p_name] = p_val
+                        except Exception:
+                            pass
         except Exception as e:
-            logger.error(f"Erro ao carregar arquivo principal de perfis: {e}")
-
-    # Migração e consolidação automática de perfis legados (user_*_profiles.json)
-    output_dir = os.path.dirname(PROFILES_FILE)
-    if os.path.exists(output_dir):
-        try:
-            for fname in os.listdir(output_dir):
-                if fname.endswith("_profiles.json") and fname != "profiles.json":
-                    legacy_file = os.path.join(output_dir, fname)
-                    try:
-                        with open(legacy_file, "r", encoding="utf-8") as lf:
-                            import json
-                            leg_data = json.load(lf)
-                            if isinstance(leg_data, dict):
-                                for p_name, p_val in leg_data.items():
-                                    if p_name not in profiles:
-                                        profiles[p_name] = p_val
-                                        logger.info(f"Perfil legado '{p_name}' migrado de {fname}.")
-                    except Exception as err:
-                        logger.error(f"Erro ao ler perfil legado {fname}: {err}")
-        except Exception as e:
-            logger.error(f"Erro ao escanear perfis legados: {e}")
+            logger.error(f"Erro ao buscar perfis na pasta /data: {e}")
 
     if not profiles:
         profiles = default_profiles
 
-    # Garantir retrocompatibilidade preenchendo campos ausentes em todos os perfis
     for p_name, p_data in profiles.items():
-        if not isinstance(p_data, dict):
-            continue
+        if not isinstance(p_data, dict): continue
         if "subtitle_mode" not in p_data: p_data["subtitle_mode"] = "syllable"
         if "words_per_line" not in p_data: p_data["words_per_line"] = 0
         if "max_chars_line" not in p_data: p_data["max_chars_line"] = 40
@@ -1147,14 +1131,13 @@ def load_profiles() -> dict:
         if "show_next_line_preview" not in p_data: p_data["show_next_line_preview"] = False
         if "keep_first_line_visible" not in p_data: p_data["keep_first_line_visible"] = False
 
-    # Salvar o arquivo consolidado para persistência permanente
     try:
         os.makedirs(os.path.dirname(PROFILES_FILE), exist_ok=True)
         with open(PROFILES_FILE, "w", encoding="utf-8") as f:
             import json
             json.dump(profiles, f, indent=4, ensure_ascii=False)
-    except Exception as e:
-        logger.error(f"Erro ao salvar perfis consolidados: {e}")
+    except Exception:
+        pass
 
     return profiles
 
@@ -1393,50 +1376,38 @@ LIBRARY_DIR = "/data/library"
 
 @app.get("/api/library")
 def get_library_files(current_user: dict = Depends(get_current_user)):
-    """Retorna as listas de arquivos disponíveis na biblioteca e histórico (v2.0 e v3.0)."""
+    """Realiza varredura RECURSIVA EXCLUSIVA na pasta /data para encontrar todas as mídias e históricos (v2.0 e v3.0)."""
     result = {"videos": [], "photos": [], "history": []}
+    video_exts = {'.mp4', '.mkv', '.avi', '.mp3', '.wav', '.flac', '.m4a', '.webm'}
+    photo_exts = {'.jpg', '.jpeg', '.png', '.webp', '.gif'}
     
-    # 1. Escanear subpastas padrão em /data/library/
-    for section in ["videos", "photos", "history"]:
-        path = os.path.join(LIBRARY_DIR, section)
-        os.makedirs(path, exist_ok=True)
-        try:
-            files = sorted(os.listdir(path))
-            result[section] = [f for f in files if os.path.isfile(os.path.join(path, f)) and not f.startswith('.')]
-        except Exception as e:
-            logger.error(f"Erro ao listar biblioteca {section}: {e}")
+    DATA_DIR = "/data"
+    if not os.path.exists(DATA_DIR):
+        return result
 
-    # 2. Escanear arquivos soltos diretamente em /data/library/
-    if os.path.exists(LIBRARY_DIR):
-        try:
-            loose_files = sorted(os.listdir(LIBRARY_DIR))
-            video_exts = {'.mp4', '.mkv', '.avi', '.mp3', '.wav', '.flac', '.m4a', '.webm'}
-            photo_exts = {'.jpg', '.jpeg', '.png', '.webp', '.gif'}
-            
-            for f in loose_files:
-                f_path = os.path.join(LIBRARY_DIR, f)
-                if os.path.isfile(f_path) and not f.startswith('.'):
-                    ext = os.path.splitext(f)[1].lower()
-                    if ext in video_exts and f not in result["videos"]:
-                        result["videos"].append(f)
-                    elif ext in photo_exts and f not in result["photos"]:
+    try:
+        for root, dirs, files in os.walk(DATA_DIR):
+            for f in files:
+                if f.startswith('.') or f in ['temp.mp4', 'bg_yt_raw.mp4', 'dummy_signal.wav']:
+                    continue
+                ext = os.path.splitext(f)[1].lower()
+                root_lower = root.lower().replace('\\', '/')
+                
+                if 'history' in root_lower or 'final' in f.lower() or 'karaoke' in f.lower():
+                    if ext in video_exts and f not in result["history"]:
+                        result["history"].append(f)
+                elif 'photos' in root_lower or 'images' in root_lower or ext in photo_exts:
+                    if ext in photo_exts and f not in result["photos"]:
                         result["photos"].append(f)
-        except Exception as e:
-            logger.error(f"Erro ao listar arquivos soltos em {LIBRARY_DIR}: {e}")
+                elif ext in video_exts:
+                    if f not in result["videos"]:
+                        result["videos"].append(f)
+    except Exception as e:
+        logger.error(f"Erro ao realizar varredura recursiva em /data: {e}")
 
-    # 3. Escanear históricos e vídeos legados do v2.0 em /data/output/ e /data/output/history/
-    legacy_output_dirs = ["/data/output", "/data/output/history"]
-    for out_dir in legacy_output_dirs:
-        if os.path.exists(out_dir):
-            try:
-                out_files = sorted(os.listdir(out_dir))
-                for f in out_files:
-                    if f.endswith(".mp4") and not f.startswith(".") and f not in result["history"]:
-                        if f not in ["temp.mp4", "bg_yt_raw.mp4"]:
-                            result["history"].append(f)
-            except Exception as e:
-                logger.error(f"Erro ao escanear histórico legado em {out_dir}: {e}")
-
+    result["videos"].sort()
+    result["photos"].sort()
+    result["history"].sort()
     return result
 
 @app.post("/api/library/upload")
@@ -1765,7 +1736,7 @@ def process_karaoke(
             if state.get("status") in ["idle", "error", "done"]:
                 try:
                     processing_lock.release()
-                    logger.info("Failsafe v3.0.8: Lock de concorrência obsoleto liberado com sucesso.")
+                    logger.info("Failsafe v3.0.10: Lock de concorrência obsoleto liberado com sucesso.")
                 except Exception:
                     pass
             else:
