@@ -756,6 +756,27 @@
                 </div>
             </div>
 
+            <!-- CARD DE REVISÃO E EDIÇÃO DE LEGENDAS (PAUSA INTERMEDIÁRIA) -->
+            <div class="card" id="correctionCard" style="display: none; border-color: rgba(139, 92, 246, 0.4);">
+                <div class="card-header">
+                    <span class="card-title">✏️ Revisão & Edição da Legenda Antes da Renderização</span>
+                    <button type="button" id="btnContinueProcess" class="btn-primary" style="width: auto; padding: 0.5rem 1.2rem; font-size: 0.85rem;">🚀 Salvar e Renderizar Vídeo Karaokê</button>
+                </div>
+                
+                <p style="font-size: 0.82rem; color: var(--text-muted); margin-bottom: 1rem;">
+                    Revise ou edite o texto de cada estrofe gerado pelo Whisper AI abaixo antes que o vídeo final seja renderizado.
+                </p>
+
+                <div id="segmentsEditList" style="display: flex; flex-direction: column; gap: 0.8rem; max-height: 50vh; overflow-y: auto; padding-right: 0.5rem;">
+                    <!-- Preenchido via JS fetchSegmentsToEdit() -->
+                </div>
+
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 1.2rem; pt: 1rem; border-top: 1px solid var(--glass-border);">
+                    <button type="button" class="btn-cancel-task btn-secondary" style="background: rgba(239,68,68,0.15); color: #fca5a5; border-color: rgba(239,68,68,0.3);">🛑 Cancelar Processamento</button>
+                    <button type="button" id="btnSkipEdit" class="btn-secondary">⏩ Pular e Renderizar Sem Alterar</button>
+                </div>
+            </div>
+
             <!-- CARD DE DOWNLOAD DO VÍDEO CONCLUÍDO -->
             <div class="card" id="downloadBox" style="display: none; text-align: center; border-color: rgba(16, 185, 129, 0.4);">
                 <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">🎉</div>
@@ -946,7 +967,7 @@
 
         <!-- RODAPÉ DISCRETO DA PÁGINA -->
         <footer>
-            Sal0 Karaokê v3.5.1
+            Sal0 Karaokê v3.5.2
         </footer>
 
     </div> <!-- Container End -->
@@ -2075,7 +2096,9 @@
                 if (!res.ok) return;
                 const data = await res.json();
 
+                const formCard = document.getElementById('karaokêForm');
                 const processCard = document.getElementById('processCard');
+                const correctionCard = document.getElementById('correctionCard');
                 const progressPercent = document.getElementById('progressPercent');
                 const progressBarFill = document.getElementById('progressBarFill');
                 const statusMessage = document.getElementById('statusMessage');
@@ -2083,25 +2106,46 @@
                 const downloadBox = document.getElementById('downloadBox');
 
                 if (data.status === "processing" || data.status === "downloading") {
-                    processCard.style.display = "block";
+                    // TRAVA DE PROCESSO ÚNICO: Ocultar o formulário enquanto houver processo ativo
+                    if (formCard) formCard.style.display = "none";
+                    if (correctionCard) correctionCard.style.display = "none";
+                    if (processCard) processCard.style.display = "block";
+
                     if (statusMessage) statusMessage.innerText = `Etapa Atual: ${data.step || 'Processando...'}`;
                     if (progressPercent) progressPercent.innerText = `${data.progress || 0}%`;
                     if (progressBarFill) progressBarFill.style.width = `${data.progress || 0}%`;
                     if (btnSubmit) btnSubmit.disabled = true;
 
                     updateTimelineUI(data.step || "");
+                } else if (data.status === "awaiting_review") {
+                    // PAUSA PARA EDIÇÃO DE LEGENDA PRÉ-RENDERIZAÇÃO
+                    if (formCard) formCard.style.display = "none";
+                    if (processCard) processCard.style.display = "none";
+                    if (correctionCard) correctionCard.style.display = "block";
+
+                    if (!isShowingCorrection) {
+                        isShowingCorrection = true;
+                        fetchSegmentsToEdit();
+                    }
                 } else if (data.status === "done" || data.status === "idle") {
                     if (pollingInterval) clearInterval(pollingInterval);
-                    processCard.style.display = "none";
+                    if (processCard) processCard.style.display = "none";
+                    if (correctionCard) correctionCard.style.display = "none";
+                    if (formCard) formCard.style.display = "block"; // Restaurar o formulário de criação
+
                     if (data.status === "done" && data.original_filename && !data.original_filename.includes("Baixando")) {
                         if (downloadBox) downloadBox.style.display = "block";
                     }
                     if (btnSubmit) { btnSubmit.disabled = false; btnSubmit.innerHTML = '🎬 Criar Vídeo Karaokê'; }
+                    isShowingCorrection = false;
                     await loadLibrary();
                 } else if (data.status === "error") {
                     if (pollingInterval) clearInterval(pollingInterval);
-                    processCard.style.display = "none";
+                    if (processCard) processCard.style.display = "none";
+                    if (correctionCard) correctionCard.style.display = "none";
+                    if (formCard) formCard.style.display = "block"; // Restaurar o formulário de criação
                     if (btnSubmit) { btnSubmit.disabled = false; btnSubmit.innerHTML = '🎬 Criar Vídeo Karaokê'; }
+                    isShowingCorrection = false;
                 }
             } catch (e) {}
         }
