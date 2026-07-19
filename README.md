@@ -16,7 +16,7 @@ Uma ferramenta local, simples e funcional para criar vídeos de karaokê com rem
 
 ## ⚙️ Principais Funcionalidades
 
-- ☀️/🌙 **Seleção de Tema Claro ou Escuro:** Interface adaptável com Tema Claro definido como padrão.
+- 🌙/☀️ **Seleção de Tema Escuro ou Claro:** Interface adaptável com Tema Escuro definido como padrão.
 - 🎙️ **Separação de Vocais:** Remove o vocal original e produz o áudio instrumental.
 - 📝 **Legendas Sincronizadas:** Animação de varredura por sílabas, palavra por palavra ou linha inteira.
 - 📚 **Biblioteca Permanente:** Arquivos enviados ficam armazenados no seu servidor para reutilização rápida.
@@ -33,7 +33,7 @@ version: '3.8'
 
 services:
   karaoke:
-    image: ghcr.io/sal0-apps/sal0-karaoke:3.5.0
+    image: ghcr.io/sal0-apps/sal0-karaoke:3.5.1
     container_name: karaoke-app
     ports:
       - "7860:7860"

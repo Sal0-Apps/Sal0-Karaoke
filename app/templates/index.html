@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="pt-BR" data-theme="light">
+<html lang="pt-BR" data-theme="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -13,27 +13,7 @@
     
     <style>
         :root {
-            /* Tema Claro (Padrão) */
-            --bg-primary: #f8fafc;
-            --bg-card: #ffffff;
-            --bg-card-hover: #f1f5f9;
-            --glass-border: #e2e8f0;
-            --glass-border-light: #cbd5e1;
-            --accent: #8b5cf6;
-            --accent-glow: rgba(139, 92, 246, 0.25);
-            --pink-accent: #ec4899;
-            --text-main: #0f172a;
-            --text-muted: #64748b;
-            --input-bg: #f8fafc;
-            --radius-lg: 18px;
-            --radius-md: 12px;
-            --radius-sm: 8px;
-            --header-bg: #ffffff;
-            --shadow: 0 10px 25px rgba(0,0,0,0.06);
-        }
-
-        [data-theme="dark"] {
-            /* Tema Escuro */
+            /* Tema Escuro (Padrão) */
             --bg-primary: #0a0914;
             --bg-card: rgba(20, 18, 38, 0.85);
             --bg-card-hover: rgba(28, 25, 54, 0.95);
@@ -47,6 +27,26 @@
             --input-bg: rgba(0, 0, 0, 0.25);
             --header-bg: rgba(20, 18, 38, 0.85);
             --shadow: 0 10px 30px rgba(0,0,0,0.3);
+            --radius-lg: 18px;
+            --radius-md: 12px;
+            --radius-sm: 8px;
+        }
+
+        [data-theme="light"] {
+            /* Tema Claro */
+            --bg-primary: #f8fafc;
+            --bg-card: #ffffff;
+            --bg-card-hover: #f1f5f9;
+            --glass-border: #e2e8f0;
+            --glass-border-light: #cbd5e1;
+            --accent: #8b5cf6;
+            --accent-glow: rgba(139, 92, 246, 0.25);
+            --pink-accent: #ec4899;
+            --text-main: #0f172a;
+            --text-muted: #64748b;
+            --input-bg: #f8fafc;
+            --header-bg: #ffffff;
+            --shadow: 0 10px 25px rgba(0,0,0,0.06);
         }
 
         * {
@@ -100,7 +100,7 @@
             height: 36px;
             object-fit: contain;
             border-radius: 8px;
-            box-shadow: 0 0 12px rgba(139, 92, 246, 0.3);
+            box-shadow: 0 0 12px rgba(139, 92, 246, 0.4);
         }
 
         h1 {
@@ -389,13 +389,13 @@
         }
 
         .library-item .actions .btn-delete {
-            background: rgba(239, 68, 68, 0.1);
-            color: #ef4444;
+            background: rgba(239, 68, 68, 0.15);
+            color: #fca5a5;
             border-color: rgba(239, 68, 68, 0.3);
         }
 
         .library-item .actions .btn-delete:hover {
-            background: rgba(239, 68, 68, 0.25);
+            background: rgba(239, 68, 68, 0.3);
         }
 
         /* PROGRESSO E TIMELINE */
@@ -445,7 +445,7 @@
             100% { transform: scale(1); opacity: 1; }
         }
         .timeline-step.completed {
-            color: #10b981 !important;
+            color: #34d399 !important;
             font-weight: 600 !important;
         }
         .timeline-step.completed .step-dot {
@@ -479,9 +479,9 @@
                 <h1>Sal0 Karaokê</h1>
             </div>
             <div class="header-actions">
-                <button type="button" class="header-btn" id="btnToggleTheme">☀️ Tema Claro</button>
+                <button type="button" class="header-btn" id="btnToggleTheme">🌙 Tema Escuro</button>
                 <button type="button" class="header-btn" id="btnOpenHelp">❓ Manual</button>
-                <button type="button" class="header-btn" id="btnLogout" style="color: #ef4444; background: rgba(239,68,68,0.1); border-color: rgba(239,68,68,0.25);">🚪 Sair</button>
+                <button type="button" class="header-btn" id="btnLogout" style="color: #fca5a5; background: rgba(239,68,68,0.15); border-color: rgba(239,68,68,0.3);">🚪 Sair</button>
             </div>
         </header>
 
@@ -609,7 +609,7 @@
                                 </div>
                                 <div style="display: flex; gap: 0.5rem; align-items: flex-end;">
                                     <button type="button" id="btnSaveProfile" class="btn-primary" style="height: 38px;">💾 Salvar Perfil</button>
-                                    <button type="button" id="btnDeleteProfile" class="btn-secondary" style="height: 38px; color: #ef4444;">🗑️ Excluir</button>
+                                    <button type="button" id="btnDeleteProfile" class="btn-secondary" style="height: 38px; color: #fca5a5;">🗑️ Excluir</button>
                                 </div>
                             </div>
                         </div>
@@ -690,7 +690,7 @@
                                 <input type="checkbox" id="saveToLibrary" name="save_to_library" checked style="accent-color: var(--accent);">
                                 Salvar mídias enviadas na biblioteca permanente
                             </label>
-                            <label style="font-size: 0.82rem; color: #ef4444; cursor: pointer; display: flex; align-items: center; gap: 0.5rem;">
+                            <label style="font-size: 0.82rem; color: #fca5a5; cursor: pointer; display: flex; align-items: center; gap: 0.5rem;">
                                 <input type="checkbox" id="onlyRemoveVocals" name="only_remove_vocals" style="accent-color: var(--pink-accent);">
                                 Apenas remover vocais (Gerar instrumental sem legenda)
                             </label>
@@ -702,7 +702,7 @@
                             <textarea id="lyricsText" name="lyrics_text" placeholder="Cole a letra oficial da música aqui se desejar forçar a sincronização correta..." class="input-text" style="height: 90px; resize: vertical;"></textarea>
                             <div style="display: flex; gap: 0.5rem; margin-top: 0.3rem;">
                                 <button type="button" id="btnSaveLyrics" class="btn-secondary" style="font-size: 0.75rem;">💾 Salvar Letra</button>
-                                <button type="button" id="btnClearLyrics" class="btn-secondary" style="font-size: 0.75rem; color: #ef4444;">🗑️ Limpar Letra</button>
+                                <button type="button" id="btnClearLyrics" class="btn-secondary" style="font-size: 0.75rem; color: #fca5a5;">🗑️ Limpar Letra</button>
                             </div>
                         </div>
                     </div>
@@ -736,7 +736,7 @@
 
                 <!-- Botão Cancelar -->
                 <div style="text-align: center; margin-top: 1.2rem;">
-                    <button type="button" class="btn-cancel-task btn-secondary" style="background: rgba(239,68,68,0.1); color: #ef4444; border-color: rgba(239,68,68,0.3);">🛑 Cancelar Processamento</button>
+                    <button type="button" class="btn-cancel-task btn-secondary" style="background: rgba(239,68,68,0.15); color: #fca5a5; border-color: rgba(239,68,68,0.3);">🛑 Cancelar Processamento</button>
                 </div>
 
                 <!-- Timeline de Etapas -->
@@ -773,8 +773,8 @@
                 <div class="form-group" style="max-width: 340px;">
                     <span class="label">Escolha o Tema da Interface</span>
                     <select id="themeSelect" class="select-input">
-                        <option value="light" selected>☀️ Tema Claro (Padrão)</option>
-                        <option value="dark">🌙 Tema Escuro</option>
+                        <option value="dark" selected>🌙 Tema Escuro (Padrão)</option>
+                        <option value="light">☀️ Tema Claro</option>
                     </select>
                 </div>
             </div>
@@ -798,7 +798,7 @@
                     <button type="button" id="btnEditTelegram" class="btn-secondary">✏️ Editar Credenciais</button>
                 </div>
 
-                <div id="telegramConfiguredBadge" style="display: none; background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.3); padding: 0.6rem 1rem; border-radius: var(--radius-sm); color: #10b981; font-size: 0.85rem; align-items: center; justify-content: space-between; margin-bottom: 1rem;">
+                <div id="telegramConfiguredBadge" style="display: none; background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.3); padding: 0.6rem 1rem; border-radius: var(--radius-sm); color: #34d399; font-size: 0.85rem; align-items: center; justify-content: space-between; margin-bottom: 1rem;">
                     <span>✓ Bot do Telegram Configurado e Ativo!</span>
                 </div>
 
@@ -942,13 +942,13 @@
 
         <!-- RODAPÉ DISCRETO DA PÁGINA -->
         <footer>
-            Sal0 Karaokê v3.5.0
+            Sal0 Karaokê v3.5.1
         </footer>
 
     </div> <!-- Container End -->
 
     <!-- MODAL MANUAL E TUTORIAL PARA INICIANTES -->
-    <div id="helpModal" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.6); backdrop-filter: blur(12px); z-index: 9999; justify-content: center; align-items: center; padding: 1rem;">
+    <div id="helpModal" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.7); backdrop-filter: blur(12px); z-index: 9999; justify-content: center; align-items: center; padding: 1rem;">
         <div style="background: var(--bg-card); border: 1px solid var(--glass-border); border-radius: 20px; padding: 1.8rem; max-width: 620px; width: 100%; max-height: 85vh; overflow-y: auto; box-shadow: var(--shadow);">
             <h3 style="color: var(--text-main); margin-bottom: 1rem; font-family: 'Outfit', sans-serif;">📖 Manual & Tutorial do Sal0 Karaokê</h3>
             
@@ -979,7 +979,7 @@
     </div>
 
     <!-- MODAIS DE SETUP ADMIN E LOGIN -->
-    <div id="setupModal" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.6); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); z-index: 99999; justify-content: center; align-items: center; padding: 1rem;">
+    <div id="setupModal" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.8); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); z-index: 99999; justify-content: center; align-items: center; padding: 1rem;">
         <div style="background: var(--bg-card); border: 1px solid var(--glass-border); border-radius: 20px; padding: 2rem; max-width: 420px; width: 100%; box-shadow: var(--shadow); text-align: center;">
             <div style="width: 60px; height: 60px; border-radius: 16px; background: linear-gradient(135deg, #8b5cf6, #ec4899); display: flex; align-items: center; justify-content: center; font-size: 1.8rem; margin: 0 auto 1.2rem auto; color: #fff;">👑</div>
             <h2 style="margin: 0 0 0.5rem 0; font-size: 1.4rem; color: var(--text-main);">Configuração Inicial</h2>
@@ -992,7 +992,7 @@
         </div>
     </div>
 
-    <div id="loginModal" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.6); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); z-index: 99999; justify-content: center; align-items: center; padding: 1rem;">
+    <div id="loginModal" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.8); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); z-index: 99999; justify-content: center; align-items: center; padding: 1rem;">
         <div style="background: var(--bg-card); border: 1px solid var(--glass-border); border-radius: 20px; padding: 2rem; max-width: 420px; width: 100%; box-shadow: var(--shadow); text-align: center;">
             <div style="width: 60px; height: 60px; border-radius: 16px; background: linear-gradient(135deg, #c084fc, #8b5cf6); display: flex; align-items: center; justify-content: center; font-size: 1.8rem; margin: 0 auto 1.2rem auto; color: #fff;">🔐</div>
             <h2 style="margin: 0 0 0.5rem 0; font-size: 1.4rem; color: var(--text-main);">Entrar no Sal0 Karaokê</h2>
@@ -1005,13 +1005,13 @@
         </div>
     </div>
 
-    <!-- JAVASCRIPT COMPLETO E SUPORTE A TEMAS -->
+    <!-- JAVASCRIPT COMPLETO E SUPORTE A TEMAS (PADRÃO TEMA ESCURO) -->
     <script>
         const authToken = localStorage.getItem('karaoke_token') || localStorage.getItem('auth_token') || '';
         let currentUser = null;
         let allProfiles = {};
 
-        // GERENCIAMENTO DE TEMA (CLARO COMO PADRÃO)
+        // GERENCIAMENTO DE TEMA (ESCURO COMO PADRÃO)
         function setTheme(theme) {
             document.documentElement.setAttribute('data-theme', theme);
             localStorage.setItem('karaoke_theme', theme);
@@ -1019,7 +1019,7 @@
             const selectTheme = document.getElementById('themeSelect');
             
             if (btnTheme) {
-                btnTheme.innerText = theme === 'dark' ? '🌙 Tema Escuro' : '☀️ Tema Claro';
+                btnTheme.innerText = theme === 'light' ? '☀️ Tema Claro' : '🌙 Tema Escuro';
             }
             if (selectTheme) {
                 selectTheme.value = theme;
@@ -1027,7 +1027,7 @@
         }
 
         function initTheme() {
-            const savedTheme = localStorage.getItem('karaoke_theme') || 'light';
+            const savedTheme = localStorage.getItem('karaoke_theme') || 'dark';
             setTheme(savedTheme);
         }
 
@@ -1193,7 +1193,7 @@
                     card.innerHTML = `
                         <div>
                             <strong style="color: var(--text-main); font-size: 0.88rem; display: block;">${friendlyNames[modelKey]}</strong>
-                            <span style="font-size: 0.75rem; color: ${isDownloaded ? '#10b981' : 'var(--text-muted)'};">
+                            <span style="font-size: 0.75rem; color: ${isDownloaded ? '#34d399' : 'var(--text-muted)'};">
                                 ${isDownloaded ? '✓ Modelo Instalado e Pronto' : '⚠️ Não baixado no servidor'}
                             </span>
                         </div>
@@ -1448,7 +1448,7 @@
             
             if (btnToggleTheme) {
                 btnToggleTheme.onclick = () => {
-                    const current = document.documentElement.getAttribute('data-theme') || 'light';
+                    const current = document.documentElement.getAttribute('data-theme') || 'dark';
                     const newTheme = current === 'dark' ? 'light' : 'dark';
                     setTheme(newTheme);
                 };
