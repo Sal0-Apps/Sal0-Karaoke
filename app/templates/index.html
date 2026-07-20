@@ -1003,7 +1003,7 @@
 
         <!-- RODAPÉ DISCRETO DA PÁGINA -->
         <footer>
-            Sal0 Karaokê v3.6.2
+            Sal0 Karaokê v3.6.3
         </footer>
 
     </div> <!-- Container End -->
@@ -2195,12 +2195,48 @@
 
         async function loadCorrectionPanel() {
             try {
+                // Carregar fundo no Mockup de Preview
+                try {
+                    const cacheRes = await authFetch('/api/cache_info');
+                    if (cacheRes.ok) {
+                        const cacheData = await cacheRes.json();
+                        const previewBgImage = document.getElementById('previewBgImage');
+                        const previewBgVideo = document.getElementById('previewBgVideo');
+                        
+                        if (cacheData.has_cache) {
+                            const token = localStorage.getItem('auth_token') || '';
+                            const bgUrl = `/api/cache/background?token=${encodeURIComponent(token)}`;
+                            if (cacheData.bg_is_video) {
+                                if (previewBgImage) previewBgImage.style.display = 'none';
+                                if (previewBgVideo) {
+                                    previewBgVideo.src = bgUrl;
+                                    previewBgVideo.style.display = 'block';
+                                    previewBgVideo.play().catch(e => console.log("Auto-play blocked", e));
+                                }
+                            } else {
+                                if (previewBgVideo) previewBgVideo.style.display = 'none';
+                                if (previewBgImage) {
+                                    previewBgImage.src = bgUrl;
+                                    previewBgImage.style.display = 'block';
+                                }
+                            }
+                        }
+                    }
+                } catch (e) {
+                    console.error("Erro ao carregar imagem/vídeo de fundo no preview:", e);
+                }
+
+                // Carregar segmentos transcritos do servidor
                 const res = await authFetch('/api/segments_to_edit');
                 if (!res.ok) throw new Error("Falha ao obter legendas para correção.");
                 
                 currentSegments = await res.json();
                 renderSegments();
                 
+                if (currentSegments && currentSegments.length > 0) {
+                    updatePreviewText(currentSegments[0].text);
+                }
+
                 const correctionCard = document.getElementById('correctionCard');
                 if (correctionCard) correctionCard.style.display = "block";
                 isShowingCorrection = true;
