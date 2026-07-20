@@ -1,20 +1,54 @@
-# Arquivos de dados do app
+# === DADOS GERADOS PELO APP (não commitar) ===
 /data/cache/*
 /data/output/*
 !/data/cache/.gitkeep
 !/data/output/.gitkeep
-*.pyc
-__pycache__/
 
-# Backups locais e pastas temporárias
+# === PYTHON ===
+*.pyc
+*.pyo
+*.pyd
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# === BACKUPS E ARQUIVOS TEMPORÁRIOS LOCAIS ===
 v224_backup/
 zip_extract_*/
 scratch/
 *.zip
+*.bak
+*.tmp
 
-# Credenciais locais, tokens de deploy e logs (NUNCA commitar no Git)
-.env_deploy
+# === CREDENCIAIS E TOKENS (NUNCA commitar no Git) ===
 .env
+.env.*
+!.env.example
+.env_deploy
 *.token
-*.log
+*.key
+*.pem
+*.p12
+*.pfx
 deploy_credentials.txt
+*_secret.txt
+github_token.txt
+
+# === LOGS ===
+*.log
+logs/
+
+# === BANCO DE DADOS ===
+*.db
+*.sqlite
+*.sqlite3
+
+# === IDEs E FERRAMENTAS ===
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
