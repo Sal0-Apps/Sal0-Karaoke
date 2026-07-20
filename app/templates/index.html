@@ -528,7 +528,7 @@
 
                     <div id="audioYoutubeContainer" style="display: none;">
                         <input type="text" id="youtubeUrl" name="youtube_url" placeholder="Cole a URL do vídeo do YouTube..." class="input-text" style="margin-bottom: 0.5rem;">
-                        <button type="button" id="btnDownloadYoutube" class="btn-secondary" style="width: 100%;">📥 Baixar Mídia do YouTube</button>
+                        <button type="button" id="btnDownloadYoutube" class="btn-secondary" style="width: 100%;">📥 Baixar</button>
                         
                         <!-- BARRA DE PROGRESSO DEDICADA DE DOWNLOAD DO YOUTUBE (ÁUDIO/VÍDEO) -->
                         <div id="audioYtProgressBox" style="display: none; margin-top: 0.6rem; background: var(--input-bg); border: 1px solid var(--accent); border-radius: 10px; padding: 0.8rem;">
@@ -581,7 +581,7 @@
 
                             <div id="bgYoutubeContainer" style="display: none;">
                                 <input type="text" id="bgYoutubeUrl" placeholder="URL de fundo do YouTube..." class="input-text" style="margin-bottom: 0.4rem;">
-                                <button type="button" id="btnDownloadBgYoutube" class="btn-secondary" style="width: 100%;">📥 Baixar Fundo do YouTube</button>
+                                <button type="button" id="btnDownloadBgYoutube" class="btn-secondary" style="width: 100%;">📥 Baixar Fundo</button>
                                 
                                 <!-- BARRA DE PROGRESSO DEDICADA DE DOWNLOAD DO YOUTUBE (FUNDO) -->
                                 <div id="bgYtProgressBox" style="display: none; margin-top: 0.6rem; background: var(--input-bg); border: 1px solid var(--pink-accent); border-radius: 10px; padding: 0.8rem;">
@@ -612,31 +612,38 @@
                                 <option value="">Carregando perfis...</option>
                             </select>
 
-                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 0.5rem; margin-top: 0.5rem;">
+                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 0.5rem; margin-top: 0.5rem;">
                                 <div>
                                     <span class="label">🖼️ Modo de Fundo</span>
                                     <select id="backgroundMode" name="background_mode" class="select-input">
-                                        <option value="original" selected>Próprio Vídeo Original</option>
-                                        <option value="image">Imagem / Vídeo Personalizado</option>
-                                        <option value="color">Cor Sólida Escura</option>
+                                        <option value="original" selected>Vídeo Original</option>
+                                        <option value="image">Imagem / Vídeo</option>
+                                        <option value="color">Cor Sólida</option>
                                     </select>
                                 </div>
                                 <div>
                                     <span class="label">📝 Modo da Legenda</span>
                                     <select id="subtitleMode" name="subtitle_mode" class="select-input">
-                                        <option value="syllable" selected>Sílabas Varredura (kf)</option>
-                                        <option value="word">Palavra por Palavra</option>
-                                        <option value="line">Linha Inteira</option>
+                                        <option value="syllable" selected>Sílabas (Varredura)</option>
+                                        <option value="word">Palavras</option>
+                                        <option value="line">Linhas</option>
                                     </select>
                                 </div>
                                 <div>
                                     <span class="label">🤖 Modelo IA Whisper</span>
                                     <select id="whisperModel" name="whisper_model" class="select-input">
-                                        <option value="large-v3-turbo" selected>Large-v3 Turbo (Padrão)</option>
-                                        <option value="medium">Medium (Fallback)</option>
+                                        <option value="large-v3-turbo" selected>Large v3 Turbo (Padrão)</option>
+                                        <option value="medium">Medium (Estável)</option>
                                         <option value="small">Small (Rápido)</option>
-                                        <option value="tiny">Tiny (Ultrarrápido)</option>
-                                        <option value="large-v3">Large-v3 (Máxima)</option>
+                                        <option value="tiny">Tiny (Ultra)</option>
+                                        <option value="large-v3">Large v3 (Máxima)</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <span class="label">✏️ Pausa 75% (Revisão)</span>
+                                    <select id="enableCorrection" name="enable_correction" class="select-input">
+                                        <option value="false" selected>Não (Direta)</option>
+                                        <option value="true">Sim (Pausar 75%)</option>
                                     </select>
                                 </div>
                             </div>
@@ -648,7 +655,7 @@
                         
                         <!-- LETRA PERSONALIZADA EM DESTAQUE NO TOPO -->
                         <div style="background: rgba(139, 92, 246, 0.12); border: 1px solid var(--accent); padding: 1rem; border-radius: var(--radius-md); margin-bottom: 1.2rem;">
-                            <span class="label" style="font-size: 0.92rem; color: var(--accent); font-weight: 700; margin-bottom: 0.4rem; display: block;">📝 Letra Personalizada (Opcional - Guia do Whisper)</span>
+                            <span class="label" style="font-size: 0.92rem; color: var(--accent); font-weight: 700; margin-bottom: 0.4rem; display: block;">📝 Letra Guia (Opcional)</span>
                             <textarea id="lyricsText" name="lyrics_text" placeholder="Cole a letra oficial da música aqui se desejar guiar a transcrição e sincronização correta..." class="input-text" style="height: 90px; resize: vertical; background: var(--input-bg); border: 1px solid var(--glass-border);"></textarea>
                             <div id="lyricsBadge" style="display: none; margin-top: 0.4rem; background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.3); color: #34d399; padding: 0.4rem 0.7rem; border-radius: 8px; font-size: 0.78rem; font-weight: 600;"></div>
                             <div style="display: flex; gap: 0.5rem; margin-top: 0.5rem;">
@@ -659,7 +666,7 @@
 
                         <!-- SEÇÃO DE SALVAR E GERENCIAR PERFIS (DENTRO DAS OPÇÕES AVANÇADAS) -->
                         <div style="background: var(--input-bg); border: 1px solid var(--glass-border); padding: 1rem; border-radius: var(--radius-md); margin-bottom: 1.2rem;">
-                            <span class="label" style="font-size: 0.88rem; color: var(--text-main); margin-bottom: 0.6rem;">💾 Salvar / Gerenciar Novo Perfil de Ajustes</span>
+                            <span class="label" style="font-size: 0.88rem; color: var(--text-main); margin-bottom: 0.6rem;">💾 Perfil de Ajustes</span>
                             <div class="form-grid">
                                 <div class="form-group">
                                     <input type="text" id="newProfileName" placeholder="Nome do perfil (Ex: Festas Anos 80)" class="input-text">
@@ -694,43 +701,43 @@
                             <div class="form-group">
                                 <span class="label">Modo de Fundo</span>
                                 <select id="backgroundMode" name="background_mode" class="select-input">
-                                    <option value="original" selected>Próprio Vídeo Original (Usar vídeo da música)</option>
-                                    <option value="image">Imagem / Vídeo Personalizado (Upload / Biblioteca)</option>
+                                    <option value="original" selected>Vídeo Original</option>
+                                    <option value="image">Imagem / Vídeo</option>
                                     <option value="color">Cor Sólida Escura</option>
                                 </select>
                             </div>
 
                             <div class="form-group">
-                                <span class="label">Palavras por Linha (0 = Auto)</span>
+                                <span class="label">Palavras / Linha (0 = Auto)</span>
                                 <input type="number" id="wordsPerLine" name="words_per_line" value="0" min="0" max="30" class="input-text">
                             </div>
 
                             <div class="form-group">
-                                <span class="label">Limite de Caracteres / Linha (0 = Auto)</span>
+                                <span class="label">Caracteres / Linha (0 = Auto)</span>
                                 <input type="number" id="maxCharsLine" name="max_chars_line" value="0" min="0" max="100" class="input-text">
                             </div>
 
                             <div class="form-group">
-                                <span class="label">Fonte da Transcrição IA</span>
+                                <span class="label">Fonte da Transcrição</span>
                                 <select id="transcribeSource" name="transcribe_source" class="select-input">
-                                    <option value="vocals" selected>Vocais Isolados Demucs (Recomendado)</option>
-                                    <option value="original">Áudio Original Completo</option>
+                                    <option value="vocals" selected>Vocais (Demucs)</option>
+                                    <option value="original">Áudio Original</option>
                                 </select>
                             </div>
 
                             <div class="form-group">
-                                <span class="label">Exibir Prévia da Próxima Frase</span>
+                                <span class="label">Prévia da Próxima Frase</span>
                                 <select id="showNextLinePreview" name="show_next_line_preview" class="select-input">
                                     <option value="false" selected>Não (Padrão)</option>
-                                    <option value="true">Sim (Exibir marcação da próxima linha)</option>
+                                    <option value="true">Sim</option>
                                 </select>
                             </div>
 
                             <div class="form-group">
-                                <span class="label">Legenda Visível desde o Início</span>
+                                <span class="label">Legenda no Início</span>
                                 <select id="keepFirstLineVisible" name="keep_first_line_visible" class="select-input">
-                                    <option value="false" selected>Não (Aparecer no tempo exato)</option>
-                                    <option value="true">Sim (Manter visível no início do vídeo)</option>
+                                    <option value="false" selected>Não</option>
+                                    <option value="true">Sim</option>
                                 </select>
                             </div>
                         </div>
@@ -738,50 +745,44 @@
                         <!-- PADRONIZAÇÃO VISUAL UNIFORME DE CONFIGURAÇÕES -->
                         <div class="form-grid" style="margin-top: 1rem;">
                             <div class="form-group">
-                                <span class="label">Remover Ruídos e Silêncio (Silero VAD)</span>
+                                <span class="label">Filtro de Ruído (Silero VAD)</span>
                                 <select id="enableVad" name="enable_vad" class="select-input">
-                                    <option value="true" selected>Sim (Recomendado - Filtra silêncios)</option>
-                                    <option value="false">Não (Processar áudio bruto)</option>
+                                    <option value="true" selected>Sim (Recomendado)</option>
+                                    <option value="false">Não</option>
                                 </select>
                             </div>
 
-                            <div class="form-group">
-                                <span class="label">Pausar para Revisão de Legenda (75%)</span>
-                                <select id="enableCorrection" name="enable_correction" class="select-input">
-                                    <option value="false" selected>Não (Renderização direta)</option>
-                                    <option value="true">Sim (Pausar a 75% para revisar texto e tempos)</option>
-                                </select>
-                            </div>
+
 
                             <div class="form-group">
-                                <span class="label">Quebrar Linhas por Pontuação</span>
+                                <span class="label">Quebra por Pontuação</span>
                                 <select id="breakOnPunctuation" name="break_on_punctuation" class="select-input">
-                                    <option value="true" selected>Sim (Recomendado - Respeitar pontuação)</option>
-                                    <option value="false">Não (Manter linhas contínuas)</option>
+                                    <option value="true" selected>Sim (Recomendado)</option>
+                                    <option value="false">Não</option>
                                 </select>
                             </div>
 
                             <div class="form-group">
                                 <span class="label">Exibir Texto "Instrumental" no Silêncio</span>
                                 <select id="showInstrumental" name="show_instrumental" class="select-input">
-                                    <option value="true" selected>Sim (Exibir marcação Instrumental nos silêncios)</option>
-                                    <option value="false">Não (Manter tela limpa nos momentos de silêncio)</option>
+                                    <option value="true" selected>Sim</option>
+                                    <option value="false">Não</option>
                                 </select>
                             </div>
 
                             <div class="form-group">
                                 <span class="label">Salvar Mídias na Biblioteca</span>
                                 <select id="saveToLibrary" name="save_to_library" class="select-input">
-                                    <option value="true" selected>Sim (Salvar arquivos permanentemente)</option>
-                                    <option value="false">Não (Usar apenas de forma temporária)</option>
+                                    <option value="true" selected>Sim (Permanente)</option>
+                                    <option value="false">Não (Temporário)</option>
                                 </select>
                             </div>
 
                             <div class="form-group">
                                 <span class="label">Modo Apenas Remover Vocais</span>
                                 <select id="onlyRemoveVocals" name="only_remove_vocals" class="select-input">
-                                    <option value="false" selected>Não (Vídeo Karaokê Completo)</option>
-                                    <option value="true">Sim (Gerar apenas áudio/vídeo instrumental)</option>
+                                    <option value="false" selected>Não (Karaokê Completo)</option>
+                                    <option value="true">Sim (Apenas Instrumental)</option>
                                 </select>
                             </div>
                         </div>
@@ -791,7 +792,7 @@
 
                     <!-- Botão Submeter -->
                     <div style="margin-top: 1.5rem;">
-                        <button type="submit" id="btnSubmit" class="btn-primary">🎬 Criar Vídeo Karaokê</button>
+                        <button type="submit" id="btnSubmit" class="btn-primary">🎬 Criar Karaokê</button>
                     </div>
                 </div>
             </form>
@@ -1068,7 +1069,7 @@
 
         <!-- RODAPÉ DISCRETO DA PÁGINA -->
         <footer>
-            Sal0 Karaokê v4.3.1
+            Sal0 Karaokê v4.4.0
         </footer>
 
     </div> <!-- Container End -->
@@ -1855,7 +1856,7 @@
                                         clearInterval(audioYtPollInterval);
                                         if (progressBox) progressBox.style.display = "none";
                                         btnDownloadYoutube.disabled = false;
-                                        btnDownloadYoutube.innerText = "📥 Baixar Mídia do YouTube";
+                                        btnDownloadYoutube.innerText = "📥 Baixar";
 
                                         // Recarregar biblioteca e selecionar automaticamente a mídia baixada
                                         await loadLibrary();
@@ -1870,7 +1871,7 @@
                                         clearInterval(audioYtPollInterval);
                                         if (progressBox) progressBox.style.display = "none";
                                         btnDownloadYoutube.disabled = false;
-                                        btnDownloadYoutube.innerText = "📥 Baixar Mídia do YouTube";
+                                        btnDownloadYoutube.innerText = "📥 Baixar";
                                         alert("Erro no download do YouTube: " + (stData.error || "Desconhecido"));
                                     }
                                 }
@@ -1880,7 +1881,7 @@
                     } catch (e) {
                         if (progressBox) progressBox.style.display = "none";
                         btnDownloadYoutube.disabled = false;
-                        btnDownloadYoutube.innerText = "📥 Baixar Mídia do YouTube";
+                        btnDownloadYoutube.innerText = "📥 Baixar";
                         alert("Erro: " + e.message);
                     }
                 };
@@ -1932,7 +1933,7 @@
                                         clearInterval(bgYtPollInterval);
                                         if (progressBox) progressBox.style.display = "none";
                                         btnDownloadBgYoutube.disabled = false;
-                                        btnDownloadBgYoutube.innerText = "📥 Baixar Fundo do YouTube";
+                                        btnDownloadBgYoutube.innerText = "📥 Baixar Fundo";
 
                                         // Recarregar biblioteca e selecionar automaticamente o fundo baixado
                                         await loadLibrary();
@@ -1947,7 +1948,7 @@
                                         clearInterval(bgYtPollInterval);
                                         if (progressBox) progressBox.style.display = "none";
                                         btnDownloadBgYoutube.disabled = false;
-                                        btnDownloadBgYoutube.innerText = "📥 Baixar Fundo do YouTube";
+                                        btnDownloadBgYoutube.innerText = "📥 Baixar Fundo";
                                         alert("Erro no download de fundo do YouTube: " + (stData.error || "Desconhecido"));
                                     }
                                 }
@@ -1957,7 +1958,7 @@
                     } catch (e) {
                         if (progressBox) progressBox.style.display = "none";
                         btnDownloadBgYoutube.disabled = false;
-                        btnDownloadBgYoutube.innerText = "📥 Baixar Fundo do YouTube";
+                        btnDownloadBgYoutube.innerText = "📥 Baixar Fundo";
                         alert("Erro: " + e.message);
                     }
                 };
@@ -1973,7 +1974,7 @@
                             if (pollingInterval) clearInterval(pollingInterval);
                             document.getElementById('processCard').style.display = 'none';
                             document.getElementById('btnSubmit').disabled = false;
-                            document.getElementById('btnSubmit').innerHTML = '🎬 Criar Vídeo Karaokê';
+                            document.getElementById('btnSubmit').innerHTML = '🎬 Criar Karaokê';
                             alert("Processamento cancelado.");
                             await loadLibrary();
                         }
@@ -2333,7 +2334,7 @@
                 } catch (err) {
                     alert("Erro ao enviar: " + err.message);
                     btnSubmit.disabled = false;
-                    btnSubmit.innerHTML = '🎬 Criar Vídeo Karaokê';
+                    btnSubmit.innerHTML = '🎬 Criar Karaokê';
                 }
             });
         }
@@ -2692,7 +2693,7 @@
                     if (data.status === "done" && data.original_filename && !data.original_filename.includes("Baixando")) {
                         if (downloadBox) downloadBox.style.display = "block";
                     }
-                    if (btnSubmit) { btnSubmit.disabled = false; btnSubmit.innerHTML = '🎬 Criar Vídeo Karaokê'; }
+                    if (btnSubmit) { btnSubmit.disabled = false; btnSubmit.innerHTML = '🎬 Criar Karaokê'; }
                     isShowingCorrection = false;
                     await fetchCacheInfo();
                     await loadLibrary();
@@ -2701,7 +2702,7 @@
                     if (processCard) processCard.style.display = "none";
                     if (correctionCard) correctionCard.style.display = "none";
                     if (formCard) formCard.style.display = "block"; // Restaurar o formulário de criação
-                    if (btnSubmit) { btnSubmit.disabled = false; btnSubmit.innerHTML = '🎬 Criar Vídeo Karaokê'; }
+                    if (btnSubmit) { btnSubmit.disabled = false; btnSubmit.innerHTML = '🎬 Criar Karaokê'; }
                     isShowingCorrection = false;
                 }
             } catch (e) {}
