@@ -594,12 +594,11 @@
                                 <div>
                                     <span class="label">Modelo IA Whisper</span>
                                     <select id="whisperModel" name="whisper_model" class="select-input">
-                                        <option value="medium" selected>Medium (Recomendado)</option>
+                                        <option value="large-v3-turbo" selected>Large-v3 Turbo (Padrão Recomendado)</option>
+                                        <option value="medium">Medium (Alternativa Estável / Fallback)</option>
                                         <option value="small">Small (Rápido)</option>
-                                        <option value="base">Base (Ultrarrápido)</option>
-                                        <option value="large-v3-turbo">Large v3 Turbo (~1.5GB)</option>
-                                        <option value="large-v3">Large v3 (Máxima Precisão)</option>
-                                        <option value="large-v2">Large v2 (Alta Precisão)</option>
+                                        <option value="tiny">Tiny (Ultrarrápido)</option>
+                                        <option value="large-v3">Large-v3 (Máxima Qualidade)</option>
                                     </select>
                                 </div>
                             </div>
@@ -1003,7 +1002,7 @@
 
         <!-- RODAPÉ DISCRETO DA PÁGINA -->
         <footer>
-            Sal0 Karaokê v3.6.4
+            Sal0 Karaokê v4.0.0
         </footer>
 
     </div> <!-- Container End -->
@@ -1229,12 +1228,11 @@
                 container.innerHTML = "";
                 
                 const friendlyNames = {
-                    "base": "Base (~140MB - Ultrarrápido)",
+                    "large-v3-turbo": "Large v3 Turbo (~1.5GB - Padrão Recomendado)",
+                    "medium": "Medium (~1.5GB - Alternativa Estável / Fallback)",
                     "small": "Small (~460MB - Rápido)",
-                    "medium": "Medium (~1.5GB - Recomendado)",
-                    "large-v3-turbo": "Large v3 Turbo (~1.5GB - Excelente)",
-                    "large-v3": "Large v3 (~3GB - Máxima Precisão)",
-                    "large-v2": "Large v2 (~3GB - Alta Precisão)"
+                    "tiny": "Tiny (~75MB - Ultrarrápido)",
+                    "large-v3": "Large v3 (~3GB - Máxima Qualidade)"
                 };
 
                 let isDownloading = false;
@@ -2237,6 +2235,7 @@
                     updatePreviewText(currentSegments[0].text);
                 }
 
+                initCorrectionButtonListeners();
                 const correctionCard = document.getElementById('correctionCard');
                 if (correctionCard) correctionCard.style.display = "block";
                 isShowingCorrection = true;
@@ -2466,7 +2465,7 @@
 
                     if (!isShowingCorrection) {
                         isShowingCorrection = true;
-                        fetchSegmentsToEdit();
+                        loadCorrectionPanel();
                     }
                 } else if (data.status === "done" || data.status === "idle") {
                     if (pollingInterval) clearInterval(pollingInterval);
