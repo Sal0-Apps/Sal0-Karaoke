@@ -663,7 +663,7 @@ model_download_status = {
 }
 
 def resolve_whisper_repo(model_size: str) -> str:
-    """Mapeia os 5 modelos suportados para seus repositórios no Hugging Face (Sal0 Karaoke v4.5.0)."""
+    """Mapeia os 5 modelos suportados para seus repositórios no Hugging Face (Sal0 Karaoke v4.6.0)."""
     mapping = {
         "large-v3-turbo": "deepdml/faster-whisper-large-v3-turbo",
         "medium": "Systran/faster-whisper-medium",
@@ -1061,7 +1061,7 @@ def delete_lyrics_server(current_user: dict = Depends(get_current_user)):
 
 
 
-# Sistema de Logs de Diagnóstico v4.5.0
+# Sistema de Logs de Diagnóstico v4.6.0
 DIAGNOSTIC_LOG_FILE = "/data/output/app_diagnostic.log"
 
 def log_diagnostic(message: str, level: str = "INFO"):
@@ -1853,7 +1853,7 @@ def process_karaoke(
             if state.get("status") in ["idle", "error", "done"]:
                 try:
                     processing_lock.release()
-                    logger.info("Failsafe v4.5.0: Lock de concorrência obsoleto liberado com sucesso.")
+                    logger.info("Failsafe v4.6.0: Lock de concorrência obsoleto liberado com sucesso.")
                 except Exception:
                     pass
             else:
@@ -2208,12 +2208,36 @@ def process_karaoke(
     
     return {"status": "processing"}
 
-def send_telegram_video_flow(token: str, chat_id: str, video_path: str, orig_name: str):
-    """Auxiliar para envio de vídeo para o Telegram em segundo plano (thread dedicada) com tratamento de limite de 50MB."""
+def send_telegram_video_flow(token: str, chat_id: str, video_path: str, orig_name: str,
+                               base_url: str = "", external_url: str = ""):
+    """Auxiliar para envio de vídeo para o Telegram (v4.6.0). Inclui links de download quando o vídeo excede 50MB ou falha no envio."""
     if not token or not chat_id:
         return
 
     LIMIT_50MB = 50 * 1024 * 1024
+    
+    # Monta bloco de links HTML para o Telegram
+    def build_download_links(history_filename: str = None) -> str:
+        links = []
+        # Link interno (URL base do servidor local)
+        if base_url and base_url.strip():
+            token_q = ""
+            # Monta URL de download da biblioteca de histórico, se o arquivo foi salvo lá
+            if history_filename:
+                local_link = f"{base_url.rstrip('/')}/api/library/download/history/{requests.utils.quote(history_filename)}"
+            else:
+                local_link = f"{base_url.rstrip('/')}/api/download"
+            links.append(f'🏠 <a href="{local_link}">Download (rede local)</a>')
+        # Link externo (IP/URL configurado nas configurações)
+        if external_url and external_url.strip():
+            if history_filename:
+                ext_link = f"{external_url.rstrip('/')}/api/library/download/history/{requests.utils.quote(history_filename)}"
+            else:
+                ext_link = f"{external_url.rstrip('/')}/api/download"
+            links.append(f'🌐 <a href="{ext_link}">Download (acesso externo)</a>')
+        if not links:
+            return ""
+        return "\n" + "\n".join(links)
     
     # Função auxiliar para copiar vídeo final para a biblioteca de histórico
     def save_video_to_history(video_path, orig_name):
@@ -2240,11 +2264,13 @@ def send_telegram_video_flow(token: str, chat_id: str, video_path: str, orig_nam
             file_size_mb = os.path.getsize(video_path) / (1024 * 1024)
             logger.info(f"O vídeo {orig_name} tem {file_size_mb:.1f}MB, excedendo o limite de 50MB do Telegram.")
             dest_name = save_video_to_history(video_path, orig_name)
+            download_block = build_download_links(dest_name)
             
             msg = (
-                f"🎬 <b>Sal0 Karaokê</b>: O vídeo de <b>{orig_name}</b> foi concluído com sucesso!\n\n"
-                f"⚠️ O arquivo possui <b>{file_size_mb:.1f}MB</b> (excede o limite de 50MB do Telegram para bots).\n"
-                f"💾 Ele foi salvo automaticamente no servidor e já está disponível na sua <b>Biblioteca</b>!"
+                f"🎬 <b>Sal0 Karaokê</b>: O vídeo de <b>{orig_name}</b> foi concluído!\n\n"
+                f"⚠️ Arquivo com <b>{file_size_mb:.1f}MB</b> (excede limite de 50MB do Telegram).\n"
+                f"💾 Salvo automaticamente na sua <b>Biblioteca</b>."
+                f"{download_block}"
             )
             send_telegram_notification(token=token, chat_id=chat_id, message=msg)
             return
@@ -2273,10 +2299,12 @@ def send_telegram_video_flow(token: str, chat_id: str, video_path: str, orig_nam
                 message=f"✅ <b>Sal0 Karaokê</b>: Processamento de <b>{orig_name}</b> concluído!"
             )
         else:
-            save_video_to_history(video_path, orig_name)
+            dest_name = save_video_to_history(video_path, orig_name)
+            download_block = build_download_links(dest_name)
             msg = (
-                f"🎬 <b>Sal0 Karaokê</b>: O vídeo de <b>{orig_name}</b> foi concluído com sucesso!\n\n"
-                f"⚠️ Não foi possível enviar o vídeo via Telegram. Ele foi salvo no servidor e está disponível na sua <b>Biblioteca</b>."
+                f"🎬 <b>Sal0 Karaokê</b>: O vídeo de <b>{orig_name}</b> foi concluído!\n\n"
+                f"⚠️ Não foi possível enviar via Telegram. Disponível na <b>Biblioteca</b>."
+                f"{download_block}"
             )
             send_telegram_notification(token=token, chat_id=chat_id, message=msg)
 
@@ -2315,6 +2343,12 @@ def run_pipeline(
     tele_config = load_telegram_config()
     telegram_token = tele_config.get("telegram_token", "")
     telegram_chat_id = tele_config.get("telegram_chat_id", "")
+    
+    # Carregar URL externa configurada pelo usuário (para links de download no Telegram)
+    ext_url_cfg = load_external_url_config()
+    telegram_external_url = ext_url_cfg.get("external_url", "")
+    # URL base interna do servidor (porta padrão 8000)
+    telegram_base_url = "http://localhost:8000"
     
     with state_lock:
         orig_name = state.get("original_filename", "final")
@@ -2519,7 +2553,14 @@ def run_pipeline(
                 if telegram_token and telegram_chat_id:
                     threading.Thread(
                         target=send_telegram_video_flow,
-                        args=(telegram_token, telegram_chat_id, final_mp4_path, orig_name),
+                        kwargs={
+                            "token": telegram_token,
+                            "chat_id": telegram_chat_id,
+                            "video_path": final_mp4_path,
+                            "orig_name": orig_name,
+                            "base_url": telegram_base_url,
+                            "external_url": telegram_external_url
+                        },
                         daemon=True
                     ).start()
                 return
@@ -2668,7 +2709,14 @@ def run_pipeline(
             if telegram_token and telegram_chat_id:
                 threading.Thread(
                     target=send_telegram_video_flow,
-                    args=(telegram_token, telegram_chat_id, final_mp4_path, orig_name),
+                    kwargs={
+                        "token": telegram_token,
+                        "chat_id": telegram_chat_id,
+                        "video_path": final_mp4_path,
+                        "orig_name": orig_name,
+                        "base_url": telegram_base_url,
+                        "external_url": telegram_external_url
+                    },
                     daemon=True
                 ).start()
             

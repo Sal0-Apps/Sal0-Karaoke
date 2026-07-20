@@ -1098,7 +1098,7 @@
 
         <!-- RODAPÉ DISCRETO DA PÁGINA -->
         <footer>
-            Sal0 Karaokê v4.5.0
+            Sal0 Karaokê v4.6.0
         </footer>
 
     </div> <!-- Container End -->
@@ -2093,33 +2093,58 @@
 
             // Salvar e Deletar Perfis (Nas Opções Avançadas)
             
-            // Handlers de Salvar e Limpar Letra Personalizada
+            // Handlers de Salvar e Limpar Letra Personalizada (persiste no servidor via /api/lyrics)
             const btnSaveLyrics = document.getElementById('btnSaveLyrics');
             const btnClearLyrics = document.getElementById('btnClearLyrics');
             const lyricsText = document.getElementById('lyricsText');
             const lyricsBadge = document.getElementById('lyricsBadge');
 
+            function updateLyricsBadge(txt) {
+                if (!lyricsBadge) return;
+                if (txt && txt.trim()) {
+                    const wordCount = txt.trim().split(/\s+/).filter(Boolean).length;
+                    lyricsBadge.innerHTML = `✓ Letra salva no servidor (${wordCount} palavras) &nbsp;—&nbsp; será usada como guia pelo Whisper AI`;
+                    lyricsBadge.style.display = 'block';
+                } else {
+                    lyricsBadge.style.display = 'none';
+                }
+            }
+
             if (btnSaveLyrics) {
-                btnSaveLyrics.onclick = () => {
+                btnSaveLyrics.onclick = async () => {
                     const txt = lyricsText ? lyricsText.value.trim() : '';
                     if (!txt) {
                         alert("Digite ou cole a letra da música antes de salvar.");
-                        if (lyricsBadge) lyricsBadge.style.display = 'none';
+                        updateLyricsBadge('');
                         return;
                     }
-                    const wordCount = txt.split(/\s+/).filter(Boolean).length;
-                    if (lyricsBadge) {
-                        lyricsBadge.innerText = `✓ Letra salva com sucesso! (${wordCount} palavras prontas para guiar o Whisper AI)`;
-                        lyricsBadge.style.display = 'block';
+                    try {
+                        btnSaveLyrics.disabled = true;
+                        btnSaveLyrics.innerText = '⏳ Salvando...';
+                        const res = await authFetch('/api/lyrics', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ lyrics_text: txt })
+                        });
+                        if (!res.ok) throw new Error('Erro ao salvar no servidor.');
+                        updateLyricsBadge(txt);
+                    } catch (e) {
+                        alert('Erro ao salvar letra: ' + e.message);
+                    } finally {
+                        btnSaveLyrics.disabled = false;
+                        btnSaveLyrics.innerHTML = '💾 Salvar Letra';
                     }
-                    alert(`✓ Letra salva com sucesso (${wordCount} palavras)! Ela será enviada ao Whisper AI como guia para a sincronização.`);
                 };
             }
 
             if (btnClearLyrics) {
-                btnClearLyrics.onclick = () => {
+                btnClearLyrics.onclick = async () => {
+                    if (!confirm('Limpar a letra salva no servidor?')) return;
+                    try {
+                        await authFetch('/api/lyrics', { method: 'DELETE' });
+                    } catch (e) { /* ignora */ }
                     if (lyricsText) lyricsText.value = '';
-                    if (lyricsBadge) lyricsBadge.style.display = 'none';
+                    updateLyricsBadge('');
                 };
             }
 
@@ -2361,6 +2386,18 @@
             await fetchModelsStatus();
             await loadLibrary();
 
+            // Carregar letra guia salva no servidor
+            try {
+                const lyricsRes = await authFetch('/api/lyrics');
+                if (lyricsRes.ok) {
+                    const lyricsData = await lyricsRes.json();
+                    const savedTxt = lyricsData.lyrics_text || '';
+                    const lyricsTextEl = document.getElementById('lyricsText');
+                    if (lyricsTextEl && savedTxt) lyricsTextEl.value = savedTxt;
+                    if (typeof updateLyricsBadge === 'function') updateLyricsBadge(savedTxt);
+                }
+            } catch (e) { console.warn('Aviso: não foi possível carregar letra salva.', e); }
+
             // CHECAGEM DE STATUS EM SEGUNDO PLANO AO ABRIR OU RECARREGAR A PÁGINA
             await fetchCacheInfo();
             await fetchStatus();
@@ -2530,6 +2567,30 @@
             }
         }
 
+                // CONVERSÃO DE TEMPO PARA EDICAO DE LEGENDAS EM MM:SS.ms
+        function formatTimeMMSS(sec) {
+            if (isNaN(sec) || sec < 0) sec = 0;
+            const mins = Math.floor(sec / 60);
+            const remainder = (sec % 60).toFixed(2);
+            const paddedMins = String(mins).padStart(2, '0');
+            const paddedSecs = parseFloat(remainder) < 10 ? '0' + remainder : remainder;
+            return `${paddedMins}:${paddedSecs}`;
+        }
+
+        function parseTimeMMSS(str) {
+            if (!str) return 0;
+            str = String(str).trim();
+            if (str.includes(':')) {
+                const parts = str.split(':');
+                const mins = parseFloat(parts[0]) || 0;
+                const secs = parseFloat(parts[1]) || 0;
+                return mins * 60 + secs;
+            } else {
+                const parsed = parseFloat(str);
+                return isNaN(parsed) ? 0 : parsed;
+            }
+        }
+
         function renderSegments() {
             const container = document.getElementById('correctionList');
             if (!container) return;
@@ -2578,10 +2639,11 @@
                 headerRow.appendChild(btnDelete);
                 card.appendChild(headerRow);
 
-                // Linha de Edição dos Tempos (Início e Fim)
+                // Linha de Edição dos Tempos em Formato Humano MM:SS.ms (Minutos:Segundos)
                 const timeRow = document.createElement('div');
                 timeRow.style.display = "flex";
                 timeRow.style.alignItems = "center";
+                timeRow.style.flexWrap = "wrap";
                 timeRow.style.gap = "0.4rem";
                 timeRow.style.fontSize = "0.75rem";
 
@@ -2590,32 +2652,73 @@
                 startLabel.style.color = "var(--text-muted)";
 
                 const startInput = document.createElement('input');
-                startInput.type = "number";
-                startInput.step = "0.1";
+                startInput.type = "text";
                 startInput.className = "input-text";
                 startInput.style.fontSize = "0.75rem";
                 startInput.style.padding = "0.2rem 0.4rem";
-                startInput.style.width = "80px";
-                startInput.value = seg.start ? seg.start.toFixed(2) : "0.00";
-                startInput.onchange = (e) => { seg.start = parseFloat(e.target.value) || 0; };
+                startInput.style.width = "85px";
+                startInput.style.textAlign = "center";
+                startInput.value = formatTimeMMSS(seg.start || 0);
+                startInput.onchange = (e) => {
+                    seg.start = parseTimeMMSS(e.target.value);
+                    e.target.value = formatTimeMMSS(seg.start);
+                };
+                startInput.onblur = (e) => {
+                    seg.start = parseTimeMMSS(e.target.value);
+                    e.target.value = formatTimeMMSS(seg.start);
+                };
 
                 const endLabel = document.createElement('span');
                 endLabel.innerText = "Fim:";
                 endLabel.style.color = "var(--text-muted)";
-                endLabel.style.marginLeft = "0.4rem";
+                endLabel.style.marginLeft = "0.3rem";
 
                 const endInput = document.createElement('input');
-                endInput.type = "number";
-                endInput.step = "0.1";
+                endInput.type = "text";
                 endInput.className = "input-text";
                 endInput.style.fontSize = "0.75rem";
                 endInput.style.padding = "0.2rem 0.4rem";
-                endInput.style.width = "80px";
-                endInput.value = seg.end ? seg.end.toFixed(2) : "0.00";
-                endInput.onchange = (e) => { seg.end = parseFloat(e.target.value) || 0; };
+                endInput.style.width = "85px";
+                endInput.style.textAlign = "center";
+                endInput.value = formatTimeMMSS(seg.end || 0);
+                endInput.onchange = (e) => {
+                    seg.end = parseTimeMMSS(e.target.value);
+                    e.target.value = formatTimeMMSS(seg.end);
+                };
+                endInput.onblur = (e) => {
+                    seg.end = parseTimeMMSS(e.target.value);
+                    e.target.value = formatTimeMMSS(seg.end);
+                };
+
+                // Botões de ajuste fino (+0.5s / -0.5s)
+                const btnNudgeMinus = document.createElement('button');
+                btnNudgeMinus.type = "button";
+                btnNudgeMinus.innerText = "-0.5s";
+                btnNudgeMinus.className = "btn-secondary";
+                btnNudgeMinus.style.padding = "0.15rem 0.4rem";
+                btnNudgeMinus.style.fontSize = "0.7rem";
+                btnNudgeMinus.title = "Atrasar início em 0.5 segundos";
+                btnNudgeMinus.onclick = () => {
+                    seg.start = Math.max(0, (seg.start || 0) - 0.5);
+                    startInput.value = formatTimeMMSS(seg.start);
+                };
+
+                const btnNudgePlus = document.createElement('button');
+                btnNudgePlus.type = "button";
+                btnNudgePlus.innerText = "+0.5s";
+                btnNudgePlus.className = "btn-secondary";
+                btnNudgePlus.style.padding = "0.15rem 0.4rem";
+                btnNudgePlus.style.fontSize = "0.7rem";
+                btnNudgePlus.title = "Adiantar início em 0.5 segundos";
+                btnNudgePlus.onclick = () => {
+                    seg.start = (seg.start || 0) + 0.5;
+                    startInput.value = formatTimeMMSS(seg.start);
+                };
 
                 timeRow.appendChild(startLabel);
                 timeRow.appendChild(startInput);
+                timeRow.appendChild(btnNudgeMinus);
+                timeRow.appendChild(btnNudgePlus);
                 timeRow.appendChild(endLabel);
                 timeRow.appendChild(endInput);
                 card.appendChild(timeRow);
