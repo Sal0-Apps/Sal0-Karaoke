@@ -1,45 +1,41 @@
-# 🎤 Sal0 Karaokê
+# 🎤 Sal0 Karaokê (v4.0.0)
 
-Uma ferramenta local, simples e funcional para criar vídeos de karaokê com remoção de voz via inteligência artificial e legendas sincronizadas.
-
----
-
-## 📖 Tutorial Rápido para Iniciantes
-
-1. **Escolha a Música:** Envie uma música/vídeo do seu computador, informe a URL do YouTube ou escolha um arquivo salvo na sua Biblioteca.
-2. **Escolha o Fundo (Opcional):** Envie uma imagem ou vídeo para usar como fundo do seu karaokê.
-3. **Personalize a Legenda:** Nas "Opções Avançadas", altere o tamanho da fonte, a cor do texto, o alinhamento da legenda e as preferências do modelo IA.
-4. **Clique em Criar Vídeo Karaokê:** O servidor vai separar o vocal do instrumental (usando Demucs) e sincronizar a letra automaticamente (usando Whisper AI).
-5. **Baixe o Vídeo:** Quando terminar, baixe seu vídeo em MP4 direto pelo navegador ou acesse a aba Biblioteca & Histórico.
+**Sal0 Karaokê** é uma aplicação completa e local para geração automática de vídeos de Karaokê com inteligência artificial, sincronização palavra por palavra, separação de vocais/instrumental e renderização de alta qualidade.
 
 ---
 
-## ⚙️ Principais Funcionalidades
+## 🚀 Novidades da Versão v4.0.0 (Major Release)
 
-- 🌙/☀️ **Seleção de Tema Escuro ou Claro:** Interface adaptável com Tema Escuro definido como padrão.
-- 🎙️ **Separação de Vocais:** Remove o vocal original e produz o áudio instrumental.
-- 📝 **Legendas Sincronizadas:** Animação de varredura por sílabas, palavra por palavra ou linha inteira.
-- 📚 **Biblioteca Permanente:** Arquivos enviados ficam armazenados no seu servidor para reutilização rápida.
-- ✈️ **Envio Automático para o Telegram:** Envia o vídeo renderizado diretamente para o seu bot ou canal.
-- 🎨 **Perfis de Estilo:** Salve suas configurações preferidas para usar em um clique.
-- 🔒 **Servidor Local e Seguro:** Processamento 100% no seu próprio hardware.
+- **⚡ Faster-Whisper Atualizado**: Desempenho otimizado para CPU com suporte total a `int8` e `float32`.
+- **🎯 5 Modelos Organizados**:
+  - **Large-v3 Turbo** (*Padrão Recomendado - 1.5GB*)
+  - **Medium** (*Alternativa Estável / Fallback - 1.5GB*)
+  - **Small** (*Rápido - 460MB*)
+  - **Tiny** (*Ultrarrápido - 75MB*)
+  - **Large-v3** (*Máxima Qualidade - 3GB*)
+- **🧠 Configuração Automática de IA**:
+  - **CPU Threads**: Cálculo automático com base nos núcleos disponíveis (`N - 1`).
+  - **Compute Type**: `int8` no uso padrão, `float32` no modo *Máxima Qualidade*.
+  - **Beam Size**: 5 no modo padrão, 10 no modo *Máxima Qualidade*.
+- **🎙️ Silero VAD Integrado**: Remoção de silêncio e trechos sem voz antes do Whisper, acelerando a transcrição e eliminando legendas fantasma.
+- **✨ Alinhamento WhisperX Offline**: Refinamento de timestamps por palavra 100% offline para sincronização perfeita de karaokê.
+- **🛠️ Editor de Legendas Corrigido**: Painel de revisão e edição de texto/tempos antes da renderização 100% funcional.
+- **🔐 Segurança Hardened**: Autenticação local, proteção contra brute-force e gerenciamento de sessões com TTL.
 
 ---
 
-## 🚀 Como Executar com Docker Compose
+## 🐳 Como Executar via Docker
 
 ```yaml
-version: '3.8'
-
 services:
-  karaoke:
-    image: ghcr.io/sal0-apps/sal0-karaoke:3.6.4
+  karaoke-app:
+    image: ghcr.io/sal0-apps/sal0-karaoke:latest
     container_name: karaoke-app
     ports:
-      - "7860:7860"
+      - "7885:7860"
     volumes:
-      - /seu/caminho/data:/data
+      - ./data:/data
     restart: unless-stopped
 ```
 
-Acesse no navegador em: `http://localhost:7860`
+Acesse via navegador em `http://localhost:7885` ou no IP do seu servidor local.
