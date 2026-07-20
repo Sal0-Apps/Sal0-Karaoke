@@ -1068,7 +1068,7 @@
 
         <!-- RODAPÉ DISCRETO DA PÁGINA -->
         <footer>
-            Sal0 Karaokê v4.2.1
+            Sal0 Karaokê v4.2.2
         </footer>
 
     </div> <!-- Container End -->
@@ -2057,25 +2057,51 @@
             const btnSaveProfile = document.getElementById('btnSaveProfile');
             if (btnSaveProfile) {
                 btnSaveProfile.onclick = async () => {
-                    const typedName = document.getElementById('newProfileName').value.trim();
-                    const selectedProfile = document.getElementById('profileSelect').value;
+                    const nameInput = document.getElementById('newProfileName');
+                    const typedName = nameInput ? nameInput.value.trim() : '';
+                    const selectElem = document.getElementById('profileSelect');
+                    const selectedProfile = selectElem ? selectElem.value : '';
                     const name = typedName || selectedProfile;
-                    if (!name) { alert("Informe o nome do perfil."); return; }
+                    if (!name) { alert("Informe o nome do perfil antes de salvar."); return; }
+
+                    const getVal = (id, fallback) => {
+                        const el = document.getElementById(id);
+                        return el ? el.value : fallback;
+                    };
+                    const getBool = (id, fallback) => {
+                        const el = document.getElementById(id);
+                        if (!el) return fallback;
+                        if (el.type === 'checkbox') return el.checked;
+                        return el.value === 'true';
+                    };
+                    const getInt = (id, fallback) => {
+                        const el = document.getElementById(id);
+                        if (!el) return fallback;
+                        const parsed = parseInt(el.value);
+                        return isNaN(parsed) ? fallback : parsed;
+                    };
+
                     const profileData = {
                         name: name,
-                        subtitle_mode: document.getElementById('subtitleMode').value,
-                        whisper_model: document.getElementById('whisperModel').value,
-                        text_position: document.getElementById('textPosition').value,
-                        text_color: document.getElementById('textColor').value,
-                        font_size: document.getElementById('fontSize').value,
-                        background_mode: document.getElementById('backgroundMode').value,
-                        words_per_line: parseInt(document.getElementById('wordsPerLine').value) || 0,
-                        max_chars_line: parseInt(document.getElementById('maxCharsLine').value) || 40,
-                        transcribe_source: document.getElementById('transcribeSource').value,
-                        show_next_line_preview: document.getElementById('showNextLinePreview').value === 'true',
-                        keep_first_line_visible: document.getElementById('keepFirstLineVisible').value === 'true',
-                        pause_for_editing: document.getElementById('pauseForEditing').checked
+                        subtitle_mode: getVal('subtitleMode', 'syllable'),
+                        whisper_model: getVal('whisperModel', 'large-v3-turbo'),
+                        text_position: getVal('textPosition', 'bottom'),
+                        text_color: getVal('textColor', '#00FFFF'),
+                        font_size: getInt('fontSize', 32),
+                        background_mode: getVal('backgroundMode', 'original'),
+                        words_per_line: getInt('wordsPerLine', 0),
+                        max_chars_line: getInt('maxCharsLine', 0),
+                        break_on_punctuation: getBool('breakOnPunctuation', true),
+                        enable_vad: getBool('enableVad', true),
+                        enable_correction: getBool('enableCorrection', false),
+                        show_instrumental: getBool('showInstrumental', true),
+                        transcribe_source: getVal('transcribeSource', 'vocals'),
+                        show_next_line_preview: getBool('showNextLinePreview', false),
+                        keep_first_line_visible: getBool('keepFirstLineVisible', false),
+                        save_to_library: getBool('saveToLibrary', true),
+                        only_remove_vocals: getBool('onlyRemoveVocals', false)
                     };
+
                     try {
                         const res = await authFetch('/api/profiles', {
                             method: 'POST',
@@ -2083,9 +2109,12 @@
                             body: JSON.stringify(profileData)
                         });
                         if (res.ok) {
-                            alert("Perfil salvo com sucesso!");
-                            document.getElementById('newProfileName').value = '';
+                            alert(`✓ Perfil '${name}' salvo com sucesso!`);
+                            if (nameInput) nameInput.value = '';
                             await fetchProfiles();
+                        } else {
+                            const errData = await res.json();
+                            alert("Erro ao salvar perfil: " + (errData.detail || "Erro desconhecido"));
                         }
                     } catch (e) { alert("Erro ao salvar perfil: " + e.message); }
                 };
