@@ -663,7 +663,7 @@ model_download_status = {
 }
 
 def resolve_whisper_repo(model_size: str) -> str:
-    """Mapeia os 5 modelos suportados para seus repositórios no Hugging Face (Sal0 Karaoke v4.3.0)."""
+    """Mapeia os 5 modelos suportados para seus repositórios no Hugging Face (Sal0 Karaoke v4.3.1)."""
     mapping = {
         "large-v3-turbo": "deepdml/faster-whisper-large-v3-turbo",
         "medium": "Systran/faster-whisper-medium",
@@ -818,6 +818,15 @@ def run_youtube_download_bg(url: str):
     yt_preset_audio_status = {"status": "downloading", "progress": 15, "title": "Conectando ao YouTube...", "filename": "", "error": None}
     
     try:
+        # Limpar áudios e segmentos legados da música anterior
+        for old_f in ["original_converted.wav", "vocals.wav", "instrumental.wav", "transcribed_segments.json"]:
+            old_p = os.path.join(cache_dir, old_f)
+            if os.path.exists(old_p):
+                try:
+                    os.remove(old_p)
+                except Exception:
+                    pass
+
         input_audio_path, title = download_youtube(url, cache_dir)
         ext = os.path.splitext(input_audio_path)[1]
         
@@ -1052,7 +1061,7 @@ def delete_lyrics_server(current_user: dict = Depends(get_current_user)):
 
 
 
-# Sistema de Logs de Diagnóstico v4.3.0
+# Sistema de Logs de Diagnóstico v4.3.1
 DIAGNOSTIC_LOG_FILE = "/data/output/app_diagnostic.log"
 
 def log_diagnostic(message: str, level: str = "INFO"):
@@ -1794,7 +1803,7 @@ def process_karaoke(
             if state.get("status") in ["idle", "error", "done"]:
                 try:
                     processing_lock.release()
-                    logger.info("Failsafe v4.3.0: Lock de concorrência obsoleto liberado com sucesso.")
+                    logger.info("Failsafe v4.3.1: Lock de concorrência obsoleto liberado com sucesso.")
                 except Exception:
                     pass
             else:
@@ -2369,15 +2378,31 @@ def run_pipeline(
                 import json
                 json.dump(cached_meta, f, indent=4)
 
-        # Se for um novo arquivo ou URL do YouTube, garanta que arquivos intermediários da música anterior não existam
-        if youtube_url or not os.path.exists(os.path.join(cache_dir, "original_converted.wav")):
-            for inter_file in ["vocals.wav", "instrumental.wav", "transcribed_segments.json"]:
+        # Invalidação Inteligente de Cache: comparar o hash/tamanho do arquivo de entrada atual com o cache
+        new_audio_hash = None
+        try:
+            if os.path.exists(input_audio_path):
+                new_audio_hash = f"{os.path.basename(input_audio_path)}_{os.path.getsize(input_audio_path)}"
+        except Exception:
+            pass
+
+        cached_audio_hash = cached_meta.get("audio_hash")
+        if (new_audio_hash and cached_audio_hash != new_audio_hash) or youtube_url:
+            logger.info(f"Nova mídia detectada para processamento ({orig_name}). Limpando cache de áudio anterior...")
+            for inter_file in ["original_converted.wav", "vocals.wav", "instrumental.wav", "transcribed_segments.json"]:
                 inter_path = os.path.join(cache_dir, inter_file)
                 if os.path.exists(inter_path):
                     try:
                         os.remove(inter_path)
-                    except Exception as e:
+                    except Exception:
                         pass
+            cached_meta["audio_hash"] = new_audio_hash
+            cached_meta["original_filename"] = orig_name
+            with open(cache_meta_file, "w", encoding="utf-8") as cm_f:
+                import json
+                json.dump(cached_meta, cm_f, indent=4)
+        else:
+            logger.info(f"Reaproveitando cache de áudio válido para '{orig_name}' (audio_hash={new_audio_hash}).")
 
         # Criar diretório temporário para todo o processamento intermediário (Demucs, Whisper, ASS)
         with tempfile.TemporaryDirectory() as tmpdir:
