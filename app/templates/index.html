@@ -608,6 +608,17 @@
                     <!-- OPÇÕES AVANÇADAS EXPANSÍVEIS -->
                     <div id="advancedContent" style="display: none; margin-top: 1.2rem; padding-top: 1.2rem; border-top: 1px solid var(--glass-border);">
                         
+                        <!-- LETRA PERSONALIZADA EM DESTAQUE NO TOPO -->
+                        <div style="background: rgba(139, 92, 246, 0.12); border: 1px solid var(--accent); padding: 1rem; border-radius: var(--radius-md); margin-bottom: 1.2rem;">
+                            <span class="label" style="font-size: 0.92rem; color: var(--accent); font-weight: 700; margin-bottom: 0.4rem; display: block;">📝 Letra Personalizada (Opcional - Guia do Whisper)</span>
+                            <textarea id="lyricsText" name="lyrics_text" placeholder="Cole a letra oficial da música aqui se desejar guiar a transcrição e sincronização correta..." class="input-text" style="height: 90px; resize: vertical; background: var(--input-bg); border: 1px solid var(--glass-border);"></textarea>
+                            <div id="lyricsBadge" style="display: none; margin-top: 0.4rem; background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.3); color: #34d399; padding: 0.4rem 0.7rem; border-radius: 8px; font-size: 0.78rem; font-weight: 600;"></div>
+                            <div style="display: flex; gap: 0.5rem; margin-top: 0.5rem;">
+                                <button type="button" id="btnSaveLyrics" class="btn-primary" style="font-size: 0.78rem; height: 34px;">💾 Salvar Letra</button>
+                                <button type="button" id="btnClearLyrics" class="btn-secondary" style="font-size: 0.78rem; height: 34px; color: #fca5a5;">🗑️ Limpar Letra</button>
+                            </div>
+                        </div>
+
                         <!-- SEÇÃO DE SALVAR E GERENCIAR PERFIS (DENTRO DAS OPÇÕES AVANÇADAS) -->
                         <div style="background: var(--input-bg); border: 1px solid var(--glass-border); padding: 1rem; border-radius: var(--radius-md); margin-bottom: 1.2rem;">
                             <span class="label" style="font-size: 0.88rem; color: var(--text-main); margin-bottom: 0.6rem;">💾 Salvar / Gerenciar Novo Perfil de Ajustes</span>
@@ -656,8 +667,8 @@
                             </div>
 
                             <div class="form-group">
-                                <span class="label">Limite de Caracteres / Linha</span>
-                                <input type="number" id="maxCharsLine" name="max_chars_line" value="40" min="0" max="100" class="input-text">
+                                <span class="label">Limite de Caracteres / Linha (0 = Auto)</span>
+                                <input type="number" id="maxCharsLine" name="max_chars_line" value="0" min="0" max="100" class="input-text">
                             </div>
 
                             <div class="form-group">
@@ -685,42 +696,58 @@
                             </div>
                         </div>
 
-                        <div style="margin-top: 1rem; display: flex; flex-direction: column; gap: 0.4rem;">
-                            <label style="font-size: 0.82rem; color: var(--text-main); font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 0.5rem; background: rgba(139, 92, 246, 0.1); padding: 0.5rem 0.8rem; border-radius: 8px; border: 1px solid var(--glass-border);">
-                                <input type="checkbox" id="enableCorrection" name="enable_correction" style="accent-color: var(--accent);">
-                                ✏️ Pausar a 75% para revisar e editar texto e tempos da legenda antes da renderização
-                            </label>
-                            <label style="font-size: 0.82rem; color: var(--text-main); cursor: pointer; display: flex; align-items: center; gap: 0.5rem;">
-                                <input type="checkbox" id="breakOnPunctuation" name="break_on_punctuation" checked style="accent-color: var(--accent);">
-                                Quebrar linhas automaticamente por pontuação
-                            </label>
-                            <div class="form-group" style="margin-bottom: 0.5rem;">
-                                <span class="label">Exibir Texto "Instrumental" em Silêncios Prolongados (v2.2.4)</span>
+                        <!-- PADRONIZAÇÃO VISUAL UNIFORME DE CONFIGURAÇÕES -->
+                        <div class="form-grid" style="margin-top: 1rem;">
+                            <div class="form-group">
+                                <span class="label">Remover Ruídos e Silêncio (Silero VAD)</span>
+                                <select id="enableVad" name="enable_vad" class="select-input">
+                                    <option value="true" selected>Sim (Recomendado - Filtra silêncios)</option>
+                                    <option value="false">Não (Processar áudio bruto)</option>
+                                </select>
+                            </div>
+
+                            <div class="form-group">
+                                <span class="label">Pausar para Revisão de Legenda (75%)</span>
+                                <select id="enableCorrection" name="enable_correction" class="select-input">
+                                    <option value="false" selected>Não (Renderização direta)</option>
+                                    <option value="true">Sim (Pausar a 75% para revisar texto e tempos)</option>
+                                </select>
+                            </div>
+
+                            <div class="form-group">
+                                <span class="label">Quebrar Linhas por Pontuação</span>
+                                <select id="breakOnPunctuation" name="break_on_punctuation" class="select-input">
+                                    <option value="true" selected>Sim (Recomendado - Respeitar pontuação)</option>
+                                    <option value="false">Não (Manter linhas contínuas)</option>
+                                </select>
+                            </div>
+
+                            <div class="form-group">
+                                <span class="label">Exibir Texto "Instrumental" no Silêncio</span>
                                 <select id="showInstrumental" name="show_instrumental" class="select-input">
                                     <option value="true" selected>Sim (Exibir marcação Instrumental nos silêncios)</option>
                                     <option value="false">Não (Manter tela limpa nos momentos de silêncio)</option>
                                 </select>
                             </div>
-                            <label style="font-size: 0.82rem; color: var(--text-main); cursor: pointer; display: flex; align-items: center; gap: 0.5rem;">
-                                <input type="checkbox" id="saveToLibrary" name="save_to_library" checked style="accent-color: var(--accent);">
-                                Salvar mídias enviadas na biblioteca permanente
-                            </label>
-                            <label style="font-size: 0.82rem; color: #fca5a5; cursor: pointer; display: flex; align-items: center; gap: 0.5rem;">
-                                <input type="checkbox" id="onlyRemoveVocals" name="only_remove_vocals" style="accent-color: var(--pink-accent);">
-                                Apenas remover vocais (Gerar instrumental sem legenda)
-                            </label>
-                        </div>
 
-                        <!-- Letra Personalizada -->
-                        <div class="form-group" style="margin-top: 1rem;">
-                            <span class="label">📝 Letra Personalizada (Opcional - Guia do Whisper)</span>
-                            <textarea id="lyricsText" name="lyrics_text" placeholder="Cole a letra oficial da música aqui se desejar forçar a sincronização correta..." class="input-text" style="height: 90px; resize: vertical;"></textarea>
-                            <div id="lyricsBadge" style="display: none; margin-top: 0.4rem; background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.3); color: #34d399; padding: 0.4rem 0.7rem; border-radius: 8px; font-size: 0.78rem; font-weight: 600;"></div>
-                            <div style="display: flex; gap: 0.5rem; margin-top: 0.4rem;">
-                                <button type="button" id="btnSaveLyrics" class="btn-secondary" style="font-size: 0.75rem;">💾 Salvar Letra</button>
-                                <button type="button" id="btnClearLyrics" class="btn-secondary" style="font-size: 0.75rem; color: #fca5a5;">🗑️ Limpar Letra</button>
+                            <div class="form-group">
+                                <span class="label">Salvar Mídias na Biblioteca</span>
+                                <select id="saveToLibrary" name="save_to_library" class="select-input">
+                                    <option value="true" selected>Sim (Salvar arquivos permanentemente)</option>
+                                    <option value="false">Não (Usar apenas de forma temporária)</option>
+                                </select>
+                            </div>
+
+                            <div class="form-group">
+                                <span class="label">Modo Apenas Remover Vocais</span>
+                                <select id="onlyRemoveVocals" name="only_remove_vocals" class="select-input">
+                                    <option value="false" selected>Não (Vídeo Karaokê Completo)</option>
+                                    <option value="true">Sim (Gerar apenas áudio/vídeo instrumental)</option>
+                                </select>
                             </div>
                         </div>
+
+
                     </div>
 
                     <!-- Botão Submeter -->
@@ -1002,7 +1029,7 @@
 
         <!-- RODAPÉ DISCRETO DA PÁGINA -->
         <footer>
-            Sal0 Karaokê v4.0.0
+            Sal0 Karaokê v4.1.0
         </footer>
 
     </div> <!-- Container End -->
