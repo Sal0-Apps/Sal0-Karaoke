@@ -478,6 +478,35 @@ def startup_event():
         except Exception as e:
             logger.error(f"Erro ao carregar estado inicial no startup: {e}")
 
+
+def save_video_to_history(video_path: str, orig_name: str) -> str:
+    """Salva uma cópia permanente do vídeo final renderizado na biblioteca de histórico /data/library/history/."""
+    if not video_path or not os.path.exists(video_path):
+        return None
+    try:
+        lib_history_dir = "/data/library/history"
+        os.makedirs(lib_history_dir, exist_ok=True)
+        safe_name = "".join([c for c in orig_name if c.isalnum() or c in ' ._-']).strip() or "video_karaoke"
+        if not safe_name.lower().endswith(".mp4"):
+            dest_filename = f"{safe_name}.mp4"
+        else:
+            dest_filename = safe_name
+            safe_name = os.path.splitext(safe_name)[0]
+            
+        dest_path = os.path.join(lib_history_dir, dest_filename)
+        counter = 1
+        while os.path.exists(dest_path):
+            dest_filename = f"{safe_name}_{counter}.mp4"
+            dest_path = os.path.join(lib_history_dir, dest_filename)
+            counter += 1
+            
+        shutil.copy2(video_path, dest_path)
+        logger.info(f"Vídeo de karaokê '{orig_name}' salvo com sucesso no Histórico: {dest_path}")
+        return dest_filename
+    except Exception as err:
+        logger.error(f"Erro ao salvar vídeo no histórico: {err}")
+        return None
+
 def _send_telegram_notification_worker(token: str, chat_id: str, message: str):
     try:
         url = f"https://api.telegram.org/bot{token}/sendMessage"
@@ -2099,7 +2128,7 @@ def send_telegram_video_flow(token: str, chat_id: str, video_path: str, orig_nam
     LIMIT_50MB = 50 * 1024 * 1024
     
     # Função auxiliar para copiar vídeo final para a biblioteca de histórico
-    def save_to_library_history():
+    def save_video_to_history(video_path, orig_name):
         try:
             lib_history_dir = "/data/library/history"
             os.makedirs(lib_history_dir, exist_ok=True)
@@ -2122,7 +2151,7 @@ def send_telegram_video_flow(token: str, chat_id: str, video_path: str, orig_nam
         if os.path.exists(video_path) and os.path.getsize(video_path) > LIMIT_50MB:
             file_size_mb = os.path.getsize(video_path) / (1024 * 1024)
             logger.info(f"O vídeo {orig_name} tem {file_size_mb:.1f}MB, excedendo o limite de 50MB do Telegram.")
-            dest_name = save_to_library_history()
+            dest_name = save_video_to_history(video_path, orig_name)
             
             msg = (
                 f"🎬 <b>Sal0 Karaokê</b>: O vídeo de <b>{orig_name}</b> foi concluído com sucesso!\n\n"
@@ -2156,7 +2185,7 @@ def send_telegram_video_flow(token: str, chat_id: str, video_path: str, orig_nam
                 message=f"✅ <b>Sal0 Karaokê</b>: Processamento de <b>{orig_name}</b> concluído!"
             )
         else:
-            save_to_library_history()
+            save_video_to_history(video_path, orig_name)
             msg = (
                 f"🎬 <b>Sal0 Karaokê</b>: O vídeo de <b>{orig_name}</b> foi concluído com sucesso!\n\n"
                 f"⚠️ Não foi possível enviar o vídeo via Telegram. Ele foi salvo no servidor e está disponível na sua <b>Biblioteca</b>."
@@ -2514,6 +2543,9 @@ def run_pipeline(
             
             # Salvar opcionalmente a legenda ASS final gerada junto com o MP4
             shutil.copy(ass_path, final_ass_path)
+            
+            # Salvar AUTOMATICAMENTE uma cópia permanente no Histórico da Biblioteca (/data/library/history/)
+            save_video_to_history(final_mp4_path, orig_name)
             
             # Passo 6: Limpar arquivos temporários (não removemos os uploads do cache)
             update_state("processing", "Cleaning temporary files", 98)
