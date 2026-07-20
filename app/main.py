@@ -663,7 +663,7 @@ model_download_status = {
 }
 
 def resolve_whisper_repo(model_size: str) -> str:
-    """Mapeia os 5 modelos suportados para seus repositórios no Hugging Face (Sal0 Karaoke v4.4.0)."""
+    """Mapeia os 5 modelos suportados para seus repositórios no Hugging Face (Sal0 Karaoke v4.5.0)."""
     mapping = {
         "large-v3-turbo": "deepdml/faster-whisper-large-v3-turbo",
         "medium": "Systran/faster-whisper-medium",
@@ -1061,7 +1061,7 @@ def delete_lyrics_server(current_user: dict = Depends(get_current_user)):
 
 
 
-# Sistema de Logs de Diagnóstico v4.4.0
+# Sistema de Logs de Diagnóstico v4.5.0
 DIAGNOSTIC_LOG_FILE = "/data/output/app_diagnostic.log"
 
 def log_diagnostic(message: str, level: str = "INFO"):
@@ -1516,6 +1516,56 @@ def save_to_history(data: dict, current_user: dict = Depends(get_current_user)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erro ao salvar vídeo no histórico: {e}")
 
+class RenameRequest(BaseModel):
+    old_name: str
+    new_name: str
+
+@app.put("/api/library/{section}/rename")
+def rename_library_file(
+    section: str, 
+    req: RenameRequest, 
+    current_user: dict = Depends(get_current_user)
+):
+    """Renomeia um arquivo na biblioteca (videos, photos ou history)."""
+    valid_sections = {
+        "videos": os.path.join(LIBRARY_DIR, "videos"),
+        "photos": os.path.join(LIBRARY_DIR, "photos"),
+        "history": os.path.join(LIBRARY_DIR, "history")
+    }
+    if section not in valid_sections:
+        raise HTTPException(status_code=400, detail="Seção de biblioteca inválida.")
+
+    target_dir = valid_sections[section]
+    old_file = os.path.basename(req.old_name)
+    new_file = os.path.basename(req.new_name)
+
+    # Manter a extensão original se a nova string não especificar extensão
+    old_ext = os.path.splitext(old_file)[1]
+    if not os.path.splitext(new_file)[1]:
+        new_file += old_ext
+
+    safe_name = "".join([c for c in new_file if c.isalnum() or c in ' ._-']).strip()
+    if not safe_name:
+        raise HTTPException(status_code=400, detail="Nome de arquivo inválido.")
+
+    src_path = os.path.join(target_dir, old_file)
+    dst_path = os.path.join(target_dir, safe_name)
+
+    if not os.path.exists(src_path):
+        raise HTTPException(status_code=404, detail=f"Arquivo '{old_file}' não encontrado.")
+
+    if os.path.exists(dst_path) and old_file != safe_name:
+        raise HTTPException(status_code=400, detail=f"Já existe um arquivo com o nome '{safe_name}'.")
+
+    try:
+        os.rename(src_path, dst_path)
+        logger.info(f"Arquivo renomeado de '{old_file}' para '{safe_name}' na seção '{section}'")
+        return {"status": "success", "new_name": safe_name}
+    except Exception as e:
+        logger.error(f"Erro ao renomear arquivo: {e}")
+        raise HTTPException(status_code=500, detail=f"Erro ao renomear arquivo: {e}")
+
+
 @app.delete("/api/library/{section}/{filename}")
 def delete_from_library(section: str, filename: str, current_user: dict = Depends(get_current_user)):
     """Exclui fisicamente um arquivo da biblioteca."""
@@ -1803,7 +1853,7 @@ def process_karaoke(
             if state.get("status") in ["idle", "error", "done"]:
                 try:
                     processing_lock.release()
-                    logger.info("Failsafe v4.4.0: Lock de concorrência obsoleto liberado com sucesso.")
+                    logger.info("Failsafe v4.5.0: Lock de concorrência obsoleto liberado com sucesso.")
                 except Exception:
                     pass
             else:

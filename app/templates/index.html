@@ -468,7 +468,36 @@
             color: var(--text-muted);
             opacity: 0.7;
         }
-    </style>
+            /* ESTILOS DE BIBLIOTECA RESPONSIVA PARA DISPOSITIVOS MÓVEIS */
+        @media (max-width: 640px) {
+            .library-item {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 0.6rem;
+                padding: 0.8rem;
+            }
+            .library-item .info {
+                width: 100%;
+                cursor: pointer;
+            }
+            .library-item .title {
+                white-space: normal;
+                word-break: break-word;
+                font-size: 0.82rem;
+            }
+            .library-item .actions {
+                width: 100%;
+                justify-content: flex-end;
+                flex-wrap: wrap;
+                gap: 0.4rem;
+            }
+            .library-item .actions button,
+            .library-item .actions a {
+                padding: 0.4rem 0.6rem;
+                font-size: 0.75rem;
+            }
+        }
+</style>
 </head>
 <body>
     <div class="container">
@@ -1069,7 +1098,7 @@
 
         <!-- RODAPÉ DISCRETO DA PÁGINA -->
         <footer>
-            Sal0 Karaokê v4.4.0
+            Sal0 Karaokê v4.5.0
         </footer>
 
     </div> <!-- Container End -->
@@ -1466,12 +1495,13 @@
                     } else {
                         videosList.innerHTML = data.videos.map(file => `
                             <div class="library-item">
-                                <div class="info">
+                                <div class="info" onclick="toggleFullTitle(this)" title="Clique para ver o nome completo">
                                     <div class="icon">🎵</div>
-                                    <div class="title" title="${file}">${file}</div>
+                                    <div class="title" style="cursor: pointer;">${file}</div>
                                 </div>
                                 <div class="actions">
-                                    <button type="button" onclick="useAudioFromLibrary('${file.replace(/'/g, "\'")}')">📂 Usar no Karaokê</button>
+                                    <button type="button" onclick="useAudioFromLibrary('${file.replace(/'/g, "\'")}')">📂 Usar</button>
+                                    <button type="button" class="btn-secondary" style="padding: 0.3rem 0.65rem; font-size: 0.75rem;" onclick="renameInLibrary('videos', '${file.replace(/'/g, "\'")}')">✏️ Renomear</button>
                                     <button type="button" class="btn-delete" onclick="deleteFromLibrary('videos', '${file.replace(/'/g, "\'")}')">🗑️ Excluir</button>
                                 </div>
                             </div>
@@ -1486,12 +1516,13 @@
                     } else {
                         photosList.innerHTML = data.photos.map(file => `
                             <div class="library-item">
-                                <div class="info">
+                                <div class="info" onclick="toggleFullTitle(this)" title="Clique para ver o nome completo">
                                     <div class="icon">🖼️</div>
-                                    <div class="title" title="${file}">${file}</div>
+                                    <div class="title" style="cursor: pointer;">${file}</div>
                                 </div>
                                 <div class="actions">
-                                    <button type="button" onclick="useBgFromLibrary('${file.replace(/'/g, "\'")}')">🖼️ Usar como Fundo</button>
+                                    <button type="button" onclick="useBgFromLibrary('${file.replace(/'/g, "\'")}')">🖼️ Usar</button>
+                                    <button type="button" class="btn-secondary" style="padding: 0.3rem 0.65rem; font-size: 0.75rem;" onclick="renameInLibrary('photos', '${file.replace(/'/g, "\'")}')">✏️ Renomear</button>
                                     <button type="button" class="btn-delete" onclick="deleteFromLibrary('photos', '${file.replace(/'/g, "\'")}')">🗑️ Excluir</button>
                                 </div>
                             </div>
@@ -1509,12 +1540,13 @@
                             const dlUrl = `/api/library/download/history/${encodeURIComponent(file)}?token=${encodeURIComponent(token)}`;
                             return `
                             <div class="library-item">
-                                <div class="info">
+                                <div class="info" onclick="toggleFullTitle(this)" title="Clique para ver o nome completo">
                                     <div class="icon">🎬</div>
-                                    <div class="title" title="${file}">${file}</div>
+                                    <div class="title" style="cursor: pointer;">${file}</div>
                                 </div>
                                 <div class="actions">
                                     <a href="${dlUrl}" download="${file}" target="_blank" class="btn-primary" style="padding: 0.3rem 0.65rem; font-size: 0.75rem; text-decoration: none; display: inline-flex; align-items: center; gap: 0.3rem;">⬇️ Baixar</a>
+                                    <button type="button" class="btn-secondary" style="padding: 0.3rem 0.65rem; font-size: 0.75rem;" onclick="renameInLibrary('history', '${file.replace(/'/g, "\'")}')">✏️ Renomear</button>
                                     <button type="button" class="btn-delete" onclick="deleteFromLibrary('history', '${file.replace(/'/g, "\'")}')">🗑️ Excluir</button>
                                 </div>
                             </div>
@@ -1555,6 +1587,43 @@
             const btnBgLib = document.getElementById('btnBgModeLibrary');
             if (btnBgLib) btnBgLib.click();
             switchTab('create');
+        }
+
+                // Alternar visualização completa do nome ao clicar
+        function toggleFullTitle(containerElem) {
+            const titleElem = containerElem.querySelector('.title');
+            if (!titleElem) return;
+            if (titleElem.style.whiteSpace === 'normal') {
+                titleElem.style.whiteSpace = 'nowrap';
+                titleElem.style.wordBreak = 'normal';
+            } else {
+                titleElem.style.whiteSpace = 'normal';
+                titleElem.style.wordBreak = 'break-word';
+            }
+        }
+
+        // Função de renomear arquivo na biblioteca
+        async function renameInLibrary(section, oldFilename) {
+            const newName = prompt(`Renomear arquivo '${oldFilename}':`, oldFilename);
+            if (!newName || newName.trim() === '' || newName.trim() === oldFilename) return;
+
+            try {
+                const res = await authFetch(`/api/library/${section}/rename`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ old_name: oldFilename, new_name: newName.trim() })
+                });
+
+                if (res.ok) {
+                    alert(`✓ Arquivo renomeado para '${newName.trim()}' com sucesso!`);
+                    await loadLibrary();
+                } else {
+                    const err = await res.json();
+                    alert("Erro ao renomear: " + (err.detail || "Falha na solicitação"));
+                }
+            } catch (e) {
+                alert("Erro ao renomear arquivo: " + e.message);
+            }
         }
 
         async function deleteFromLibrary(section, filename) {
