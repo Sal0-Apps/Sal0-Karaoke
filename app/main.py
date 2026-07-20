@@ -663,7 +663,7 @@ model_download_status = {
 }
 
 def resolve_whisper_repo(model_size: str) -> str:
-    """Mapeia os 5 modelos suportados para seus repositórios no Hugging Face (Sal0 Karaoke v4.6.0)."""
+    """Mapeia os 5 modelos suportados para seus repositórios no Hugging Face (Sal0 Karaoke v4.6.1)."""
     mapping = {
         "large-v3-turbo": "deepdml/faster-whisper-large-v3-turbo",
         "medium": "Systran/faster-whisper-medium",
@@ -1061,7 +1061,7 @@ def delete_lyrics_server(current_user: dict = Depends(get_current_user)):
 
 
 
-# Sistema de Logs de Diagnóstico v4.6.0
+# Sistema de Logs de Diagnóstico v4.6.1
 DIAGNOSTIC_LOG_FILE = "/data/output/app_diagnostic.log"
 
 def log_diagnostic(message: str, level: str = "INFO"):
@@ -1216,7 +1216,11 @@ def save_profile(profile: ProfileModel, current_user: dict = Depends(get_current
         "show_instrumental": profile.show_instrumental,
         "transcribe_source": profile.transcribe_source,
         "show_next_line_preview": profile.show_next_line_preview,
-        "keep_first_line_visible": profile.keep_first_line_visible
+        "keep_first_line_visible": profile.keep_first_line_visible,
+        "enable_correction": profile.enable_correction,
+        "enable_vad": profile.enable_vad,
+        "save_to_library": profile.save_to_library,
+        "only_remove_vocals": profile.only_remove_vocals
     }
     try:
         with open(PROFILES_FILE, "w", encoding="utf-8") as f:
@@ -1853,7 +1857,7 @@ def process_karaoke(
             if state.get("status") in ["idle", "error", "done"]:
                 try:
                     processing_lock.release()
-                    logger.info("Failsafe v4.6.0: Lock de concorrência obsoleto liberado com sucesso.")
+                    logger.info("Failsafe v4.6.1: Lock de concorrência obsoleto liberado com sucesso.")
                 except Exception:
                     pass
             else:
@@ -2210,7 +2214,7 @@ def process_karaoke(
 
 def send_telegram_video_flow(token: str, chat_id: str, video_path: str, orig_name: str,
                                base_url: str = "", external_url: str = ""):
-    """Auxiliar para envio de vídeo para o Telegram (v4.6.0). Inclui links de download quando o vídeo excede 50MB ou falha no envio."""
+    """Auxiliar para envio de vídeo para o Telegram (v4.6.1). Inclui links de download quando o vídeo excede 50MB ou falha no envio."""
     if not token or not chat_id:
         return
 
