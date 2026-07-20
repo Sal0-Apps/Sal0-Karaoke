@@ -5,32 +5,31 @@ import shutil
 import subprocess
 from faster_whisper import WhisperModel
 
-print("=== INICIANDO PRÉ-DOWNLOAD DOS MODELOS IA ===")
+print("=== INICIANDO PRÉ-DOWNLOAD DOS MODELOS IA (v4.0.0) ===")
 
-# 1. Baixar os modelos Whisper Medium e Large v3 Turbo para virem pré-instalados na imagem
-print("1/3: Baixando Whisper Medium pré-instalado...")
-try:
-    WhisperModel("medium", device="cpu", compute_type="float32")
-    print("Whisper Medium pré-instalado com sucesso.")
-except Exception as e:
-    print(f"Aviso ao baixar o Whisper Medium: {e}")
-
-print("2/3: Baixando Whisper Large v3 Turbo pré-instalado...")
+# 1. Baixar os modelos Whisper Large v3 Turbo e Medium pré-instalados na imagem
+print("1/3: Baixando Whisper Large v3 Turbo (padrão v4.0.0)...")
 try:
     WhisperModel("deepdml/faster-whisper-large-v3-turbo", device="cpu", compute_type="float32")
     print("Whisper Large v3 Turbo pré-instalado com sucesso.")
 except Exception as e:
     print(f"Aviso ao baixar o Whisper Large v3 Turbo: {e}")
 
-# 2. Criar áudio de 10 segundos com onda senoidal de 440Hz (sinal real para evitar AssertionError)
+print("2/3: Baixando Whisper Medium (fallback alternativo v4.0.0)...")
+try:
+    WhisperModel("medium", device="cpu", compute_type="float32")
+    print("Whisper Medium pré-instalado com sucesso.")
+except Exception as e:
+    print(f"Aviso ao baixar o Whisper Medium: {e}")
+
+# 2. Criar áudio de 10 segundos com onda senoidal para teste do Demucs
 dummy_wav = "dummy_signal.wav"
 print("Criando arquivo de áudio senoidal de 10s para teste do Demucs...")
 sample_rate = 44100
 num_channels = 2
 sample_width = 2
-duration = 10.0  # Duração suficiente para a janela do Demucs
+duration = 10.0
 
-# Gerar tom senoidal puro de 440Hz
 try:
     with wave.open(dummy_wav, "wb") as w:
         w.setnchannels(num_channels)
@@ -40,9 +39,7 @@ try:
         frames = []
         for i in range(int(sample_rate * duration)):
             t = i / sample_rate
-            # Gerar valor PCM 16-bit (entre -32768 e 32767)
             val = int(16000 * math.sin(2 * math.pi * 440 * t))
-            # Converter para bytes de 16 bits signed (little endian) duplicados para estéreo
             frame = val.to_bytes(sample_width, byteorder='little', signed=True) * num_channels
             frames.append(frame)
             
@@ -52,7 +49,7 @@ except Exception as e:
     print(f"Aviso ao gerar áudio de teste: {e}")
 
 # 3. Executar o Demucs via CLI para forçar o download do modelo htdemucs
-print("2/2: Baixando e testando o modelo Demucs htdemucs...")
+print("Testando o modelo Demucs htdemucs...")
 if os.path.exists(dummy_wav):
     try:
         cmd = [
@@ -61,18 +58,15 @@ if os.path.exists(dummy_wav):
             "--two-stems", "vocals",
             dummy_wav
         ]
-        # Executa silenciosamente
         result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         if result.returncode == 0:
             print("Demucs htdemucs baixado e testado com sucesso.")
         else:
-            print(f"Demucs baixou o modelo, mas retornou aviso no teste: {result.stderr}")
+            print(f"Demucs baixou o modelo com avisos: {result.stderr}")
     except Exception as e:
         print(f"Aviso ao executar teste do Demucs: {e}")
-else:
-    print("Arquivo de áudio de teste não encontrado. Pulando execução do teste do Demucs.")
 
-# 4. Limpeza dos arquivos de teste gerados
+# 4. Limpeza dos arquivos temporários de teste
 print("Limpando arquivos temporários do build...")
 try:
     if os.path.exists(dummy_wav):
@@ -104,4 +98,4 @@ for idx, url in enumerate(landscape_urls):
         except Exception as e:
             print(f"Aviso ao baixar imagem {idx+1}: {e}")
 
-print("=== FINALIZADA CONFIGURAÇÃO DOS MODELOS IA ===")
+print("=== FINALIZADA CONFIGURAÇÃO DOS MODELOS IA (v4.0.0) ===")
