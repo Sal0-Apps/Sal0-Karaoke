@@ -11,15 +11,15 @@ def transcribe_vocals(
     model_size: str = "large-v3-turbo",
     initial_prompt: str = None,
     quality_mode: str = "standard",
-    cpu_threads: int = None
+    cpu_threads: int = None,
+    enable_vad: bool = True
 ) -> list[dict]:
     """
-    Sal0 Karaoke v4.0.0 - Transcrição de vocais com Faster-Whisper, Silero VAD e WhisperX.
+    Sal0 Karaoke v4.1.0 - Transcrição de vocais com Faster-Whisper, Silero VAD e WhisperX.
+    - enable_vad: Ativa/desativa a remoção de ruídos e silêncio com Silero VAD.
     - CPU Threads: Auto-calculado max(1, os.cpu_count() - 1)
     - Compute Type: 'int8' (padrão) ou 'float32' (máxima qualidade)
     - Beam Size: 5 (padrão) ou 10 (máxima qualidade)
-    - Silero VAD: Ativado via vad_filter=True
-    - WhisperX Alignment: Refinamento por palavra 100% offline
     """
     if not cpu_threads or cpu_threads <= 0:
         total_cpus = os.cpu_count() or 4
@@ -30,8 +30,8 @@ def transcribe_vocals(
     beam_size = 10 if is_max_quality else 5
 
     logger.info(
-        f"Configuração Faster-Whisper v4.0.0: Modelo={model_size}, "
-        f"Threads={cpu_threads}, Compute={compute_type}, BeamSize={beam_size}"
+        f"Configuração Faster-Whisper v4.1.0: Modelo={model_size}, "
+        f"Threads={cpu_threads}, Compute={compute_type}, BeamSize={beam_size}, SileroVAD={enable_vad}"
     )
 
     repo_id = model_size
@@ -75,22 +75,30 @@ def transcribe_vocals(
                 "Por favor, acesse o painel 'Configurações Avançadas' -> 'Gerenciador de Modelos de IA' e baixe o modelo antes de prosseguir."
             )
 
-    logger.info(f"Iniciando transcrição com Silero VAD: {vocals_path}")
+    logger.info(f"Iniciando transcrição (Silero VAD={enable_vad}): {vocals_path}")
     try:
-        segments, info = model.transcribe(
-            vocals_path,
-            word_timestamps=True,
-            beam_size=beam_size,
-            initial_prompt=initial_prompt,
-            vad_filter=True,
-            vad_parameters=dict(
-                min_silence_duration_ms=500,
-                speech_pad_ms=400,
-                threshold=0.5
+        if enable_vad:
+            segments, info = model.transcribe(
+                vocals_path,
+                word_timestamps=True,
+                beam_size=beam_size,
+                initial_prompt=initial_prompt,
+                vad_filter=True,
+                vad_parameters=dict(
+                    min_silence_duration_ms=500,
+                    speech_pad_ms=400,
+                    threshold=0.5
+                )
             )
-        )
+        else:
+            segments, info = model.transcribe(
+                vocals_path,
+                word_timestamps=True,
+                beam_size=beam_size,
+                initial_prompt=initial_prompt
+            )
     except Exception as e_vad:
-        logger.warning(f"Silero VAD retornou aviso ({e_vad}). Transcrevendo sem filtro VAD...")
+        logger.warning(f"Transcrição com Silero VAD retornou aviso ({e_vad}). Transcrevendo sem filtro VAD...")
         segments, info = model.transcribe(
             vocals_path,
             word_timestamps=True,
