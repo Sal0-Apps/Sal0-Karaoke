@@ -133,26 +133,50 @@ def download_youtube(url: str, cache_dir: str) -> tuple[str, str]:
                 break
     return file_path, title
 
-def get_current_user(x_session_token: str = Header(None), token: str = Query(None)):
+def get_current_user(
+    x_session_token: str = Header(None),
+    authorization: str = Header(None),
+    token: str = Query(None)
+):
     users = load_users()
     if not users:
         # Modo Setup: Sem usuários criados ainda
         return {"username": "setup_mode", "role": "setup"}
-    
+
+    # Aceita x-session-token, Authorization: Bearer <token>, ou ?token=
     active_token = x_session_token or token
+    if not active_token and authorization:
+        if authorization.lower().startswith("bearer "):
+            active_token = authorization[7:].strip()
+
     if not active_token:
         raise HTTPException(status_code=401, detail="Sessão não fornecida.")
-        
+
     sessions = load_sessions()
     session = sessions.get(active_token)
     if not session:
         raise HTTPException(status_code=401, detail="Sessão inválida ou expirada.")
-        
+
+    # Verificar TTL da sessão (30 dias)
+    import time
+    created_at = session.get("created_at", 0)
+    if created_at and (time.time() - created_at) > (30 * 24 * 3600):
+        # Sessão expirada - remover e rejeitar
+        sessions.pop(active_token, None)
+        save_sessions(sessions)
+        raise HTTPException(status_code=401, detail="Sessão expirada. Faça login novamente.")
+
     return session
 
 # Locks para controle thread-safe e prevenção de processamentos concorrentes
 state_lock = threading.Lock()
 processing_lock = threading.Lock()
+
+# Proteção contra brute-force no login
+_login_attempts: dict = {}  # {ip_or_user: {"count": int, "locked_until": float}}
+_login_lock = threading.Lock()
+MAX_LOGIN_ATTEMPTS = 10   # tentativas antes do bloqueio
+LOCKOUT_SECONDS = 300     # 5 minutos de bloqueio
 
 # Estado global da aplicação e persistência em disco
 STATE_FILE = "/data/output/state.json"
@@ -494,7 +518,8 @@ def send_telegram_video(token: str, chat_id: str, video_path: str, caption: str 
             if response.status_code == 200:
                 logger.info("Vídeo de karaokê enviado com sucesso para o Telegram.")
             else:
-                logger.error(f"Erro do Telegram ao enviar vídeo: {response.text}")
+                # Log sem expor dados sensíveis da resposta do Telegram
+                logger.error(f"Erro do Telegram ao enviar vídeo: HTTP {response.status_code}")
     except Exception as e:
         logger.error(f"Falha ao enviar vídeo de karaokê para o Telegram: {e}")
 
@@ -518,12 +543,17 @@ def load_telegram_config() -> dict:
         return {"telegram_token": "", "telegram_chat_id": ""}
 
 @app.get("/api/telegram")
-def get_telegram_config():
+def get_telegram_config(current_user: dict = Depends(get_current_user)):
     """Endpoint para ler a credencial global do Telegram."""
-    return load_telegram_config()
+    config = load_telegram_config()
+    # Mascarar token parcialmente na resposta para não expor o valor completo
+    token = config.get("telegram_token", "")
+    if token and len(token) > 8:
+        config["telegram_token"] = token[:6] + "***" + token[-4:]
+    return config
 
 @app.post("/api/telegram")
-def save_telegram_config(config: TelegramModel):
+def save_telegram_config(config: TelegramModel, current_user: dict = Depends(get_current_user)):
     """Endpoint para salvar a credencial global do Telegram."""
     try:
         os.makedirs(os.path.dirname(TELEGRAM_FILE), exist_ok=True)
@@ -556,12 +586,12 @@ def load_external_url_config() -> dict:
         return {"external_url": ""}
 
 @app.get("/api/external_url")
-def get_external_url_config():
+def get_external_url_config(current_user: dict = Depends(get_current_user)):
     """Endpoint para ler a URL/IP externo salvo."""
     return load_external_url_config()
 
 @app.post("/api/external_url")
-def save_external_url_config(config: ExternalUrlModel):
+def save_external_url_config(config: ExternalUrlModel, current_user: dict = Depends(get_current_user)):
     """Endpoint para salvar a URL/IP externo."""
     try:
         os.makedirs(os.path.dirname(EXTERNAL_URL_FILE), exist_ok=True)
@@ -980,7 +1010,7 @@ def delete_lyrics_server(current_user: dict = Depends(get_current_user)):
 
 
 
-# Sistema de Logs de Diagnóstico v3.6.3
+# Sistema de Logs de Diagnóstico v3.6.4
 DIAGNOSTIC_LOG_FILE = "/data/output/app_diagnostic.log"
 
 def log_diagnostic(message: str, level: str = "INFO"):
@@ -1167,7 +1197,7 @@ def get_last_profile(current_user: dict = Depends(get_current_user)):
     return {"last_profile": "Padrão"}
 
 @app.post("/api/last_profile")
-def save_last_profile(data: dict):
+def save_last_profile(data: dict, current_user: dict = Depends(get_current_user)):
     """Salva o nome do último perfil utilizado."""
     try:
         os.makedirs(os.path.dirname(LAST_PROFILE_FILE), exist_ok=True)
@@ -1224,27 +1254,48 @@ def setup_admin(data: dict):
     }
     save_users(users)
     
+    import time
     token = str(uuid.uuid4())
     sessions = load_sessions()
     sessions[token] = {
         "username": username,
-        "role": "admin"
+        "role": "admin",
+        "created_at": time.time()
     }
     save_sessions(sessions)
-    
+
     return {"status": "success", "token": token, "username": username, "role": "admin"}
 
 @app.post("/api/login")
 def login(data: dict):
+    import time
     users = load_users()
     username = data.get("username", "").strip()
     password = data.get("password", "")
-    
+
     if not username or not password:
         raise HTTPException(status_code=400, detail="Usuário e senha são obrigatórios.")
-        
+
+    # Proteção contra brute-force por nome de usuário
+    with _login_lock:
+        attempt_info = _login_attempts.get(username, {"count": 0, "locked_until": 0})
+        if time.time() < attempt_info.get("locked_until", 0):
+            remaining = int(attempt_info["locked_until"] - time.time())
+            raise HTTPException(
+                status_code=429,
+                detail=f"Conta temporariamente bloqueada. Tente novamente em {remaining} segundos."
+            )
+
     user = users.get(username)
     if not user:
+        # Registrar tentativa falha mesmo para usuários inexistentes (evita user enumeration timing)
+        with _login_lock:
+            info = _login_attempts.get(username, {"count": 0, "locked_until": 0})
+            info["count"] = info.get("count", 0) + 1
+            if info["count"] >= MAX_LOGIN_ATTEMPTS:
+                info["locked_until"] = time.time() + LOCKOUT_SECONDS
+                info["count"] = 0
+            _login_attempts[username] = info
         raise HTTPException(status_code=401, detail="Usuário ou senha incorretos.")
         
     # Lógica de migração automática do SHA-256 legado para PBKDF2
@@ -1267,14 +1318,20 @@ def login(data: dict):
         if user.get("password_hash") != check_hash:
             raise HTTPException(status_code=401, detail="Usuário ou senha incorretos.")
         
+    # Reset contador de tentativas após login bem-sucedido
+    with _login_lock:
+        _login_attempts.pop(username, None)
+
+    import time
     token = str(uuid.uuid4())
     sessions = load_sessions()
     sessions[token] = {
         "username": username,
-        "role": user.get("role", "user")
+        "role": user.get("role", "user"),
+        "created_at": time.time()
     }
     save_sessions(sessions)
-    
+
     return {"status": "success", "token": token, "username": username, "role": user.get("role", "user")}
 
 @app.post("/api/logout")
@@ -1684,7 +1741,7 @@ def process_karaoke(
             if state.get("status") in ["idle", "error", "done"]:
                 try:
                     processing_lock.release()
-                    logger.info("Failsafe v3.6.3: Lock de concorrência obsoleto liberado com sucesso.")
+                    logger.info("Failsafe v3.6.4: Lock de concorrência obsoleto liberado com sucesso.")
                 except Exception:
                     pass
             else:
