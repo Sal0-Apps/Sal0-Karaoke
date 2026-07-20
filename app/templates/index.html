@@ -612,9 +612,17 @@
                                 <option value="">Carregando perfis...</option>
                             </select>
 
-                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; margin-top: 0.5rem;">
+                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 0.5rem; margin-top: 0.5rem;">
                                 <div>
-                                    <span class="label">Modo da Legenda</span>
+                                    <span class="label">🖼️ Modo de Fundo</span>
+                                    <select id="backgroundMode" name="background_mode" class="select-input">
+                                        <option value="original" selected>Próprio Vídeo Original</option>
+                                        <option value="image">Imagem / Vídeo Personalizado</option>
+                                        <option value="color">Cor Sólida Escura</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <span class="label">📝 Modo da Legenda</span>
                                     <select id="subtitleMode" name="subtitle_mode" class="select-input">
                                         <option value="syllable" selected>Sílabas Varredura (kf)</option>
                                         <option value="word">Palavra por Palavra</option>
@@ -622,13 +630,13 @@
                                     </select>
                                 </div>
                                 <div>
-                                    <span class="label">Modelo IA Whisper</span>
+                                    <span class="label">🤖 Modelo IA Whisper</span>
                                     <select id="whisperModel" name="whisper_model" class="select-input">
-                                        <option value="large-v3-turbo" selected>Large-v3 Turbo (Padrão Recomendado)</option>
-                                        <option value="medium">Medium (Alternativa Estável / Fallback)</option>
+                                        <option value="large-v3-turbo" selected>Large-v3 Turbo (Padrão)</option>
+                                        <option value="medium">Medium (Fallback)</option>
                                         <option value="small">Small (Rápido)</option>
                                         <option value="tiny">Tiny (Ultrarrápido)</option>
-                                        <option value="large-v3">Large-v3 (Máxima Qualidade)</option>
+                                        <option value="large-v3">Large-v3 (Máxima)</option>
                                     </select>
                                 </div>
                             </div>
@@ -1060,7 +1068,7 @@
 
         <!-- RODAPÉ DISCRETO DA PÁGINA -->
         <footer>
-            Sal0 Karaokê v4.2.0
+            Sal0 Karaokê v4.2.1
         </footer>
 
     </div> <!-- Container End -->
