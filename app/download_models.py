@@ -10,14 +10,14 @@ print("=== INICIANDO PRÉ-DOWNLOAD DOS MODELOS IA (v4.0.0) ===")
 # 1. Baixar os modelos Whisper Large v3 Turbo e Medium pré-instalados na imagem
 print("1/3: Baixando Whisper Large v3 Turbo (padrão v4.0.0)...")
 try:
-    WhisperModel("deepdml/faster-whisper-large-v3-turbo", device="cpu", compute_type="float32")
+    WhisperModel("deepdml/faster-whisper-large-v3-turbo", device="cpu", compute_type="float32", download_root="/data/output/models/whisper")
     print("Whisper Large v3 Turbo pré-instalado com sucesso.")
 except Exception as e:
     print(f"Aviso ao baixar o Whisper Large v3 Turbo: {e}")
 
 print("2/3: Baixando Whisper Medium (fallback alternativo v4.0.0)...")
 try:
-    WhisperModel("medium", device="cpu", compute_type="float32")
+    WhisperModel("Systran/faster-whisper-medium", device="cpu", compute_type="float32", download_root="/data/output/models/whisper")
     print("Whisper Medium pré-instalado com sucesso.")
 except Exception as e:
     print(f"Aviso ao baixar o Whisper Medium: {e}")

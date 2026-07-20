@@ -663,7 +663,7 @@ model_download_status = {
 }
 
 def resolve_whisper_repo(model_size: str) -> str:
-    """Mapeia os 5 modelos suportados para seus repositórios no Hugging Face (Sal0 Karaoke v4.2.4)."""
+    """Mapeia os 5 modelos suportados para seus repositórios no Hugging Face (Sal0 Karaoke v4.3.0)."""
     mapping = {
         "large-v3-turbo": "deepdml/faster-whisper-large-v3-turbo",
         "medium": "Systran/faster-whisper-medium",
@@ -673,10 +673,17 @@ def resolve_whisper_repo(model_size: str) -> str:
     }
     return mapping.get(model_size.lower().strip(), model_size)
 
-def is_model_downloaded(model_size: str) -> bool:
-    """Verifica nos diretórios locais se um dos 5 modelos Whisper v4.2.4 já foi baixado."""
+def get_model_local_dir(model_size: str) -> str:
+    """Retorna o diretório local válido contendo os pesos reais (model.bin com tamanho válido) do modelo Whisper."""
     key = model_size.lower().strip()
     
+    # Tamanho mínimo exigido em bytes para garantir que o modelo não está incompleto
+    min_size_bytes = 300 * 1024 * 1024  # 300 MB padrão (para medium, large, turbo)
+    if "tiny" in key:
+        min_size_bytes = 30 * 1024 * 1024   # 30 MB
+    elif "small" in key:
+        min_size_bytes = 150 * 1024 * 1024  # 150 MB
+
     if key == "large-v3-turbo":
         match_fn = lambda name: "turbo" in name or "large-v3-turbo" in name
     elif key == "large-v3":
@@ -706,11 +713,21 @@ def is_model_downloaded(model_size: str) -> bool:
                 entry_path = os.path.join(root, entry)
                 if os.path.isdir(entry_path) and match_fn(entry.lower()):
                     for r, dirs, files in os.walk(entry_path):
-                        if any(f in files for f in ["model.bin", "model.safetensors", "config.json", "pytorch_model.bin", "model.pt", "vocabulary.json"]):
-                            return True
+                        for f in files:
+                            if f in ["model.bin", "model.safetensors", "pytorch_model.bin", "model.pt"]:
+                                fpath = os.path.join(r, f)
+                                try:
+                                    if os.path.getsize(fpath) >= min_size_bytes:
+                                        return r
+                                except Exception:
+                                    pass
         except Exception as e:
-            logger.warning(f"Erro ao verificar modelos em {root}: {e}")
-    return False
+            logger.warning(f"Erro ao verificar modelo em {root}: {e}")
+    return None
+
+def is_model_downloaded(model_size: str) -> bool:
+    """Verifica nos diretórios locais se um dos 5 modelos Whisper já foi baixado com pesos válidos no disco."""
+    return get_model_local_dir(model_size) is not None
 
 def download_model_worker(model_size: str):
     """Worker em background para baixar o modelo Whisper e liberar a RAM."""
@@ -1035,7 +1052,7 @@ def delete_lyrics_server(current_user: dict = Depends(get_current_user)):
 
 
 
-# Sistema de Logs de Diagnóstico v4.2.4
+# Sistema de Logs de Diagnóstico v4.3.0
 DIAGNOSTIC_LOG_FILE = "/data/output/app_diagnostic.log"
 
 def log_diagnostic(message: str, level: str = "INFO"):
@@ -1777,7 +1794,7 @@ def process_karaoke(
             if state.get("status") in ["idle", "error", "done"]:
                 try:
                     processing_lock.release()
-                    logger.info("Failsafe v4.2.4: Lock de concorrência obsoleto liberado com sucesso.")
+                    logger.info("Failsafe v4.3.0: Lock de concorrência obsoleto liberado com sucesso.")
                 except Exception:
                     pass
             else:
