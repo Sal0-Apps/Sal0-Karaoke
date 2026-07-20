@@ -663,7 +663,7 @@ model_download_status = {
 }
 
 def resolve_whisper_repo(model_size: str) -> str:
-    """Mapeia os 5 modelos suportados para seus repositórios no Hugging Face (Sal0 Karaoke v4.1.1)."""
+    """Mapeia os 5 modelos suportados para seus repositórios no Hugging Face (Sal0 Karaoke v4.2.0)."""
     mapping = {
         "large-v3-turbo": "deepdml/faster-whisper-large-v3-turbo",
         "medium": "Systran/faster-whisper-medium",
@@ -674,7 +674,7 @@ def resolve_whisper_repo(model_size: str) -> str:
     return mapping.get(model_size.lower().strip(), model_size)
 
 def is_model_downloaded(model_size: str) -> bool:
-    """Verifica nos diretórios locais se um dos 5 modelos Whisper v4.1.1 já foi baixado."""
+    """Verifica nos diretórios locais se um dos 5 modelos Whisper v4.2.0 já foi baixado."""
     key = model_size.lower().strip()
     
     if key == "large-v3-turbo":
@@ -1035,7 +1035,7 @@ def delete_lyrics_server(current_user: dict = Depends(get_current_user)):
 
 
 
-# Sistema de Logs de Diagnóstico v4.1.1
+# Sistema de Logs de Diagnóstico v4.2.0
 DIAGNOSTIC_LOG_FILE = "/data/output/app_diagnostic.log"
 
 def log_diagnostic(message: str, level: str = "INFO"):
@@ -1086,12 +1086,15 @@ class ProfileModel(BaseModel):
     words_per_line: int = 0
     max_chars_line: int = 0
     break_on_punctuation: bool = True
-    background_mode: str = "image"
+    background_mode: str = "original"
     show_instrumental: bool = True
     transcribe_source: str = "vocals"
     show_next_line_preview: bool = False
     keep_first_line_visible: bool = False
+    enable_correction: bool = False
     enable_vad: bool = True
+    save_to_library: bool = True
+    only_remove_vocals: bool = False
 
 def load_profiles() -> dict:
     """Carrega os perfis do arquivo JSON ou inicializa com valores padrão se não existir."""
@@ -1150,8 +1153,14 @@ def load_profiles() -> dict:
                     p_data["show_next_line_preview"] = False
                 if "keep_first_line_visible" not in p_data:
                     p_data["keep_first_line_visible"] = False
-                if "pause_for_editing" not in p_data:
-                    p_data["pause_for_editing"] = False
+                if "enable_correction" not in p_data:
+                    p_data["enable_correction"] = p_data.get("pause_for_editing", False)
+                if "enable_vad" not in p_data:
+                    p_data["enable_vad"] = True
+                if "save_to_library" not in p_data:
+                    p_data["save_to_library"] = True
+                if "only_remove_vocals" not in p_data:
+                    p_data["only_remove_vocals"] = False
             return profiles
     except Exception as e:
         logger.error(f"Erro ao carregar arquivo de perfis: {e}")
@@ -1768,7 +1777,7 @@ def process_karaoke(
             if state.get("status") in ["idle", "error", "done"]:
                 try:
                     processing_lock.release()
-                    logger.info("Failsafe v4.1.1: Lock de concorrência obsoleto liberado com sucesso.")
+                    logger.info("Failsafe v4.2.0: Lock de concorrência obsoleto liberado com sucesso.")
                 except Exception:
                     pass
             else:
@@ -2200,20 +2209,21 @@ def send_telegram_video_flow(token: str, chat_id: str, video_path: str, orig_nam
 def run_pipeline(
     input_audio_path: str, 
     input_bg_path: str = None, 
-    whisper_model: str = "medium",
+    whisper_model: str = "large-v3-turbo",
     font_size: int = 32,
     text_color: str = "#00FFFF",
     text_position: str = "bottom",
     subtitle_mode: str = "syllable",
     words_per_line: int = 0,
-    max_chars_line: int = 40,
+    max_chars_line: int = 0,
     break_on_punctuation: bool = True,
-    background_mode: str = "image",
+    enable_vad: bool = True,
+    background_mode: str = "original",
     show_instrumental: bool = True,
     transcribe_source: str = "vocals",
     show_next_line_preview: bool = False,
     lyrics_text: str = None,
-    enable_correction: bool = True,
+    enable_correction: bool = False,
     keep_first_line_visible: bool = False,
     youtube_url: str = None,
     only_remove_vocals: bool = False
@@ -2532,13 +2542,14 @@ def run_pipeline(
             # Passo 5: Renderizar o vídeo final
             update_state("processing", "Rendering final video", 95)
             send_telegram_notification(telegram_token, telegram_chat_id, "🎬 <b>Sal0 Karaokê</b>: Renderizando vídeo (95%)")
+            bg_mode_param = "original_video" if (background_mode in ["original", "original_video"]) else background_mode
             render_karaoke_video(
                 instrumental_path=instrumental_wav,
                 ass_path=ass_path,
                 output_mp4_path=final_mp4_path,
                 background_image_path=input_bg_path,
                 original_video_path=input_audio_path,
-                background_mode=background_mode
+                background_mode=bg_mode_param
             )
             
             pm.check_cancelled()

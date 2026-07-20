@@ -686,7 +686,8 @@
                             <div class="form-group">
                                 <span class="label">Modo de Fundo</span>
                                 <select id="backgroundMode" name="background_mode" class="select-input">
-                                    <option value="image" selected>Imagem / Vídeo</option>
+                                    <option value="original" selected>Próprio Vídeo Original (Usar vídeo da música)</option>
+                                    <option value="image">Imagem / Vídeo Personalizado (Upload / Biblioteca)</option>
                                     <option value="color">Cor Sólida Escura</option>
                                 </select>
                             </div>
@@ -1059,7 +1060,7 @@
 
         <!-- RODAPÉ DISCRETO DA PÁGINA -->
         <footer>
-            Sal0 Karaokê v4.1.1
+            Sal0 Karaokê v4.2.0
         </footer>
 
     </div> <!-- Container End -->
@@ -1253,18 +1254,23 @@
                     }
                     if (selected && allProfiles[selected]) {
                         const p = allProfiles[selected];
-                        if (p.subtitle_mode) document.getElementById('subtitleMode').value = p.subtitle_mode;
-                        if (p.whisper_model) document.getElementById('whisperModel').value = p.whisper_model;
-                        if (p.text_position) document.getElementById('textPosition').value = p.text_position;
-                        if (p.text_color) document.getElementById('textColor').value = p.text_color;
-                        if (p.font_size) document.getElementById('fontSize').value = p.font_size;
-                        if (p.background_mode) document.getElementById('backgroundMode').value = p.background_mode;
-                        if (p.words_per_line !== undefined) document.getElementById('wordsPerLine').value = p.words_per_line;
-                        if (p.max_chars_line !== undefined) document.getElementById('maxCharsLine').value = p.max_chars_line;
-                        if (p.transcribe_source) document.getElementById('transcribeSource').value = p.transcribe_source;
-                        if (p.show_next_line_preview !== undefined) document.getElementById('showNextLinePreview').value = String(p.show_next_line_preview);
-                        if (p.keep_first_line_visible !== undefined) document.getElementById('keepFirstLineVisible').value = String(p.keep_first_line_visible);
-                        if (p.pause_for_editing !== undefined) document.getElementById('pauseForEditing').checked = Boolean(p.pause_for_editing);
+                        if (p.subtitle_mode && document.getElementById('subtitleMode')) document.getElementById('subtitleMode').value = p.subtitle_mode;
+                        if (p.whisper_model && document.getElementById('whisperModel')) document.getElementById('whisperModel').value = p.whisper_model;
+                        if (p.text_position && document.getElementById('textPosition')) document.getElementById('textPosition').value = p.text_position;
+                        if (p.text_color && document.getElementById('textColor')) document.getElementById('textColor').value = p.text_color;
+                        if (p.font_size && document.getElementById('fontSize')) document.getElementById('fontSize').value = p.font_size;
+                        if (p.background_mode && document.getElementById('backgroundMode')) document.getElementById('backgroundMode').value = p.background_mode;
+                        if (p.words_per_line !== undefined && document.getElementById('wordsPerLine')) document.getElementById('wordsPerLine').value = p.words_per_line;
+                        if (p.max_chars_line !== undefined && document.getElementById('maxCharsLine')) document.getElementById('maxCharsLine').value = p.max_chars_line;
+                        if (p.break_on_punctuation !== undefined && document.getElementById('breakOnPunctuation')) document.getElementById('breakOnPunctuation').value = String(p.break_on_punctuation);
+                        if (p.enable_vad !== undefined && document.getElementById('enableVad')) document.getElementById('enableVad').value = String(p.enable_vad);
+                        if (p.enable_correction !== undefined && document.getElementById('enableCorrection')) document.getElementById('enableCorrection').value = String(p.enable_correction);
+                        if (p.show_instrumental !== undefined && document.getElementById('showInstrumental')) document.getElementById('showInstrumental').value = String(p.show_instrumental);
+                        if (p.transcribe_source && document.getElementById('transcribeSource')) document.getElementById('transcribeSource').value = p.transcribe_source;
+                        if (p.show_next_line_preview !== undefined && document.getElementById('showNextLinePreview')) document.getElementById('showNextLinePreview').value = String(p.show_next_line_preview);
+                        if (p.keep_first_line_visible !== undefined && document.getElementById('keepFirstLineVisible')) document.getElementById('keepFirstLineVisible').value = String(p.keep_first_line_visible);
+                        if (p.save_to_library !== undefined && document.getElementById('saveToLibrary')) document.getElementById('saveToLibrary').value = String(p.save_to_library);
+                        if (p.only_remove_vocals !== undefined && document.getElementById('onlyRemoveVocals')) document.getElementById('onlyRemoveVocals').value = String(p.only_remove_vocals);
                     }
                 };
             } catch (e) {
