@@ -1,0 +1,46 @@
+# Arquivos que NAO devem entrar na imagem Docker
+
+# Git e CI
+.git
+.github
+.gitignore
+
+# Documentacao e testes
+docs/
+tests/
+*.md
+!README.md
+
+# IDEs e ferramentas locais
+.vscode/
+.idea/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.py[cod]
+.pytest_cache/
+
+# Credenciais e variaveis de ambiente
+.env
+.env.*
+.env_deploy
+*.token
+*.key
+*.pem
+*.p12
+
+# Backups e arquivos temporarios
+*.zip
+v224_backup/
+zip_extract_*/
+scratch/
+
+# Logs
+*.log
+logs/
+
+# Dados runtime (sao montados via volume)
+data/
