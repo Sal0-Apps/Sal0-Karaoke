@@ -1,45 +1,35 @@
-# Security Policy
+# 🛡️ Política de Segurança (v4.0.0)
 
-## Versoes com Suporte de Seguranca
+## Versões com Suporte de Segurança
 
-Apenas a versao mais recente do Sal0 Karaoke recebe patches de seguranca ativos.
+Apenas a versão mais recente e oficial do **Sal0 Karaokê** recebe correções e patches de segurança ativos.
 
-| Versao | Suporte |
-|--------|---------|
-| 3.6.x (atual) | Sim |
-| < 3.6.0 | Nao |
+| Versão | Status de Suporte | Observação |
+|---|---|---|
+| **v4.0.0 (atual)** | 🟢 **Ativo (Suportado)** | Única release oficial mantida no repositório. |
 
-## Reportando Vulnerabilidades
+---
 
-Se voce descobriu uma vulnerabilidade de seguranca no Sal0 Karaoke:
+## 🔒 Práticas de Segurança e Privacidade
 
-1. **NAO abra uma issue publica** com detalhes da vulnerabilidade.
-2. Envie um relatorio privado abrindo um **GitHub Security Advisory** neste repositorio:
-   - Va em: Security > Advisories > New draft security advisory
-3. Inclua no relatorio:
-   - Descricao clara da vulnerabilidade
-   - Passos para reproduzir
-   - Impacto potencial
-   - Sugestao de correcao (se tiver)
+- **Processamento 100% Local**: O Sal0 Karaokê não transmite áudios, vídeos, legendas ou dados pessoais para nenhum servidor externo ou serviço em nuvem.
+- **Isolamento de Credenciais**: Arquivos contendo tokens e chaves privadas (`.env_deploy`, `.env`, `*.token`) são expressamente ignorados pelo `.gitignore` e `.dockerignore`.
+- **Criptografia de Senhas**: As senhas dos usuários são armazenadas em hash seguro **PBKDF2-HMAC-SHA256** com 100.000 iterações e Salt aleatório individual.
+- **Proteção contra Brute-Force**: Tentativas de login são monitoradas, aplicando bloqueio temporário de 5 minutos após 10 falhas consecutivas.
+- **Expiração de Sessões (TTL)**: Sessões ativas expiram automaticamente para proteger acessos em ambientes compartilhados.
 
-## O que esperamos de voce
+---
 
-- Nos dar tempo razoavel para corrigir antes de divulgar publicamente
-- Nao explorar a vulnerabilidade alem do necessario para confirma-la
-- Nao acessar dados de outros usuarios sem consentimento
+## 📢 Reportando Vulnerabilidades
 
-## O que voce pode esperar de nos
+Se você identificou uma vulnerabilidade de segurança no Sal0 Karaokê:
 
-- Confirmacao de recebimento em ate 48h
-- Atualizacoes sobre o progresso da correcao
-- Credito publico pelo relatorio (se desejar)
+1. **NÃO abra uma issue pública** com os detalhes da vulnerabilidade.
+2. Envie um relatório privado abrindo um **GitHub Security Advisory**:
+   - Acesse no repositório: `Security` > `Advisories` > `New draft security advisory`
+3. Inclua no relatório:
+   - Descrição detalhada do problema
+   - Passos claros para reprodução
+   - Impacto potencial estimado
 
-## Credenciais e Tokens
-
-- **Nunca** commite tokens, senhas ou chaves no repositorio
-- Use variaveis de ambiente ou arquivos locais listados no .gitignore
-- O arquivo .env_deploy e um exemplo de armazenamento local seguro de credenciais
-
-## Contato
-
-Para duvidas de seguranca que nao se qualificam como vulnerabilidades, abra uma issue normal.
+Responderemos em até 48 horas e aplicaremos a correção na próxima atualização da v4.0.0.
