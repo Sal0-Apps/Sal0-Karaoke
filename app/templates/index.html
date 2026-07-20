@@ -1432,18 +1432,21 @@
                     if (!data.history || data.history.length === 0) {
                         historyList.innerHTML = '<p style="font-size: 0.8rem; color: var(--text-muted); padding: 0.5rem;">Nenhum vídeo renderizado no histórico ainda.</p>';
                     } else {
-                        historyList.innerHTML = data.history.map(file => `
+                        const token = localStorage.getItem('auth_token') || localStorage.getItem('karaoke_token') || '';
+                        historyList.innerHTML = data.history.map(file => {
+                            const dlUrl = `/api/library/download/history/${encodeURIComponent(file)}?token=${encodeURIComponent(token)}`;
+                            return `
                             <div class="library-item">
                                 <div class="info">
                                     <div class="icon">🎬</div>
                                     <div class="title" title="${file}">${file}</div>
                                 </div>
                                 <div class="actions">
-                                    <a href="/api/download" download="${file}" target="_blank">⬇️ Baixar</a>
+                                    <a href="${dlUrl}" download="${file}" target="_blank" class="btn-primary" style="padding: 0.3rem 0.65rem; font-size: 0.75rem; text-decoration: none; display: inline-flex; align-items: center; gap: 0.3rem;">⬇️ Baixar</a>
                                     <button type="button" class="btn-delete" onclick="deleteFromLibrary('history', '${file.replace(/'/g, "\'")}')">🗑️ Excluir</button>
                                 </div>
                             </div>
-                        `).join('');
+                        `;}).join('');
                     }
                 }
 
