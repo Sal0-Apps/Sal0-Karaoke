@@ -651,7 +651,7 @@ model_download_status = {
 }
 
 def resolve_whisper_repo(model_size: str) -> str:
-    """Mapeia os 5 modelos suportados para seus repositórios no Hugging Face (Sal0 Karaoke v4.0.0)."""
+    """Mapeia os 5 modelos suportados para seus repositórios no Hugging Face (Sal0 Karaoke v4.1.0)."""
     mapping = {
         "large-v3-turbo": "deepdml/faster-whisper-large-v3-turbo",
         "medium": "Systran/faster-whisper-medium",
@@ -662,7 +662,7 @@ def resolve_whisper_repo(model_size: str) -> str:
     return mapping.get(model_size.lower().strip(), model_size)
 
 def is_model_downloaded(model_size: str) -> bool:
-    """Verifica nos diretórios locais se um dos 5 modelos Whisper v4.0.0 já foi baixado."""
+    """Verifica nos diretórios locais se um dos 5 modelos Whisper v4.1.0 já foi baixado."""
     key = model_size.lower().strip()
     
     if key == "large-v3-turbo":
@@ -1035,7 +1035,7 @@ def delete_lyrics_server(current_user: dict = Depends(get_current_user)):
 
 
 
-# Sistema de Logs de Diagnóstico v4.0.0
+# Sistema de Logs de Diagnóstico v4.1.0
 DIAGNOSTIC_LOG_FILE = "/data/output/app_diagnostic.log"
 
 def log_diagnostic(message: str, level: str = "INFO"):
@@ -1076,21 +1076,22 @@ PROFILES_FILE = "/data/output/profiles.json"
 
 class ProfileModel(BaseModel):
     name: str
-    whisper_model: str
-    font_size: int
-    text_color: str
-    text_position: str
+    whisper_model: str = "large-v3-turbo"
+    font_size: int = 32
+    text_color: str = "#00FFFF"
+    text_position: str = "bottom"
     telegram_token: str = ""
     telegram_chat_id: str = ""
     subtitle_mode: str = "syllable"
     words_per_line: int = 0
-    max_chars_line: int = 40
+    max_chars_line: int = 0
     break_on_punctuation: bool = True
     background_mode: str = "image"
     show_instrumental: bool = True
     transcribe_source: str = "vocals"
     show_next_line_preview: bool = False
     keep_first_line_visible: bool = False
+    enable_vad: bool = True
 
 def load_profiles() -> dict:
     """Carrega os perfis do arquivo JSON ou inicializa com valores padrão se não existir."""
@@ -1741,8 +1742,9 @@ def process_karaoke(
     text_position: str = Form("bottom"),
     subtitle_mode: str = Form("syllable"),
     words_per_line: int = Form(0),
-    max_chars_line: int = Form(40),
+    max_chars_line: int = Form(0),
     break_on_punctuation: bool = Form(True),
+    enable_vad: bool = Form(True),
     background_mode: str = Form("image"),
     show_instrumental: bool = Form(True),
     transcribe_source: str = Form("vocals"),
@@ -1766,7 +1768,7 @@ def process_karaoke(
             if state.get("status") in ["idle", "error", "done"]:
                 try:
                     processing_lock.release()
-                    logger.info("Failsafe v4.0.0: Lock de concorrência obsoleto liberado com sucesso.")
+                    logger.info("Failsafe v4.1.0: Lock de concorrência obsoleto liberado com sucesso.")
                 except Exception:
                     pass
             else:
@@ -2450,7 +2452,7 @@ def run_pipeline(
                     update_state("processing", f"Baixando Modelo de IA Whisper {whisper_model} (Download único de ~1.5GB)...", 65)
                 
                 quality_preset = "max_quality" if whisper_model == "large-v3" else "standard"
-                segments = transcribe_vocals(transcribe_audio, model_size=whisper_model, initial_prompt=lyrics_text, quality_mode=quality_preset)
+                segments = transcribe_vocals(transcribe_audio, model_size=whisper_model, initial_prompt=lyrics_text, quality_mode=quality_preset, enable_vad=enable_vad)
                 
                 if segments:
                     with open(segments_cache_file, "w", encoding="utf-8") as f:
