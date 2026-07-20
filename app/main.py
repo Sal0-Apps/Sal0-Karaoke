@@ -663,7 +663,7 @@ model_download_status = {
 }
 
 def resolve_whisper_repo(model_size: str) -> str:
-    """Mapeia os 5 modelos suportados para seus repositórios no Hugging Face (Sal0 Karaoke v4.2.2)."""
+    """Mapeia os 5 modelos suportados para seus repositórios no Hugging Face (Sal0 Karaoke v4.2.3)."""
     mapping = {
         "large-v3-turbo": "deepdml/faster-whisper-large-v3-turbo",
         "medium": "Systran/faster-whisper-medium",
@@ -674,7 +674,7 @@ def resolve_whisper_repo(model_size: str) -> str:
     return mapping.get(model_size.lower().strip(), model_size)
 
 def is_model_downloaded(model_size: str) -> bool:
-    """Verifica nos diretórios locais se um dos 5 modelos Whisper v4.2.2 já foi baixado."""
+    """Verifica nos diretórios locais se um dos 5 modelos Whisper v4.2.3 já foi baixado."""
     key = model_size.lower().strip()
     
     if key == "large-v3-turbo":
@@ -1035,7 +1035,7 @@ def delete_lyrics_server(current_user: dict = Depends(get_current_user)):
 
 
 
-# Sistema de Logs de Diagnóstico v4.2.2
+# Sistema de Logs de Diagnóstico v4.2.3
 DIAGNOSTIC_LOG_FILE = "/data/output/app_diagnostic.log"
 
 def log_diagnostic(message: str, level: str = "INFO"):
@@ -1777,7 +1777,7 @@ def process_karaoke(
             if state.get("status") in ["idle", "error", "done"]:
                 try:
                     processing_lock.release()
-                    logger.info("Failsafe v4.2.2: Lock de concorrência obsoleto liberado com sucesso.")
+                    logger.info("Failsafe v4.2.3: Lock de concorrência obsoleto liberado com sucesso.")
                 except Exception:
                     pass
             else:
@@ -2455,11 +2455,11 @@ def run_pipeline(
                 transcribe_audio = vocals_wav if transcribe_source == "vocals" else converted_wav
                 logger.info(f"Fonte de transcrição escolhida: {transcribe_audio} (Modo: {transcribe_source})")
                 
-                # Verificar se o modelo Whisper está baixado para informar o usuário na 1ª vez
-                folder_name = f"models--Systran--faster-whisper-{whisper_model}"
-                model_path = os.path.join("/data/output/models/whisper", folder_name)
-                if not os.path.exists(model_path):
-                    update_state("processing", f"Baixando Modelo de IA Whisper {whisper_model} (Download único de ~1.5GB)...", 65)
+                # Verificar status do modelo Whisper com is_model_downloaded() para exibir a mensagem correta na UI
+                if is_model_downloaded(whisper_model):
+                    update_state("processing", f"Carregando Modelo Whisper {whisper_model} do disco e transcrevendo voz...", 65)
+                else:
+                    update_state("processing", f"Baixando Modelo de IA Whisper {whisper_model} no servidor...", 65)
                 
                 quality_preset = "max_quality" if whisper_model == "large-v3" else "standard"
                 segments = transcribe_vocals(transcribe_audio, model_size=whisper_model, initial_prompt=lyrics_text, quality_mode=quality_preset, enable_vad=enable_vad)
