@@ -663,7 +663,7 @@ model_download_status = {
 }
 
 def resolve_whisper_repo(model_size: str) -> str:
-    """Mapeia os 5 modelos suportados para seus repositórios no Hugging Face (Sal0 Karaoke v4.2.3)."""
+    """Mapeia os 5 modelos suportados para seus repositórios no Hugging Face (Sal0 Karaoke v4.2.4)."""
     mapping = {
         "large-v3-turbo": "deepdml/faster-whisper-large-v3-turbo",
         "medium": "Systran/faster-whisper-medium",
@@ -674,7 +674,7 @@ def resolve_whisper_repo(model_size: str) -> str:
     return mapping.get(model_size.lower().strip(), model_size)
 
 def is_model_downloaded(model_size: str) -> bool:
-    """Verifica nos diretórios locais se um dos 5 modelos Whisper v4.2.3 já foi baixado."""
+    """Verifica nos diretórios locais se um dos 5 modelos Whisper v4.2.4 já foi baixado."""
     key = model_size.lower().strip()
     
     if key == "large-v3-turbo":
@@ -1035,7 +1035,7 @@ def delete_lyrics_server(current_user: dict = Depends(get_current_user)):
 
 
 
-# Sistema de Logs de Diagnóstico v4.2.3
+# Sistema de Logs de Diagnóstico v4.2.4
 DIAGNOSTIC_LOG_FILE = "/data/output/app_diagnostic.log"
 
 def log_diagnostic(message: str, level: str = "INFO"):
@@ -1777,7 +1777,7 @@ def process_karaoke(
             if state.get("status") in ["idle", "error", "done"]:
                 try:
                     processing_lock.release()
-                    logger.info("Failsafe v4.2.3: Lock de concorrência obsoleto liberado com sucesso.")
+                    logger.info("Failsafe v4.2.4: Lock de concorrência obsoleto liberado com sucesso.")
                 except Exception:
                     pass
             else:
@@ -2108,25 +2108,26 @@ def process_karaoke(
         
     background_tasks.add_task(
         run_pipeline, 
-        input_audio_path, 
-        input_bg_path, 
-        whisper_model,
-        font_size,
-        text_color,
-        text_position,
-        subtitle_mode,
-        words_per_line,
-        max_chars_line,
-        break_on_punctuation,
-        background_mode,
-        show_instrumental,
-        transcribe_source,
-        show_next_line_preview,
-        lyrics_text,
-        enable_correction,
-        keep_first_line_visible,
-        youtube_url,
-        only_remove_vocals
+        input_audio_path=input_audio_path, 
+        input_bg_path=input_bg_path, 
+        whisper_model=whisper_model,
+        font_size=font_size,
+        text_color=text_color,
+        text_position=text_position,
+        subtitle_mode=subtitle_mode,
+        words_per_line=words_per_line,
+        max_chars_line=max_chars_line,
+        break_on_punctuation=break_on_punctuation,
+        enable_vad=enable_vad,
+        background_mode=background_mode,
+        show_instrumental=show_instrumental,
+        transcribe_source=transcribe_source,
+        show_next_line_preview=show_next_line_preview,
+        lyrics_text=lyrics_text,
+        enable_correction=enable_correction,
+        keep_first_line_visible=keep_first_line_visible,
+        youtube_url=youtube_url,
+        only_remove_vocals=only_remove_vocals
     )
     
     return {"status": "processing"}
