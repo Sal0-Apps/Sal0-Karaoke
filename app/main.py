@@ -639,6 +639,18 @@ class ModelDownloadRequest(BaseModel):
     model_size: str = None
     model: str = None
 
+
+yt_preset_audio_status = {"status": "idle", "progress": 0, "title": "", "filename": "", "error": None}
+yt_preset_bg_status = {"status": "idle", "progress": 0, "title": "", "filename": "", "error": None}
+
+@app.get("/api/youtube-preset-status/audio")
+def get_yt_preset_audio_status(current_user: dict = Depends(get_current_user)):
+    return yt_preset_audio_status
+
+@app.get("/api/youtube-preset-status/bg")
+def get_yt_preset_bg_status(current_user: dict = Depends(get_current_user)):
+    return yt_preset_bg_status
+
 class YouTubePresetModel(BaseModel):
     youtube_url: str
 
@@ -651,7 +663,7 @@ model_download_status = {
 }
 
 def resolve_whisper_repo(model_size: str) -> str:
-    """Mapeia os 5 modelos suportados para seus repositórios no Hugging Face (Sal0 Karaoke v4.1.0)."""
+    """Mapeia os 5 modelos suportados para seus repositórios no Hugging Face (Sal0 Karaoke v4.1.1)."""
     mapping = {
         "large-v3-turbo": "deepdml/faster-whisper-large-v3-turbo",
         "medium": "Systran/faster-whisper-medium",
@@ -662,7 +674,7 @@ def resolve_whisper_repo(model_size: str) -> str:
     return mapping.get(model_size.lower().strip(), model_size)
 
 def is_model_downloaded(model_size: str) -> bool:
-    """Verifica nos diretórios locais se um dos 5 modelos Whisper v4.1.0 já foi baixado."""
+    """Verifica nos diretórios locais se um dos 5 modelos Whisper v4.1.1 já foi baixado."""
     key = model_size.lower().strip()
     
     if key == "large-v3-turbo":
@@ -781,26 +793,19 @@ def start_model_download(req: ModelDownloadRequest, current_user: dict = Depends
     return {"message": f"Download do modelo {model_size} iniciado."}
 
 def run_youtube_download_bg(url: str):
+    global yt_preset_audio_status
     cache_dir = "/data/cache"
     os.makedirs(cache_dir, exist_ok=True)
     cache_meta_file = os.path.join(cache_dir, "cache_meta.json")
     
-    # Carregar configuração global do Telegram do arquivo json
-    tele_config = load_telegram_config()
-    telegram_token = tele_config.get("telegram_token", "")
-    telegram_chat_id = tele_config.get("telegram_chat_id", "")
+    yt_preset_audio_status = {"status": "downloading", "progress": 15, "title": "Conectando ao YouTube...", "filename": "", "error": None}
     
     try:
-        update_state("processing", "Downloading YouTube", 5, original_filename="Baixando do YouTube...")
-        
-        send_telegram_notification(
-            telegram_token,
-            telegram_chat_id,
-            f"🌐 <b>Sal0 Karaokê</b>: Iniciando download do YouTube de <b>{url}</b>..."
-        )
-        
         input_audio_path, title = download_youtube(url, cache_dir)
         ext = os.path.splitext(input_audio_path)[1]
+        
+        yt_preset_audio_status["title"] = title
+        yt_preset_audio_status["progress"] = 70
         
         cached_meta = {
             "youtube_url": url,
@@ -815,33 +820,34 @@ def run_youtube_download_bg(url: str):
         with open(cache_meta_file, "w", encoding="utf-8") as f:
             json.dump(cached_meta, f, indent=4)
             
-        # Salvar também na biblioteca de vídeos permanentemente
+        dest_filename = os.path.basename(input_audio_path)
         try:
             lib_video_dir = "/data/library/videos"
             os.makedirs(lib_video_dir, exist_ok=True)
             safe_title = "".join([c for c in title if c.isalnum() or c in ' ._-']).strip() or "youtube_download"
-            dest_file = os.path.join(lib_video_dir, f"{safe_title}{ext}")
+            dest_filename = f"{safe_title}{ext}"
+            dest_file = os.path.join(lib_video_dir, dest_filename)
             shutil.copy2(input_audio_path, dest_file)
             logger.info(f"Vídeo do YouTube adicionado à biblioteca: {dest_file}")
         except Exception as copy_err:
             logger.error(f"Erro ao salvar vídeo do YouTube na biblioteca: {copy_err}")
 
-        send_telegram_notification(
-            telegram_token,
-            telegram_chat_id,
-            f"📥 <b>Sal0 Karaokê</b>: Download concluído e adicionado à Biblioteca! <b>{title}</b>"
-        )
-        
-        update_state("done", "Download Concluído e Adicionado à Biblioteca!", 100, original_filename=title)
-        
+        yt_preset_audio_status = {
+            "status": "done",
+            "progress": 100,
+            "title": title,
+            "filename": dest_filename,
+            "error": None
+        }
     except Exception as e:
         logger.error(f"Erro no download do YouTube em background: {e}")
-        update_state("error", "Error", 0, error_message=f"Falha ao baixar vídeo do YouTube: {e}")
-        send_telegram_notification(
-            telegram_token,
-            telegram_chat_id,
-            f"❌ <b>Sal0 Karaokê</b>: Falha ao baixar vídeo do YouTube. Erro: {e}"
-        )
+        yt_preset_audio_status = {
+            "status": "error",
+            "progress": 0,
+            "title": "",
+            "filename": "",
+            "error": str(e)
+        }
 
 def download_bg_youtube(url: str, cache_dir: str) -> tuple[str, str]:
     """Baixa apenas o fluxo de vídeo do YouTube (sem áudio) para uso como fundo com expurgo e overwrites: True."""
@@ -907,26 +913,20 @@ def download_bg_youtube(url: str, cache_dir: str) -> tuple[str, str]:
     return no_audio_file, title
 
 def run_bg_youtube_download_bg(url: str):
+    global yt_preset_bg_status
     cache_dir = "/data/cache"
     os.makedirs(cache_dir, exist_ok=True)
     
-    tele_config = load_telegram_config()
-    telegram_token = tele_config.get("telegram_token", "")
-    telegram_chat_id = tele_config.get("telegram_chat_id", "")
+    yt_preset_bg_status = {"status": "downloading", "progress": 15, "title": "Conectando ao YouTube...", "filename": "", "error": None}
     
     try:
-        update_state("processing", "Downloading YouTube Background", 5, original_filename="Baixando fundo do YouTube...")
-        
-        send_telegram_notification(
-            telegram_token,
-            telegram_chat_id,
-            f"🖼️ <b>Sal0 Karaokê</b>: Iniciando download de fundo do YouTube (sem áudio) de <b>{url}</b>..."
-        )
-        
         no_audio_path, title = download_bg_youtube(url, cache_dir)
         ext = os.path.splitext(no_audio_path)[1]
         
-        # Salvar na biblioteca de fotos/vídeos de fundo permanentemente
+        yt_preset_bg_status["title"] = title
+        yt_preset_bg_status["progress"] = 70
+        
+        dest_filename = os.path.basename(no_audio_path)
         try:
             lib_photos_dir = "/data/library/photos"
             os.makedirs(lib_photos_dir, exist_ok=True)
@@ -938,22 +938,22 @@ def run_bg_youtube_download_bg(url: str):
         except Exception as copy_err:
             logger.error(f"Erro ao salvar fundo do YouTube na biblioteca: {copy_err}")
 
-        send_telegram_notification(
-            telegram_token,
-            telegram_chat_id,
-            f"🖼️ <b>Sal0 Karaokê</b>: Fundo do YouTube baixado sem áudio e salvo na Biblioteca! <b>{title}</b>"
-        )
-        
-        update_state("done", "Download Concluído e Adicionado à Biblioteca!", 100, original_filename=title)
-        
+        yt_preset_bg_status = {
+            "status": "done",
+            "progress": 100,
+            "title": title,
+            "filename": dest_filename,
+            "error": None
+        }
     except Exception as e:
         logger.error(f"Erro no download de fundo do YouTube em background: {e}")
-        update_state("error", "Error", 0, error_message=f"Falha ao baixar fundo do YouTube: {e}")
-        send_telegram_notification(
-            telegram_token,
-            telegram_chat_id,
-            f"❌ <b>Sal0 Karaokê</b>: Falha ao baixar fundo do YouTube. Erro: {e}"
-        )
+        yt_preset_bg_status = {
+            "status": "error",
+            "progress": 0,
+            "title": "",
+            "filename": "",
+            "error": str(e)
+        }
 
 
 @app.post("/api/download-youtube-preset")
@@ -1035,7 +1035,7 @@ def delete_lyrics_server(current_user: dict = Depends(get_current_user)):
 
 
 
-# Sistema de Logs de Diagnóstico v4.1.0
+# Sistema de Logs de Diagnóstico v4.1.1
 DIAGNOSTIC_LOG_FILE = "/data/output/app_diagnostic.log"
 
 def log_diagnostic(message: str, level: str = "INFO"):
@@ -1768,7 +1768,7 @@ def process_karaoke(
             if state.get("status") in ["idle", "error", "done"]:
                 try:
                     processing_lock.release()
-                    logger.info("Failsafe v4.1.0: Lock de concorrência obsoleto liberado com sucesso.")
+                    logger.info("Failsafe v4.1.1: Lock de concorrência obsoleto liberado com sucesso.")
                 except Exception:
                     pass
             else:
