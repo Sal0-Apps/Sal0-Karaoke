@@ -614,42 +614,38 @@ class YouTubePresetModel(BaseModel):
     youtube_url: str
 
 model_download_status = {
-    "base": {"status": "idle", "progress": 0, "error": None},
-    "small": {"status": "idle", "progress": 0, "error": None},
-    "medium": {"status": "idle", "progress": 0, "error": None},
     "large-v3-turbo": {"status": "idle", "progress": 0, "error": None},
-    "large-v2": {"status": "idle", "progress": 0, "error": None},
+    "medium": {"status": "idle", "progress": 0, "error": None},
+    "small": {"status": "idle", "progress": 0, "error": None},
+    "tiny": {"status": "idle", "progress": 0, "error": None},
     "large-v3": {"status": "idle", "progress": 0, "error": None}
 }
 
 def resolve_whisper_repo(model_size: str) -> str:
-    """Mapeia nomes amigáveis de modelos para repositórios oficiais Hugging Face."""
+    """Mapeia os 5 modelos suportados para seus repositórios no Hugging Face (Sal0 Karaoke v4.0.0)."""
     mapping = {
-        "base": "Systran/faster-whisper-base",
-        "small": "Systran/faster-whisper-small",
-        "medium": "Systran/faster-whisper-medium",
         "large-v3-turbo": "deepdml/faster-whisper-large-v3-turbo",
-        "large-v3": "Systran/faster-whisper-large-v3",
-        "large-v2": "Systran/faster-whisper-large-v2"
+        "medium": "Systran/faster-whisper-medium",
+        "small": "Systran/faster-whisper-small",
+        "tiny": "Systran/faster-whisper-tiny",
+        "large-v3": "Systran/faster-whisper-large-v3"
     }
-    return mapping.get(model_size, model_size)
+    return mapping.get(model_size.lower().strip(), model_size)
 
 def is_model_downloaded(model_size: str) -> bool:
-    """Verifica nos diretórios locais se o modelo Whisper já foi baixado sem falso-positivos."""
+    """Verifica nos diretórios locais se um dos 5 modelos Whisper v4.0.0 já foi baixado."""
     key = model_size.lower().strip()
     
     if key == "large-v3-turbo":
         match_fn = lambda name: "turbo" in name or "large-v3-turbo" in name
     elif key == "large-v3":
         match_fn = lambda name: "large-v3" in name and "turbo" not in name
-    elif key == "large-v2":
-        match_fn = lambda name: "large-v2" in name or (name == "large" or ("whisper-large" in name and "v3" not in name and "turbo" not in name))
     elif key == "medium":
         match_fn = lambda name: "medium" in name
     elif key == "small":
         match_fn = lambda name: "small" in name
-    elif key == "base":
-        match_fn = lambda name: "base" in name
+    elif key == "tiny" or key == "base":
+        match_fn = lambda name: "tiny" in name or "base" in name
     else:
         match_fn = lambda name: key in name
 
@@ -1010,7 +1006,7 @@ def delete_lyrics_server(current_user: dict = Depends(get_current_user)):
 
 
 
-# Sistema de Logs de Diagnóstico v3.6.4
+# Sistema de Logs de Diagnóstico v4.0.0
 DIAGNOSTIC_LOG_FILE = "/data/output/app_diagnostic.log"
 
 def log_diagnostic(message: str, level: str = "INFO"):
@@ -1741,7 +1737,7 @@ def process_karaoke(
             if state.get("status") in ["idle", "error", "done"]:
                 try:
                     processing_lock.release()
-                    logger.info("Failsafe v3.6.4: Lock de concorrência obsoleto liberado com sucesso.")
+                    logger.info("Failsafe v4.0.0: Lock de concorrência obsoleto liberado com sucesso.")
                 except Exception:
                     pass
             else:
@@ -2424,7 +2420,8 @@ def run_pipeline(
                 if not os.path.exists(model_path):
                     update_state("processing", f"Baixando Modelo de IA Whisper {whisper_model} (Download único de ~1.5GB)...", 65)
                 
-                segments = transcribe_vocals(transcribe_audio, model_size=whisper_model, initial_prompt=lyrics_text)
+                quality_preset = "max_quality" if whisper_model == "large-v3" else "standard"
+                segments = transcribe_vocals(transcribe_audio, model_size=whisper_model, initial_prompt=lyrics_text, quality_mode=quality_preset)
                 
                 if segments:
                     with open(segments_cache_file, "w", encoding="utf-8") as f:
