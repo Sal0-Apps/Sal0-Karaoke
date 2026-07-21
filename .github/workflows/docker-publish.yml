@@ -65,16 +65,17 @@ jobs:
           name: Sal0 Karaoke v${{ env.VERSION_TAG }}
           body: |
             ## 🚀 Sal0 Karaoke v${{ env.VERSION_TAG }}
-            
-            Esta release estável do Sal0 Karaoke traz melhorias visuais, novas integrações e controle de acesso local.
-            
-            ### 🔐 Novidades em Destaque:
-            * **Controle de Acesso e Contas de Usuário:** Tela de login local. Configuração do usuário Administrador principal no primeiro acesso e criação de perfis secundários nas Configurações Avançadas.
-            * **Persistência de Sessão:** Opção "Permanecer conectado" que armazena a credencial no navegador (localStorage).
-            * **Ícone de Microfone Minimalista:** Ícone oficial personalizado v1.0 que funciona como favicon e elemento do cabeçalho.
-            * **Manual de Instruções Embutido:** Nova ajuda interativa acessível diretamente pela interface.
-            * **Failsafe de Tela Preta:** Fallback inteligente que usa a imagem enviada se o container não tiver imagens de paisagem padrão.
-            
+
+            Gerador local de vídeos de karaokê com Demucs, Faster-Whisper, FFmpeg e sincronização de legendas ASS.
+
+            ### ✨ Destaques da versão 5.0.0
+            * Pipeline local para separação vocal, VAD opcional, transcrição, alinhamento e renderização.
+            * Entrada por upload, biblioteca ou YouTube; fundos por vídeo original, imagem/vídeo, biblioteca, paisagem e cor sólida.
+            * Modos de legenda por sílaba/varredura, palavra e linha, com fontes, cores, posição, quebra e perfis personalizáveis.
+            * Letra manual ou automática na tela básica, com prioridade manual, revisão local e cache persistente.
+            * Busca resiliente em LRCLIB, Lyrics.ovh e Musixmatch; somente título/artista sai do ambiente local, nunca áudio ou vídeo.
+            * Autenticação local, usuários, histórico, editor de correção, Telegram opcional e compatibilidade com Docker/CasaOS.
+
             ### 🐋 Como executar esta versão:
             No seu `docker-compose.yml`, você pode travar a versão alterando a linha da imagem para:
             ```yaml

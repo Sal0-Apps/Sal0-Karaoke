@@ -1,41 +1,37 @@
-# 🎤 Sal0 Karaokê
+# 🎤 Sal0 Karaoke 5.0.0
 
-O **Sal0 Karaokê** é uma ferramenta pessoal desenvolvida para criar vídeos de karaokê de forma totalmente automática e local. O sistema separa os vocais do instrumental, filtra o silêncio, transcreve a letra e gera legendas sincronizadas palavra por palavra.
+O Sal0 Karaoke cria vídeos de karaokê a partir de músicas e vídeos usando um pipeline local. Ele separa voz e instrumental, transcreve a música, sincroniza as legendas e renderiza o vídeo final com FFmpeg, sem enviar o áudio ou o vídeo para serviços de IA.
 
-> ℹ️ **Nota**: Este é um projeto pessoal criado para uso próprio e disponibilizado "como está" (*as is*). Não há suporte técnico, garantia de atualizações ou acompanhamento de dúvidas/issues.
+> Projeto pessoal, disponibilizado “como está” (*as is*). A disponibilidade de serviços externos de letras e do YouTube pode mudar.
 
----
+## O que ele faz
 
-## ✨ Funcionalidades
+- Separa vocais e instrumental com Demucs (`htdemucs`/`htdemucs_ft`).
+- Extrai áudio de arquivos MP3, WAV, FLAC, M4A, MP4, MKV e outros formatos compatíveis com FFmpeg.
+- Aceita upload local, mídia da biblioteca e download de áudio/vídeo pelo YouTube.
+- Transcreve localmente com Faster-Whisper, com modelos Tiny, Small, Medium, Large-v3 e Large-v3 Turbo.
+- Usa Silero VAD opcional para reduzir silêncio antes da transcrição.
+- Refina timestamps por palavra com alinhamento local e gera legendas ASS próprias para karaokê.
+- Oferece três modos de legenda: sílabas/varredura, palavras e linhas.
+- Permite informar a letra manualmente ou tentar encontrá-la automaticamente quando houver internet.
+- Consulta apenas título e artista em fontes públicas de letras: LRCLIB, Lyrics.ovh e Musixmatch Desktop API.
+- Consulta os provedores de letras em paralelo, aceita falha/offline sem interromper o processamento local e mantém a letra editável.
+- Dá prioridade à letra manual e permite revisar, salvar, limpar e substituir a letra encontrada.
+- Ajusta fonte, cor, posição, quebra de linha, quantidade de palavras, pontuação e visualização da próxima linha.
+- Permite fundo original, imagem/vídeo enviado, paisagem aleatória, cor sólida, biblioteca e fundo obtido do YouTube.
+- Mantém cache local, biblioteca de mídias, histórico de vídeos e perfis de estilo reutilizáveis.
+- Oferece editor web para correções antes da renderização, incluindo pausa de revisão de 75%.
+- Possui autenticação local, gerenciamento de usuários e sessões protegidas por senha derivada com PBKDF2.
+- Pode enviar notificações e vídeos ao Telegram quando essa integração opcional for configurada.
+- Funciona em Docker, Docker Compose, CasaOS e servidores pessoais com armazenamento persistente em `/data`.
 
-- **🎛️ Separação de Áudio**: Separa vocais e instrumental usando Demucs (`htdemucs`).
-- **🎙️ Filtro de Silêncio (Silero VAD)**: Remove partes sem voz antes da transcrição para economizar tempo e evitar alucinações de legenda.
-- **⚡ Transcrição via IA (Faster-Whisper)**: Suporte a múltiplos idiomas e otimizado para rodar em CPU.
-- **✨ Sincronização por Palavra (WhisperX Alignment)**: Refinamento de timestamps palavra por palavra para o efeito visual de karaokê.
-- **🛠️ Editor de Legendas na Web**: Permite pausar e ajustar o texto ou o tempo das estrofes antes de renderizar o vídeo final.
-- **🎬 Renderização de Vídeo**: Gera legendas em formato ASS e renderiza o vídeo final com plano de fundo personalizado.
-- **📥 Entradas Flexíveis**: Aceita arquivos locais (vídeo/áudio) ou links do YouTube.
-- **🔎 Letra Manual ou Automática**: Na tela principal, procura automaticamente a letra da música escolhida na LRCLIB quando houver internet; você também pode colar, editar ou substituir a letra manualmente.
-- **🤖 Bot do Telegram (Opcional)**: Envia notificações e o vídeo pronto para o seu Telegram se configurado.
-- **🔐 Acesso Local Protegido**: Tela de login simples com senha criptografada para proteger o acesso na sua rede local.
+## Busca de letras e privacidade
 
----
+A letra automática é uma ajuda para orientar a transcrição; ela não substitui a sincronização local. O Sal0 Karaoke envia somente a consulta textual de título/artista para os provedores públicos. Nenhum áudio, vídeo, separação Demucs, modelo Whisper, legenda em edição, senha ou configuração do Telegram é enviado para buscar letras.
 
-## 🎯 Modelos de IA Disponíveis
+O Musixmatch é consultado pelo fluxo público do aplicativo desktop: o app solicita um token temporário e o mantém somente em memória durante a consulta. Não há token fixo, cookie pessoal ou chave privada no código. Se as fontes não responderem, o pipeline continua e a letra pode ser colada manualmente.
 
-Você pode escolher entre 5 modelos na interface:
-
-- **Large-v3 Turbo** (*Padrão Recomendado - ~1.5GB*)
-- **Medium** (*Alternativa Estável / Fallback - ~1.5GB*)
-- **Small** (*Rápido - ~460MB*)
-- **Tiny** (*Ultrarrápido - ~75MB*)
-- **Large-v3** (*Máxima Qualidade - ~3GB*)
-
----
-
-## 🐳 Como Executar no Docker
-
-Arquivo `docker-compose.yml`:
+## Execução com Docker
 
 ```yaml
 services:
@@ -49,31 +45,36 @@ services:
     restart: unless-stopped
 ```
 
-Para iniciar:
+Inicie com:
+
 ```bash
 docker compose up -d
 ```
 
-Acesse no navegador: `http://localhost:7885`
+Abra `http://localhost:7885` no navegador.
 
----
+## Dados persistentes
 
-## 📁 Pasta de Dados (`/data`)
+O volume `/data` preserva todo o estado do aplicativo:
 
-Tudo o que o aplicativo precisa salvar fica na pasta `/data`:
+- `/data/library/`: mídias, fundos e histórico;
+- `/data/cache/`: arquivos intermediários e cache da última mídia;
+- `/data/output/`: vídeos, legendas, modelos baixados, perfis e logs;
+- `/data/users.json` e `/data/sessions.json`: autenticação local;
+- `/data/output/saved_lyrics.txt`: letra guia salva localmente.
 
-- `/data/library/`: Arquivos originais, fundos e vídeos gerados.
-- `/data/output/`: Modelos de IA, perfis de estilo e logs.
-- `/data/users.json`: Usuários salvos.
+## Modelos e recursos
 
-## 🌐 Busca de Letras e Privacidade
+| Modelo | Uso típico |
+| --- | --- |
+| Large-v3 Turbo | Melhor equilíbrio entre qualidade e velocidade |
+| Medium | Qualidade estável com menor custo |
+| Small | Processamento mais rápido |
+| Tiny | Prévia e máquinas limitadas |
+| Large-v3 | Maior qualidade, com maior consumo |
 
-A busca automática de letra vem ativada na tela principal e é repetida ao iniciar o processamento caso ainda não exista uma letra manual. Somente o texto da consulta (normalmente título e artista) é enviado à LRCLIB; áudios, vídeos, transcrição por IA e renderização continuam exclusivamente locais. A letra importada permanece editável e uma letra digitada manualmente sempre tem prioridade.
+O tempo depende do modelo, duração da música, CPU/GPU, memória e configuração de separação vocal.
 
----
+## Licença e fontes externas
 
-## 💻 Requisitos
-
-- **Processador**: Qualquer CPU de 64 bits com pelo menos 2 núcleos.
-- **Memória RAM**: 4 GB a 8 GB de RAM recomendados.
-- **Sistema**: Linux, Windows (Docker Desktop/WSL) ou servidor pessoal (CasaOS, ZimaOS, Unraid).
+O projeto integra FFmpeg, Demucs, Faster-Whisper, Silero VAD e bibliotecas Python com suas próprias licenças. Consulte os respectivos projetos antes de redistribuir imagens Docker ou conteúdo gerado. As fontes de letras são serviços externos gratuitos/públicos, sujeitos a disponibilidade, limites e termos próprios.

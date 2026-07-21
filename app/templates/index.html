@@ -583,34 +583,34 @@
                     <input type="hidden" id="libraryAudioHidden" name="library_audio" value="">
                 </div>
 
-                <!-- Letra manual ou automática: opção básica -->
-                <div class="card" id="lyricsCard">
-                    <div class="card-header">
-                        <span class="card-title">📝 Letra da Música</span>
-                        <select id="lyricsMode" name="lyrics_mode" class="select-input" style="width: auto; min-width: 180px;">
-                            <option value="auto" selected>Automática (internet)</option>
-                            <option value="manual">Manual</option>
-                        </select>
-                    </div>
-                    <p id="lyricsModeHint" style="font-size: 0.74rem; color: var(--text-muted); margin: 0 0 0.6rem;">Ao selecionar uma música, o sistema tentará encontrar a letra automaticamente. Se você preencher abaixo, sua letra manual terá prioridade.</p>
-                    <textarea id="lyricsText" name="lyrics_text" placeholder="Opcional: cole ou edite a letra da música aqui..." class="input-text" style="height: 110px; resize: vertical; background: var(--input-bg); border: 1px solid var(--glass-border);"></textarea>
-                    <div id="lyricsBadge" style="display: none; margin-top: 0.4rem; background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.3); color: #34d399; padding: 0.4rem 0.7rem; border-radius: 8px; font-size: 0.78rem; font-weight: 600;"></div>
-                    <div style="display: flex; gap: 0.5rem; margin-top: 0.65rem; flex-wrap: wrap;">
-                        <input type="text" id="lyricsSearchQuery" class="input-text" placeholder="Título e artista (ou deixe vazio para usar o arquivo)" style="flex: 1 1 230px; min-width: 0;">
-                        <button type="button" id="btnSearchLyrics" class="btn-secondary" style="font-size: 0.78rem; height: 34px; white-space: nowrap;">🔎 Buscar agora</button>
-                        <button type="button" id="btnSaveLyrics" class="btn-primary" style="font-size: 0.78rem; height: 34px;">💾 Salvar</button>
-                        <button type="button" id="btnClearLyrics" class="btn-secondary" style="font-size: 0.78rem; height: 34px; color: #fca5a5;">🗑️ Limpar</button>
-                    </div>
-                    <p style="font-size: 0.7rem; color: var(--text-muted); margin: 0.45rem 0 0;">Somente o título/artista é consultado na LRCLIB. Áudio, vídeo, Whisper e renderização continuam locais.</p>
-                    <div id="lyricsSearchStatus" aria-live="polite" style="display: none; margin-top: 0.55rem; font-size: 0.78rem;"></div>
-                    <div id="lyricsSearchResults" style="display: flex; flex-direction: column; gap: 0.45rem; margin-top: 0.55rem;"></div>
-                </div>
-
                 <!-- Card de Fundo e Estilo -->
                 <div class="card">
                     <div class="card-header">
                         <span class="card-title">🖼️ Fundo & Personalização do Karaokê</span>
                         <button type="button" id="btnToggleAdvanced" class="btn-secondary">⚙️ Opções Avançadas</button>
+                    </div>
+
+                    <!-- Letra básica, compacta e integrada à personalização -->
+                    <div id="lyricsCard" style="margin: 0.75rem 0 1rem; padding: 0.7rem; background: var(--input-bg); border: 1px solid var(--glass-border); border-radius: var(--radius-md);">
+                        <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.6rem; flex-wrap: wrap;">
+                            <span style="font-size: 0.88rem; font-weight: 700; color: var(--text-main);">📝 Letra</span>
+                            <select id="lyricsMode" name="lyrics_mode" class="select-input" style="width: auto; min-width: 150px; height: 32px; font-size: 0.78rem;">
+                                <option value="auto" selected>Automática (internet)</option>
+                                <option value="manual">Manual</option>
+                            </select>
+                        </div>
+                        <p id="lyricsModeHint" style="font-size: 0.7rem; color: var(--text-muted); margin: 0.35rem 0 0.45rem;">A letra é apenas uma guia. Se você preencher manualmente, ela terá prioridade.</p>
+                        <textarea id="lyricsText" name="lyrics_text" placeholder="Cole ou edite a letra aqui..." class="input-text" style="height: 72px; resize: vertical; background: var(--input-bg); border: 1px solid var(--glass-border);"></textarea>
+                        <div id="lyricsBadge" style="display: none; margin-top: 0.35rem; background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.3); color: #34d399; padding: 0.3rem 0.55rem; border-radius: 7px; font-size: 0.7rem; font-weight: 600;"></div>
+                        <div style="display: flex; gap: 0.4rem; margin-top: 0.45rem; flex-wrap: wrap;">
+                            <input type="text" id="lyricsSearchQuery" class="input-text" placeholder="Artista - título (ou use o arquivo)" style="flex: 1 1 210px; min-width: 0; height: 32px; font-size: 0.76rem;">
+                            <button type="button" id="btnSearchLyrics" class="btn-secondary" style="font-size: 0.72rem; height: 32px; white-space: nowrap;">🔎 Buscar</button>
+                            <button type="button" id="btnSaveLyrics" class="btn-primary" style="font-size: 0.72rem; height: 32px;">💾 Salvar</button>
+                            <button type="button" id="btnClearLyrics" class="btn-secondary" style="font-size: 0.72rem; height: 32px; color: #fca5a5;">🗑️ Limpar</button>
+                        </div>
+                        <p style="font-size: 0.66rem; color: var(--text-muted); margin: 0.35rem 0 0;">Somente título/artista são consultados em LRCLIB, Lyrics.ovh e Musixmatch. Áudio, vídeo, Whisper e renderização continuam locais.</p>
+                        <div id="lyricsSearchStatus" aria-live="polite" style="display: none; margin-top: 0.45rem; font-size: 0.72rem;"></div>
+                        <div id="lyricsSearchResults" style="display: flex; flex-direction: column; gap: 0.35rem; margin-top: 0.45rem;"></div>
                     </div>
 
                     <div class="form-grid">
@@ -1110,7 +1110,7 @@
 
         <!-- RODAPÉ DISCRETO DA PÁGINA -->
         <footer>
-            Sal0 Karaokê v4.6.1
+            Sal0 Karaokê v5.0.0
         </footer>
 
     </div> <!-- Container End -->
@@ -2194,7 +2194,7 @@
                 const filename = libraryAudio || uploadedAudio;
                 return filename
                     .replace(/\.[^/.]+$/, '')
-                    .replace(/[_-]+/g, ' ')
+                    .replace(/_+/g, ' ')
                     .replace(/\s+/g, ' ')
                     .trim();
             }
@@ -2208,13 +2208,28 @@
                 setLyricsSearchStatus(`Obtendo a letra de ${result.track_name}...`);
 
                 try {
-                    const response = await authFetch('/api/lyrics/fetch', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ id: result.id })
-                    });
-                    const payload = await response.json();
-                    if (!response.ok) throw new Error(payload.detail || 'Não foi possível obter a letra.');
+                    let payload;
+                    if (result.lyrics_text) {
+                        payload = {
+                            provider: result.provider,
+                            track_name: result.track_name,
+                            artist_name: result.artist_name,
+                            lyrics_text: result.lyrics_text
+                        };
+                    } else {
+                        const response = await authFetch('/api/lyrics/fetch', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                id: result.id,
+                                provider: result.provider,
+                                artist_name: result.artist_name,
+                                track_name: result.track_name
+                            })
+                        });
+                        payload = await response.json();
+                        if (!response.ok) throw new Error(payload.detail || 'Não foi possível obter a letra.');
+                    }
 
                     lyricsText.value = payload.lyrics_text || '';
                     const saveResponse = await authFetch('/api/lyrics', {
@@ -2304,7 +2319,7 @@
                     title.style.cssText = 'font-size:0.78rem; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;';
                     const details = document.createElement('div');
                     const duration = Number.isFinite(result.duration) ? ` · ${Math.round(result.duration)}s` : '';
-                    details.textContent = `${result.album_name || 'LRCLIB'}${duration}`;
+                    details.textContent = `${result.provider || result.album_name || 'Fonte pública'}${duration}`;
                     details.style.cssText = 'font-size:0.7rem; color:var(--text-muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;';
                     description.append(title, details);
 
@@ -2346,7 +2361,7 @@
 
                         const results = payload.results || [];
                         if (!results.length) {
-                            setLyricsSearchStatus('Nenhuma letra encontrada. Tente título e artista mais específicos.', true);
+                            setLyricsSearchStatus(payload.message || 'Nenhuma letra encontrada. Tente título e artista mais específicos.', true);
                             return;
                         }
                         renderLyricsSearchResults(results);

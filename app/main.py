@@ -6,11 +6,13 @@ import shutil
 import logging
 import tempfile
 import threading
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import requests
 import re
 import difflib
 import json
 import hashlib
+from urllib.parse import quote
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException, BackgroundTasks, Header, Depends, Query
 from fastapi.responses import HTMLResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -1022,7 +1024,11 @@ def download_bg_youtube_preset(
 
 SAVED_LYRICS_FILE = "/data/output/saved_lyrics.txt"
 LRCLIB_API_URL = "https://lrclib.net/api"
-LRCLIB_USER_AGENT = "Sal0-Karaoke/4.6.2 (+https://github.com/Sal0-Apps/Sal0-Karaoke)"
+LRCLIB_USER_AGENT = "Sal0-Karaoke/5.0.0 (+https://github.com/Sal0-Apps/Sal0-Karaoke)"
+LYRICS_OVH_API_URL = "https://api.lyrics.ovh/v1"
+LYRICS_PROVIDER_TIMEOUT = (3.05, 6)
+MUSIXMATCH_API_URL = "https://apic-desktop.musixmatch.com/ws/1.1"
+MUSIXMATCH_APP_ID = "web-desktop-app-v1.0"
 
 class LyricsModel(BaseModel):
     lyrics_text: str = ""
@@ -1033,7 +1039,10 @@ class LyricsSearchRequest(BaseModel):
 
 
 class LyricsFetchRequest(BaseModel):
-    id: int
+    id: int | None = None
+    provider: str = "LRCLIB"
+    artist_name: str = ""
+    track_name: str = ""
 
 
 def _lrclib_get(path: str, params: dict = None):
@@ -1046,7 +1055,7 @@ def _lrclib_get(path: str, params: dict = None):
                 "Accept": "application/json",
                 "User-Agent": LRCLIB_USER_AGENT
             },
-            timeout=12
+            timeout=LYRICS_PROVIDER_TIMEOUT
         )
         if response.status_code == 429:
             raise HTTPException(
@@ -1082,34 +1091,239 @@ def _plain_lyrics_from_lrclib(record: dict) -> str:
     return "\n".join(lines)
 
 
+def _lyrics_provider_get(url: str, params: dict = None, provider: str = "lyrics"):
+    """Fetch JSON from a public lyrics provider without blocking local processing."""
+    try:
+        response = requests.get(
+            url,
+            params=params,
+            headers={
+                "Accept": "application/json",
+                "User-Agent": LRCLIB_USER_AGENT
+            },
+            timeout=LYRICS_PROVIDER_TIMEOUT
+        )
+        if response.status_code == 429:
+            logger.info("Lyrics provider %s is rate limited.", provider)
+            return None
+        response.raise_for_status()
+        return response.json()
+    except requests.Timeout:
+        logger.info("Lyrics provider %s timed out.", provider)
+    except (requests.RequestException, ValueError):
+        logger.info("Lyrics provider %s is unavailable.", provider)
+    return None
+
+
+def _lyrics_ovh_query_parts(query: str) -> tuple[str, str] | None:
+    """Extract artist and title from the common 'artist - title' format."""
+    parts = re.split(r"\s+[\-–—|]\s+", (query or "").strip(), maxsplit=1)
+    if len(parts) != 2:
+        return None
+    artist, title = (part.strip() for part in parts)
+    return (artist, title) if artist and title else None
+
+
+def _search_lrclib(query: str) -> list[dict]:
+    payload = _lyrics_provider_get(
+        f"{LRCLIB_API_URL}/search",
+        params={"q": query},
+        provider="LRCLIB"
+    )
+    if not isinstance(payload, list):
+        return []
+
+    results = []
+    for item in payload[:10]:
+        if not isinstance(item, dict) or not isinstance(item.get("id"), int):
+            continue
+        lyrics_text = _plain_lyrics_from_lrclib(item)
+        results.append({
+            "provider": "LRCLIB",
+            "id": item["id"],
+            "track_name": item.get("trackName") or "Faixa sem título",
+            "artist_name": item.get("artistName") or "Artista desconhecido",
+            "album_name": item.get("albumName") or "",
+            "duration": item.get("duration"),
+            "instrumental": bool(item.get("instrumental")),
+            "has_lyrics": bool(lyrics_text),
+            "lyrics_text": lyrics_text
+        })
+    return results
+
+
+def _fetch_lyrics_ovh(artist: str, title: str) -> str:
+    if not artist or not title:
+        return ""
+    payload = _lyrics_provider_get(
+        f"{LYRICS_OVH_API_URL}/{quote(artist, safe='')}/{quote(title, safe='')}",
+        provider="Lyrics.ovh"
+    )
+    return str(payload.get("lyrics") or "").strip() if isinstance(payload, dict) else ""
+
+
+def _musixmatch_token() -> str:
+    """Get a short-lived Musixmatch desktop token without storing credentials."""
+    payload = _lyrics_provider_get(
+        f"{MUSIXMATCH_API_URL}/token.get",
+        params={"app_id": MUSIXMATCH_APP_ID},
+        provider="Musixmatch token"
+    )
+    if not isinstance(payload, dict):
+        return ""
+    return str(
+        payload.get("message", {})
+        .get("body", {})
+        .get("user_token") or ""
+    ).strip()
+
+
+def _musixmatch_record(artist: str, title: str) -> dict | None:
+    token = _musixmatch_token()
+    if not token or not title:
+        return None
+
+    params = {
+        "format": "json",
+        "namespace": "lyrics_richsynched",
+        "subtitle_format": "mxm",
+        "app_id": MUSIXMATCH_APP_ID,
+        "usertoken": token,
+        "q_track": title,
+    }
+    if artist:
+        params["q_artist"] = artist
+
+    payload = _lyrics_provider_get(
+        f"{MUSIXMATCH_API_URL}/macro.subtitles.get",
+        params=params,
+        provider="Musixmatch"
+    )
+    if not isinstance(payload, dict):
+        return None
+
+    body = payload.get("message", {}).get("body", {})
+    macro_calls = body.get("macro_calls", {}) if isinstance(body, dict) else {}
+    track_message = macro_calls.get("matcher.track.get", {}).get("message", {})
+    track = track_message.get("body", {}).get("track", {})
+    if not isinstance(track, dict):
+        track = {}
+    if track.get("instrumental") == 1:
+        return None
+
+    subtitle_message = macro_calls.get("track.subtitles.get", {}).get("message", {})
+    subtitle_body = subtitle_message.get("body", {})
+    subtitle_list = subtitle_body.get("subtitle_list", []) if isinstance(subtitle_body, dict) else []
+    lyrics_text = ""
+    if subtitle_list:
+        subtitle = subtitle_list[0].get("subtitle", {})
+        raw_subtitles = subtitle.get("subtitle_body", "") if isinstance(subtitle, dict) else ""
+        try:
+            subtitle_lines = json.loads(raw_subtitles)
+        except (TypeError, ValueError):
+            subtitle_lines = []
+        if isinstance(subtitle_lines, list):
+            lyrics_text = "\n".join(
+                str(line.get("text") or "").strip()
+                for line in subtitle_lines
+                if isinstance(line, dict) and str(line.get("text") or "").strip()
+            ).strip()
+
+    if not lyrics_text:
+        lyrics_message = macro_calls.get("track.lyrics.get", {}).get("message", {})
+        lyrics_body = lyrics_message.get("body", {})
+        lyrics = lyrics_body.get("lyrics", {}) if isinstance(lyrics_body, dict) else {}
+        lyrics_text = str(lyrics.get("lyrics_body") or "").strip() if isinstance(lyrics, dict) else ""
+
+    if not lyrics_text:
+        return None
+    return {
+        "track_name": track.get("track_name") or title,
+        "artist_name": track.get("artist_name") or artist or "Artista desconhecido",
+        "lyrics_text": lyrics_text
+    }
+
+
+def _search_musixmatch(query: str) -> list[dict]:
+    parts = _lyrics_ovh_query_parts(query)
+    artist, title = parts if parts else ("", query.strip())
+    record = _musixmatch_record(artist, title)
+    if not record:
+        return []
+    return [{
+        "provider": "Musixmatch",
+        "id": None,
+        "track_name": record["track_name"],
+        "artist_name": record["artist_name"],
+        "album_name": "",
+        "duration": None,
+        "instrumental": False,
+        "has_lyrics": True,
+        "lyrics_text": record["lyrics_text"]
+    }]
+
+
+def _fetch_lyrics_musixmatch(artist: str, title: str) -> str:
+    record = _musixmatch_record(artist, title)
+    return str(record.get("lyrics_text") or "").strip() if record else ""
+
+
+def _search_lyrics_ovh(query: str) -> list[dict]:
+    parts = _lyrics_ovh_query_parts(query)
+    if not parts:
+        return []
+    artist, title = parts
+    lyrics_text = _fetch_lyrics_ovh(artist, title)
+    if not lyrics_text:
+        return []
+    return [{
+        "provider": "Lyrics.ovh",
+        "id": None,
+        "track_name": title,
+        "artist_name": artist,
+        "album_name": "",
+        "duration": None,
+        "instrumental": False,
+        "has_lyrics": True,
+        "lyrics_text": lyrics_text
+    }]
+
+
+def search_lyrics_providers(query: str) -> list[dict]:
+    """Query free providers in parallel, following SyncLyrics' resilient strategy."""
+    providers = (_search_lrclib, _search_lyrics_ovh, _search_musixmatch)
+    results = []
+    with ThreadPoolExecutor(max_workers=len(providers)) as executor:
+        futures = [executor.submit(provider, query) for provider in providers]
+        for future in as_completed(futures):
+            try:
+                results.extend(future.result())
+            except Exception as exc:
+                logger.info("Lyrics provider failed: %s", type(exc).__name__)
+    return results
+
+
 def find_lyrics_automatically(query: str) -> tuple[str, dict | None]:
     """Busca a melhor letra disponível sem tornar a internet obrigatória ao pipeline."""
     query = (query or "").strip()
     if len(query) < 2:
         return "", None
 
-    try:
-        payload = _lrclib_get("/search", params={"q": query})
-    except HTTPException:
-        logger.info("Busca automática de letra indisponível; o pipeline seguirá sem letra guia.")
-        return "", None
-
-    if not isinstance(payload, list):
-        return "", None
+    payload = search_lyrics_providers(query)
 
     query_normalized = re.sub(r"\s+", " ", query.lower()).strip()
     best_match = None
     best_score = -1.0
     for item in payload:
-        if not isinstance(item, dict) or item.get("instrumental"):
+        if not isinstance(item, dict) or item.get("instrumental") or not item.get("has_lyrics"):
             continue
-        lyrics_text = _plain_lyrics_from_lrclib(item)
+        lyrics_text = str(item.get("lyrics_text") or "").strip()
         if not lyrics_text:
             continue
 
         candidate_name = " ".join([
-            str(item.get("trackName") or ""),
-            str(item.get("artistName") or "")
+            str(item.get("track_name") or ""),
+            str(item.get("artist_name") or "")
         ]).lower()
         score = difflib.SequenceMatcher(None, query_normalized, candidate_name).ratio()
         if score > best_score:
@@ -1122,43 +1336,66 @@ def find_lyrics_automatically(query: str) -> tuple[str, dict | None]:
 
     lyrics_text, record = best_match
     return lyrics_text, {
-        "track_name": record.get("trackName") or "Faixa sem título",
-        "artist_name": record.get("artistName") or "Artista desconhecido"
+        "track_name": record.get("track_name") or "Faixa sem título",
+        "artist_name": record.get("artist_name") or "Artista desconhecido"
     }
 
 
 @app.post("/api/lyrics/search")
 def search_lyrics_online(data: LyricsSearchRequest, current_user: dict = Depends(get_current_user)):
-    """Pesquisa títulos na LRCLIB e devolve apenas metadados para escolha do usuário."""
+    """Pesquisa provedores públicos e devolve apenas metadados para escolha do usuário."""
     query = data.query.strip()
     if not 2 <= len(query) <= 160:
         raise HTTPException(status_code=400, detail="Informe entre 2 e 160 caracteres para buscar a letra.")
 
-    payload = _lrclib_get("/search", params={"q": query})
-    if not isinstance(payload, list):
-        raise HTTPException(status_code=502, detail="O serviço de letras retornou uma resposta inválida.")
-
-    results = []
-    for item in payload[:10]:
-        if not isinstance(item, dict) or not isinstance(item.get("id"), int):
-            continue
-        results.append({
-            "id": item["id"],
-            "track_name": item.get("trackName") or "Faixa sem título",
-            "artist_name": item.get("artistName") or "Artista desconhecido",
-            "album_name": item.get("albumName") or "",
-            "duration": item.get("duration"),
-            "instrumental": bool(item.get("instrumental")),
-            "has_lyrics": bool(item.get("plainLyrics") or item.get("syncedLyrics"))
-        })
-
-    return {"provider": "LRCLIB", "results": results}
+    provider_results = search_lyrics_providers(query)
+    results = [
+        {key: value for key, value in item.items() if key != "lyrics_text"}
+        for item in provider_results
+    ]
+    return {
+        "provider": "LRCLIB + Lyrics.ovh + Musixmatch",
+        "results": results,
+        "online_unavailable": not results,
+        "message": "Nenhuma fonte online respondeu. Você ainda pode colar a letra manualmente." if not results else ""
+    }
 
 
 @app.post("/api/lyrics/fetch")
 def fetch_lyrics_online(data: LyricsFetchRequest, current_user: dict = Depends(get_current_user)):
     """Obtém a letra da faixa escolhida e deixa a revisão final para a interface local."""
-    if data.id <= 0:
+    provider = (data.provider or "LRCLIB").strip().lower()
+    if provider == "lyrics.ovh":
+        track_name = data.track_name.strip()
+        artist_name = data.artist_name.strip()
+        if not track_name or not artist_name:
+            raise HTTPException(status_code=400, detail="Artista e faixa são necessários para importar esta letra.")
+        lyrics_text = _fetch_lyrics_ovh(artist_name, track_name)
+        if not lyrics_text:
+            raise HTTPException(status_code=404, detail="Essa faixa não possui uma letra disponível para importar.")
+        return {
+            "provider": "Lyrics.ovh",
+            "track_name": track_name,
+            "artist_name": artist_name,
+            "lyrics_text": lyrics_text
+        }
+
+    if provider == "musixmatch":
+        track_name = data.track_name.strip()
+        artist_name = data.artist_name.strip()
+        if not track_name:
+            raise HTTPException(status_code=400, detail="O título da faixa é necessário para importar esta letra.")
+        lyrics_text = _fetch_lyrics_musixmatch(artist_name, track_name)
+        if not lyrics_text:
+            raise HTTPException(status_code=404, detail="Essa faixa não possui uma letra disponível para importar.")
+        return {
+            "provider": "Musixmatch",
+            "track_name": track_name,
+            "artist_name": artist_name or "Artista desconhecido",
+            "lyrics_text": lyrics_text
+        }
+
+    if provider != "lrclib" or not data.id or data.id <= 0:
         raise HTTPException(status_code=400, detail="Identificador de letra inválido.")
 
     payload = _lrclib_get(f"/get/{data.id}")
@@ -1212,7 +1449,7 @@ def delete_lyrics_server(current_user: dict = Depends(get_current_user)):
 
 
 
-# Sistema de Logs de Diagnóstico v4.6.1
+# Sistema de Logs de Diagnóstico v5.0.0
 DIAGNOSTIC_LOG_FILE = "/data/output/app_diagnostic.log"
 
 def log_diagnostic(message: str, level: str = "INFO"):
@@ -2009,7 +2246,7 @@ def process_karaoke(
             if state.get("status") in ["idle", "error", "done"]:
                 try:
                     processing_lock.release()
-                    logger.info("Failsafe v4.6.1: Lock de concorrência obsoleto liberado com sucesso.")
+                    logger.info("Failsafe v5.0.0: Lock de concorrência obsoleto liberado com sucesso.")
                 except Exception:
                     pass
             else:
@@ -2371,7 +2608,7 @@ def process_karaoke(
 
 def send_telegram_video_flow(token: str, chat_id: str, video_path: str, orig_name: str,
                                base_url: str = "", external_url: str = ""):
-    """Auxiliar para envio de vídeo para o Telegram (v4.6.1). Inclui links de download quando o vídeo excede 50MB ou falha no envio."""
+    """Auxiliar para envio de vídeo para o Telegram (v5.0.0). Inclui links de download quando o vídeo excede 50MB ou falha no envio."""
     if not token or not chat_id:
         return
 

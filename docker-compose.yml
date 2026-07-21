@@ -14,4 +14,4 @@ x-casaos:
   icon: "https://raw.githubusercontent.com/Sal0-Apps/Sal0-Karaoke/main/app/templates/favicon.png"
   title: "Sal0 Karaokê"
   port_map: "7885"
-  overview: "Gerador Automático de Vídeos de Karaokê locais via IA com separação de áudio e sincronização automática."
+  overview: "Gerador local de vídeos de karaokê com Demucs, Whisper, FFmpeg, sincronização automática e letras guia manuais ou buscadas online."

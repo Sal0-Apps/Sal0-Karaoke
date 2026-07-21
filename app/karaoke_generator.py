@@ -209,7 +209,7 @@ def generate_ass_karaoke(
     """
     Gera um arquivo de legenda ASS customizado.
     Suporta os modos de legenda:
-    - 'syllable': Segue cada sílaba/palavra com efeito clássico de varredura de cor (\kf).
+    - 'syllable': Segue cada sílaba/palavra com efeito clássico de varredura de cor (\\kf).
     - 'phrase': Exibe as frases/linhas inteiras sincronizadas estaticamente.
     """
     logger.info(f"Gerando legenda ASS ({subtitle_mode}): fonte={font_size}, cor={text_color_hex}, pos={text_position}, show_inst={show_instrumental}, preview={show_next_line_preview}")
