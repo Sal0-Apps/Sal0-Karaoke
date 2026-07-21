@@ -66,15 +66,13 @@ jobs:
           body: |
             ## 🚀 Sal0 Karaoke v${{ env.VERSION_TAG }}
 
-            Gerador local de vídeos de karaokê com Demucs, Faster-Whisper, FFmpeg e sincronização de legendas ASS.
+            Mais uma rodada de carinho no criador de karaokês pessoal. Escolha uma música, dê seu toque no visual e deixe o app montar o vídeo.
 
-            ### ✨ Destaques da versão 5.0.0
-            * Pipeline local para separação vocal, VAD opcional, transcrição, alinhamento e renderização.
-            * Entrada por upload, biblioteca ou YouTube; fundos por vídeo original, imagem/vídeo, biblioteca, paisagem e cor sólida.
-            * Modos de legenda por sílaba/varredura, palavra e linha, com fontes, cores, posição, quebra e perfis personalizáveis.
-            * Letra manual ou automática na tela básica, com prioridade manual, revisão local e cache persistente.
-            * Busca resiliente em LRCLIB, Lyrics.ovh e Musixmatch; somente título/artista sai do ambiente local, nunca áudio ou vídeo.
-            * Autenticação local, usuários, histórico, editor de correção, Telegram opcional e compatibilidade com Docker/CasaOS.
+            ### ✨ Nesta versão
+            * Painel de letra mais compacto, dobrável e fácil de abrir quando precisar.
+            * Aviso ao encontrar — ou não encontrar — uma letra ao selecionar a música.
+            * Interface com nomes mais curtos, botões mais comportados e pequenos retoques visuais.
+            * Pipeline local para voz, transcrição, sincronização e renderização; a busca online usa apenas título e artista.
 
             ### 🐋 Como executar esta versão:
             No seu `docker-compose.yml`, você pode travar a versão alterando a linha da imagem para:

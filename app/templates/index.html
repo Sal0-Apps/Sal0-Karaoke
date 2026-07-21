@@ -197,6 +197,8 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
+            gap: 0.75rem;
+            flex-wrap: wrap;
             margin-bottom: 1.2rem;
             padding-bottom: 0.75rem;
             border-bottom: 1px solid var(--glass-border);
@@ -204,12 +206,14 @@
 
         .card-title {
             font-family: 'Outfit', sans-serif;
-            font-size: 1.15rem;
+            font-size: 1.05rem;
             font-weight: 700;
             color: var(--text-main);
             display: flex;
             align-items: center;
             gap: 0.5rem;
+            min-width: 0;
+            line-height: 1.2;
         }
 
         /* FORMULÁRIO E INPUTS */
@@ -313,6 +317,103 @@
             background: var(--accent);
             color: #fff;
             border-color: var(--accent);
+        }
+
+        .lyrics-panel {
+            margin: 0.75rem 0 1rem;
+            border: 1px solid var(--glass-border);
+            border-radius: var(--radius-md);
+            background: linear-gradient(135deg, rgba(139, 92, 246, 0.08), var(--input-bg));
+            overflow: hidden;
+        }
+
+        .lyrics-panel-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.65rem;
+            padding: 0.6rem 0.7rem;
+        }
+
+        .lyrics-panel-title {
+            display: flex;
+            align-items: center;
+            gap: 0.45rem;
+            min-width: 0;
+            font-size: 0.84rem;
+            font-weight: 700;
+            color: var(--text-main);
+        }
+
+        .lyrics-summary {
+            display: inline-flex;
+            align-items: center;
+            max-width: 150px;
+            padding: 0.16rem 0.42rem;
+            border-radius: 999px;
+            background: rgba(148, 163, 184, 0.12);
+            color: var(--text-muted);
+            font-size: 0.67rem;
+            font-weight: 600;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .lyrics-summary.ready {
+            background: rgba(16, 185, 129, 0.14);
+            color: #6ee7b7;
+        }
+
+        .lyrics-panel-content {
+            display: none;
+            padding: 0 0.7rem 0.7rem;
+            border-top: 1px solid var(--glass-border);
+        }
+
+        .lyrics-panel-content.open {
+            display: block;
+        }
+
+        .lyrics-mode-select {
+            width: 132px !important;
+            min-width: 0 !important;
+            flex: 0 1 132px;
+            padding: 0.35rem 0.5rem !important;
+        }
+
+        .app-notice {
+            position: fixed;
+            right: 1rem;
+            bottom: 1rem;
+            z-index: 10050;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            width: min(360px, calc(100vw - 2rem));
+            padding: 0.75rem 0.85rem;
+            border: 1px solid rgba(16, 185, 129, 0.38);
+            border-radius: 12px;
+            background: rgba(12, 26, 30, 0.95);
+            color: #d1fae5;
+            box-shadow: 0 12px 35px rgba(0, 0, 0, 0.35);
+            font-size: 0.78rem;
+            line-height: 1.35;
+            opacity: 0;
+            pointer-events: none;
+            transform: translateY(12px);
+            transition: opacity 0.2s ease, transform 0.2s ease;
+        }
+
+        .app-notice.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .app-notice.error {
+            border-color: rgba(251, 146, 60, 0.4);
+            background: rgba(47, 25, 21, 0.96);
+            color: #fed7aa;
         }
 
         /* ------------------------------------------------------------- */
@@ -470,6 +571,36 @@
         }
             /* ESTILOS DE BIBLIOTECA RESPONSIVA PARA DISPOSITIVOS MÓVEIS */
         @media (max-width: 640px) {
+            .card {
+                padding: 1rem;
+                margin-bottom: 1rem;
+            }
+            .nav-tabs {
+                flex-wrap: wrap;
+                gap: 0.3rem;
+            }
+            .tab-btn {
+                flex: 1 1 calc(33.333% - 0.3rem);
+                min-width: 0;
+                padding: 0.55rem 0.45rem;
+                font-size: 0.72rem;
+            }
+            .card-title {
+                font-size: 0.95rem;
+            }
+            .card-header > .btn-secondary {
+                padding: 0.45rem 0.6rem;
+                font-size: 0.74rem;
+            }
+            .lyrics-panel-head {
+                align-items: flex-start;
+            }
+            .lyrics-panel-title {
+                flex-wrap: wrap;
+            }
+            .lyrics-summary {
+                max-width: 120px;
+            }
             .library-item {
                 flex-direction: column;
                 align-items: flex-start;
@@ -516,9 +647,9 @@
 
         <!-- NAVEGAÇÃO ENTRE ABAS -->
         <div class="nav-tabs">
-            <button type="button" class="tab-btn active" id="tabBtnCreate">🎬 Criar Karaokê</button>
-            <button type="button" class="tab-btn" id="tabBtnSettings">⚙️ Ajustes & Configurações</button>
-            <button type="button" class="tab-btn" id="tabBtnLibrary">📚 Biblioteca & Histórico</button>
+            <button type="button" class="tab-btn active" id="tabBtnCreate">🎬 Criar</button>
+            <button type="button" class="tab-btn" id="tabBtnSettings">⚙️ Ajustes</button>
+            <button type="button" class="tab-btn" id="tabBtnLibrary">📚 Biblioteca</button>
         </div>
 
         <!-- ============================================================= -->
@@ -537,7 +668,7 @@
 
                 <div class="card">
                     <div class="card-header">
-                        <span class="card-title">🎵 Arquivo de Música ou Vídeo Original</span>
+                        <span class="card-title">🎵 Música</span>
                         <div style="display: flex; gap: 0.3rem;">
                             <button type="button" id="btnAudioModeUpload" class="btn-tab-small active">📁 Enviar</button>
                             <button type="button" id="btnAudioModeYoutube" class="btn-tab-small">🌐 YouTube</button>
@@ -586,31 +717,40 @@
                 <!-- Card de Fundo e Estilo -->
                 <div class="card">
                     <div class="card-header">
-                        <span class="card-title">🖼️ Fundo & Personalização do Karaokê</span>
-                        <button type="button" id="btnToggleAdvanced" class="btn-secondary">⚙️ Opções Avançadas</button>
+                        <span class="card-title">🖼️ Visual</span>
+                        <button type="button" id="btnToggleAdvanced" class="btn-secondary">⚙️ Mais ajustes</button>
                     </div>
 
-                    <!-- Letra básica, compacta e integrada à personalização -->
-                    <div id="lyricsCard" style="margin: 0.75rem 0 1rem; padding: 0.7rem; background: var(--input-bg); border: 1px solid var(--glass-border); border-radius: var(--radius-md);">
-                        <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.6rem; flex-wrap: wrap;">
-                            <span style="font-size: 0.88rem; font-weight: 700; color: var(--text-main);">📝 Letra</span>
-                            <select id="lyricsMode" name="lyrics_mode" class="select-input" style="width: auto; min-width: 150px; height: 32px; font-size: 0.78rem;">
-                                <option value="auto" selected>Automática (internet)</option>
-                                <option value="manual">Manual</option>
-                            </select>
+                    <!-- Letra opcional: sempre acessível, sem ocupar espaço quando fechada -->
+                    <div id="lyricsCard" class="lyrics-panel">
+                        <div class="lyrics-panel-head">
+                            <div class="lyrics-panel-title">
+                                <span>📝 Letra</span>
+                                <span id="lyricsSummary" class="lyrics-summary">Sem letra</span>
+                            </div>
+                            <button type="button" id="btnToggleLyrics" class="btn-secondary" aria-expanded="false" style="padding: 0.38rem 0.6rem; font-size: 0.72rem; white-space: nowrap;">Abrir ▾</button>
                         </div>
-                        <p id="lyricsModeHint" style="font-size: 0.7rem; color: var(--text-muted); margin: 0.35rem 0 0.45rem;">A letra é apenas uma guia. Se você preencher manualmente, ela terá prioridade.</p>
-                        <textarea id="lyricsText" name="lyrics_text" placeholder="Cole ou edite a letra aqui..." class="input-text" style="height: 72px; resize: vertical; background: var(--input-bg); border: 1px solid var(--glass-border);"></textarea>
-                        <div id="lyricsBadge" style="display: none; margin-top: 0.35rem; background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.3); color: #34d399; padding: 0.3rem 0.55rem; border-radius: 7px; font-size: 0.7rem; font-weight: 600;"></div>
-                        <div style="display: flex; gap: 0.4rem; margin-top: 0.45rem; flex-wrap: wrap;">
-                            <input type="text" id="lyricsSearchQuery" class="input-text" placeholder="Artista - título (ou use o arquivo)" style="flex: 1 1 210px; min-width: 0; height: 32px; font-size: 0.76rem;">
-                            <button type="button" id="btnSearchLyrics" class="btn-secondary" style="font-size: 0.72rem; height: 32px; white-space: nowrap;">🔎 Buscar</button>
-                            <button type="button" id="btnSaveLyrics" class="btn-primary" style="font-size: 0.72rem; height: 32px;">💾 Salvar</button>
-                            <button type="button" id="btnClearLyrics" class="btn-secondary" style="font-size: 0.72rem; height: 32px; color: #fca5a5;">🗑️ Limpar</button>
+                        <div id="lyricsContent" class="lyrics-panel-content">
+                            <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.55rem;">
+                                <span style="font-size: 0.75rem; font-weight: 600; color: var(--text-muted);">Como usar</span>
+                                <select id="lyricsMode" name="lyrics_mode" class="select-input lyrics-mode-select" style="height: 32px; font-size: 0.76rem;">
+                                    <option value="auto" selected>Automática</option>
+                                    <option value="manual">Manual</option>
+                                </select>
+                            </div>
+                            <p id="lyricsModeHint" style="font-size: 0.7rem; color: var(--text-muted); margin: 0.35rem 0 0.45rem;">A letra é uma guia. Texto manual sempre tem prioridade.</p>
+                            <textarea id="lyricsText" name="lyrics_text" placeholder="Cole ou edite a letra aqui..." class="input-text" style="height: 72px; resize: vertical; background: var(--input-bg); border: 1px solid var(--glass-border);"></textarea>
+                            <div id="lyricsBadge" style="display: none; margin-top: 0.35rem; background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.3); color: #34d399; padding: 0.3rem 0.55rem; border-radius: 7px; font-size: 0.7rem; font-weight: 600;"></div>
+                            <div style="display: flex; gap: 0.4rem; margin-top: 0.45rem; flex-wrap: wrap;">
+                                <input type="text" id="lyricsSearchQuery" class="input-text" placeholder="Artista - título" style="flex: 1 1 190px; min-width: 0; height: 32px; font-size: 0.76rem;">
+                                <button type="button" id="btnSearchLyrics" class="btn-secondary" style="font-size: 0.72rem; height: 32px; white-space: nowrap;">🔎 Buscar</button>
+                                <button type="button" id="btnSaveLyrics" class="btn-primary" style="width: auto; padding: 0.45rem 0.65rem; font-size: 0.72rem; height: 32px;">💾 Salvar</button>
+                                <button type="button" id="btnClearLyrics" class="btn-secondary" style="font-size: 0.72rem; height: 32px; color: #fca5a5;">🗑️ Limpar</button>
+                            </div>
+                            <p style="font-size: 0.66rem; color: var(--text-muted); margin: 0.35rem 0 0;">A busca usa só título e artista. O resto continua local.</p>
+                            <div id="lyricsSearchStatus" aria-live="polite" style="display: none; margin-top: 0.45rem; font-size: 0.72rem;"></div>
+                            <div id="lyricsSearchResults" style="display: flex; flex-direction: column; gap: 0.35rem; margin-top: 0.45rem;"></div>
                         </div>
-                        <p style="font-size: 0.66rem; color: var(--text-muted); margin: 0.35rem 0 0;">Somente título/artista são consultados em LRCLIB, Lyrics.ovh e Musixmatch. Áudio, vídeo, Whisper e renderização continuam locais.</p>
-                        <div id="lyricsSearchStatus" aria-live="polite" style="display: none; margin-top: 0.45rem; font-size: 0.72rem;"></div>
-                        <div id="lyricsSearchResults" style="display: flex; flex-direction: column; gap: 0.35rem; margin-top: 0.45rem;"></div>
                     </div>
 
                     <div class="form-grid">
@@ -841,7 +981,7 @@
             <!-- CARD DE PROGRESSO DE PRODUÇÃO -->
             <div class="card" id="processCard" style="display: none;">
                 <div class="card-header">
-                    <span class="card-title">⏳ Produção em Andamento...</span>
+                    <span class="card-title">⏳ Produzindo</span>
                     <span id="progressPercent" style="font-size: 1.2rem; font-weight: 800; color: var(--accent);">0%</span>
                 </div>
 
@@ -882,9 +1022,9 @@
             <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem;">
                 <div style="display: flex; align-items: center; gap: 0.5rem;">
                     <span style="font-size: 1.3rem;">✏️</span>
-                    <h3 style="margin: 0; font-size: 1.1rem; font-weight: 700; color: var(--text-main);">Revisão & Edição Avançada da Legenda (Texto e Tempos)</h3>
+                    <h3 style="margin: 0; font-size: 1.1rem; font-weight: 700; color: var(--text-main);">✍️ Revisar legendas</h3>
                 </div>
-                <button type="button" id="btnContinueProcess" class="btn-primary" style="width: auto; padding: 0.5rem 1.2rem; font-size: 0.85rem;">🚀 Salvar e Renderizar Vídeo Karaokê</button>
+                <button type="button" id="btnContinueProcess" class="btn-primary" style="width: auto; padding: 0.5rem 1.2rem; font-size: 0.85rem;">🚀 Salvar e renderizar</button>
             </div>
             
             <!-- Grid de Duas Colunas: Live Preview e Lista de Estrofes -->
@@ -916,7 +1056,7 @@
 
             <div style="display: flex; justify-content: space-between; align-items: center; pt: 1rem; border-top: 1px solid var(--glass-border);">
                 <button type="button" class="btn-cancel-task btn-secondary" style="background: rgba(239,68,68,0.15); color: #fca5a5; border-color: rgba(239,68,68,0.3);">🛑 Cancelar Processamento</button>
-                <button type="button" id="btnSkipEdit" class="btn-secondary">⏩ Pular e Renderizar Sem Alterar</button>
+                <button type="button" id="btnSkipEdit" class="btn-secondary">⏩ Renderizar sem editar</button>
             </div>
         </div>
 
@@ -1110,10 +1250,12 @@
 
         <!-- RODAPÉ DISCRETO DA PÁGINA -->
         <footer>
-            Sal0 Karaokê v5.0.0
+            Sal0 Karaokê v5.0.1
         </footer>
 
     </div> <!-- Container End -->
+
+    <div id="appNotice" class="app-notice" role="status" aria-live="polite"></div>
 
     <!-- MODAL MANUAL E TUTORIAL PARA INICIANTES -->
     <div id="helpModal" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.7); backdrop-filter: blur(12px); z-index: 9999; justify-content: center; align-items: center; padding: 1rem;">
@@ -2125,9 +2267,42 @@
             const lyricsText = document.getElementById('lyricsText');
             const lyricsBadge = document.getElementById('lyricsBadge');
             const lyricsMode = document.getElementById('lyricsMode');
+            const lyricsContent = document.getElementById('lyricsContent');
+            const btnToggleLyrics = document.getElementById('btnToggleLyrics');
+            const lyricsSummary = document.getElementById('lyricsSummary');
+            const appNotice = document.getElementById('appNotice');
             let lastAutoLyricsQuery = '';
+            let noticeTimer = null;
+
+            function setLyricsPanel(open) {
+                if (!lyricsContent || !btnToggleLyrics) return;
+                lyricsContent.classList.toggle('open', open);
+                btnToggleLyrics.setAttribute('aria-expanded', String(open));
+                btnToggleLyrics.textContent = open ? 'Fechar ▴' : 'Abrir ▾';
+            }
+
+            function setLyricsSummary(txt) {
+                if (!lyricsSummary) return;
+                const hasLyrics = Boolean(txt && txt.trim());
+                lyricsSummary.textContent = hasLyrics ? '✓ Letra pronta' : 'Sem letra';
+                lyricsSummary.classList.toggle('ready', hasLyrics);
+            }
+
+            function showLyricsNotice(message, isError = false) {
+                if (!appNotice || !message) return;
+                if (noticeTimer) clearTimeout(noticeTimer);
+                appNotice.textContent = message;
+                appNotice.classList.toggle('error', isError);
+                appNotice.classList.add('show');
+                noticeTimer = setTimeout(() => appNotice.classList.remove('show'), 5200);
+            }
+
+            if (btnToggleLyrics) {
+                btnToggleLyrics.onclick = () => setLyricsPanel(!lyricsContent?.classList.contains('open'));
+            }
 
             function updateLyricsBadge(txt) {
+                setLyricsSummary(txt);
                 if (!lyricsBadge) return;
                 if (txt && txt.trim()) {
                     const wordCount = txt.trim().split(/\s+/).filter(Boolean).length;
@@ -2160,7 +2335,7 @@
                         alert('Erro ao salvar letra: ' + e.message);
                     } finally {
                         btnSaveLyrics.disabled = false;
-                        btnSaveLyrics.innerHTML = '💾 Salvar Letra';
+                        btnSaveLyrics.innerHTML = '💾 Salvar';
                     }
                 };
             }
@@ -2242,7 +2417,7 @@
                     updateLyricsBadge(lyricsText.value);
                     if (lyricsSearchQuery) lyricsSearchQuery.value = `${payload.track_name} — ${payload.artist_name}`;
                     if (lyricsSearchResults) lyricsSearchResults.replaceChildren();
-                    setLyricsSearchStatus('Letra importada e salva localmente. Revise o texto antes de criar o vídeo.');
+                    setLyricsSearchStatus('Letra salva localmente. Você pode revisar quando quiser.');
                     return true;
                 } catch (error) {
                     setLyricsSearchStatus(`Erro ao importar a letra: ${error.message}`, true);
@@ -2272,14 +2447,17 @@
                     const result = (payload.results || []).find(item => item.has_lyrics && !item.instrumental);
                     if (!result) {
                         setLyricsSearchStatus('Nenhuma letra automática encontrada; você pode preencher manualmente.', true);
+                        showLyricsNotice('ℹ️ Não encontrei uma letra agora. Você pode adicionar uma quando quiser.', true);
                         return;
                     }
                     const imported = await importOnlineLyrics(result);
                     if (imported) {
-                        setLyricsSearchStatus(`Letra encontrada para ${result.track_name} — ${result.artist_name}. Revise antes de criar o vídeo.`);
+                        setLyricsSearchStatus(`Letra encontrada para ${result.track_name} — ${result.artist_name}.`);
+                        showLyricsNotice(`✓ Letra encontrada para ${result.track_name}.`);
                     }
                 } catch (error) {
                     setLyricsSearchStatus('Não foi possível buscar a letra automaticamente. Você pode inserir a letra manualmente.', true);
+                    showLyricsNotice('ℹ️ A busca de letra não respondeu. Você pode adicionar uma manualmente.', true);
                 }
             }
 
@@ -2297,6 +2475,7 @@
 
             if (lyricsText) {
                 lyricsText.addEventListener('input', () => {
+                    setLyricsSummary(lyricsText.value);
                     if (lyricsText.value.trim() && lyricsMode && lyricsMode.value === 'auto') {
                         lyricsMode.value = 'manual';
                         setLyricsSearchStatus('Entrada manual detectada; ela terá prioridade sobre a busca automática.');
@@ -2370,7 +2549,7 @@
                         setLyricsSearchStatus(`Erro na busca de letras: ${error.message}`, true);
                     } finally {
                         btnSearchLyrics.disabled = false;
-                        btnSearchLyrics.innerText = '🔎 Buscar agora';
+                    btnSearchLyrics.innerText = '🔎 Buscar';
                     }
                 };
             }

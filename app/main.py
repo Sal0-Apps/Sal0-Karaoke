@@ -1024,7 +1024,7 @@ def download_bg_youtube_preset(
 
 SAVED_LYRICS_FILE = "/data/output/saved_lyrics.txt"
 LRCLIB_API_URL = "https://lrclib.net/api"
-LRCLIB_USER_AGENT = "Sal0-Karaoke/5.0.0 (+https://github.com/Sal0-Apps/Sal0-Karaoke)"
+LRCLIB_USER_AGENT = "Sal0-Karaoke/5.0.1 (+https://github.com/Sal0-Apps/Sal0-Karaoke)"
 LYRICS_OVH_API_URL = "https://api.lyrics.ovh/v1"
 LYRICS_PROVIDER_TIMEOUT = (3.05, 6)
 MUSIXMATCH_API_URL = "https://apic-desktop.musixmatch.com/ws/1.1"
@@ -1449,7 +1449,7 @@ def delete_lyrics_server(current_user: dict = Depends(get_current_user)):
 
 
 
-# Sistema de Logs de Diagnóstico v5.0.0
+# Sistema de Logs de Diagnóstico v5.0.1
 DIAGNOSTIC_LOG_FILE = "/data/output/app_diagnostic.log"
 
 def log_diagnostic(message: str, level: str = "INFO"):
@@ -2246,7 +2246,7 @@ def process_karaoke(
             if state.get("status") in ["idle", "error", "done"]:
                 try:
                     processing_lock.release()
-                    logger.info("Failsafe v5.0.0: Lock de concorrência obsoleto liberado com sucesso.")
+                    logger.info("Failsafe v5.0.1: Lock de concorrência obsoleto liberado com sucesso.")
                 except Exception:
                     pass
             else:
@@ -2608,7 +2608,7 @@ def process_karaoke(
 
 def send_telegram_video_flow(token: str, chat_id: str, video_path: str, orig_name: str,
                                base_url: str = "", external_url: str = ""):
-    """Auxiliar para envio de vídeo para o Telegram (v5.0.0). Inclui links de download quando o vídeo excede 50MB ou falha no envio."""
+    """Auxiliar para envio de vídeo para o Telegram (v5.0.1). Inclui links de download quando o vídeo excede 50MB ou falha no envio."""
     if not token or not chat_id:
         return
 

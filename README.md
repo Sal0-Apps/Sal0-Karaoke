@@ -1,37 +1,29 @@
-# 🎤 Sal0 Karaoke 5.0.0
+# 🎤 Sal0 Karaoke
 
-O Sal0 Karaoke cria vídeos de karaokê a partir de músicas e vídeos usando um pipeline local. Ele separa voz e instrumental, transcreve a música, sincroniza as legendas e renderiza o vídeo final com FFmpeg, sem enviar o áudio ou o vídeo para serviços de IA.
+Transforme uma música em um vídeo de karaokê sem sair da sua própria máquina. Escolha a faixa, dê um toque no visual e deixe o Sal0 Karaoke cuidar do resto: separar a voz, ouvir a música, montar as legendas e renderizar o vídeo.
 
-> Projeto pessoal, disponibilizado “como está” (*as is*). A disponibilidade de serviços externos de letras e do YouTube pode mudar.
+É um projeto pessoal, feito para brincar com música e criar karaokês do seu jeito. ✨
 
-## O que ele faz
+## O que tem por aqui
 
-- Separa vocais e instrumental com Demucs (`htdemucs`/`htdemucs_ft`).
-- Extrai áudio de arquivos MP3, WAV, FLAC, M4A, MP4, MKV e outros formatos compatíveis com FFmpeg.
-- Aceita upload local, mídia da biblioteca e download de áudio/vídeo pelo YouTube.
-- Transcreve localmente com Faster-Whisper, com modelos Tiny, Small, Medium, Large-v3 e Large-v3 Turbo.
-- Usa Silero VAD opcional para reduzir silêncio antes da transcrição.
-- Refina timestamps por palavra com alinhamento local e gera legendas ASS próprias para karaokê.
-- Oferece três modos de legenda: sílabas/varredura, palavras e linhas.
-- Permite informar a letra manualmente ou tentar encontrá-la automaticamente quando houver internet.
-- Consulta apenas título e artista em fontes públicas de letras: LRCLIB, Lyrics.ovh e Musixmatch Desktop API.
-- Consulta os provedores de letras em paralelo, aceita falha/offline sem interromper o processamento local e mantém a letra editável.
-- Dá prioridade à letra manual e permite revisar, salvar, limpar e substituir a letra encontrada.
-- Ajusta fonte, cor, posição, quebra de linha, quantidade de palavras, pontuação e visualização da próxima linha.
-- Permite fundo original, imagem/vídeo enviado, paisagem aleatória, cor sólida, biblioteca e fundo obtido do YouTube.
-- Mantém cache local, biblioteca de mídias, histórico de vídeos e perfis de estilo reutilizáveis.
-- Oferece editor web para correções antes da renderização, incluindo pausa de revisão de 75%.
-- Possui autenticação local, gerenciamento de usuários e sessões protegidas por senha derivada com PBKDF2.
-- Pode enviar notificações e vídeos ao Telegram quando essa integração opcional for configurada.
-- Funciona em Docker, Docker Compose, CasaOS e servidores pessoais com armazenamento persistente em `/data`.
+- Upload de áudio/vídeo, biblioteca local e links do YouTube.
+- Separação de vocal e instrumental com Demucs.
+- Transcrição local com Faster-Whisper e sincronização de legendas em estilo karaokê.
+- Modos por sílaba, palavra ou linha.
+- Fundo original, cor, imagem, vídeo, paisagem, biblioteca ou YouTube.
+- Ajustes de fonte, cor, posição e quebra de texto.
+- Perfis para guardar seus estilos favoritos.
+- Biblioteca, histórico, cache e editor para revisar as legendas antes de finalizar.
+- Letra manual ou busca automática como guia.
+- Telegram opcional para avisos e envio do vídeo pronto.
 
-## Busca de letras e privacidade
+## Sobre a letra
 
-A letra automática é uma ajuda para orientar a transcrição; ela não substitui a sincronização local. O Sal0 Karaoke envia somente a consulta textual de título/artista para os provedores públicos. Nenhum áudio, vídeo, separação Demucs, modelo Whisper, legenda em edição, senha ou configuração do Telegram é enviado para buscar letras.
+O painel de letra pode ficar fechado enquanto você cria. Ao escolher uma música, o app tenta encontrar uma letra e mostra um aviso dizendo se conseguiu ou não. Quando quiser, abra o painel para ver, editar, colar ou apagar o texto.
 
-O Musixmatch é consultado pelo fluxo público do aplicativo desktop: o app solicita um token temporário e o mantém somente em memória durante a consulta. Não há token fixo, cookie pessoal ou chave privada no código. Se as fontes não responderem, o pipeline continua e a letra pode ser colada manualmente.
+A busca consulta só o nome da música e do artista em fontes públicas como LRCLIB, Lyrics.ovh e Musixmatch. O áudio, o vídeo, a separação de voz, a transcrição e a renderização continuam na sua máquina. Se não aparecer nada, sem drama: é só colar a letra manualmente.
 
-## Execução com Docker
+## Rodando com Docker
 
 ```yaml
 services:
@@ -45,36 +37,18 @@ services:
     restart: unless-stopped
 ```
 
-Inicie com:
+Depois:
 
 ```bash
 docker compose up -d
 ```
 
-Abra `http://localhost:7885` no navegador.
+Abra `http://localhost:7885` e solte a primeira música na tela. 🎶
 
-## Dados persistentes
+## Onde ficam as coisas
 
-O volume `/data` preserva todo o estado do aplicativo:
+Tudo que o app guarda permanece no volume `/data`: suas mídias, fundos, resultados, perfis, letras, usuários e histórico. Faça backup dessa pasta se quiser preservar suas criações.
 
-- `/data/library/`: mídias, fundos e histórico;
-- `/data/cache/`: arquivos intermediários e cache da última mídia;
-- `/data/output/`: vídeos, legendas, modelos baixados, perfis e logs;
-- `/data/users.json` e `/data/sessions.json`: autenticação local;
-- `/data/output/saved_lyrics.txt`: letra guia salva localmente.
+## Pequeno aviso
 
-## Modelos e recursos
-
-| Modelo | Uso típico |
-| --- | --- |
-| Large-v3 Turbo | Melhor equilíbrio entre qualidade e velocidade |
-| Medium | Qualidade estável com menor custo |
-| Small | Processamento mais rápido |
-| Tiny | Prévia e máquinas limitadas |
-| Large-v3 | Maior qualidade, com maior consumo |
-
-O tempo depende do modelo, duração da música, CPU/GPU, memória e configuração de separação vocal.
-
-## Licença e fontes externas
-
-O projeto integra FFmpeg, Demucs, Faster-Whisper, Silero VAD e bibliotecas Python com suas próprias licenças. Consulte os respectivos projetos antes de redistribuir imagens Docker ou conteúdo gerado. As fontes de letras são serviços externos gratuitos/públicos, sujeitos a disponibilidade, limites e termos próprios.
+Fontes de letras e YouTube são serviços externos e podem variar de disponibilidade. O Sal0 Karaoke continua funcionando sem a busca de letra; ela é só uma ajuda extra para deixar a legenda ainda melhor.
