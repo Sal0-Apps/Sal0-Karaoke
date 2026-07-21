@@ -4,8 +4,8 @@ Este é um projeto pessoal disponibilizado abertamente sem garantias ou compromi
 
 ## Privacidade e Dados
 
-- O aplicativo roda **100% offline** na sua máquina ou servidor local.
-- Nenhum áudio, vídeo, letra ou credencial é enviado para servidores externos.
+- Áudio, vídeo, modelos de IA, transcrição e renderização rodam localmente na sua máquina ou servidor.
+- A busca de letra é automática por padrão e pode ser substituída pela entrada manual: o título/artista da música selecionada é enviado à LRCLIB quando houver conexão e a letra retornada pode ser salva localmente para revisão. Nenhum arquivo de áudio ou vídeo é enviado nessa busca.
 - Senhas locais são salvas usando PBKDF2 com Salt.
 - Arquivos de configuração e credenciais locais são ignorados no Git pelo `.gitignore`.
 

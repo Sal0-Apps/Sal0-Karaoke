@@ -583,6 +583,29 @@
                     <input type="hidden" id="libraryAudioHidden" name="library_audio" value="">
                 </div>
 
+                <!-- Letra manual ou automática: opção básica -->
+                <div class="card" id="lyricsCard">
+                    <div class="card-header">
+                        <span class="card-title">📝 Letra da Música</span>
+                        <select id="lyricsMode" name="lyrics_mode" class="select-input" style="width: auto; min-width: 180px;">
+                            <option value="auto" selected>Automática (internet)</option>
+                            <option value="manual">Manual</option>
+                        </select>
+                    </div>
+                    <p id="lyricsModeHint" style="font-size: 0.74rem; color: var(--text-muted); margin: 0 0 0.6rem;">Ao selecionar uma música, o sistema tentará encontrar a letra automaticamente. Se você preencher abaixo, sua letra manual terá prioridade.</p>
+                    <textarea id="lyricsText" name="lyrics_text" placeholder="Opcional: cole ou edite a letra da música aqui..." class="input-text" style="height: 110px; resize: vertical; background: var(--input-bg); border: 1px solid var(--glass-border);"></textarea>
+                    <div id="lyricsBadge" style="display: none; margin-top: 0.4rem; background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.3); color: #34d399; padding: 0.4rem 0.7rem; border-radius: 8px; font-size: 0.78rem; font-weight: 600;"></div>
+                    <div style="display: flex; gap: 0.5rem; margin-top: 0.65rem; flex-wrap: wrap;">
+                        <input type="text" id="lyricsSearchQuery" class="input-text" placeholder="Título e artista (ou deixe vazio para usar o arquivo)" style="flex: 1 1 230px; min-width: 0;">
+                        <button type="button" id="btnSearchLyrics" class="btn-secondary" style="font-size: 0.78rem; height: 34px; white-space: nowrap;">🔎 Buscar agora</button>
+                        <button type="button" id="btnSaveLyrics" class="btn-primary" style="font-size: 0.78rem; height: 34px;">💾 Salvar</button>
+                        <button type="button" id="btnClearLyrics" class="btn-secondary" style="font-size: 0.78rem; height: 34px; color: #fca5a5;">🗑️ Limpar</button>
+                    </div>
+                    <p style="font-size: 0.7rem; color: var(--text-muted); margin: 0.45rem 0 0;">Somente o título/artista é consultado na LRCLIB. Áudio, vídeo, Whisper e renderização continuam locais.</p>
+                    <div id="lyricsSearchStatus" aria-live="polite" style="display: none; margin-top: 0.55rem; font-size: 0.78rem;"></div>
+                    <div id="lyricsSearchResults" style="display: flex; flex-direction: column; gap: 0.45rem; margin-top: 0.55rem;"></div>
+                </div>
+
                 <!-- Card de Fundo e Estilo -->
                 <div class="card">
                     <div class="card-header">
@@ -682,17 +705,6 @@
                     <!-- OPÇÕES AVANÇADAS EXPANSÍVEIS -->
                     <div id="advancedContent" style="display: none; margin-top: 1.2rem; padding-top: 1.2rem; border-top: 1px solid var(--glass-border);">
                         
-                        <!-- LETRA PERSONALIZADA EM DESTAQUE NO TOPO -->
-                        <div style="background: rgba(139, 92, 246, 0.12); border: 1px solid var(--accent); padding: 1rem; border-radius: var(--radius-md); margin-bottom: 1.2rem;">
-                            <span class="label" style="font-size: 0.92rem; color: var(--accent); font-weight: 700; margin-bottom: 0.4rem; display: block;">📝 Letra Guia (Opcional)</span>
-                            <textarea id="lyricsText" name="lyrics_text" placeholder="Cole a letra oficial da música aqui se desejar guiar a transcrição e sincronização correta..." class="input-text" style="height: 90px; resize: vertical; background: var(--input-bg); border: 1px solid var(--glass-border);"></textarea>
-                            <div id="lyricsBadge" style="display: none; margin-top: 0.4rem; background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.3); color: #34d399; padding: 0.4rem 0.7rem; border-radius: 8px; font-size: 0.78rem; font-weight: 600;"></div>
-                            <div style="display: flex; gap: 0.5rem; margin-top: 0.5rem;">
-                                <button type="button" id="btnSaveLyrics" class="btn-primary" style="font-size: 0.78rem; height: 34px;">💾 Salvar Letra</button>
-                                <button type="button" id="btnClearLyrics" class="btn-secondary" style="font-size: 0.78rem; height: 34px; color: #fca5a5;">🗑️ Limpar Letra</button>
-                            </div>
-                        </div>
-
                         <!-- SEÇÃO DE SALVAR E GERENCIAR PERFIS (DENTRO DAS OPÇÕES AVANÇADAS) -->
                         <div style="background: var(--input-bg); border: 1px solid var(--glass-border); padding: 1rem; border-radius: var(--radius-md); margin-bottom: 1.2rem;">
                             <span class="label" style="font-size: 0.88rem; color: var(--text-main); margin-bottom: 0.6rem;">💾 Perfil de Ajustes</span>
@@ -1577,7 +1589,10 @@
             const btnLib = document.getElementById('btnAudioModeLibrary');
             if (btnLib) btnLib.click();
             const select = document.getElementById('libraryAudioSelect');
-            if (select) select.value = filename;
+            if (select) {
+                select.value = filename;
+                select.dispatchEvent(new Event('change'));
+            }
             switchTab('create');
         }
 
@@ -1780,7 +1795,17 @@
                         const badge = document.getElementById('audioBadge');
                         badge.innerText = `✓ Arquivo carregado: ${fname}`;
                         badge.style.display = 'inline-block';
+                        autoLookupLyricsForSong(getSuggestedLyricsQuery());
                     }
+                };
+            }
+
+            const libraryAudioSelect = document.getElementById('libraryAudioSelect');
+            if (libraryAudioSelect) {
+                libraryAudioSelect.onchange = () => {
+                    const hiddenLib = document.getElementById('libraryAudioHidden');
+                    if (hiddenLib) hiddenLib.value = libraryAudioSelect.value || '';
+                    autoLookupLyricsForSong(getSuggestedLyricsQuery());
                 };
             }
 
@@ -1933,6 +1958,7 @@
                                         const selectAudio = document.getElementById('libraryAudioSelect');
                                         if (hiddenLib) hiddenLib.value = stData.filename;
                                         if (selectAudio) selectAudio.value = stData.filename;
+                                        if (selectAudio) selectAudio.dispatchEvent(new Event('change'));
 
                                         if (selectedBadge) selectedBadge.style.display = "flex";
                                         if (selectedText) selectedText.innerText = `✓ Mídia baixada e selecionada automaticamente: "${stData.filename}"`;
@@ -2098,6 +2124,8 @@
             const btnClearLyrics = document.getElementById('btnClearLyrics');
             const lyricsText = document.getElementById('lyricsText');
             const lyricsBadge = document.getElementById('lyricsBadge');
+            const lyricsMode = document.getElementById('lyricsMode');
+            let lastAutoLyricsQuery = '';
 
             function updateLyricsBadge(txt) {
                 if (!lyricsBadge) return;
@@ -2145,6 +2173,190 @@
                     } catch (e) { /* ignora */ }
                     if (lyricsText) lyricsText.value = '';
                     updateLyricsBadge('');
+                };
+            }
+
+            const btnSearchLyrics = document.getElementById('btnSearchLyrics');
+            const lyricsSearchQuery = document.getElementById('lyricsSearchQuery');
+            const lyricsSearchStatus = document.getElementById('lyricsSearchStatus');
+            const lyricsSearchResults = document.getElementById('lyricsSearchResults');
+
+            function setLyricsSearchStatus(message, isError = false) {
+                if (!lyricsSearchStatus) return;
+                lyricsSearchStatus.textContent = message;
+                lyricsSearchStatus.style.color = isError ? '#fca5a5' : 'var(--text-muted)';
+                lyricsSearchStatus.style.display = message ? 'block' : 'none';
+            }
+
+            function getSuggestedLyricsQuery() {
+                const libraryAudio = document.getElementById('libraryAudioSelect')?.value || '';
+                const uploadedAudio = document.getElementById('audioFile')?.files?.[0]?.name || '';
+                const filename = libraryAudio || uploadedAudio;
+                return filename
+                    .replace(/\.[^/.]+$/, '')
+                    .replace(/[_-]+/g, ' ')
+                    .replace(/\s+/g, ' ')
+                    .trim();
+            }
+
+            async function importOnlineLyrics(result, button = null) {
+                if (!lyricsText) return false;
+                if (button) {
+                    button.disabled = true;
+                    button.innerText = '⏳ Importando...';
+                }
+                setLyricsSearchStatus(`Obtendo a letra de ${result.track_name}...`);
+
+                try {
+                    const response = await authFetch('/api/lyrics/fetch', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ id: result.id })
+                    });
+                    const payload = await response.json();
+                    if (!response.ok) throw new Error(payload.detail || 'Não foi possível obter a letra.');
+
+                    lyricsText.value = payload.lyrics_text || '';
+                    const saveResponse = await authFetch('/api/lyrics', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ lyrics_text: lyricsText.value })
+                    });
+                    if (!saveResponse.ok) throw new Error('A letra foi obtida, mas não pôde ser salva localmente.');
+
+                    updateLyricsBadge(lyricsText.value);
+                    if (lyricsSearchQuery) lyricsSearchQuery.value = `${payload.track_name} — ${payload.artist_name}`;
+                    if (lyricsSearchResults) lyricsSearchResults.replaceChildren();
+                    setLyricsSearchStatus('Letra importada e salva localmente. Revise o texto antes de criar o vídeo.');
+                    return true;
+                } catch (error) {
+                    setLyricsSearchStatus(`Erro ao importar a letra: ${error.message}`, true);
+                    if (button) {
+                        button.disabled = false;
+                        button.innerText = 'Usar esta letra';
+                    }
+                    return false;
+                }
+            }
+
+            async function autoLookupLyricsForSong(query) {
+                if (!lyricsMode || lyricsMode.value !== 'auto' || (lyricsText && lyricsText.value.trim())) return;
+                query = (query || '').trim();
+                if (query.length < 2 || query === lastAutoLyricsQuery) return;
+                lastAutoLyricsQuery = query;
+                setLyricsSearchStatus(`Buscando automaticamente a letra de "${query}"...`);
+
+                try {
+                    const response = await authFetch('/api/lyrics/search', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ query })
+                    });
+                    const payload = await response.json();
+                    if (!response.ok) throw new Error(payload.detail || 'Busca indisponível.');
+                    const result = (payload.results || []).find(item => item.has_lyrics && !item.instrumental);
+                    if (!result) {
+                        setLyricsSearchStatus('Nenhuma letra automática encontrada; você pode preencher manualmente.', true);
+                        return;
+                    }
+                    const imported = await importOnlineLyrics(result);
+                    if (imported) {
+                        setLyricsSearchStatus(`Letra encontrada para ${result.track_name} — ${result.artist_name}. Revise antes de criar o vídeo.`);
+                    }
+                } catch (error) {
+                    setLyricsSearchStatus('Não foi possível buscar a letra automaticamente. Você pode inserir a letra manualmente.', true);
+                }
+            }
+
+            if (lyricsMode) {
+                lyricsMode.onchange = () => {
+                    if (lyricsMode.value === 'manual') {
+                        setLyricsSearchStatus('Modo manual ativo. A letra digitada será usada como prioridade.');
+                    } else if (lyricsText && lyricsText.value.trim()) {
+                        setLyricsSearchStatus('Uma letra já preenchida será preservada; limpe o campo para buscar automaticamente outra.');
+                    } else {
+                        autoLookupLyricsForSong(getSuggestedLyricsQuery());
+                    }
+                };
+            }
+
+            if (lyricsText) {
+                lyricsText.addEventListener('input', () => {
+                    if (lyricsText.value.trim() && lyricsMode && lyricsMode.value === 'auto') {
+                        lyricsMode.value = 'manual';
+                        setLyricsSearchStatus('Entrada manual detectada; ela terá prioridade sobre a busca automática.');
+                    }
+                });
+            }
+
+            function renderLyricsSearchResults(results) {
+                if (!lyricsSearchResults) return;
+                lyricsSearchResults.replaceChildren();
+
+                results.forEach((result) => {
+                    const card = document.createElement('div');
+                    card.style.cssText = 'display:flex; justify-content:space-between; align-items:center; gap:0.6rem; padding:0.55rem 0.65rem; border:1px solid var(--glass-border); border-radius:8px; background:var(--input-bg);';
+
+                    const description = document.createElement('div');
+                    description.style.minWidth = '0';
+                    const title = document.createElement('div');
+                    title.textContent = `${result.track_name} — ${result.artist_name}`;
+                    title.style.cssText = 'font-size:0.78rem; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;';
+                    const details = document.createElement('div');
+                    const duration = Number.isFinite(result.duration) ? ` · ${Math.round(result.duration)}s` : '';
+                    details.textContent = `${result.album_name || 'LRCLIB'}${duration}`;
+                    details.style.cssText = 'font-size:0.7rem; color:var(--text-muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;';
+                    description.append(title, details);
+
+                    const useButton = document.createElement('button');
+                    useButton.type = 'button';
+                    useButton.className = 'btn-secondary';
+                    useButton.style.cssText = 'font-size:0.7rem; padding:0.35rem 0.55rem; white-space:nowrap;';
+                    useButton.innerText = result.has_lyrics ? 'Usar esta letra' : 'Sem letra';
+                    useButton.disabled = !result.has_lyrics || result.instrumental;
+                    useButton.onclick = () => importOnlineLyrics(result, useButton);
+
+                    card.append(description, useButton);
+                    lyricsSearchResults.appendChild(card);
+                });
+            }
+
+            if (btnSearchLyrics) {
+                btnSearchLyrics.onclick = async () => {
+                    const query = (lyricsSearchQuery?.value || getSuggestedLyricsQuery()).trim();
+                    if (!query) {
+                        setLyricsSearchStatus('Informe título e artista, ou selecione/envie uma música para usar o nome do arquivo.', true);
+                        return;
+                    }
+
+                    if (lyricsSearchQuery) lyricsSearchQuery.value = query;
+                    if (lyricsSearchResults) lyricsSearchResults.replaceChildren();
+                    btnSearchLyrics.disabled = true;
+                    btnSearchLyrics.innerText = '⏳ Buscando...';
+                    setLyricsSearchStatus('Buscando opções de letra online...');
+
+                    try {
+                        const response = await authFetch('/api/lyrics/search', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ query })
+                        });
+                        const payload = await response.json();
+                        if (!response.ok) throw new Error(payload.detail || 'Não foi possível buscar letras.');
+
+                        const results = payload.results || [];
+                        if (!results.length) {
+                            setLyricsSearchStatus('Nenhuma letra encontrada. Tente título e artista mais específicos.', true);
+                            return;
+                        }
+                        renderLyricsSearchResults(results);
+                        setLyricsSearchStatus(`${results.length} resultado(s) encontrado(s). Escolha a versão correta da música.`);
+                    } catch (error) {
+                        setLyricsSearchStatus(`Erro na busca de letras: ${error.message}`, true);
+                    } finally {
+                        btnSearchLyrics.disabled = false;
+                        btnSearchLyrics.innerText = '🔎 Buscar agora';
+                    }
                 };
             }
 

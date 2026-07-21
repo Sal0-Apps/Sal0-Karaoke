@@ -1021,9 +1021,160 @@ def download_bg_youtube_preset(
 
 
 SAVED_LYRICS_FILE = "/data/output/saved_lyrics.txt"
+LRCLIB_API_URL = "https://lrclib.net/api"
+LRCLIB_USER_AGENT = "Sal0-Karaoke/4.6.2 (+https://github.com/Sal0-Apps/Sal0-Karaoke)"
 
 class LyricsModel(BaseModel):
     lyrics_text: str = ""
+
+
+class LyricsSearchRequest(BaseModel):
+    query: str
+
+
+class LyricsFetchRequest(BaseModel):
+    id: int
+
+
+def _lrclib_get(path: str, params: dict = None):
+    """Consulta a LRCLIB apenas quando o usuário solicita uma busca de letra."""
+    try:
+        response = requests.get(
+            f"{LRCLIB_API_URL}{path}",
+            params=params,
+            headers={
+                "Accept": "application/json",
+                "User-Agent": LRCLIB_USER_AGENT
+            },
+            timeout=12
+        )
+        if response.status_code == 429:
+            raise HTTPException(
+                status_code=429,
+                detail="O serviço de letras está temporariamente com muitas consultas. Tente novamente em alguns instantes."
+            )
+        response.raise_for_status()
+        return response.json()
+    except HTTPException:
+        raise
+    except requests.Timeout:
+        raise HTTPException(status_code=504, detail="A busca de letras demorou demais para responder.")
+    except (requests.RequestException, ValueError):
+        logger.warning("Falha ao consultar o serviço de letras LRCLIB.")
+        raise HTTPException(status_code=502, detail="Não foi possível consultar o serviço de letras agora.")
+
+
+def _plain_lyrics_from_lrclib(record: dict) -> str:
+    """Prefere letra simples e remove timestamps LRC apenas quando necessário."""
+    plain_lyrics = str(record.get("plainLyrics") or "").strip()
+    if plain_lyrics:
+        return plain_lyrics
+
+    synced_lyrics = str(record.get("syncedLyrics") or "").strip()
+    if not synced_lyrics:
+        return ""
+
+    lines = []
+    for line in synced_lyrics.splitlines():
+        text = re.sub(r"^\s*(?:\[[^\]]+\]\s*)+", "", line).strip()
+        if text:
+            lines.append(text)
+    return "\n".join(lines)
+
+
+def find_lyrics_automatically(query: str) -> tuple[str, dict | None]:
+    """Busca a melhor letra disponível sem tornar a internet obrigatória ao pipeline."""
+    query = (query or "").strip()
+    if len(query) < 2:
+        return "", None
+
+    try:
+        payload = _lrclib_get("/search", params={"q": query})
+    except HTTPException:
+        logger.info("Busca automática de letra indisponível; o pipeline seguirá sem letra guia.")
+        return "", None
+
+    if not isinstance(payload, list):
+        return "", None
+
+    query_normalized = re.sub(r"\s+", " ", query.lower()).strip()
+    best_match = None
+    best_score = -1.0
+    for item in payload:
+        if not isinstance(item, dict) or item.get("instrumental"):
+            continue
+        lyrics_text = _plain_lyrics_from_lrclib(item)
+        if not lyrics_text:
+            continue
+
+        candidate_name = " ".join([
+            str(item.get("trackName") or ""),
+            str(item.get("artistName") or "")
+        ]).lower()
+        score = difflib.SequenceMatcher(None, query_normalized, candidate_name).ratio()
+        if score > best_score:
+            best_match = (lyrics_text, item)
+            best_score = score
+
+    if not best_match:
+        logger.info("Nenhuma letra online encontrada para a música selecionada.")
+        return "", None
+
+    lyrics_text, record = best_match
+    return lyrics_text, {
+        "track_name": record.get("trackName") or "Faixa sem título",
+        "artist_name": record.get("artistName") or "Artista desconhecido"
+    }
+
+
+@app.post("/api/lyrics/search")
+def search_lyrics_online(data: LyricsSearchRequest, current_user: dict = Depends(get_current_user)):
+    """Pesquisa títulos na LRCLIB e devolve apenas metadados para escolha do usuário."""
+    query = data.query.strip()
+    if not 2 <= len(query) <= 160:
+        raise HTTPException(status_code=400, detail="Informe entre 2 e 160 caracteres para buscar a letra.")
+
+    payload = _lrclib_get("/search", params={"q": query})
+    if not isinstance(payload, list):
+        raise HTTPException(status_code=502, detail="O serviço de letras retornou uma resposta inválida.")
+
+    results = []
+    for item in payload[:10]:
+        if not isinstance(item, dict) or not isinstance(item.get("id"), int):
+            continue
+        results.append({
+            "id": item["id"],
+            "track_name": item.get("trackName") or "Faixa sem título",
+            "artist_name": item.get("artistName") or "Artista desconhecido",
+            "album_name": item.get("albumName") or "",
+            "duration": item.get("duration"),
+            "instrumental": bool(item.get("instrumental")),
+            "has_lyrics": bool(item.get("plainLyrics") or item.get("syncedLyrics"))
+        })
+
+    return {"provider": "LRCLIB", "results": results}
+
+
+@app.post("/api/lyrics/fetch")
+def fetch_lyrics_online(data: LyricsFetchRequest, current_user: dict = Depends(get_current_user)):
+    """Obtém a letra da faixa escolhida e deixa a revisão final para a interface local."""
+    if data.id <= 0:
+        raise HTTPException(status_code=400, detail="Identificador de letra inválido.")
+
+    payload = _lrclib_get(f"/get/{data.id}")
+    if not isinstance(payload, dict):
+        raise HTTPException(status_code=502, detail="O serviço de letras retornou uma resposta inválida.")
+
+    lyrics_text = _plain_lyrics_from_lrclib(payload)
+    if not lyrics_text:
+        raise HTTPException(status_code=404, detail="Essa faixa não possui uma letra disponível para importar.")
+
+    return {
+        "provider": "LRCLIB",
+        "track_name": payload.get("trackName") or "Faixa sem título",
+        "artist_name": payload.get("artistName") or "Artista desconhecido",
+        "lyrics_text": lyrics_text
+    }
 
 @app.get("/api/lyrics")
 def get_saved_lyrics(current_user: dict = Depends(get_current_user)):
@@ -1839,6 +1990,7 @@ def process_karaoke(
     transcribe_source: str = Form("vocals"),
     show_next_line_preview: bool = Form(False),
     lyrics_text: str = Form(None),
+    lyrics_mode: str = Form("auto"),
     enable_correction: bool = Form(False),
     keep_first_line_visible: bool = Form(False),
     pause_for_editing: bool = Form(False),
@@ -1869,6 +2021,10 @@ def process_karaoke(
     cache_dir = "/data/cache"
     os.makedirs(cache_dir, exist_ok=True)
     cache_meta_file = os.path.join(cache_dir, "cache_meta.json")
+
+    lyrics_mode = (lyrics_mode or "auto").strip().lower()
+    if lyrics_mode not in {"auto", "manual"}:
+        raise HTTPException(status_code=400, detail="Modo de letra inválido.")
 
     # Se uma música da biblioteca foi explicitamente selecionada, anular youtube_url para priorizar a biblioteca
     if library_audio and library_audio.strip():
@@ -2204,6 +2360,7 @@ def process_karaoke(
         transcribe_source=transcribe_source,
         show_next_line_preview=show_next_line_preview,
         lyrics_text=lyrics_text,
+        lyrics_mode=lyrics_mode,
         enable_correction=enable_correction,
         keep_first_line_visible=keep_first_line_visible,
         youtube_url=youtube_url,
@@ -2332,6 +2489,7 @@ def run_pipeline(
     transcribe_source: str = "vocals",
     show_next_line_preview: bool = False,
     lyrics_text: str = None,
+    lyrics_mode: str = "auto",
     enable_correction: bool = False,
     keep_first_line_visible: bool = False,
     youtube_url: str = None,
@@ -2465,6 +2623,29 @@ def run_pipeline(
             with open(cache_meta_file, "w", encoding="utf-8") as f:
                 import json
                 json.dump(cached_meta, f, indent=4)
+
+        # Busca automática de letra: não torna a internet obrigatória para o pipeline local.
+        lyrics_text = (lyrics_text or "").strip()
+        if lyrics_mode == "auto" and not lyrics_text:
+            update_state("processing", "Searching lyrics online", 10, original_filename=orig_name)
+            auto_lyrics, auto_match = find_lyrics_automatically(orig_name)
+            if auto_lyrics:
+                lyrics_text = auto_lyrics
+                cached_meta["lyrics_text"] = auto_lyrics
+                try:
+                    with open(cache_meta_file, "w", encoding="utf-8") as f:
+                        json.dump(cached_meta, f, indent=4)
+                    with open(SAVED_LYRICS_FILE, "w", encoding="utf-8") as f:
+                        f.write(auto_lyrics)
+                    logger.info(
+                        "Letra guia encontrada automaticamente: %s — %s",
+                        auto_match["track_name"],
+                        auto_match["artist_name"]
+                    )
+                except Exception as save_error:
+                    logger.warning("A letra automática foi encontrada, mas não pôde ser salva: %s", save_error)
+            else:
+                logger.info("Seguindo sem letra guia automática para '%s'.", orig_name)
 
         # Invalidação Inteligente de Cache: comparar o hash/tamanho do arquivo de entrada atual com o cache
         new_audio_hash = None

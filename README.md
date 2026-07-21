@@ -15,6 +15,7 @@ O **Sal0 Karaokê** é uma ferramenta pessoal desenvolvida para criar vídeos de
 - **🛠️ Editor de Legendas na Web**: Permite pausar e ajustar o texto ou o tempo das estrofes antes de renderizar o vídeo final.
 - **🎬 Renderização de Vídeo**: Gera legendas em formato ASS e renderiza o vídeo final com plano de fundo personalizado.
 - **📥 Entradas Flexíveis**: Aceita arquivos locais (vídeo/áudio) ou links do YouTube.
+- **🔎 Letra Manual ou Automática**: Na tela principal, procura automaticamente a letra da música escolhida na LRCLIB quando houver internet; você também pode colar, editar ou substituir a letra manualmente.
 - **🤖 Bot do Telegram (Opcional)**: Envia notificações e o vídeo pronto para o seu Telegram se configurado.
 - **🔐 Acesso Local Protegido**: Tela de login simples com senha criptografada para proteger o acesso na sua rede local.
 
@@ -64,6 +65,10 @@ Tudo o que o aplicativo precisa salvar fica na pasta `/data`:
 - `/data/library/`: Arquivos originais, fundos e vídeos gerados.
 - `/data/output/`: Modelos de IA, perfis de estilo e logs.
 - `/data/users.json`: Usuários salvos.
+
+## 🌐 Busca de Letras e Privacidade
+
+A busca automática de letra vem ativada na tela principal e é repetida ao iniciar o processamento caso ainda não exista uma letra manual. Somente o texto da consulta (normalmente título e artista) é enviado à LRCLIB; áudios, vídeos, transcrição por IA e renderização continuam exclusivamente locais. A letra importada permanece editável e uma letra digitada manualmente sempre tem prioridade.
 
 ---
 
