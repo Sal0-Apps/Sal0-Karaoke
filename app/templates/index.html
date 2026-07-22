@@ -382,6 +382,70 @@
             padding: 0.35rem 0.5rem !important;
         }
 
+        .profile-card {
+            position: relative;
+            overflow: hidden;
+            border-color: rgba(139, 92, 246, 0.38);
+            background:
+                radial-gradient(circle at top right, rgba(236, 72, 153, 0.13), transparent 38%),
+                var(--bg-card);
+        }
+
+        .profile-card::before {
+            content: '';
+            position: absolute;
+            inset: 0 auto 0 0;
+            width: 4px;
+            background: linear-gradient(180deg, var(--accent), var(--pink-accent));
+        }
+
+        .profile-hero {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .profile-kicker {
+            display: block;
+            margin-bottom: 0.28rem;
+            color: var(--accent);
+            font-size: 0.67rem;
+            font-weight: 800;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+        }
+
+        .profile-badge {
+            flex: 0 0 auto;
+            padding: 0.25rem 0.55rem;
+            border: 1px solid rgba(139, 92, 246, 0.35);
+            border-radius: 999px;
+            background: rgba(139, 92, 246, 0.13);
+            color: var(--accent);
+            font-size: 0.68rem;
+            font-weight: 700;
+        }
+
+        .profile-grid {
+            display: grid;
+            grid-template-columns: 1.35fr 1fr 1fr;
+            gap: 0.8rem;
+            align-items: end;
+        }
+
+        .profile-description {
+            margin-top: 0.8rem;
+            padding: 0.65rem 0.75rem;
+            border: 1px solid var(--glass-border);
+            border-radius: var(--radius-sm);
+            background: var(--input-bg);
+            color: var(--text-muted);
+            font-size: 0.76rem;
+            line-height: 1.45;
+        }
+
         .app-notice {
             position: fixed;
             right: 1rem;
@@ -601,6 +665,12 @@
             .lyrics-summary {
                 max-width: 120px;
             }
+            .profile-hero {
+                gap: 0.6rem;
+            }
+            .profile-grid {
+                grid-template-columns: 1fr;
+            }
             .library-item {
                 flex-direction: column;
                 align-items: flex-start;
@@ -719,7 +789,7 @@
                     <h2>Seu karaokê começa aqui</h2>
                     <p>Escolha a música, ajuste o visual e deixe o processamento local fazer o resto.</p>
                 </div>
-                <span class="user-chip">1. Música · 2. Visual · 3. Criar</span>
+                <span class="user-chip">1. Música · 2. Perfil · 3. Visual · 4. Criar</span>
             </div>
             <!-- Form Principal -->
             <form id="karaokêForm">
@@ -777,6 +847,46 @@
                         </select>
                     </div>
                     <input type="hidden" id="libraryAudioHidden" name="library_audio" value="">
+                </div>
+
+                <!-- Perfil em destaque: reúne as decisões que mais afetam a sincronia -->
+                <div class="card profile-card">
+                    <div class="profile-hero">
+                        <div>
+                            <span class="profile-kicker">Etapa importante</span>
+                            <span class="card-title">🎛️ Perfil da música</span>
+                            <p style="margin-top: 0.3rem; color: var(--text-muted); font-size: 0.78rem;">Escolha um ponto de partida e ajuste se quiser. Seus próprios perfis continuam disponíveis.</p>
+                        </div>
+                        <span id="profileTypeBadge" class="profile-badge">Pronto para usar</span>
+                    </div>
+                    <div class="profile-grid">
+                        <div class="form-group">
+                            <span class="label">Perfil</span>
+                            <select id="profileSelect" class="select-input">
+                                <option value="">Carregando perfis...</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <span class="label">Leitura da voz</span>
+                            <select id="transcriptionPreset" name="transcription_preset" class="select-input">
+                                <option value="karaoke" selected>Karaokê equilibrado</option>
+                                <option value="continuous">Canto contínuo</option>
+                                <option value="difficult">Voz difícil</option>
+                                <option value="fast">Criação rápida</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <span class="label">Modelo Whisper</span>
+                            <select id="whisperModel" name="whisper_model" class="select-input">
+                                <option value="large-v3-turbo" selected>Large v3 Turbo</option>
+                                <option value="medium">Medium</option>
+                                <option value="small">Small</option>
+                                <option value="tiny">Tiny</option>
+                                <option value="large-v3">Large v3 (máxima)</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div id="profileDescription" class="profile-description">O perfil recomendado evita filtros agressivos e prioriza a continuidade da música.</div>
                 </div>
 
                 <!-- Card de Fundo e Estilo -->
@@ -864,11 +974,7 @@
                         </div>
 
                         <div class="form-group">
-                            <span class="label">🎨 Perfil de Estilo Rápido</span>
-                            <select id="profileSelect" class="select-input">
-                                <option value="">Carregando perfis...</option>
-                            </select>
-
+                            <span class="label">🎨 Estilo da tela</span>
                             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 0.5rem; margin-top: 0.5rem;">
                                 <div>
                                     <span class="label">🖼️ Modo de Fundo</span>
@@ -884,16 +990,6 @@
                                         <option value="syllable" selected>Sílabas (Varredura)</option>
                                         <option value="word">Palavras</option>
                                         <option value="line">Linhas</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <span class="label">🤖 Modelo IA Whisper</span>
-                                    <select id="whisperModel" name="whisper_model" class="select-input">
-                                        <option value="large-v3-turbo" selected>Large v3 Turbo (Padrão)</option>
-                                        <option value="medium">Medium (Estável)</option>
-                                        <option value="small">Small (Rápido)</option>
-                                        <option value="tiny">Tiny (Ultra)</option>
-                                        <option value="large-v3">Large v3 (Máxima)</option>
                                     </select>
                                 </div>
                                 <div>
@@ -982,10 +1078,10 @@
                         <!-- PADRONIZAÇÃO VISUAL UNIFORME DE CONFIGURAÇÕES -->
                         <div class="form-grid" style="margin-top: 1rem;">
                             <div class="form-group">
-                                <span class="label">Filtro de Ruído (Silero VAD)</span>
+                                <span class="label">Filtro de fala (Silero VAD)</span>
                                 <select id="enableVad" name="enable_vad" class="select-input">
-                                    <option value="true" selected>Sim (Recomendado)</option>
-                                    <option value="false">Não</option>
+                                    <option value="false" selected>Desligado (melhor para canto)</option>
+                                    <option value="true">Ligado (fala ou muito ruído)</option>
                                 </select>
                             </div>
 
@@ -1317,7 +1413,7 @@
 
         <!-- RODAPÉ DISCRETO DA PÁGINA -->
         <footer>
-            Sal0 Karaokê v5.1.0
+            Sal0 Karaokê v5.2.0
         </footer>
 
     </div> <!-- Container End -->
@@ -1347,11 +1443,15 @@
                 <p><strong style="color: var(--text-main);">Primeiro karaokê, passo a passo</strong></p>
                 <ol style="margin-left: 1.2rem; display: flex; flex-direction: column; gap: 0.5rem;">
                     <li><strong style="color: var(--accent);">1. Música:</strong> envie um arquivo, cole um link do YouTube ou escolha algo da sua Biblioteca.</li>
-                    <li><strong style="color: var(--accent);">2. Letra:</strong> no modo automático, o app procura uma letra-guia e avisa se encontrou. Abra o bloco quando quiser revisar ou colar uma versão manual.</li>
-                    <li><strong style="color: var(--accent);">3. Visual:</strong> use o vídeo original, uma cor, imagem, vídeo ou fundo salvo. Os ajustes extras controlam legenda, linhas, IA e revisão.</li>
-                    <li><strong style="color: var(--accent);">4. Criar:</strong> acompanhe as etapas. Se a revisão estiver ativa, corrija texto e tempos antes da renderização.</li>
-                    <li><strong style="color: var(--accent);">5. Resultado:</strong> assista na própria tela, baixe o MP4 ou abra a cópia salva em “Biblioteca → Resultados”.</li>
+                    <li><strong style="color: var(--accent);">2. Perfil:</strong> comece com “Karaokê equilibrado”. Use “Canto contínuo” para notas longas, “Voz difícil ou mix” quando a separação estiver ruim e “Criação rápida” para testes.</li>
+                    <li><strong style="color: var(--accent);">3. Letra:</strong> no modo automático, o app procura uma letra-guia e avisa se encontrou. Abra o bloco quando quiser revisar ou colar uma versão manual.</li>
+                    <li><strong style="color: var(--accent);">4. Visual:</strong> use o vídeo original, uma cor, imagem, vídeo ou fundo salvo. Os ajustes extras controlam legenda, linhas, fonte da transcrição e revisão.</li>
+                    <li><strong style="color: var(--accent);">5. Criar:</strong> acompanhe as etapas. Se a revisão estiver ativa, corrija texto e tempos antes da renderização.</li>
+                    <li><strong style="color: var(--accent);">6. Resultado:</strong> assista na própria tela, baixe o MP4 ou abra a cópia salva em “Biblioteca → Resultados”.</li>
                 </ol>
+
+                <p><strong style="color: var(--text-main);">Dica de sincronia</strong><br>
+                O filtro Silero VAD fica desligado nos perfis de canto porque notas suaves e sustentadas nem sempre se parecem com fala. Ative-o nos ajustes avançados apenas quando o áudio tiver muito ruído ou for principalmente falado.</p>
 
                 <p><strong style="color: var(--text-main);">Contas, Biblioteca e Telegram</strong></p>
                 <ul style="margin-left: 1.2rem; display: flex; flex-direction: column; gap: 0.3rem;">
@@ -1517,8 +1617,50 @@
         if (tabBtnSettings) tabBtnSettings.onclick = () => switchTab('settings');
         if (tabBtnLibrary) tabBtnLibrary.onclick = () => switchTab('library');
 
+        function applyProfile(name) {
+            const profile = allProfiles[name];
+            if (!profile) return;
+
+            const setValue = (id, value) => {
+                const element = document.getElementById(id);
+                if (element && value !== undefined && value !== null) element.value = String(value);
+            };
+            setValue('subtitleMode', profile.subtitle_mode);
+            setValue('whisperModel', profile.whisper_model);
+            setValue('transcriptionPreset', profile.transcription_preset || 'karaoke');
+            setValue('textPosition', profile.text_position);
+            setValue('textColor', profile.text_color);
+            setValue('fontSize', profile.font_size);
+            setValue('backgroundMode', profile.background_mode);
+            setValue('wordsPerLine', profile.words_per_line);
+            setValue('maxCharsLine', profile.max_chars_line);
+            setValue('breakOnPunctuation', profile.break_on_punctuation);
+            setValue('enableVad', profile.enable_vad);
+            setValue('enableCorrection', profile.enable_correction);
+            setValue('showInstrumental', profile.show_instrumental);
+            setValue('transcribeSource', profile.transcribe_source);
+            setValue('showNextLinePreview', profile.show_next_line_preview);
+            setValue('keepFirstLineVisible', profile.keep_first_line_visible);
+            setValue('saveToLibrary', profile.save_to_library);
+            setValue('onlyRemoveVocals', profile.only_remove_vocals);
+
+            const description = document.getElementById('profileDescription');
+            if (description) description.textContent = profile.description || 'Perfil personalizado por você.';
+            const typeBadge = document.getElementById('profileTypeBadge');
+            if (typeBadge) typeBadge.textContent = profile._builtin ? 'Pronto para usar' : 'Seu perfil';
+            const nameInput = document.getElementById('newProfileName');
+            if (nameInput) {
+                nameInput.value = profile._builtin ? '' : name;
+                nameInput.placeholder = profile._builtin
+                    ? 'Nome para salvar sua própria variação'
+                    : 'Nome do perfil';
+            }
+            const deleteButton = document.getElementById('btnDeleteProfile');
+            if (deleteButton) deleteButton.disabled = Boolean(profile._builtin) || name === 'Padrão';
+        }
+
         // FUNÇÃO PARA CARREGAR PERFIS SALVOS
-        async function fetchProfiles() {
+        async function fetchProfiles(preferredName = '') {
             try {
                 const res = await authFetch('/api/profiles');
                 if (!res.ok) return;
@@ -1526,46 +1668,58 @@
                 
                 const profileSelect = document.getElementById('profileSelect');
                 if (!profileSelect) return;
-                
-                const currentVal = profileSelect.value;
-                profileSelect.innerHTML = '<option value="">Selecione um perfil salvo...</option>';
-                
-                Object.keys(allProfiles).forEach(name => {
+
+                let currentVal = preferredName || profileSelect.value;
+                profileSelect.innerHTML = '<option value="">Escolha um perfil...</option>';
+
+                const readyOrder = ['Karaokê equilibrado', 'Canto contínuo', 'Voz difícil ou mix', 'Criação rápida'];
+                Object.keys(allProfiles)
+                    .sort((a, b) => {
+                        const aReady = readyOrder.indexOf(a);
+                        const bReady = readyOrder.indexOf(b);
+                        if (aReady !== -1 || bReady !== -1) {
+                            if (aReady === -1) return 1;
+                            if (bReady === -1) return -1;
+                            return aReady - bReady;
+                        }
+                        return a.localeCompare(b, 'pt-BR');
+                    })
+                    .forEach(name => {
                     const opt = document.createElement('option');
                     opt.value = name;
-                    opt.textContent = name;
+                    opt.textContent = allProfiles[name]._builtin ? `Pronto · ${name}` : `Meu · ${name}`;
                     profileSelect.appendChild(opt);
                 });
 
-                if (currentVal && allProfiles[currentVal]) {
-                    profileSelect.value = currentVal;
-                }
-
-                profileSelect.onchange = () => {
-                    const selected = profileSelect.value;
-                    if (selected) {
-                        const nameInput = document.getElementById('newProfileName');
-                        if (nameInput) nameInput.value = selected;
+                if (!currentVal) {
+                    try {
+                        const lastResponse = await authFetch('/api/last_profile');
+                        if (lastResponse.ok) {
+                            const saved = await lastResponse.json();
+                            currentVal = saved.last_profile;
+                        }
+                    } catch (_) {
+                        // O perfil recomendado abaixo continua sendo um fallback seguro.
                     }
+                }
+                if (currentVal === 'Padrão' && allProfiles['Karaokê equilibrado']) currentVal = 'Karaokê equilibrado';
+                if (!allProfiles[currentVal]) currentVal = allProfiles['Karaokê equilibrado'] ? 'Karaokê equilibrado' : Object.keys(allProfiles)[0];
+                profileSelect.value = currentVal || '';
+                if (currentVal) applyProfile(currentVal);
+
+                profileSelect.onchange = async () => {
+                    const selected = profileSelect.value;
                     if (selected && allProfiles[selected]) {
-                        const p = allProfiles[selected];
-                        if (p.subtitle_mode && document.getElementById('subtitleMode')) document.getElementById('subtitleMode').value = p.subtitle_mode;
-                        if (p.whisper_model && document.getElementById('whisperModel')) document.getElementById('whisperModel').value = p.whisper_model;
-                        if (p.text_position && document.getElementById('textPosition')) document.getElementById('textPosition').value = p.text_position;
-                        if (p.text_color && document.getElementById('textColor')) document.getElementById('textColor').value = p.text_color;
-                        if (p.font_size && document.getElementById('fontSize')) document.getElementById('fontSize').value = p.font_size;
-                        if (p.background_mode && document.getElementById('backgroundMode')) document.getElementById('backgroundMode').value = p.background_mode;
-                        if (p.words_per_line !== undefined && document.getElementById('wordsPerLine')) document.getElementById('wordsPerLine').value = p.words_per_line;
-                        if (p.max_chars_line !== undefined && document.getElementById('maxCharsLine')) document.getElementById('maxCharsLine').value = p.max_chars_line;
-                        if (p.break_on_punctuation !== undefined && document.getElementById('breakOnPunctuation')) document.getElementById('breakOnPunctuation').value = String(p.break_on_punctuation);
-                        if (p.enable_vad !== undefined && document.getElementById('enableVad')) document.getElementById('enableVad').value = String(p.enable_vad);
-                        if (p.enable_correction !== undefined && document.getElementById('enableCorrection')) document.getElementById('enableCorrection').value = String(p.enable_correction);
-                        if (p.show_instrumental !== undefined && document.getElementById('showInstrumental')) document.getElementById('showInstrumental').value = String(p.show_instrumental);
-                        if (p.transcribe_source && document.getElementById('transcribeSource')) document.getElementById('transcribeSource').value = p.transcribe_source;
-                        if (p.show_next_line_preview !== undefined && document.getElementById('showNextLinePreview')) document.getElementById('showNextLinePreview').value = String(p.show_next_line_preview);
-                        if (p.keep_first_line_visible !== undefined && document.getElementById('keepFirstLineVisible')) document.getElementById('keepFirstLineVisible').value = String(p.keep_first_line_visible);
-                        if (p.save_to_library !== undefined && document.getElementById('saveToLibrary')) document.getElementById('saveToLibrary').value = String(p.save_to_library);
-                        if (p.only_remove_vocals !== undefined && document.getElementById('onlyRemoveVocals')) document.getElementById('onlyRemoveVocals').value = String(p.only_remove_vocals);
+                        applyProfile(selected);
+                        try {
+                            await authFetch('/api/last_profile', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ last_profile: selected })
+                            });
+                        } catch (_) {
+                            // A seleção atual continua aplicada mesmo sem persistência.
+                        }
                     }
                 };
             } catch (e) {
@@ -2688,8 +2842,9 @@
                     const typedName = nameInput ? nameInput.value.trim() : '';
                     const selectElem = document.getElementById('profileSelect');
                     const selectedProfile = selectElem ? selectElem.value : '';
-                    const name = typedName || selectedProfile;
-                    if (!name) { alert("Informe o nome do perfil antes de salvar."); return; }
+                    const selectedData = allProfiles[selectedProfile];
+                    const name = typedName || (selectedData && !selectedData._builtin ? selectedProfile : '');
+                    if (!name) { alert("Dê um nome à sua variação antes de salvar."); return; }
 
                     const getVal = (id, fallback) => {
                         const el = document.getElementById(id);
@@ -2719,7 +2874,8 @@
                         words_per_line: getInt('wordsPerLine', 0),
                         max_chars_line: getInt('maxCharsLine', 0),
                         break_on_punctuation: getBool('breakOnPunctuation', true),
-                        enable_vad: getBool('enableVad', true),
+                        enable_vad: getBool('enableVad', false),
+                        transcription_preset: getVal('transcriptionPreset', 'karaoke'),
                         enable_correction: getBool('enableCorrection', false),
                         show_instrumental: getBool('showInstrumental', true),
                         transcribe_source: getVal('transcribeSource', 'vocals'),
@@ -2738,7 +2894,7 @@
                         if (res.ok) {
                             alert(`✓ Perfil '${name}' salvo com sucesso!`);
                             if (nameInput) nameInput.value = '';
-                            await fetchProfiles();
+                            await fetchProfiles(name);
                         } else {
                             const errData = await res.json();
                             alert("Erro ao salvar perfil: " + (errData.detail || "Erro desconhecido"));
@@ -2753,12 +2909,16 @@
                     const select = document.getElementById('profileSelect');
                     const selected = select.value;
                     if (!selected) { alert("Selecione um perfil para excluir."); return; }
+                    if (allProfiles[selected]?._builtin || selected === 'Padrão') { alert("Os perfis prontos do aplicativo não podem ser excluídos."); return; }
                     if (!confirm(`Deseja excluir o perfil '${selected}'?`)) return;
                     try {
                         const res = await authFetch(`/api/profiles/${encodeURIComponent(selected)}`, { method: 'DELETE' });
                         if (res.ok) {
                             alert("Perfil excluído com sucesso!");
                             await fetchProfiles();
+                        } else {
+                            const errorData = await res.json();
+                            alert("Erro ao excluir perfil: " + (errorData.detail || "Falha desconhecida"));
                         }
                     } catch (e) { alert("Erro ao excluir perfil: " + e.message); }
                 };

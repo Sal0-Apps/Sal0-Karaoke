@@ -300,34 +300,33 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
     for idx, seg in enumerate(segments):
         start_time_str = format_time(seg["start"])
         end_time_str = format_time(seg["end"])
-        
+
         # 1. Linha ativa (Default)
-        if subtitle_mode == "phrase" or not seg.get("words"):
+        if subtitle_mode in {"phrase", "line"} or not seg.get("words"):
             line = f"Dialogue: 0,{start_time_str},{end_time_str},Default,,0,0,0,,{seg['text']}\n"
         else:
             # Modo Karaoke (segue sílabas)
             karaoke_text = ""
-            current_ref = seg["start"]
-            
+            current_ref_cs = 0
+
             for word_info in seg["words"]:
                 word_text = word_info["word"]
                 w_start = word_info["start"]
                 w_end = word_info["end"]
-                
-                # Tratar silêncios intermediários (gaps)
-                if w_start > current_ref:
-                    gap_dur = w_start - current_ref
-                    gap_cs = int(round(gap_dur * 100))
-                    if gap_cs > 0:
-                        karaoke_text += f"{{\\kf{gap_cs}}}"
-                    current_ref = w_start
-                    
+                word_start_cs = max(0, int(round((w_start - seg["start"]) * 100)))
+                word_end_cs = max(word_start_cs + 1, int(round((w_end - seg["start"]) * 100)))
+
+                # O tempo é calculado a partir do início absoluto da linha. Isso
+                # evita que arredondamentos de cada palavra se acumulem. Espaços
+                # invisíveis consomem pausas reais; uma tag sem texto seria
+                # ignorada pelo renderizador ASS e adiantaria as palavras seguintes.
+                gap_cs = word_start_cs - current_ref_cs
+                if gap_cs > 0:
+                    karaoke_text += f"{{\\k{gap_cs}\\alpha&HFF&}}\\h{{\\alpha&H00&}}"
+
                 # Calcular a duração da palavra
-                word_dur = w_end - w_start
-                if word_dur <= 0:
-                    word_dur = 0.05
-                word_cs = int(round(word_dur * 100))
-                
+                word_cs = max(1, word_end_cs - word_start_cs)
+
                 # Separar espaços
                 leading_spaces = len(word_text) - len(word_text.lstrip(' '))
                 trailing_spaces = len(word_text.lstrip(' ')) - len(word_text.strip(' '))
@@ -339,16 +338,9 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                     karaoke_text += f"{spaces_before}{{\\kf{word_cs}}}{clean_text}{spaces_after}"
                 else:
                     karaoke_text += f"{{\\kf{word_cs}}}{word_text}"
-                    
-                current_ref = w_end
-                
-            # Tratar silêncio final
-            if seg["end"] > current_ref:
-                trail_dur = seg["end"] - current_ref
-                trail_cs = int(round(trail_dur * 100))
-                if trail_cs > 0:
-                    karaoke_text += f"{{\\kf{trail_cs}}}"
-                    
+
+                current_ref_cs = word_end_cs
+
             line = f"Dialogue: 0,{start_time_str},{end_time_str},Default,,0,0,0,,{karaoke_text}\n"
             
         lines.append(line)

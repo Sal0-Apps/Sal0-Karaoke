@@ -11,6 +11,7 @@ Transforme uma música em um vídeo de karaokê sem mandar seu áudio para uma n
 | Música | Upload de áudio ou vídeo, link do YouTube e Biblioteca local |
 | Voz | Separação de vocal e instrumental com Demucs |
 | Legenda | Transcrição local com Faster-Whisper e modos por sílaba, palavra ou linha |
+| Perfis | Opções prontas para karaokê equilibrado, canto contínuo, voz difícil/mix e criação rápida, além dos perfis pessoais |
 | Letra-guia | Texto manual ou busca opcional em LRCLIB, Lyrics.ovh e Musixmatch |
 | Visual | Vídeo original, cor, imagem, vídeo, Biblioteca ou YouTube |
 | Revisão | Editor de texto e tempos antes da renderização |
@@ -53,10 +54,13 @@ Abra `http://localhost:7885`. No primeiro acesso, o aplicativo pede a criação 
 ## Um primeiro karaokê
 
 1. Em **Criar**, envie uma música, use o YouTube ou escolha um item da Biblioteca.
-2. Deixe **Letra automática** ativa ou abra o bloco para colar uma letra manualmente.
-3. Escolha o fundo e, se quiser, abra **Mais ajustes** para personalizar legenda e revisão.
-4. Clique em **Criar Karaokê** e acompanhe as etapas.
-5. Quando terminar, assista no próprio app, baixe o MP4 ou abra **Biblioteca → Resultados**.
+2. Escolha um **Perfil da música**. **Karaokê equilibrado** é o ponto de partida recomendado.
+3. Deixe **Letra automática** ativa ou abra o bloco para colar uma letra manualmente.
+4. Escolha o fundo e, se quiser, abra **Mais ajustes** para personalizar legenda e revisão.
+5. Clique em **Criar Karaokê** e acompanhe as etapas.
+6. Quando terminar, assista no próprio app, baixe o MP4 ou abra **Biblioteca → Resultados**.
+
+Para canto, o filtro Silero VAD fica desligado por padrão: ele foi criado para detectar fala e pode cortar notas suaves ou sustentadas. Os perfis de voz difícil também evitam esse filtro; a opção continua disponível em **Mais ajustes** para gravações faladas ou muito ruidosas.
 
 O botão de tema claro/escuro fica sempre no topo da tela.
 

@@ -2,9 +2,83 @@ import gc
 import os
 import logging
 from faster_whisper import WhisperModel
-from whisperx_align import align_words_whisperx
+from whisperx_align import stabilize_word_timestamps
 
 logger = logging.getLogger("karaoke")
+
+TRANSCRIPTION_PRESETS = {
+    "karaoke": {
+        "label": "Karaokê equilibrado",
+        "beam_size": 5,
+        "patience": 1.0,
+        "condition_on_previous_text": False,
+        "no_speech_threshold": 0.75,
+        "hallucination_silence_threshold": 2.0,
+        "vad_parameters": {
+            "min_silence_duration_ms": 1200,
+            "speech_pad_ms": 800,
+            "threshold": 0.25,
+        },
+    },
+    "continuous": {
+        "label": "Canto contínuo",
+        "beam_size": 7,
+        "patience": 1.2,
+        "condition_on_previous_text": False,
+        "no_speech_threshold": 0.85,
+        "hallucination_silence_threshold": 3.0,
+        "vad_parameters": {
+            "min_silence_duration_ms": 1600,
+            "speech_pad_ms": 1000,
+            "threshold": 0.20,
+        },
+    },
+    "difficult": {
+        "label": "Voz difícil",
+        "beam_size": 10,
+        "patience": 1.5,
+        "condition_on_previous_text": False,
+        "no_speech_threshold": 0.90,
+        "hallucination_silence_threshold": 3.0,
+        "vad_parameters": {
+            "min_silence_duration_ms": 1600,
+            "speech_pad_ms": 1000,
+            "threshold": 0.20,
+        },
+    },
+    "fast": {
+        "label": "Criação rápida",
+        "beam_size": 3,
+        "patience": 1.0,
+        "condition_on_previous_text": False,
+        "no_speech_threshold": 0.70,
+        "hallucination_silence_threshold": 2.0,
+        "vad_parameters": {
+            "min_silence_duration_ms": 700,
+            "speech_pad_ms": 500,
+            "threshold": 0.35,
+        },
+    },
+}
+
+
+def _prepare_lyrics_hint(lyrics: str, max_chars: int = 1200) -> str | None:
+    """Converte a letra em vocabulário curto para orientar sem ditar a música."""
+    if not lyrics or not lyrics.strip():
+        return None
+
+    unique_words = []
+    seen = set()
+    for token in lyrics.replace("\r", " ").replace("\n", " ").split():
+        clean = token.strip()
+        key = clean.casefold().strip(".,!?;:()[]{}\"'")
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        unique_words.append(clean)
+        if len(" ".join(unique_words)) >= max_chars:
+            break
+    return " ".join(unique_words)[:max_chars] or None
 
 def resolve_whisper_repo(model_size: str) -> str:
     """Retorna o repositório oficial do HuggingFace para o modelo Whisper desejado."""
@@ -77,10 +151,11 @@ def transcribe_vocals(
     initial_prompt: str = None,
     quality_mode: str = "standard",
     cpu_threads: int = None,
-    enable_vad: bool = True
+    enable_vad: bool = False,
+    transcription_preset: str = "karaoke",
 ) -> list[dict]:
     """
-    Sal0 Karaoke v4.3.0 - Transcrição de vocais com Faster-Whisper, Silero VAD e WhisperX.
+    Transcrição local de vocais com Faster-Whisper e ajustes próprios para canto.
     - Tenta primeiro carregar por caminho direto local sem chamadas de rede.
     - Se não encontrar no disco, baixa do repositório oficial HuggingFace.
     """
@@ -88,12 +163,15 @@ def transcribe_vocals(
         total_cpus = os.cpu_count() or 4
         cpu_threads = max(1, total_cpus - 1)
 
+    preset = TRANSCRIPTION_PRESETS.get(transcription_preset, TRANSCRIPTION_PRESETS["karaoke"])
+    transcription_preset = transcription_preset if transcription_preset in TRANSCRIPTION_PRESETS else "karaoke"
     is_max_quality = (quality_mode == "max_quality" or "max" in str(quality_mode).lower())
     compute_type = "float32" if is_max_quality else "int8"
-    beam_size = 10 if is_max_quality else 5
+    beam_size = max(preset["beam_size"], 10 if is_max_quality else 0)
+    lyrics_hint = _prepare_lyrics_hint(initial_prompt)
 
     logger.info(
-        f"Configuração Faster-Whisper v4.3.0: Modelo={model_size}, "
+        f"Configuração Faster-Whisper: Modelo={model_size}, Perfil={transcription_preset}, "
         f"Threads={cpu_threads}, Compute={compute_type}, BeamSize={beam_size}, SileroVAD={enable_vad}"
     )
 
@@ -157,35 +235,32 @@ def transcribe_vocals(
                     raise RuntimeError(f"Erro fatal ao baixar e carregar o modelo Whisper '{model_size}': {ex_online}")
 
     logger.info(f"Iniciando transcrição (Silero VAD={enable_vad}): {vocals_path}")
+    transcribe_options = {
+        "word_timestamps": True,
+        "beam_size": beam_size,
+        "patience": preset["patience"],
+        "condition_on_previous_text": preset["condition_on_previous_text"],
+        "no_speech_threshold": preset["no_speech_threshold"],
+        "hallucination_silence_threshold": preset["hallucination_silence_threshold"],
+        "hotwords": lyrics_hint,
+    }
+    if enable_vad:
+        transcribe_options.update({
+            "vad_filter": True,
+            "vad_parameters": dict(preset["vad_parameters"]),
+        })
+
     try:
-        if enable_vad:
-            segments, info = model.transcribe(
-                vocals_path,
-                word_timestamps=True,
-                beam_size=beam_size,
-                initial_prompt=initial_prompt,
-                vad_filter=True,
-                vad_parameters=dict(
-                    min_silence_duration_ms=500,
-                    speech_pad_ms=400,
-                    threshold=0.5
-                )
-            )
-        else:
-            segments, info = model.transcribe(
-                vocals_path,
-                word_timestamps=True,
-                beam_size=beam_size,
-                initial_prompt=initial_prompt
-            )
+        segments, info = model.transcribe(vocals_path, **transcribe_options)
+        segments = list(segments)
     except Exception as e_vad:
+        if not enable_vad:
+            raise
         logger.warning(f"Transcrição com Silero VAD retornou aviso ({e_vad}). Transcrevendo sem filtro VAD...")
-        segments, info = model.transcribe(
-            vocals_path,
-            word_timestamps=True,
-            beam_size=beam_size,
-            initial_prompt=initial_prompt
-        )
+        transcribe_options.pop("vad_filter", None)
+        transcribe_options.pop("vad_parameters", None)
+        segments, info = model.transcribe(vocals_path, **transcribe_options)
+        segments = list(segments)
 
     logger.info(f"Idioma detectado: {info.language} ({info.language_probability:.2%})")
 
@@ -213,9 +288,9 @@ def transcribe_vocals(
 
     if structured_segments:
         try:
-            logger.info("Aplicando alinhamento WhisperX por palavra...")
-            structured_segments = align_words_whisperx(vocals_path, structured_segments)
+            logger.info("Estabilizando timestamps de palavras sem alterar o alinhamento do áudio...")
+            structured_segments = stabilize_word_timestamps(structured_segments)
         except Exception as e_align:
-            logger.warning(f"Aviso no alinhamento WhisperX: {e_align}")
+            logger.warning(f"Aviso ao estabilizar timestamps: {e_align}")
 
     return structured_segments

@@ -16,6 +16,7 @@ import re
 import difflib
 import json
 import hashlib
+import unicodedata
 from urllib.parse import quote
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException, BackgroundTasks, Header, Depends, Query, Request
 from fastapi.responses import HTMLResponse, FileResponse, Response
@@ -349,186 +350,61 @@ def update_segment_words(original_seg: dict, new_text: str) -> dict:
     return original_seg
 
 def clean_word(w: str) -> str:
-    # Remove pontuações e converte para minúsculas
-    return re.sub(r'[^\w]', '', w).lower()
+    """Normaliza uma palavra para comparar a letra sem perder sua grafia original."""
+    decomposed = unicodedata.normalize("NFKD", str(w))
+    without_accents = "".join(char for char in decomposed if not unicodedata.combining(char))
+    return re.sub(r'[^\w]', '', without_accents).casefold()
 
 def align_lyrics(official_lyrics_text: str, transcribed_segments: list[dict]) -> list[dict]:
-    # 1. Separar a letra oficial em linhas e palavras
-    raw_lines = official_lyrics_text.strip().split('\n')
-    official_lines = []
-    official_words_flat = [] # Lista flat para correspondência global de sequências
-    
-    for line_idx, line in enumerate(raw_lines):
-        line = line.strip()
-        if not line:
-            continue
-        words = line.split()
-        line_data = {
-            "text": line,
-            "words": words,
-            "word_times": [None] * len(words) # Armazenará {"start": ..., "end": ...} para cada palavra
-        }
-        official_lines.append(line_data)
-        for word_idx, w in enumerate(words):
-            official_words_flat.append({
-                "text": w,
-                "clean": clean_word(w),
-                "line_ref": line_data,
-                "word_idx": word_idx
-            })
-            
-    if not official_lines:
-        return transcribed_segments
-        
-    # 2. Obter palavras transcritas pelo Whisper com seus timestamps
-    transcribed_words_flat = []
-    for seg in transcribed_segments:
-        for w_info in seg.get("words", []):
-            transcribed_words_flat.append({
-                "text": w_info["word"],
-                "clean": clean_word(w_info["word"]),
-                "start": w_info["start"],
-                "end": w_info["end"]
-            })
-            
-    if not transcribed_words_flat:
-        return transcribed_segments
-        
-    # 3. Alinhamento de sequências global usando difflib
-    off_clean_list = [w["clean"] for w in official_words_flat]
-    trans_clean_list = [w["clean"] for w in transcribed_words_flat]
-    
-    matcher = difflib.SequenceMatcher(None, off_clean_list, trans_clean_list)
-    matching_blocks = matcher.get_matching_blocks()
-    
-    # Preencher correspondências diretas nos objetos de tempo das palavras das linhas
-    for block in matching_blocks:
-        off_start = block.a
-        trans_start = block.b
-        size = block.size
-        for i in range(size):
-            off_idx = off_start + i
-            trans_idx = trans_start + i
-            if off_idx < len(official_words_flat) and trans_idx < len(transcribed_words_flat):
-                w_flat = official_words_flat[off_idx]
-                w_flat["line_ref"]["word_times"][w_flat["word_idx"]] = {
-                    "start": transcribed_words_flat[trans_idx]["start"],
-                    "end": transcribed_words_flat[trans_idx]["end"]
-                }
-                
-    # 4. Ajustar tempos locais de palavras dentro de cada linha
-    for line_data in official_lines:
-        times = line_data["word_times"]
-        n_words = len(times)
-        
-        known_indices = [idx for idx, t in enumerate(times) if t is not None]
-        
-        if not known_indices:
-            continue
-            
-        # Interpolação de palavras intermediárias não alinhadas
-        for k in range(len(known_indices) - 1):
-            idx_start = known_indices[k]
-            idx_end = known_indices[k + 1]
-            if idx_end - idx_start > 1:
-                t_start = times[idx_start]["end"]
-                t_end = times[idx_end]["start"]
-                gap = t_end - t_start
-                num_gaps = idx_end - idx_start
-                step = gap / num_gaps if gap > 0 else 0.05
-                for i in range(idx_start + 1, idx_end):
-                    w_start = t_start + step * (i - idx_start - 1)
-                    w_end = w_start + step
-                    times[i] = {"start": w_start, "end": w_end}
-                    
-        # Extrapolação para trás para palavras não alinhadas no início da linha
-        first_known = known_indices[0]
-        if first_known > 0:
-            first_start = times[first_known]["start"]
-            for i in range(first_known - 1, -1, -1):
-                w_end = times[i + 1]["start"]
-                w_start = w_end - 0.35
-                times[i] = {"start": w_start, "end": w_end}
-                
-        # Extrapolação para frente para palavras não alinhadas no final da linha
-        last_known = known_indices[-1]
-        if last_known < n_words - 1:
-            last_end = times[last_known]["end"]
-            for i in range(last_known + 1, n_words):
-                w_start = times[i - 1]["end"]
-                w_end = w_start + 0.35
-                times[i] = {"start": w_start, "end": w_end}
-                
-    # 5. Resolver linhas inteiras que não foram alinhadas de forma alguma
-    for l_idx, line_data in enumerate(official_lines):
-        times = line_data["word_times"]
-        if any(t is not None for t in times):
-            continue
-            
-        # Achar o tempo final da linha anterior conhecida
-        prev_line_end = 0.0
-        for prev_idx in range(l_idx - 1, -1, -1):
-            prev_times = [t for t in official_lines[prev_idx]["word_times"] if t is not None]
-            if prev_times:
-                prev_line_end = prev_times[-1]["end"]
-                break
-                
-        # Achar o tempo inicial da próxima linha conhecida
-        next_line_start = None
-        for next_idx in range(l_idx + 1, len(official_lines)):
-            next_times = [t for t in official_lines[next_idx]["word_times"] if t is not None]
-            if next_times:
-                next_line_start = next_times[0]["start"]
-                break
-                
-        n_words = len(line_data["words"])
-        default_line_dur = n_words * 0.35
-        
-        if next_line_start is not None:
-            # Posiciona 1.5s antes do início da próxima linha conhecida
-            line_end = next_line_start - 1.5
-            line_start = line_end - default_line_dur
-            if line_start < prev_line_end + 1.0:
-                line_start = prev_line_end + 1.0
-                line_end = line_start + default_line_dur
-        else:
-            line_start = prev_line_end + 2.0
-            line_end = line_start + default_line_dur
-            
-        step = (line_end - line_start) / n_words
-        for i in range(n_words):
-            w_start = line_start + i * step
-            w_end = w_start + step
-            times[i] = {"start": w_start, "end": w_end}
+    """Usa a letra como guia de grafia sem criar ou mover timestamps.
 
-    # 6. Reconstruir a estrutura final de segmentos com segurança de tempos crescentes
-    new_segments = []
-    for line_data in official_lines:
-        aligned_words = []
-        for word_idx, word_text in enumerate(line_data["words"]):
-            time_info = line_data["word_times"][word_idx]
-            
-            w_start = max(0.0, time_info["start"])
-            w_end = max(w_start + 0.05, time_info["end"])
-            
-            if word_idx < len(line_data["words"]) - 1:
-                word_text += " "
-                
-            aligned_words.append({
-                "word": word_text,
-                "start": w_start,
-                "end": w_end
-            })
-            
-        if aligned_words:
-            new_segments.append({
-                "start": aligned_words[0]["start"],
-                "end": aligned_words[-1]["end"],
-                "text": line_data["text"],
-                "words": aligned_words
-            })
-            
-    return new_segments
+    Refrões repetidos tornam inseguro reconstruir a linha do tempo a partir de
+    uma comparação textual global. Por isso, somente palavras já confirmadas
+    pelo Whisper recebem a grafia da letra oficial; versos ausentes permanecem
+    ausentes e toda a estrutura temporal original é preservada.
+    """
+    official_words = [word for word in official_lyrics_text.split() if clean_word(word)]
+    if not official_words or not transcribed_segments:
+        return transcribed_segments
+
+    guided_segments = []
+    transcribed_words = []
+    for source_segment in transcribed_segments:
+        copied_words = [dict(word) for word in source_segment.get("words", [])]
+        copied_segment = {**source_segment, "words": copied_words}
+        guided_segments.append(copied_segment)
+        for copied_word in copied_words:
+            if clean_word(copied_word.get("word", "")):
+                transcribed_words.append(copied_word)
+
+    if not transcribed_words:
+        return transcribed_segments
+
+    official_clean = [clean_word(word) for word in official_words]
+    transcribed_clean = [clean_word(word.get("word", "")) for word in transcribed_words]
+    matcher = difflib.SequenceMatcher(None, official_clean, transcribed_clean, autojunk=False)
+    matched = 0
+
+    for block in matcher.get_matching_blocks():
+        for offset in range(block.size):
+            official_word = official_words[block.a + offset].strip()
+            target_word = transcribed_words[block.b + offset]
+            current_text = str(target_word.get("word", ""))
+            leading_space = current_text[:len(current_text) - len(current_text.lstrip())]
+            trailing_space = current_text[len(current_text.rstrip()):]
+            target_word["word"] = f"{leading_space}{official_word}{trailing_space}"
+            matched += 1
+
+    for segment in guided_segments:
+        if segment.get("words"):
+            segment["text"] = "".join(word.get("word", "") for word in segment["words"]).strip()
+
+    logger.info(
+        "Letra guia aplicada à grafia de %s/%s palavras; todos os timestamps do Whisper foram preservados.",
+        matched,
+        len(transcribed_words),
+    )
+    return guided_segments
 
 def update_state(
     status: str,
@@ -1721,80 +1597,161 @@ class ProfileModel(BaseModel):
     show_next_line_preview: bool = False
     keep_first_line_visible: bool = False
     enable_correction: bool = False
-    enable_vad: bool = True
+    enable_vad: bool = False
+    transcription_preset: str = "karaoke"
     save_to_library: bool = True
     only_remove_vocals: bool = False
 
+BUILTIN_PROFILES = {
+    "Karaokê equilibrado": {
+        "description": "O ponto de partida recomendado: acompanha a voz sem cortar canto suave ou refrões longos.",
+        "_builtin": True,
+        "whisper_model": "large-v3-turbo",
+        "font_size": 32,
+        "text_color": "#00FFFF",
+        "text_position": "bottom",
+        "subtitle_mode": "syllable",
+        "words_per_line": 0,
+        "max_chars_line": 38,
+        "break_on_punctuation": True,
+        "background_mode": "original",
+        "show_instrumental": True,
+        "transcribe_source": "vocals",
+        "show_next_line_preview": False,
+        "keep_first_line_visible": False,
+        "enable_correction": False,
+        "enable_vad": False,
+        "transcription_preset": "karaoke",
+        "save_to_library": True,
+        "only_remove_vocals": False,
+    },
+    "Canto contínuo": {
+        "description": "Dá mais espaço a notas sustentadas, vozes suaves e músicas com poucas pausas.",
+        "_builtin": True,
+        "whisper_model": "large-v3-turbo",
+        "font_size": 32,
+        "text_color": "#00FFFF",
+        "text_position": "bottom",
+        "subtitle_mode": "syllable",
+        "words_per_line": 0,
+        "max_chars_line": 36,
+        "break_on_punctuation": True,
+        "background_mode": "original",
+        "show_instrumental": True,
+        "transcribe_source": "vocals",
+        "show_next_line_preview": True,
+        "keep_first_line_visible": False,
+        "enable_correction": False,
+        "enable_vad": False,
+        "transcription_preset": "continuous",
+        "save_to_library": True,
+        "only_remove_vocals": False,
+    },
+    "Voz difícil ou mix": {
+        "description": "Mais paciente para vocais abafados, separação imperfeita, rap rápido ou dueto.",
+        "_builtin": True,
+        "whisper_model": "large-v3",
+        "font_size": 32,
+        "text_color": "#00FFFF",
+        "text_position": "bottom",
+        "subtitle_mode": "word",
+        "words_per_line": 6,
+        "max_chars_line": 38,
+        "break_on_punctuation": True,
+        "background_mode": "original",
+        "show_instrumental": True,
+        "transcribe_source": "original",
+        "show_next_line_preview": True,
+        "keep_first_line_visible": False,
+        "enable_correction": True,
+        "enable_vad": False,
+        "transcription_preset": "difficult",
+        "save_to_library": True,
+        "only_remove_vocals": False,
+    },
+    "Criação rápida": {
+        "description": "Uma prévia mais leve para testar visual e letra antes da versão final.",
+        "_builtin": True,
+        "whisper_model": "small",
+        "font_size": 32,
+        "text_color": "#00FFFF",
+        "text_position": "bottom",
+        "subtitle_mode": "word",
+        "words_per_line": 6,
+        "max_chars_line": 38,
+        "break_on_punctuation": True,
+        "background_mode": "original",
+        "show_instrumental": True,
+        "transcribe_source": "vocals",
+        "show_next_line_preview": False,
+        "keep_first_line_visible": False,
+        "enable_correction": False,
+        "enable_vad": True,
+        "transcription_preset": "fast",
+        "save_to_library": True,
+        "only_remove_vocals": False,
+    },
+}
+
+PROFILE_DEFAULT_FIELDS = {
+    "subtitle_mode": "syllable",
+    "words_per_line": 0,
+    "max_chars_line": 40,
+    "break_on_punctuation": True,
+    "background_mode": "original",
+    "show_instrumental": True,
+    "transcribe_source": "vocals",
+    "show_next_line_preview": False,
+    "keep_first_line_visible": False,
+    "enable_correction": False,
+    "enable_vad": False,
+    "transcription_preset": "karaoke",
+    "save_to_library": True,
+    "only_remove_vocals": False,
+    "description": "Perfil personalizado por você.",
+    "_builtin": False,
+}
+
 def load_profiles(user: dict) -> dict:
-    """Carrega os perfis do arquivo JSON ou inicializa com valores padrão se não existir."""
-    default_profiles = {
-        "Padrão": {
-            "whisper_model": "medium",
-            "font_size": 32,
-            "text_color": "#00FFFF",
-            "text_position": "bottom",
-            "telegram_token": "",
-            "telegram_chat_id": "",
-            "subtitle_mode": "syllable",
-            "words_per_line": 0,
-            "max_chars_line": 40,
-            "break_on_punctuation": True,
-            "background_mode": "image",
-            "show_instrumental": True,
-            "transcribe_source": "vocals",
-            "show_next_line_preview": False,
-            "keep_first_line_visible": False
-        }
-    }
-    
+    """Carrega perfis pessoais e inclui opções prontas sem sobrescrevê-los."""
     profiles_file = config_path(user, "profiles.json")
-    if not os.path.exists(profiles_file):
+    profiles = {}
+    try:
+        if os.path.exists(profiles_file):
+            with open(profiles_file, "r", encoding="utf-8") as f:
+                profiles = json.load(f)
+    except Exception as e:
+        logger.error(f"Erro ao carregar arquivo de perfis: {e}")
+
+    changed = False
+    for name, builtin in BUILTIN_PROFILES.items():
+        if name not in profiles:
+            profiles[name] = dict(builtin)
+            changed = True
+
+    for name, profile_data in profiles.items():
+        if name in BUILTIN_PROFILES:
+            # Perfis prontos acompanham as melhorias do aplicativo.
+            if profile_data != BUILTIN_PROFILES[name]:
+                profiles[name] = dict(BUILTIN_PROFILES[name])
+                changed = True
+            continue
+        if "enable_correction" not in profile_data:
+            profile_data["enable_correction"] = profile_data.get("pause_for_editing", False)
+            changed = True
+        for field, default_value in PROFILE_DEFAULT_FIELDS.items():
+            if field not in profile_data:
+                profile_data[field] = default_value
+                changed = True
+
+    if changed or not os.path.exists(profiles_file):
         try:
             os.makedirs(os.path.dirname(profiles_file), exist_ok=True)
             with open(profiles_file, "w", encoding="utf-8") as f:
-                import json
-                json.dump(default_profiles, f, indent=4, ensure_ascii=False)
-            return default_profiles
+                json.dump(profiles, f, indent=4, ensure_ascii=False)
         except Exception as e:
-            logger.error(f"Erro ao criar arquivo de perfis padrão: {e}")
-            return default_profiles
-            
-    try:
-        with open(profiles_file, "r", encoding="utf-8") as f:
-            import json
-            profiles = json.load(f)
-            # Garantir retrocompatibilidade preenchendo campos ausentes
-            for p_name, p_data in profiles.items():
-                if "subtitle_mode" not in p_data:
-                    p_data["subtitle_mode"] = "syllable"
-                if "words_per_line" not in p_data:
-                    p_data["words_per_line"] = 0
-                if "max_chars_line" not in p_data:
-                    p_data["max_chars_line"] = 40
-                if "break_on_punctuation" not in p_data:
-                    p_data["break_on_punctuation"] = True
-                if "background_mode" not in p_data:
-                    p_data["background_mode"] = "image"
-                if "show_instrumental" not in p_data:
-                    p_data["show_instrumental"] = True
-                if "transcribe_source" not in p_data:
-                    p_data["transcribe_source"] = "vocals"
-                if "show_next_line_preview" not in p_data:
-                    p_data["show_next_line_preview"] = False
-                if "keep_first_line_visible" not in p_data:
-                    p_data["keep_first_line_visible"] = False
-                if "enable_correction" not in p_data:
-                    p_data["enable_correction"] = p_data.get("pause_for_editing", False)
-                if "enable_vad" not in p_data:
-                    p_data["enable_vad"] = True
-                if "save_to_library" not in p_data:
-                    p_data["save_to_library"] = True
-                if "only_remove_vocals" not in p_data:
-                    p_data["only_remove_vocals"] = False
-            return profiles
-    except Exception as e:
-        logger.error(f"Erro ao carregar arquivo de perfis: {e}")
-        return default_profiles
+            logger.error(f"Erro ao atualizar arquivo de perfis: {e}")
+    return profiles
 
 @app.get("/api/profiles")
 def get_profiles(current_user: dict = Depends(get_current_user)):
@@ -1805,7 +1762,14 @@ def get_profiles(current_user: dict = Depends(get_current_user)):
 def save_profile(profile: ProfileModel, current_user: dict = Depends(get_current_user)):
     """Salva ou atualiza um perfil de uso."""
     profiles = load_profiles(current_user)
-    profiles[profile.name] = {
+    profile_name = profile.name.strip()
+    if not profile_name:
+        raise HTTPException(status_code=400, detail="Informe um nome para o perfil.")
+    if profile_name in BUILTIN_PROFILES:
+        raise HTTPException(status_code=400, detail="Perfis prontos não podem ser sobrescritos. Salve sua variação com outro nome.")
+    profiles[profile_name] = {
+        "description": "Perfil personalizado por você.",
+        "_builtin": False,
         "whisper_model": profile.whisper_model,
         "font_size": profile.font_size,
         "text_color": profile.text_color,
@@ -1823,6 +1787,7 @@ def save_profile(profile: ProfileModel, current_user: dict = Depends(get_current
         "keep_first_line_visible": profile.keep_first_line_visible,
         "enable_correction": profile.enable_correction,
         "enable_vad": profile.enable_vad,
+        "transcription_preset": profile.transcription_preset,
         "save_to_library": profile.save_to_library,
         "only_remove_vocals": profile.only_remove_vocals
     }
@@ -1837,8 +1802,8 @@ def save_profile(profile: ProfileModel, current_user: dict = Depends(get_current
 @app.delete("/api/profiles/{name}")
 def delete_profile(name: str, current_user: dict = Depends(get_current_user)):
     """Remove um perfil de uso."""
-    if name == "Padrão":
-        raise HTTPException(status_code=400, detail="O perfil 'Padrão' não pode ser excluído.")
+    if name == "Padrão" or name in BUILTIN_PROFILES:
+        raise HTTPException(status_code=400, detail="Perfis prontos do aplicativo não podem ser excluídos.")
     profiles = load_profiles(current_user)
     if name in profiles:
         del profiles[name]
@@ -1862,7 +1827,7 @@ def get_last_profile(current_user: dict = Depends(get_current_user)):
                 return json.load(f)
         except Exception:
             pass
-    return {"last_profile": "Padrão"}
+    return {"last_profile": "Karaokê equilibrado"}
 
 @app.post("/api/last_profile")
 def save_last_profile(data: dict, current_user: dict = Depends(get_current_user)):
@@ -2548,7 +2513,8 @@ def process_karaoke(
     words_per_line: int = Form(0),
     max_chars_line: int = Form(0),
     break_on_punctuation: bool = Form(True),
-    enable_vad: bool = Form(True),
+    enable_vad: bool = Form(False),
+    transcription_preset: str = Form("karaoke"),
     background_mode: str = Form("image"),
     show_instrumental: bool = Form(True),
     transcribe_source: str = Form("vocals"),
@@ -2568,6 +2534,9 @@ def process_karaoke(
     """
     Recebe os arquivos enviados, valida a concorrência e inicia o pipeline em segundo plano.
     """
+    if transcription_preset not in {"karaoke", "continuous", "difficult", "fast"}:
+        raise HTTPException(status_code=400, detail="Perfil de leitura da voz inválido.")
+
     # 1. Verificar se o servidor já está processando alguma música
     if processing_lock.locked():
         with state_lock:
@@ -2929,6 +2898,7 @@ def process_karaoke(
         max_chars_line=max_chars_line,
         break_on_punctuation=break_on_punctuation,
         enable_vad=enable_vad,
+        transcription_preset=transcription_preset,
         background_mode=background_mode,
         show_instrumental=show_instrumental,
         transcribe_source=transcribe_source,
@@ -3051,7 +3021,8 @@ def run_pipeline(
     words_per_line: int = 0,
     max_chars_line: int = 0,
     break_on_punctuation: bool = True,
-    enable_vad: bool = True,
+    enable_vad: bool = False,
+    transcription_preset: str = "karaoke",
     background_mode: str = "original",
     show_instrumental: bool = True,
     transcribe_source: str = "vocals",
@@ -3316,10 +3287,14 @@ def run_pipeline(
             # Passo 3: Transcrever vocais com Whisper selecionado
             segments = None
             segments_cache_file = os.path.join(cache_dir, "transcribed_segments.json")
-            
-            if (os.path.exists(segments_cache_file) and 
-                cached_meta.get("transcribe_source") == transcribe_source and 
-                cached_meta.get("whisper_model") == whisper_model):
+            lyrics_hint_hash = hashlib.sha256((lyrics_text or "").strip().encode("utf-8")).hexdigest()
+
+            if (os.path.exists(segments_cache_file) and
+                cached_meta.get("transcribe_source") == transcribe_source and
+                cached_meta.get("whisper_model") == whisper_model and
+                cached_meta.get("enable_vad") == enable_vad and
+                cached_meta.get("transcription_preset") == transcription_preset and
+                cached_meta.get("lyrics_hint_hash") == lyrics_hint_hash):
                 try:
                     with open(segments_cache_file, "r", encoding="utf-8") as f:
                         import json
@@ -3342,16 +3317,26 @@ def run_pipeline(
                     update_state("processing", f"Carregando Modelo Whisper {whisper_model} do disco e transcrevendo voz...", 65)
                 else:
                     update_state("processing", f"Baixando Modelo de IA Whisper {whisper_model} no servidor...", 65)
-                
+
                 quality_preset = "max_quality" if whisper_model == "large-v3" else "standard"
-                segments = transcribe_vocals(transcribe_audio, model_size=whisper_model, initial_prompt=lyrics_text, quality_mode=quality_preset, enable_vad=enable_vad)
-                
+                segments = transcribe_vocals(
+                    transcribe_audio,
+                    model_size=whisper_model,
+                    initial_prompt=lyrics_text,
+                    quality_mode=quality_preset,
+                    enable_vad=enable_vad,
+                    transcription_preset=transcription_preset,
+                )
+
                 if segments:
                     with open(segments_cache_file, "w", encoding="utf-8") as f:
                         import json
                         json.dump(segments, f, indent=4)
                     cached_meta["transcribe_source"] = transcribe_source
                     cached_meta["whisper_model"] = whisper_model
+                    cached_meta["enable_vad"] = enable_vad
+                    cached_meta["transcription_preset"] = transcription_preset
+                    cached_meta["lyrics_hint_hash"] = lyrics_hint_hash
                     with open(cache_meta_file, "w", encoding="utf-8") as f:
                         import json
                         json.dump(cached_meta, f, indent=4)
@@ -3360,12 +3345,12 @@ def run_pipeline(
             
             if not segments:
                 raise ValueError("Nenhum vocal detectado ou transcrição vazia.")
-                
-            # Se o usuário forneceu a letra oficial, alinhar os tempos obtidos pelo Whisper com a letra oficial
+
+            # A letra corrige apenas a grafia; os tempos continuam vindo do áudio.
             if lyrics_text and lyrics_text.strip():
-                logger.info("Aplicando alinhamento forçado local com a letra oficial fornecida...")
+                logger.info("Aplicando letra guia de forma conservadora, sem criar timestamps...")
                 segments = align_lyrics(lyrics_text, segments)
-                
+
             pm.check_cancelled()
             
             # --- NOVO: Passo de Pausa e Correção de Legendas (se ativado pelo usuário) ---
