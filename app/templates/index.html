@@ -628,6 +628,63 @@
                 font-size: 0.75rem;
             }
         }
+
+        .page-intro {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 1rem;
+            padding: 0.9rem 1rem;
+            border: 1px solid var(--glass-border);
+            border-radius: var(--radius-md);
+            background: linear-gradient(135deg, rgba(139, 92, 246, 0.11), rgba(236, 72, 153, 0.06));
+        }
+        .page-intro h2 { margin: 0; font-size: 1rem; color: var(--text-main); }
+        .page-intro p { margin: 0.2rem 0 0; font-size: 0.76rem; color: var(--text-muted); }
+        .user-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            padding: 0.32rem 0.62rem;
+            border-radius: 999px;
+            border: 1px solid var(--glass-border-light);
+            background: var(--input-bg);
+            color: var(--text-muted);
+            font-size: 0.72rem;
+            white-space: nowrap;
+        }
+        .settings-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(min(360px, 100%), 1fr));
+            gap: 1rem;
+        }
+        .settings-grid > .card { margin: 0; }
+        .media-preview {
+            width: 100%;
+            max-height: 430px;
+            margin: 0.8rem 0 1rem;
+            border-radius: 14px;
+            background: #000;
+            border: 1px solid var(--glass-border);
+        }
+        .preview-dialog {
+            width: min(900px, 100%);
+            max-height: 90vh;
+            overflow: auto;
+            background: var(--bg-card);
+            border: 1px solid var(--glass-border);
+            border-radius: 20px;
+            padding: 1rem;
+            box-shadow: var(--shadow);
+        }
+        .preview-dialog-head { display: flex; justify-content: space-between; align-items: center; gap: 1rem; }
+        .preview-dialog-head h3 { margin: 0; font-size: 0.95rem; color: var(--text-main); overflow-wrap: anywhere; }
+        .compact-note { font-size: 0.76rem; color: var(--text-muted); line-height: 1.45; }
+        @media (max-width: 620px) {
+            .page-intro { align-items: flex-start; flex-direction: column; }
+            .settings-grid { grid-template-columns: 1fr; }
+        }
 </style>
 </head>
 <body>
@@ -639,6 +696,7 @@
                 <h1>Sal0 Karaokê</h1>
             </div>
             <div class="header-actions">
+                <span id="currentUserChip" class="user-chip" style="display: none;"></span>
                 <button type="button" class="header-btn" id="btnToggleTheme" title="Alternar Tema (Escuro / Claro)" style="padding: 0.35rem 0.65rem; font-size: 0.78rem;">🌙 Escuro</button>
                 <button type="button" class="header-btn" id="btnOpenHelp">❓ Manual</button>
                 <button type="button" class="header-btn" id="btnLogout" style="color: #fca5a5; background: rgba(239,68,68,0.15); border-color: rgba(239,68,68,0.3);">🚪 Sair</button>
@@ -656,6 +714,13 @@
         <!-- ABA 1: CRIAR KARAOKÊ -->
         <!-- ============================================================= -->
         <div id="createTabContent">
+            <div class="page-intro">
+                <div>
+                    <h2>Seu karaokê começa aqui</h2>
+                    <p>Escolha a música, ajuste o visual e deixe o processamento local fazer o resto.</p>
+                </div>
+                <span class="user-chip">1. Música · 2. Visual · 3. Criar</span>
+            </div>
             <!-- Form Principal -->
             <form id="karaokêForm">
                 <!-- BADGE DE REUTILIZAÇÃO DE CACHE RÁPIDA -->
@@ -880,15 +945,6 @@
                             </div>
 
                             <div class="form-group">
-                                <span class="label">Modo de Fundo</span>
-                                <select id="backgroundMode" name="background_mode" class="select-input">
-                                    <option value="original" selected>Vídeo Original</option>
-                                    <option value="image">Imagem / Vídeo</option>
-                                    <option value="color">Cor Sólida Escura</option>
-                                </select>
-                            </div>
-
-                            <div class="form-group">
                                 <span class="label">Palavras / Linha (0 = Auto)</span>
                                 <input type="number" id="wordsPerLine" name="words_per_line" value="0" min="0" max="30" class="input-text">
                             </div>
@@ -1063,36 +1119,35 @@
             <!-- CARD DE DOWNLOAD DO VÍDEO CONCLUÍDO -->
             <div class="card" id="downloadBox" style="display: none; text-align: center; border-color: rgba(16, 185, 129, 0.4);">
                 <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">🎉</div>
-                <h3 style="font-size: 1.2rem; color: var(--text-main); margin-bottom: 0.4rem;">Vídeo de Karaokê Concluído!</h3>
-                <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1.2rem;">Seu vídeo foi gerado com sucesso e está pronto para download.</p>
-                <button type="button" id="btnDownloadResult" class="btn-primary" style="background: linear-gradient(135deg, #10b981, #059669); max-width: 320px; margin: 0 auto;">⬇️ Baixar Vídeo Final (.mp4)</button>
+                <h3 style="font-size: 1.08rem; color: var(--text-main); margin-bottom: 0.25rem;">Vídeo pronto!</h3>
+                <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.6rem;">Assista aqui ou abra sua cópia permanente na Biblioteca.</p>
+                <video id="resultVideoPreview" class="media-preview" controls preload="metadata"></video>
+                <div style="display: flex; justify-content: center; gap: 0.55rem; flex-wrap: wrap;">
+                    <button type="button" id="btnDownloadResult" class="btn-primary" style="background: linear-gradient(135deg, #10b981, #059669); width: auto;">⬇️ Baixar MP4</button>
+                    <button type="button" id="btnOpenResultLibrary" class="btn-secondary">📚 Abrir Biblioteca</button>
+                </div>
             </div>
         </div>
 
         <!-- ============================================================= -->
-        <!-- ABA 2: AJUSTES & CONFIGURAÇÕES -->
+        <!-- ABA 2: AJUSTES -->
         <!-- ============================================================= -->
         <div id="settingsTabContent" style="display: none;">
-            <!-- Tema Visual -->
-            <div class="card">
-                <div class="card-header">
-                    <span class="card-title">🎨 Aparência & Tema Visual</span>
+            <div class="page-intro">
+                <div>
+                    <h2>Ajustes</h2>
+                    <p>Modelos, bot pessoal e ferramentas do servidor em blocos mais diretos.</p>
                 </div>
-                <div class="form-group" style="max-width: 340px;">
-                    <span class="label">Escolha o Tema da Interface</span>
-                    <select id="themeSelect" class="select-input">
-                        <option value="dark" selected>🌙 Tema Escuro (Padrão)</option>
-                        <option value="light">☀️ Tema Claro</option>
-                    </select>
-                </div>
+                <span class="user-chip">O tema continua no topo da tela</span>
             </div>
+            <div class="settings-grid">
 
             <!-- Gerenciador de Modelos Whisper -->
-            <div class="card">
+            <div class="card" id="modelManagerSection">
                 <div class="card-header">
-                    <span class="card-title">🤖 Gerenciador de Modelos de IA Whisper</span>
+                    <span class="card-title">🤖 Modelos Whisper</span>
                 </div>
-                <p style="font-size: 0.82rem; color: var(--text-muted); margin-bottom: 1rem;">Modelos baixados ficam salvos permanentemente no seu servidor para transcrição instantânea.</p>
+                <p class="compact-note">Modelos baixados ficam disponíveis para todas as contas, mas só o administrador pode instalar novos.</p>
 
                 <div id="modelsListContainer" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr)); gap: 0.8rem;">
                     <!-- Preenchido via JS fetchModelsStatus() -->
@@ -1102,12 +1157,14 @@
             <!-- Credenciais do Telegram -->
             <div class="card">
                 <div class="card-header">
-                    <span class="card-title">✈️ Bot do Telegram (Envio Automático)</span>
-                    <button type="button" id="btnEditTelegram" class="btn-secondary">✏️ Editar Credenciais</button>
+                    <span class="card-title">✈️ Meu bot do Telegram</span>
+                    <button type="button" id="btnEditTelegram" class="btn-secondary">✏️ Editar</button>
                 </div>
 
+                <p id="telegramScopeText" class="compact-note">Este bot recebe apenas as suas criações.</p>
+
                 <div id="telegramConfiguredBadge" style="display: none; background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.3); padding: 0.6rem 1rem; border-radius: var(--radius-sm); color: #34d399; font-size: 0.85rem; align-items: center; justify-content: space-between; margin-bottom: 1rem;">
-                    <span>✓ Bot do Telegram Configurado e Ativo!</span>
+                    <span>✓ Bot configurado e ativo</span>
                 </div>
 
                 <div id="telegramInputsDiv" class="form-grid">
@@ -1126,11 +1183,13 @@
             </div>
 
             <!-- IP Externo / Acesso Remoto -->
-            <div class="card">
+            <div class="card" id="externalUrlSection">
                 <div class="card-header">
-                    <span class="card-title">🌐 URL ou IP de Acesso Externo</span>
-                    <button type="button" id="btnEditExternalUrl" class="btn-secondary">✏️ Editar URL</button>
+                    <span class="card-title">🌐 Acesso externo</span>
+                    <button type="button" id="btnEditExternalUrl" class="btn-secondary">✏️ Editar</button>
                 </div>
+
+                <p class="compact-note">Base pública opcional para o link direto e aleatório enviado pelo Telegram.</p>
 
                 <div id="externalUrlConfiguredBadge" style="display: none; background: rgba(139, 92, 246, 0.15); border: 1px solid rgba(139, 92, 246, 0.3); padding: 0.6rem 1rem; border-radius: var(--radius-sm); color: var(--accent); font-size: 0.85rem; margin-bottom: 1rem;">
                     <span id="externalUrlValText">IP/URL configurada!</span>
@@ -1150,7 +1209,7 @@
             <!-- Gerenciamento de Usuários -->
             <div class="card" id="userManagementSection">
                 <div class="card-header">
-                    <span class="card-title">👥 Gerenciamento de Usuários</span>
+                    <span class="card-title">👥 Usuários</span>
                 </div>
 
                 <div class="form-grid" style="margin-bottom: 1rem;">
@@ -1160,7 +1219,7 @@
                     </div>
                     <div class="form-group">
                         <span class="label">Senha</span>
-                        <input type="password" id="newUserPassword" placeholder="Senha" class="input-text">
+                        <input type="password" id="newUserPassword" placeholder="Senha (mínimo de 8 caracteres)" minlength="8" class="input-text">
                     </div>
                     <div class="form-group">
                         <span class="label">Função (Role)</span>
@@ -1180,12 +1239,13 @@
             </div>
 
             <!-- Logs e Diagnóstico do Sistema -->
-            <div class="card">
+            <div class="card" id="logsSection">
                 <div class="card-header">
-                    <span class="card-title">📋 Logs e Diagnóstico</span>
-                    <button type="button" id="btnDownloadLogs" class="btn-secondary">⬇️ Baixar Logs (.txt)</button>
+                    <span class="card-title">📋 Diagnóstico</span>
+                    <button type="button" id="btnDownloadLogs" class="btn-secondary">⬇️ Logs atuais</button>
                 </div>
-                <p style="font-size: 0.82rem; color: var(--text-muted);">Baixe os logs do sistema para solução de problemas ou suporte técnico.</p>
+                <p class="compact-note">Gera um relatório novo com o estado e os registros mais recentes do aplicativo.</p>
+            </div>
             </div>
         </div>
 
@@ -1193,10 +1253,17 @@
         <!-- ABA 3: BIBLIOTECA & HISTÓRICO -->
         <!-- ============================================================= -->
         <div id="libraryTabContent" style="display: none; flex-direction: column; gap: 1.5rem;">
+            <div class="page-intro" style="margin-bottom: 0;">
+                <div>
+                    <h2>Minha Biblioteca</h2>
+                    <p>Arquivos desta conta, organizados entre originais, fundos e resultados.</p>
+                </div>
+                <span class="user-chip">🔒 Espaço privado da conta</span>
+            </div>
             <!-- Grid de Envio Rápido para a Biblioteca -->
             <div style="background: var(--input-bg); border: 1px solid var(--glass-border); padding: 1.2rem; border-radius: 12px; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr)); gap: 1rem;">
                 <div>
-                    <h4 style="margin: 0 0 0.5rem 0; font-size: 0.9rem; color: var(--text-main);">➕ Adicionar Mídia de Áudio/Vídeo</h4>
+                    <h4 style="margin: 0 0 0.5rem 0; font-size: 0.9rem; color: var(--text-main);">➕ Música ou vídeo</h4>
                     <form id="libAudioUploadForm" style="display: flex; gap: 0.5rem; align-items: center;">
                         <input type="file" id="libAudioFile" accept="audio/*,video/*" style="display: none;">
                         <div id="libAudioUploadArea" class="btn-secondary" style="flex: 1; text-align: center; cursor: pointer; padding: 0.6rem; font-size: 0.8rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
@@ -1206,7 +1273,7 @@
                     </form>
                 </div>
                 <div>
-                    <h4 style="margin: 0 0 0.5rem 0; font-size: 0.9rem; color: var(--text-main);">🖼️ Adicionar Imagem/Vídeo de Fundo</h4>
+                    <h4 style="margin: 0 0 0.5rem 0; font-size: 0.9rem; color: var(--text-main);">🖼️ Fundo</h4>
                     <form id="libBgUploadForm" style="display: flex; gap: 0.5rem; align-items: center;">
                         <input type="file" id="libBgFile" accept="image/*,video/*" style="display: none;">
                         <div id="libBgUploadArea" class="btn-secondary" style="flex: 1; text-align: center; cursor: pointer; padding: 0.6rem; font-size: 0.8rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
@@ -1220,7 +1287,7 @@
             <!-- Seção 1: Músicas e Vídeos Originais -->
             <div class="card" style="margin: 0;">
                 <div class="card-header">
-                    <span class="card-title">🎵 Músicas & Vídeos Originais</span>
+                    <span class="card-title">🎵 Originais</span>
                 </div>
                 <div id="libVideosList" style="display: flex; flex-direction: column; gap: 0.6rem;">
                     <!-- Preenchido via JS loadLibrary() -->
@@ -1230,7 +1297,7 @@
             <!-- Seção 2: Imagens e Vídeos de Fundo -->
             <div class="card" style="margin: 0;">
                 <div class="card-header">
-                    <span class="card-title">🖼️ Imagens & Vídeos de Fundo</span>
+                    <span class="card-title">🖼️ Fundos</span>
                 </div>
                 <div id="libPhotosList" style="display: flex; flex-direction: column; gap: 0.6rem;">
                     <!-- Preenchido via JS loadLibrary() -->
@@ -1240,7 +1307,7 @@
             <!-- Seção 3: Karaokês Renderizados no Histórico -->
             <div class="card" style="margin: 0;">
                 <div class="card-header">
-                    <span class="card-title">🎬 Karaokês Renderizados no Histórico</span>
+                    <span class="card-title">🎬 Resultados</span>
                 </div>
                 <div id="libHistoryList" style="display: flex; flex-direction: column; gap: 0.6rem;">
                     <!-- Preenchido via JS loadLibrary() -->
@@ -1250,38 +1317,52 @@
 
         <!-- RODAPÉ DISCRETO DA PÁGINA -->
         <footer>
-            Sal0 Karaokê v5.0.1
+            Sal0 Karaokê v5.1.0
         </footer>
 
     </div> <!-- Container End -->
 
     <div id="appNotice" class="app-notice" role="status" aria-live="polite"></div>
 
+    <div id="mediaPreviewModal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.76); backdrop-filter: blur(12px); z-index: 9998; align-items: center; justify-content: center; padding: 1rem;">
+        <div class="preview-dialog">
+            <div class="preview-dialog-head">
+                <h3 id="mediaPreviewTitle">Visualização</h3>
+                <button type="button" id="btnCloseMediaPreview" class="btn-secondary">Fechar ✕</button>
+            </div>
+            <video id="libraryVideoPreview" class="media-preview" controls preload="metadata"></video>
+            <img id="libraryImagePreview" class="media-preview" alt="Visualização do arquivo" style="display: none; object-fit: contain;">
+        </div>
+    </div>
+
     <!-- MODAL MANUAL E TUTORIAL PARA INICIANTES -->
     <div id="helpModal" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.7); backdrop-filter: blur(12px); z-index: 9999; justify-content: center; align-items: center; padding: 1rem;">
         <div style="background: var(--bg-card); border: 1px solid var(--glass-border); border-radius: 20px; padding: 1.8rem; max-width: 620px; width: 100%; max-height: 85vh; overflow-y: auto; box-shadow: var(--shadow);">
-            <h3 style="color: var(--text-main); margin-bottom: 1rem; font-family: 'Outfit', sans-serif;">📖 Manual & Tutorial do Sal0 Karaokê</h3>
+            <h3 style="color: var(--text-main); margin-bottom: 1rem; font-family: 'Outfit', sans-serif;">📖 Manual do Sal0 Karaokê</h3>
             
             <div style="display: flex; flex-direction: column; gap: 0.8rem; font-size: 0.85rem; color: var(--text-muted); line-height: 1.5;">
-                <p><strong style="color: var(--text-main);">O que é o Sal0 Karaokê?</strong><br>
-                É uma ferramenta simples e funcional que roda localmente no seu computador ou servidor para remover a voz de músicas e criar vídeos de karaokê com legendas sincronizadas.</p>
+                <p><strong style="color: var(--text-main);">O que ele faz?</strong><br>
+                O Sal0 Karaokê separa voz e instrumental, transcreve a música, sincroniza as legendas e renderiza o vídeo no seu próprio computador ou servidor. Só a busca opcional de letras e os downloads solicitados usam a internet.</p>
 
-                <p><strong style="color: var(--text-main);">Tutorial Passo a Passo para Iniciantes:</strong></p>
+                <p><strong style="color: var(--text-main);">Primeiro karaokê, passo a passo</strong></p>
                 <ol style="margin-left: 1.2rem; display: flex; flex-direction: column; gap: 0.5rem;">
-                    <li><strong style="color: var(--accent);">1. Selecione a Música:</strong> Clique na caixa de envio para escolher uma música/vídeo do seu computador, insira um link do YouTube ou escolha uma música já salva na sua Biblioteca.</li>
-                    <li><strong style="color: var(--accent);">2. Escolha o Fundo (Opcional):</strong> Envie uma imagem ou vídeo para usar como fundo do karaokê. Se não escolher, o sistema usará um fundo padrão escuro.</li>
-                    <li><strong style="color: var(--accent);">3. Personalize a Legenda (Opcional):</strong> Nas "Opções Avançadas", você pode alterar o tamanho da fonte, a cor do texto, a posição da legenda e o modelo de IA.</li>
-                    <li><strong style="color: var(--accent);">4. Clique em "Criar Vídeo Karaokê":</strong> O servidor vai separar o vocal do instrumental com IA e transcrever a letra sincronizada.</li>
-                    <li><strong style="color: var(--accent);">5. Baixe o Vídeo Pronto:</strong> Ao finalizar, clique no botão verde de download ou acesse a aba "Biblioteca & Histórico".</li>
+                    <li><strong style="color: var(--accent);">1. Música:</strong> envie um arquivo, cole um link do YouTube ou escolha algo da sua Biblioteca.</li>
+                    <li><strong style="color: var(--accent);">2. Letra:</strong> no modo automático, o app procura uma letra-guia e avisa se encontrou. Abra o bloco quando quiser revisar ou colar uma versão manual.</li>
+                    <li><strong style="color: var(--accent);">3. Visual:</strong> use o vídeo original, uma cor, imagem, vídeo ou fundo salvo. Os ajustes extras controlam legenda, linhas, IA e revisão.</li>
+                    <li><strong style="color: var(--accent);">4. Criar:</strong> acompanhe as etapas. Se a revisão estiver ativa, corrija texto e tempos antes da renderização.</li>
+                    <li><strong style="color: var(--accent);">5. Resultado:</strong> assista na própria tela, baixe o MP4 ou abra a cópia salva em “Biblioteca → Resultados”.</li>
                 </ol>
 
-                <p><strong style="color: var(--text-main);">Resumo dos Recursos:</strong></p>
+                <p><strong style="color: var(--text-main);">Contas, Biblioteca e Telegram</strong></p>
                 <ul style="margin-left: 1.2rem; display: flex; flex-direction: column; gap: 0.3rem;">
-                    <li>• <strong>Processamento Local:</strong> Roda inteiramente no seu servidor, sem depender de assinaturas externas.</li>
-                    <li>• <strong>Biblioteca Permanente:</strong> Suas mídias ficam salvas para reuso sem precisar enviar novamente.</li>
-                    <li>• <strong>Envio via Telegram:</strong> Pode enviar o vídeo finalizado automaticamente para o seu bot no Telegram.</li>
-                    <li>• <strong>Perfis de Estilo:</strong> Salve seus ajustes favoritos para usar em um clique nas próximas criações.</li>
+                    <li>• Cada usuário comum vê apenas biblioteca, cache, letras, perfis, resultados e bot próprios.</li>
+                    <li>• O administrador gerencia contas, modelos, URL externa e diagnóstico, além de receber os avisos de todas as tarefas.</li>
+                    <li>• Configure seu bot em Ajustes. O link do Telegram é um download direto com endereço aleatório; não compartilhe a mensagem com quem não deve receber o vídeo.</li>
+                    <li>• O botão de tema claro/escuro fica no topo e vale somente para este navegador.</li>
                 </ul>
+
+                <p><strong style="color: var(--text-main);">Se algo der errado</strong><br>
+                Tente novamente com um modelo menor se faltar memória. O administrador pode baixar um diagnóstico atualizado em Ajustes. Antes de compartilhar logs, confira nomes de arquivos e endereços que possam ser pessoais.</p>
             </div>
 
             <button type="button" id="btnCloseHelpModal" class="btn-primary" style="margin-top: 1.5rem;">Entendido</button>
@@ -1296,7 +1377,7 @@
             <p style="margin: 0 0 1.5rem 0; font-size: 0.85rem; color: var(--text-muted);">Crie a conta de administrador para proteger seu servidor Sal0 Karaokê.</p>
             <form id="setupForm" style="display: flex; flex-direction: column; gap: 1rem;">
                 <input type="text" id="setupUsername" placeholder="Nome de Usuário Administrador" required class="input-text">
-                <input type="password" id="setupPassword" placeholder="Sua Senha Segura" required class="input-text">
+                <input type="password" id="setupPassword" placeholder="Senha (mínimo de 8 caracteres)" minlength="8" required class="input-text">
                 <button type="submit" id="btnSetupSubmit" class="btn-primary">🚀 Criar Administrador e Entrar</button>
             </form>
         </div>
@@ -1321,18 +1402,39 @@
         let currentUser = null;
         let allProfiles = {};
 
+        function escapeHtml(value) {
+            return String(value ?? '').replace(/[&<>'"]/g, char => ({
+                '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
+            })[char]);
+        }
+
+        function applyRoleUI() {
+            const admin = currentUser?.role === 'admin';
+            ['modelManagerSection', 'externalUrlSection', 'userManagementSection', 'logsSection'].forEach(id => {
+                const element = document.getElementById(id);
+                if (element) element.style.display = admin ? '' : 'none';
+            });
+            const chip = document.getElementById('currentUserChip');
+            if (chip && currentUser) {
+                chip.textContent = `${admin ? '👑' : '👤'} ${currentUser.username}`;
+                chip.style.display = 'inline-flex';
+            }
+            const telegramScope = document.getElementById('telegramScopeText');
+            if (telegramScope) {
+                telegramScope.textContent = admin
+                    ? 'Bot do administrador: recebe as suas criações e os avisos de todas as contas.'
+                    : 'Seu bot pessoal recebe somente as suas criações. O administrador também recebe os avisos do sistema.';
+            }
+        }
+
         // GERENCIAMENTO DE TEMA (ESCURO COMO PADRÃO)
         function setTheme(theme) {
             document.documentElement.setAttribute('data-theme', theme);
             localStorage.setItem('karaoke_theme', theme);
             const btnTheme = document.getElementById('btnToggleTheme');
-            const selectTheme = document.getElementById('themeSelect');
             
             if (btnTheme) {
                 btnTheme.innerText = theme === 'light' ? '☀️ Claro' : '🌙 Escuro';
-            }
-            if (selectTheme) {
-                selectTheme.value = theme;
             }
         }
 
@@ -1371,6 +1473,7 @@
                     if (setupModal) setupModal.style.display = 'none';
                     if (loginModal) loginModal.style.display = 'none';
                     currentUser = data;
+                    applyRoleUI();
                     return true;
                 }
             } catch (e) {
@@ -1631,98 +1734,115 @@
             } catch (e) { console.error("Erro ao carregar usuários:", e); }
         }
 
-        // CARREGAR A BIBLIOTECA
+        function makeLibraryButton(label, className, handler) {
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = className || '';
+            button.textContent = label;
+            button.onclick = handler;
+            return button;
+        }
+
+        function renderLibrarySection(container, section, files, icon, emptyText) {
+            if (!container) return;
+            container.replaceChildren();
+            if (!files?.length) {
+                const empty = document.createElement('p');
+                empty.className = 'compact-note';
+                empty.style.padding = '0.5rem';
+                empty.textContent = emptyText;
+                container.appendChild(empty);
+                return;
+            }
+
+            files.forEach(file => {
+                const row = document.createElement('div');
+                row.className = 'library-item';
+                const info = document.createElement('div');
+                info.className = 'info';
+                info.title = 'Clique para ver o nome completo';
+                info.onclick = () => toggleFullTitle(info);
+                const fileIcon = document.createElement('div');
+                fileIcon.className = 'icon';
+                fileIcon.textContent = icon;
+                const title = document.createElement('div');
+                title.className = 'title';
+                title.style.cursor = 'pointer';
+                title.textContent = file;
+                info.append(fileIcon, title);
+
+                const actions = document.createElement('div');
+                actions.className = 'actions';
+                if (section === 'videos') actions.appendChild(makeLibraryButton('📂 Usar', '', () => useAudioFromLibrary(file)));
+                if (section === 'photos') actions.appendChild(makeLibraryButton('🖼️ Usar', '', () => useBgFromLibrary(file)));
+
+                const ext = (file.split('.').pop() || '').toLowerCase();
+                if (section === 'history' || ['mp4', 'mkv', 'webm', 'mov', 'avi', 'mp3', 'wav', 'm4a', 'flac', 'png', 'jpg', 'jpeg', 'gif', 'webp'].includes(ext)) {
+                    actions.appendChild(makeLibraryButton('▶️ Ver', 'btn-secondary', () => openMediaPreview(section, file)));
+                }
+                if (section === 'history') {
+                    const link = document.createElement('a');
+                    link.href = `/api/library/download/history/${encodeURIComponent(file)}?token=${encodeURIComponent(authToken)}`;
+                    link.download = file;
+                    link.className = 'btn-primary';
+                    link.textContent = '⬇️ Baixar';
+                    link.style.cssText = 'padding:0.3rem 0.65rem;font-size:0.75rem;text-decoration:none;display:inline-flex;align-items:center;';
+                    actions.appendChild(link);
+                }
+                actions.appendChild(makeLibraryButton('✏️ Renomear', 'btn-secondary', () => renameInLibrary(section, file)));
+                actions.appendChild(makeLibraryButton('🗑️ Excluir', 'btn-delete', () => deleteFromLibrary(section, file)));
+                row.append(info, actions);
+                container.appendChild(row);
+            });
+        }
+
+        function fillLibrarySelect(select, files, placeholder) {
+            if (!select) return;
+            select.replaceChildren(new Option(placeholder, ''));
+            (files || []).forEach(file => select.add(new Option(file, file)));
+        }
+
         async function loadLibrary() {
             try {
                 const res = await authFetch('/api/library');
                 if (!res.ok) return;
                 const data = await res.json();
-
-                const videosList = document.getElementById('libVideosList');
-                const photosList = document.getElementById('libPhotosList');
-                const historyList = document.getElementById('libHistoryList');
-
-                // 1. Músicas e Vídeos Originais
-                if (videosList) {
-                    if (!data.videos || data.videos.length === 0) {
-                        videosList.innerHTML = '<p style="font-size: 0.8rem; color: var(--text-muted); padding: 0.5rem;">Nenhum áudio ou vídeo original na biblioteca.</p>';
-                    } else {
-                        videosList.innerHTML = data.videos.map(file => `
-                            <div class="library-item">
-                                <div class="info" onclick="toggleFullTitle(this)" title="Clique para ver o nome completo">
-                                    <div class="icon">🎵</div>
-                                    <div class="title" style="cursor: pointer;">${file}</div>
-                                </div>
-                                <div class="actions">
-                                    <button type="button" onclick="useAudioFromLibrary('${file.replace(/'/g, "\'")}')">📂 Usar</button>
-                                    <button type="button" class="btn-secondary" style="padding: 0.3rem 0.65rem; font-size: 0.75rem;" onclick="renameInLibrary('videos', '${file.replace(/'/g, "\'")}')">✏️ Renomear</button>
-                                    <button type="button" class="btn-delete" onclick="deleteFromLibrary('videos', '${file.replace(/'/g, "\'")}')">🗑️ Excluir</button>
-                                </div>
-                            </div>
-                        `).join('');
-                    }
-                }
-
-                // 2. Fundos (Fotos e Vídeos)
-                if (photosList) {
-                    if (!data.photos || data.photos.length === 0) {
-                        photosList.innerHTML = '<p style="font-size: 0.8rem; color: var(--text-muted); padding: 0.5rem;">Nenhum fundo ou imagem na biblioteca.</p>';
-                    } else {
-                        photosList.innerHTML = data.photos.map(file => `
-                            <div class="library-item">
-                                <div class="info" onclick="toggleFullTitle(this)" title="Clique para ver o nome completo">
-                                    <div class="icon">🖼️</div>
-                                    <div class="title" style="cursor: pointer;">${file}</div>
-                                </div>
-                                <div class="actions">
-                                    <button type="button" onclick="useBgFromLibrary('${file.replace(/'/g, "\'")}')">🖼️ Usar</button>
-                                    <button type="button" class="btn-secondary" style="padding: 0.3rem 0.65rem; font-size: 0.75rem;" onclick="renameInLibrary('photos', '${file.replace(/'/g, "\'")}')">✏️ Renomear</button>
-                                    <button type="button" class="btn-delete" onclick="deleteFromLibrary('photos', '${file.replace(/'/g, "\'")}')">🗑️ Excluir</button>
-                                </div>
-                            </div>
-                        `).join('');
-                    }
-                }
-
-                // 3. Karaokês no Histórico
-                if (historyList) {
-                    if (!data.history || data.history.length === 0) {
-                        historyList.innerHTML = '<p style="font-size: 0.8rem; color: var(--text-muted); padding: 0.5rem;">Nenhum vídeo renderizado no histórico ainda.</p>';
-                    } else {
-                        const token = localStorage.getItem('auth_token') || localStorage.getItem('karaoke_token') || '';
-                        historyList.innerHTML = data.history.map(file => {
-                            const dlUrl = `/api/library/download/history/${encodeURIComponent(file)}?token=${encodeURIComponent(token)}`;
-                            return `
-                            <div class="library-item">
-                                <div class="info" onclick="toggleFullTitle(this)" title="Clique para ver o nome completo">
-                                    <div class="icon">🎬</div>
-                                    <div class="title" style="cursor: pointer;">${file}</div>
-                                </div>
-                                <div class="actions">
-                                    <a href="${dlUrl}" download="${file}" target="_blank" class="btn-primary" style="padding: 0.3rem 0.65rem; font-size: 0.75rem; text-decoration: none; display: inline-flex; align-items: center; gap: 0.3rem;">⬇️ Baixar</a>
-                                    <button type="button" class="btn-secondary" style="padding: 0.3rem 0.65rem; font-size: 0.75rem;" onclick="renameInLibrary('history', '${file.replace(/'/g, "\'")}')">✏️ Renomear</button>
-                                    <button type="button" class="btn-delete" onclick="deleteFromLibrary('history', '${file.replace(/'/g, "\'")}')">🗑️ Excluir</button>
-                                </div>
-                            </div>
-                        `;}).join('');
-                    }
-                }
-
-                // Atualizar Selects no formulário principal
-                const audioSelect = document.getElementById('libraryAudioSelect');
-                if (audioSelect && data.videos) {
-                    audioSelect.innerHTML = '<option value="">Selecione uma música da biblioteca...</option>' + 
-                        data.videos.map(v => `<option value="${v}">${v}</option>`).join('');
-                }
-                const bgSelect = document.getElementById('libraryBgSelect');
-                if (bgSelect && data.photos) {
-                    bgSelect.innerHTML = '<option value="">Selecione um fundo da biblioteca...</option>' + 
-                        data.photos.map(p => `<option value="${p}">${p}</option>`).join('');
-                }
-
+                renderLibrarySection(document.getElementById('libVideosList'), 'videos', data.videos, '🎵', 'Nenhum original nesta conta.');
+                renderLibrarySection(document.getElementById('libPhotosList'), 'photos', data.photos, '🖼️', 'Nenhum fundo nesta conta.');
+                renderLibrarySection(document.getElementById('libHistoryList'), 'history', data.history, '🎬', 'Nenhum resultado nesta conta.');
+                fillLibrarySelect(document.getElementById('libraryAudioSelect'), data.videos, 'Selecione uma música da biblioteca...');
+                fillLibrarySelect(document.getElementById('libraryBgSelect'), data.photos, 'Selecione um fundo da biblioteca...');
             } catch (e) {
-                console.error("Erro ao carregar biblioteca:", e);
+                console.error('Erro ao carregar biblioteca:', e);
             }
+        }
+
+        function closeMediaPreview() {
+            const modal = document.getElementById('mediaPreviewModal');
+            const video = document.getElementById('libraryVideoPreview');
+            const image = document.getElementById('libraryImagePreview');
+            if (video) { video.pause(); video.removeAttribute('src'); video.load(); }
+            if (image) image.removeAttribute('src');
+            if (modal) modal.style.display = 'none';
+        }
+
+        function openMediaPreview(section, filename) {
+            const modal = document.getElementById('mediaPreviewModal');
+            const title = document.getElementById('mediaPreviewTitle');
+            const video = document.getElementById('libraryVideoPreview');
+            const image = document.getElementById('libraryImagePreview');
+            const url = `/api/library/preview/${encodeURIComponent(section)}/${encodeURIComponent(filename)}?token=${encodeURIComponent(authToken)}`;
+            const imageType = /\.(png|jpe?g|gif|webp|bmp)$/i.test(filename);
+            if (title) title.textContent = filename;
+            if (video) {
+                video.style.display = imageType ? 'none' : 'block';
+                if (!imageType) video.src = url;
+            }
+            if (image) {
+                image.style.display = imageType ? 'block' : 'none';
+                if (imageType) image.src = url;
+            }
+            if (modal) modal.style.display = 'flex';
         }
 
         function useAudioFromLibrary(filename) {
@@ -1806,7 +1926,6 @@
 
             // Alternadores de Tema
             const btnToggleTheme = document.getElementById('btnToggleTheme');
-            const themeSelect = document.getElementById('themeSelect');
             
             if (btnToggleTheme) {
                 btnToggleTheme.onclick = () => {
@@ -1815,18 +1934,18 @@
                     setTheme(newTheme);
                 };
             }
-            if (themeSelect) {
-                themeSelect.onchange = () => {
-                    setTheme(themeSelect.value);
-                };
-            }
-
             // Modais de Ajuda
             const btnOpenHelp = document.getElementById('btnOpenHelp');
             const helpModal = document.getElementById('helpModal');
             const btnCloseHelpModal = document.getElementById('btnCloseHelpModal');
             if (btnOpenHelp && helpModal) btnOpenHelp.onclick = () => helpModal.style.display = 'flex';
             if (btnCloseHelpModal && helpModal) btnCloseHelpModal.onclick = () => helpModal.style.display = 'none';
+            const mediaPreviewModal = document.getElementById('mediaPreviewModal');
+            const btnCloseMediaPreview = document.getElementById('btnCloseMediaPreview');
+            if (btnCloseMediaPreview) btnCloseMediaPreview.onclick = closeMediaPreview;
+            if (mediaPreviewModal) mediaPreviewModal.onclick = event => {
+                if (event.target === mediaPreviewModal) closeMediaPreview();
+            };
 
             // Opções Avançadas Toggle
             const btnToggleAdvanced = document.getElementById('btnToggleAdvanced');
@@ -2000,7 +2119,7 @@
                     }
                     const formData = new FormData();
                     formData.append('file', libAudioFile.files[0]);
-                    formData.append('target_folder', 'videos');
+                    formData.append('section', 'videos');
                     try {
                         const res = await authFetch('/api/library/upload', { method: 'POST', body: formData });
                         if (res.ok) {
@@ -2026,7 +2145,7 @@
                     }
                     const formData = new FormData();
                     formData.append('file', libBgFile.files[0]);
-                    formData.append('target_folder', 'photos');
+                    formData.append('section', 'photos');
                     try {
                         const res = await authFetch('/api/library/upload', { method: 'POST', body: formData });
                         if (res.ok) {
@@ -2214,6 +2333,9 @@
                             document.getElementById('btnSubmit').innerHTML = '🎬 Criar Karaokê';
                             alert("Processamento cancelado.");
                             await loadLibrary();
+                        } else {
+                            const error = await res.json();
+                            alert(error.detail || 'Você não pode cancelar esta tarefa.');
                         }
                     } catch (e) { alert("Erro ao cancelar: " + e.message); }
                 };
@@ -2349,6 +2471,10 @@
                     if (lyricsText) lyricsText.value = '';
                     updateLyricsBadge('');
                 };
+            }
+            const btnOpenResultLibrary = document.getElementById('btnOpenResultLibrary');
+            if (btnOpenResultLibrary) {
+                btnOpenResultLibrary.onclick = () => switchTab('library');
             }
 
             const btnSearchLyrics = document.getElementById('btnSearchLyrics');
@@ -2786,10 +2912,12 @@
 
             // CARREGAR DADOS SALVOS NO SERVIDOR
             await fetchTelegramConfig();
-            await fetchExternalUrlConfig();
             await fetchProfiles();
-            await fetchUsers();
-            await fetchModelsStatus();
+            if (currentUser?.role === 'admin') {
+                await fetchExternalUrlConfig();
+                await fetchUsers();
+                await fetchModelsStatus();
+            }
             await loadLibrary();
 
             // Carregar letra guia salva no servidor
@@ -2836,6 +2964,7 @@
                 processCard.style.display = 'block';
 
                 const formData = new FormData(karaokêForm);
+                formData.set('app_base_url', window.location.origin);
                 try {
                     const res = await authFetch('/api/process', { method: 'POST', body: formData });
                     if (!res.ok) {
@@ -3194,6 +3323,9 @@
                             document.getElementById('processCard').style.display = 'block';
                             isShowingCorrection = false;
                             startPolling();
+                        } else {
+                            const error = await res.json();
+                            alert(error.detail || 'Você não pode cancelar esta tarefa.');
                         }
                     } catch (e) {
                         alert("Erro: " + e.message);
@@ -3239,8 +3371,21 @@
                 const statusMessage = document.getElementById('statusMessage');
                 const btnSubmit = document.getElementById('btnSubmit');
                 const downloadBox = document.getElementById('downloadBox');
+                const resultVideoPreview = document.getElementById('resultVideoPreview');
+                document.querySelectorAll('.btn-cancel-task').forEach(button => {
+                    button.style.display = data.can_cancel ? '' : 'none';
+                });
 
-                if (data.status === "processing" || data.status === "downloading") {
+                if (data.status === "busy") {
+                    if (formCard) formCard.style.display = 'block';
+                    if (correctionCard) correctionCard.style.display = 'none';
+                    if (processCard) processCard.style.display = 'block';
+                    if (statusMessage) statusMessage.innerText = 'O servidor está ocupado com outra criação. Os detalhes ficam privados.';
+                    if (progressPercent) progressPercent.innerText = '—';
+                    if (progressBarFill) progressBarFill.style.width = '0%';
+                    if (btnSubmit) { btnSubmit.disabled = true; btnSubmit.innerHTML = '⏳ Servidor ocupado'; }
+                    if (downloadBox) downloadBox.style.display = 'none';
+                } else if (data.status === "processing" || data.status === "downloading") {
                     // TRAVA DE PROCESSO ÚNICO: Ocultar o formulário enquanto houver processo ativo
                     if (formCard) formCard.style.display = "none";
                     if (correctionCard) correctionCard.style.display = "none";
@@ -3268,8 +3413,14 @@
                     if (correctionCard) correctionCard.style.display = "none";
                     if (formCard) formCard.style.display = "block"; // Restaurar o formulário de criação
 
-                    if (data.status === "done" && data.original_filename && !data.original_filename.includes("Baixando")) {
+                    if (data.status === "done" && data.result_available_to_current_user && data.original_filename && !data.original_filename.includes("Baixando")) {
                         if (downloadBox) downloadBox.style.display = "block";
+                        if (resultVideoPreview) {
+                            resultVideoPreview.src = `/api/download?inline=true&token=${encodeURIComponent(authToken)}&t=${Date.now()}`;
+                            resultVideoPreview.load();
+                        }
+                    } else if (downloadBox) {
+                        downloadBox.style.display = 'none';
                     }
                     if (btnSubmit) { btnSubmit.disabled = false; btnSubmit.innerHTML = '🎬 Criar Karaokê'; }
                     isShowingCorrection = false;

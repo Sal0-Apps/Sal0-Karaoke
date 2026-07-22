@@ -1,27 +1,32 @@
-# 🎤 Sal0 Karaoke
+# 🎤 Sal0 Karaokê
 
-Transforme uma música em um vídeo de karaokê sem sair da sua própria máquina. Escolha a faixa, dê um toque no visual e deixe o Sal0 Karaoke cuidar do resto: separar a voz, ouvir a música, montar as legendas e renderizar o vídeo.
+Transforme uma música em um vídeo de karaokê sem mandar seu áudio para uma nuvem de processamento. Escolha a faixa, ajuste o visual e deixe o Sal0 Karaokê separar a voz, transcrever, sincronizar e renderizar tudo no seu próprio computador ou servidor.
 
-É um projeto pessoal, feito para brincar com música e criar karaokês do seu jeito. ✨
+É um projeto pessoal, feito com carinho para brincar com música — mas organizado o bastante para virar o cantinho de karaokê de uma casa, família ou grupo de amigos. ✨
 
-## O que tem por aqui
+## O que ele faz
 
-- Upload de áudio/vídeo, biblioteca local e links do YouTube.
-- Separação de vocal e instrumental com Demucs.
-- Transcrição local com Faster-Whisper e sincronização de legendas em estilo karaokê.
-- Modos por sílaba, palavra ou linha.
-- Fundo original, cor, imagem, vídeo, paisagem, biblioteca ou YouTube.
-- Ajustes de fonte, cor, posição e quebra de texto.
-- Perfis para guardar seus estilos favoritos.
-- Biblioteca, histórico, cache e editor para revisar as legendas antes de finalizar.
-- Letra manual ou busca automática como guia.
-- Telegram opcional para avisos e envio do vídeo pronto.
+| Parte | Possibilidades |
+|---|---|
+| Música | Upload de áudio ou vídeo, link do YouTube e Biblioteca local |
+| Voz | Separação de vocal e instrumental com Demucs |
+| Legenda | Transcrição local com Faster-Whisper e modos por sílaba, palavra ou linha |
+| Letra-guia | Texto manual ou busca opcional em LRCLIB, Lyrics.ovh e Musixmatch |
+| Visual | Vídeo original, cor, imagem, vídeo, Biblioteca ou YouTube |
+| Revisão | Editor de texto e tempos antes da renderização |
+| Resultado | Preview no app, download em MP4 e histórico permanente |
+| Telegram | Bot pessoal por usuário, avisos e vídeo ou link direto |
+| Contas | Espaços separados para Biblioteca, cache, letras, perfis, bot e resultados |
 
-## Sobre a letra
+Todo o processamento de mídia continua local. Quando a busca automática de letra é usada, apenas o nome da música e do artista é consultado na internet; a letra encontrada serve como guia para a transcrição.
 
-O painel de letra pode ficar fechado enquanto você cria. Ao escolher uma música, o app tenta encontrar uma letra e mostra um aviso dizendo se conseguiu ou não. Quando quiser, abra o painel para ver, editar, colar ou apagar o texto.
+## Contas sem misturar os discos
 
-A busca consulta só o nome da música e do artista em fontes públicas como LRCLIB, Lyrics.ovh e Musixmatch. O áudio, o vídeo, a separação de voz, a transcrição e a renderização continuam na sua máquina. Se não aparecer nada, sem drama: é só colar a letra manualmente.
+- Cada usuário comum vê e controla apenas as próprias criações.
+- Um usuário comum não cria contas nem cancela a tarefa de outra pessoa.
+- Cada conta pode configurar seu próprio bot do Telegram.
+- O administrador gerencia o servidor, pode cancelar qualquer tarefa e recebe também os avisos de todas as contas.
+- A Biblioteca antiga permanece com a conta administradora; novos usuários recebem espaços separados automaticamente.
 
 ## Rodando com Docker
 
@@ -37,18 +42,43 @@ services:
     restart: unless-stopped
 ```
 
-Depois:
+Depois, execute:
 
 ```bash
 docker compose up -d
 ```
 
-Abra `http://localhost:7885` e solte a primeira música na tela. 🎶
+Abra `http://localhost:7885`. No primeiro acesso, o aplicativo pede a criação da conta administradora.
 
-## Onde ficam as coisas
+## Um primeiro karaokê
 
-Tudo que o app guarda permanece no volume `/data`: suas mídias, fundos, resultados, perfis, letras, usuários e histórico. Faça backup dessa pasta se quiser preservar suas criações.
+1. Em **Criar**, envie uma música, use o YouTube ou escolha um item da Biblioteca.
+2. Deixe **Letra automática** ativa ou abra o bloco para colar uma letra manualmente.
+3. Escolha o fundo e, se quiser, abra **Mais ajustes** para personalizar legenda e revisão.
+4. Clique em **Criar Karaokê** e acompanhe as etapas.
+5. Quando terminar, assista no próprio app, baixe o MP4 ou abra **Biblioteca → Resultados**.
 
-## Pequeno aviso
+O botão de tema claro/escuro fica sempre no topo da tela.
 
-Fontes de letras e YouTube são serviços externos e podem variar de disponibilidade. O Sal0 Karaoke continua funcionando sem a busca de letra; ela é só uma ajuda extra para deixar a legenda ainda melhor.
+## Telegram e links diretos
+
+Cada conta configura seu bot em **Ajustes → Meu bot do Telegram**. O administrador pode informar uma URL externa do servidor. Ao concluir um vídeo, o app cria um endereço aleatório de download direto para aquele arquivo; assim, o link funciona sem levar uma sessão do navegador para o Telegram.
+
+Quem receber esse endereço consegue baixar o vídeo enquanto ele existir na Biblioteca. Trate a mensagem como um link privado e não a encaminhe para pessoas que não devam acessar o arquivo.
+
+## Dados, privacidade e cuidados
+
+Tudo que o app guarda fica no volume `/data`: usuários, sessões, modelos, mídias, fundos, letras, perfis, caches e resultados.
+
+- Use uma senha que não esteja sendo usada em outro serviço.
+- Publique o app somente em uma rede confiável, VPN ou proxy configurado por você.
+- Faça backup da pasta `/data` para preservar contas e criações.
+- Nunca publique `.env_deploy`, tokens do GitHub, tokens do Telegram ou arquivos de sessão.
+- Os logs podem conter nomes de arquivos e endereços. Revise o texto antes de compartilhá-lo.
+- Fontes de letras e YouTube são serviços externos e podem ficar indisponíveis. O restante do fluxo continua local.
+
+## Onde pedir ajuda
+
+Ao relatar um problema, conte o que estava fazendo, qual etapa apareceu e qual foi a mensagem de erro. O administrador pode gerar um relatório atualizado em **Ajustes → Diagnóstico**. Remova nomes pessoais, endereços e outros dados que não precisem aparecer no relato.
+
+Divirta-se — e deixe o microfone longe da caixa de som. 🎶

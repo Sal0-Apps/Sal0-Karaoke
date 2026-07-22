@@ -4,8 +4,12 @@ import os
 import uuid
 import shutil
 import logging
+import logging.handlers
+import mimetypes
+import subprocess
 import tempfile
 import threading
+import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import requests
 import re
@@ -13,8 +17,8 @@ import difflib
 import json
 import hashlib
 from urllib.parse import quote
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException, BackgroundTasks, Header, Depends, Query
-from fastapi.responses import HTMLResponse, FileResponse
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException, BackgroundTasks, Header, Depends, Query, Request
+from fastapi.responses import HTMLResponse, FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
@@ -31,6 +35,22 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
 )
 logger = logging.getLogger("karaokê")
+
+RUNTIME_LOG_FILE = "/data/output/app_runtime.log"
+try:
+    os.makedirs(os.path.dirname(RUNTIME_LOG_FILE), exist_ok=True)
+    if not any(getattr(handler, "baseFilename", None) == RUNTIME_LOG_FILE for handler in logging.getLogger().handlers):
+        runtime_handler = logging.handlers.RotatingFileHandler(
+            RUNTIME_LOG_FILE,
+            maxBytes=2 * 1024 * 1024,
+            backupCount=2,
+            encoding="utf-8"
+        )
+        runtime_handler.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(message)s"))
+        logging.getLogger().addHandler(runtime_handler)
+except Exception:
+    # O stdout do contêiner continua disponível mesmo se o volume ainda não estiver pronto.
+    pass
 
 app = FastAPI(title="Karaokê Maker", description="Pipeline local para geração de vídeos de karaokê")
 
@@ -81,6 +101,16 @@ def hash_password(password: str, salt: str = None) -> tuple[str, str]:
         salt = os.urandom(16).hex()
     dk = hashlib.pbkdf2_hmac('sha256', password.encode('utf-8'), bytes.fromhex(salt), 100000)
     return dk.hex(), salt
+
+
+def validate_new_credentials(username: str, password: str):
+    if not re.fullmatch(r"[\w.@-]{3,40}", username or "", re.UNICODE):
+        raise HTTPException(
+            status_code=400,
+            detail="O usuário deve ter de 3 a 40 caracteres e usar apenas letras, números, ponto, hífen ou sublinhado."
+        )
+    if len(password or "") < 8:
+        raise HTTPException(status_code=400, detail="A senha deve ter pelo menos 8 caracteres.")
 
 def download_youtube(url: str, cache_dir: str) -> tuple[str, str]:
     """Baixa o melhor vídeo/áudio do YouTube usando yt-dlp com expurgo prévio e 'overwrites': True."""
@@ -168,7 +198,83 @@ def get_current_user(
         save_sessions(sessions)
         raise HTTPException(status_code=401, detail="Sessão expirada. Faça login novamente.")
 
-    return session
+    username = session.get("username")
+    user_record = users.get(username)
+    if not user_record:
+        sessions.pop(active_token, None)
+        save_sessions(sessions)
+        raise HTTPException(status_code=401, detail="Usuário removido ou sessão inválida.")
+
+    # A permissão atual vem do cadastro, não de uma sessão antiga.
+    current_role = user_record.get("role", "user")
+    if session.get("role") != current_role:
+        session["role"] = current_role
+        sessions[active_token] = session
+        save_sessions(sessions)
+    return {"username": username, "role": current_role, "created_at": session.get("created_at")}
+
+
+USER_DATA_ROOT = "/data/user_data"
+LEGACY_LIBRARY_DIR = "/data/library"
+LEGACY_CACHE_DIR = "/data/cache"
+LEGACY_OUTPUT_DIR = "/data/output"
+
+
+def is_admin(user: dict) -> bool:
+    return user.get("role") in {"admin", "setup"}
+
+
+def require_admin(user: dict):
+    if not is_admin(user):
+        raise HTTPException(status_code=403, detail="Apenas administradores podem acessar esta função.")
+
+
+def user_from_username(username: str) -> dict | None:
+    record = load_users().get(username)
+    if not record:
+        return None
+    return {"username": username, "role": record.get("role", "user")}
+
+
+def user_storage_key(username: str) -> str:
+    """Cria um nome de pasta estável sem confiar no texto informado pelo usuário."""
+    return hashlib.sha256((username or "user").encode("utf-8")).hexdigest()[:24]
+
+
+def get_user_paths(user: dict) -> dict:
+    """Mantém os dados legados com o admin e isola cada usuário comum."""
+    if is_admin(user):
+        paths = {
+            "library": LEGACY_LIBRARY_DIR,
+            "cache": LEGACY_CACHE_DIR,
+            "output": LEGACY_OUTPUT_DIR,
+        }
+    else:
+        root = os.path.join(USER_DATA_ROOT, user_storage_key(user.get("username", "user")))
+        paths = {
+            "library": os.path.join(root, "library"),
+            "cache": os.path.join(root, "cache"),
+            "output": os.path.join(root, "output"),
+        }
+
+    for section in ("videos", "photos", "history"):
+        os.makedirs(os.path.join(paths["library"], section), exist_ok=True)
+    os.makedirs(paths["cache"], exist_ok=True)
+    os.makedirs(paths["output"], exist_ok=True)
+    return paths
+
+
+def config_path(user: dict, filename: str) -> str:
+    return os.path.join(get_user_paths(user)["output"], filename)
+
+
+def current_task_owned_by(user: dict) -> bool:
+    return state.get("owner_username") == user.get("username")
+
+
+def require_task_control(user: dict):
+    if not (is_admin(user) or current_task_owned_by(user)):
+        raise HTTPException(status_code=403, detail="Esta tarefa pertence a outro usuário.")
 
 # Locks para controle thread-safe e prevenção de processamentos concorrentes
 state_lock = threading.Lock()
@@ -188,7 +294,11 @@ state = {
     "progress": 0,             # 0 a 100
     "error_message": "",
     "result_file": None,
-    "original_filename": "final"
+    "original_filename": "final",
+    "owner_username": None,
+    "owner_role": None,
+    "history_filename": None,
+    "public_download_token": None
 }
 
 # Evento global para pausar e continuar o processamento (revisão de legenda)
@@ -420,7 +530,18 @@ def align_lyrics(official_lyrics_text: str, transcribed_segments: list[dict]) ->
             
     return new_segments
 
-def update_state(status: str, step: str, progress: int, error_message: str = "", result_file: str = None, original_filename: str = None):
+def update_state(
+    status: str,
+    step: str,
+    progress: int,
+    error_message: str = "",
+    result_file: str = None,
+    original_filename: str = None,
+    owner_username: str = None,
+    owner_role: str = None,
+    history_filename: str = None,
+    public_download_token: str = None
+):
     """Atualiza o estado global da aplicação de forma thread-safe e persiste no disco."""
     with state_lock:
         state["status"] = status
@@ -430,6 +551,16 @@ def update_state(status: str, step: str, progress: int, error_message: str = "",
         state["result_file"] = result_file
         if original_filename is not None:
             state["original_filename"] = original_filename
+        if owner_username is not None:
+            state["owner_username"] = owner_username
+            state["history_filename"] = None
+            state["public_download_token"] = None
+        if owner_role is not None:
+            state["owner_role"] = owner_role
+        if history_filename is not None:
+            state["history_filename"] = history_filename
+        if public_download_token is not None:
+            state["public_download_token"] = public_download_token
             
         try:
             os.makedirs(os.path.dirname(STATE_FILE), exist_ok=True)
@@ -452,7 +583,8 @@ def startup_event():
                 saved_state = json.load(f)
                 
                 # Se o estado salvo era "processing", significa que o container foi finalizado abruptamente (por exemplo, por falta de RAM)
-                if saved_state.get("status") == "processing":
+                if saved_state.get("status") in {"processing", "downloading", "waiting_for_user_correction", "awaiting_review"}:
+                    state.update(saved_state)
                     orig_name = saved_state.get("original_filename", "vídeo")
                     logger.warning("Detecção de reinicialização abrupta (possível OOM ou queda)!")
                     
@@ -465,14 +597,11 @@ def startup_event():
                     with open(STATE_FILE, "w", encoding="utf-8") as sf:
                         json.dump(state, sf, indent=4)
                     
-                    # Notificar o erro no Telegram
-                    tel_config = load_telegram_config()
-                    token = tel_config.get("telegram_token")
-                    chat_id = tel_config.get("telegram_chat_id")
-                    if token and chat_id:
+                    owner = user_from_username(saved_state.get("owner_username", ""))
+                    for target in get_notification_targets(owner):
                         send_telegram_notification(
-                            token,
-                            chat_id,
+                            target["telegram_token"],
+                            target["telegram_chat_id"],
                             f"⚠️ <b>Sal0 Karaokê</b>: O servidor foi reiniciado inesperadamente ou ficou sem memória RAM (OOM) enquanto processava <b>{orig_name}</b>!"
                         )
                 else:
@@ -481,12 +610,12 @@ def startup_event():
             logger.error(f"Erro ao carregar estado inicial no startup: {e}")
 
 
-def save_video_to_history(video_path: str, orig_name: str) -> str:
-    """Salva uma cópia permanente do vídeo final renderizado na biblioteca de histórico /data/library/history/."""
+def save_video_to_history(video_path: str, orig_name: str, library_dir: str) -> str:
+    """Salva uma cópia permanente no histórico do dono da tarefa."""
     if not video_path or not os.path.exists(video_path):
         return None
     try:
-        lib_history_dir = "/data/library/history"
+        lib_history_dir = os.path.join(library_dir, "history")
         os.makedirs(lib_history_dir, exist_ok=True)
         safe_name = "".join([c for c in orig_name if c.isalnum() or c in ' ._-']).strip() or "video_karaoke"
         if not safe_name.lower().endswith(".mp4"):
@@ -508,6 +637,18 @@ def save_video_to_history(video_path: str, orig_name: str) -> str:
     except Exception as err:
         logger.error(f"Erro ao salvar vídeo no histórico: {err}")
         return None
+
+
+def save_result_metadata(output_dir: str, original_filename: str, history_filename: str):
+    try:
+        with open(os.path.join(output_dir, "result_meta.json"), "w", encoding="utf-8") as file:
+            json.dump({
+                "original_filename": original_filename,
+                "history_filename": history_filename,
+                "completed_at": time.time()
+            }, file, ensure_ascii=False, indent=2)
+    except Exception as exc:
+        logger.warning("Não foi possível salvar metadados do resultado: %s", exc)
 
 def _send_telegram_notification_worker(token: str, chat_id: str, message: str):
     try:
@@ -554,29 +695,62 @@ def send_telegram_video(token: str, chat_id: str, video_path: str, caption: str 
     except Exception as e:
         logger.error(f"Falha ao enviar vídeo de karaokê para o Telegram: {e}")
 
-# Gerenciamento de Configurações Globais do Telegram
+# Bot do Telegram por usuário; o arquivo legado continua sendo o bot do administrador.
 TELEGRAM_FILE = "/data/output/telegram.json"
 
 class TelegramModel(BaseModel):
     telegram_token: str
     telegram_chat_id: str
 
-def load_telegram_config() -> dict:
-    """Carrega as credenciais globais do Telegram do disco."""
-    if not os.path.exists(TELEGRAM_FILE):
+def telegram_file_for_user(user: dict) -> str:
+    return TELEGRAM_FILE if is_admin(user) else config_path(user, "telegram.json")
+
+
+def load_telegram_config(user: dict = None) -> dict:
+    """Carrega somente o bot pertencente ao usuário informado."""
+    if not user:
+        return {"telegram_token": "", "telegram_chat_id": ""}
+    telegram_file = telegram_file_for_user(user)
+    if not os.path.exists(telegram_file):
         return {"telegram_token": "", "telegram_chat_id": ""}
     try:
-        with open(TELEGRAM_FILE, "r", encoding="utf-8") as f:
-            import json
+        with open(telegram_file, "r", encoding="utf-8") as f:
             return json.load(f)
     except Exception as e:
         logger.error(f"Erro ao carregar configurações do Telegram: {e}")
         return {"telegram_token": "", "telegram_chat_id": ""}
 
+def get_notification_targets(owner: dict | None) -> list[dict]:
+    """Notifica o bot pessoal do dono e todos os administradores configurados."""
+    target_users = []
+    if owner:
+        target_users.append(owner)
+    for username, record in load_users().items():
+        if record.get("role") == "admin" and username != (owner or {}).get("username"):
+            target_users.append({"username": username, "role": "admin"})
+
+    targets = []
+    seen = set()
+    for target_user in target_users:
+        config = load_telegram_config(target_user)
+        token = str(config.get("telegram_token") or "").strip()
+        chat_id = str(config.get("telegram_chat_id") or "").strip()
+        key = (token, chat_id)
+        if token and chat_id and key not in seen:
+            seen.add(key)
+            targets.append({"telegram_token": token, "telegram_chat_id": chat_id})
+    return targets
+
+
+def notify_targets(targets: list[dict], message: str):
+    for target in targets:
+        send_telegram_notification(target["telegram_token"], target["telegram_chat_id"], message)
+
+
 @app.get("/api/telegram")
 def get_telegram_config(current_user: dict = Depends(get_current_user)):
-    """Endpoint para ler a credencial global do Telegram."""
-    config = load_telegram_config()
+    """Retorna apenas o bot pessoal da conta autenticada."""
+    config = load_telegram_config(current_user)
     # Mascarar token parcialmente na resposta para não expor o valor completo
     token = config.get("telegram_token", "")
     if token and len(token) > 8:
@@ -585,15 +759,19 @@ def get_telegram_config(current_user: dict = Depends(get_current_user)):
 
 @app.post("/api/telegram")
 def save_telegram_config(config: TelegramModel, current_user: dict = Depends(get_current_user)):
-    """Endpoint para salvar a credencial global do Telegram."""
+    """Salva apenas o bot pessoal da conta autenticada."""
     try:
-        os.makedirs(os.path.dirname(TELEGRAM_FILE), exist_ok=True)
-        with open(TELEGRAM_FILE, "w", encoding="utf-8") as f:
-            import json
+        telegram_file = telegram_file_for_user(current_user)
+        previous = load_telegram_config(current_user)
+        submitted_token = config.telegram_token.strip()
+        if "***" in submitted_token:
+            submitted_token = previous.get("telegram_token", "")
+        os.makedirs(os.path.dirname(telegram_file), exist_ok=True)
+        with open(telegram_file, "w", encoding="utf-8") as f:
             json.dump({
-                "telegram_token": config.telegram_token.strip(),
+                "telegram_token": submitted_token,
                 "telegram_chat_id": config.telegram_chat_id.strip()
-            }, f, indent=4)
+            }, f, indent=4, ensure_ascii=False)
         return {"status": "success"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erro ao salvar configurações do Telegram: {e}")
@@ -619,19 +797,25 @@ def load_external_url_config() -> dict:
 @app.get("/api/external_url")
 def get_external_url_config(current_user: dict = Depends(get_current_user)):
     """Endpoint para ler a URL/IP externo salvo."""
+    require_admin(current_user)
     return load_external_url_config()
 
 @app.post("/api/external_url")
 def save_external_url_config(config: ExternalUrlModel, current_user: dict = Depends(get_current_user)):
     """Endpoint para salvar a URL/IP externo."""
+    require_admin(current_user)
     try:
+        external_url = config.external_url.strip().rstrip("/")
+        if external_url and not re.match(r"^https?://[^\s]+$", external_url, re.IGNORECASE):
+            raise HTTPException(status_code=400, detail="Informe uma URL completa iniciada por http:// ou https://.")
         os.makedirs(os.path.dirname(EXTERNAL_URL_FILE), exist_ok=True)
         with open(EXTERNAL_URL_FILE, "w", encoding="utf-8") as f:
-            import json
             json.dump({
-                "external_url": config.external_url.strip()
-            }, f, indent=4)
+                "external_url": external_url
+            }, f, indent=4, ensure_ascii=False)
         return {"status": "success"}
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erro ao salvar URL externa: {e}")
 
@@ -642,16 +826,26 @@ class ModelDownloadRequest(BaseModel):
     model: str = None
 
 
-yt_preset_audio_status = {"status": "idle", "progress": 0, "title": "", "filename": "", "error": None}
-yt_preset_bg_status = {"status": "idle", "progress": 0, "title": "", "filename": "", "error": None}
+yt_preset_statuses = {}
+
+
+def youtube_status_key(user: dict, kind: str) -> str:
+    return f"{user_storage_key(user.get('username', 'user'))}:{kind}"
+
+
+def get_youtube_status(user: dict, kind: str) -> dict:
+    return yt_preset_statuses.get(
+        youtube_status_key(user, kind),
+        {"status": "idle", "progress": 0, "title": "", "filename": "", "error": None}
+    )
 
 @app.get("/api/youtube-preset-status/audio")
 def get_yt_preset_audio_status(current_user: dict = Depends(get_current_user)):
-    return yt_preset_audio_status
+    return get_youtube_status(current_user, "audio")
 
 @app.get("/api/youtube-preset-status/bg")
 def get_yt_preset_bg_status(current_user: dict = Depends(get_current_user)):
-    return yt_preset_bg_status
+    return get_youtube_status(current_user, "background")
 
 class YouTubePresetModel(BaseModel):
     youtube_url: str
@@ -792,6 +986,7 @@ def get_models_status(current_user: dict = Depends(get_current_user)):
 @app.post("/api/models/download")
 def start_model_download(req: ModelDownloadRequest, current_user: dict = Depends(get_current_user)):
     """Dispara o download do modelo Whisper selecionado em background."""
+    require_admin(current_user)
     model_size = req.model_size or req.model
     if model_size not in model_download_status:
         raise HTTPException(status_code=400, detail="Modelo inválido.")
@@ -811,13 +1006,14 @@ def start_model_download(req: ModelDownloadRequest, current_user: dict = Depends
     
     return {"message": f"Download do modelo {model_size} iniciado."}
 
-def run_youtube_download_bg(url: str):
-    global yt_preset_audio_status
-    cache_dir = "/data/cache"
+def run_youtube_download_bg(url: str, owner: dict):
+    status_key = youtube_status_key(owner, "audio")
+    paths = get_user_paths(owner)
+    cache_dir = paths["cache"]
     os.makedirs(cache_dir, exist_ok=True)
     cache_meta_file = os.path.join(cache_dir, "cache_meta.json")
     
-    yt_preset_audio_status = {"status": "downloading", "progress": 15, "title": "Conectando ao YouTube...", "filename": "", "error": None}
+    yt_preset_statuses[status_key] = {"status": "downloading", "progress": 15, "title": "Conectando ao YouTube...", "filename": "", "error": None}
     
     try:
         # Limpar áudios e segmentos legados da música anterior
@@ -832,8 +1028,8 @@ def run_youtube_download_bg(url: str):
         input_audio_path, title = download_youtube(url, cache_dir)
         ext = os.path.splitext(input_audio_path)[1]
         
-        yt_preset_audio_status["title"] = title
-        yt_preset_audio_status["progress"] = 70
+        yt_preset_statuses[status_key]["title"] = title
+        yt_preset_statuses[status_key]["progress"] = 70
         
         cached_meta = {
             "youtube_url": url,
@@ -850,7 +1046,7 @@ def run_youtube_download_bg(url: str):
             
         dest_filename = os.path.basename(input_audio_path)
         try:
-            lib_video_dir = "/data/library/videos"
+            lib_video_dir = os.path.join(paths["library"], "videos")
             os.makedirs(lib_video_dir, exist_ok=True)
             safe_title = "".join([c for c in title if c.isalnum() or c in ' ._-']).strip() or "youtube_download"
             dest_filename = f"{safe_title}{ext}"
@@ -860,7 +1056,7 @@ def run_youtube_download_bg(url: str):
         except Exception as copy_err:
             logger.error(f"Erro ao salvar vídeo do YouTube na biblioteca: {copy_err}")
 
-        yt_preset_audio_status = {
+        yt_preset_statuses[status_key] = {
             "status": "done",
             "progress": 100,
             "title": title,
@@ -869,7 +1065,7 @@ def run_youtube_download_bg(url: str):
         }
     except Exception as e:
         logger.error(f"Erro no download do YouTube em background: {e}")
-        yt_preset_audio_status = {
+        yt_preset_statuses[status_key] = {
             "status": "error",
             "progress": 0,
             "title": "",
@@ -940,23 +1136,24 @@ def download_bg_youtube(url: str, cache_dir: str) -> tuple[str, str]:
         
     return no_audio_file, title
 
-def run_bg_youtube_download_bg(url: str):
-    global yt_preset_bg_status
-    cache_dir = "/data/cache"
+def run_bg_youtube_download_bg(url: str, owner: dict):
+    status_key = youtube_status_key(owner, "background")
+    paths = get_user_paths(owner)
+    cache_dir = paths["cache"]
     os.makedirs(cache_dir, exist_ok=True)
     
-    yt_preset_bg_status = {"status": "downloading", "progress": 15, "title": "Conectando ao YouTube...", "filename": "", "error": None}
+    yt_preset_statuses[status_key] = {"status": "downloading", "progress": 15, "title": "Conectando ao YouTube...", "filename": "", "error": None}
     
     try:
         no_audio_path, title = download_bg_youtube(url, cache_dir)
         ext = os.path.splitext(no_audio_path)[1]
         
-        yt_preset_bg_status["title"] = title
-        yt_preset_bg_status["progress"] = 70
+        yt_preset_statuses[status_key]["title"] = title
+        yt_preset_statuses[status_key]["progress"] = 70
         
         dest_filename = os.path.basename(no_audio_path)
         try:
-            lib_photos_dir = "/data/library/photos"
+            lib_photos_dir = os.path.join(paths["library"], "photos")
             os.makedirs(lib_photos_dir, exist_ok=True)
             safe_title = "".join([c for c in title if c.isalnum() or c in ' ._-']).strip() or "fundo_youtube"
             dest_filename = f"{safe_title}_sem_audio{ext}"
@@ -966,7 +1163,7 @@ def run_bg_youtube_download_bg(url: str):
         except Exception as copy_err:
             logger.error(f"Erro ao salvar fundo do YouTube na biblioteca: {copy_err}")
 
-        yt_preset_bg_status = {
+        yt_preset_statuses[status_key] = {
             "status": "done",
             "progress": 100,
             "title": title,
@@ -975,7 +1172,7 @@ def run_bg_youtube_download_bg(url: str):
         }
     except Exception as e:
         logger.error(f"Erro no download de fundo do YouTube em background: {e}")
-        yt_preset_bg_status = {
+        yt_preset_statuses[status_key] = {
             "status": "error",
             "progress": 0,
             "title": "",
@@ -999,7 +1196,7 @@ def download_youtube_preset(
     if not url:
         raise HTTPException(status_code=400, detail="URL do YouTube vazia.")
         
-    threading.Thread(target=run_youtube_download_bg, args=(url,), daemon=True).start()
+    threading.Thread(target=run_youtube_download_bg, args=(url, dict(current_user)), daemon=True).start()
     return {"status": "started"}
 
 # Gerenciamento de Perfis de Uso Persistentes em JSON
@@ -1018,13 +1215,12 @@ def download_bg_youtube_preset(
     if not url:
         raise HTTPException(status_code=400, detail="URL do YouTube vazia.")
         
-    threading.Thread(target=run_bg_youtube_download_bg, args=(url,), daemon=True).start()
+    threading.Thread(target=run_bg_youtube_download_bg, args=(url, dict(current_user)), daemon=True).start()
     return {"status": "started"}
 
 
-SAVED_LYRICS_FILE = "/data/output/saved_lyrics.txt"
 LRCLIB_API_URL = "https://lrclib.net/api"
-LRCLIB_USER_AGENT = "Sal0-Karaoke/5.0.1 (+https://github.com/Sal0-Apps/Sal0-Karaoke)"
+LRCLIB_USER_AGENT = "Sal0-Karaoke/5.1.0 (+https://github.com/Sal0-Apps/Sal0-Karaoke)"
 LYRICS_OVH_API_URL = "https://api.lyrics.ovh/v1"
 LYRICS_PROVIDER_TIMEOUT = (3.05, 6)
 MUSIXMATCH_API_URL = "https://apic-desktop.musixmatch.com/ws/1.1"
@@ -1416,9 +1612,10 @@ def fetch_lyrics_online(data: LyricsFetchRequest, current_user: dict = Depends(g
 @app.get("/api/lyrics")
 def get_saved_lyrics(current_user: dict = Depends(get_current_user)):
     """Retorna a letra salva no servidor."""
-    if os.path.exists(SAVED_LYRICS_FILE):
+    lyrics_file = config_path(current_user, "saved_lyrics.txt")
+    if os.path.exists(lyrics_file):
         try:
-            with open(SAVED_LYRICS_FILE, "r", encoding="utf-8") as f:
+            with open(lyrics_file, "r", encoding="utf-8") as f:
                 return {"lyrics_text": f.read()}
         except Exception as e:
             logger.error(f"Erro ao ler letra do servidor: {e}")
@@ -1428,8 +1625,9 @@ def get_saved_lyrics(current_user: dict = Depends(get_current_user)):
 def save_lyrics_server(data: LyricsModel, current_user: dict = Depends(get_current_user)):
     """Salva a letra da música no servidor."""
     try:
-        os.makedirs(os.path.dirname(SAVED_LYRICS_FILE), exist_ok=True)
-        with open(SAVED_LYRICS_FILE, "w", encoding="utf-8") as f:
+        lyrics_file = config_path(current_user, "saved_lyrics.txt")
+        os.makedirs(os.path.dirname(lyrics_file), exist_ok=True)
+        with open(lyrics_file, "w", encoding="utf-8") as f:
             f.write(data.lyrics_text or "")
         return {"status": "saved"}
     except Exception as e:
@@ -1440,8 +1638,9 @@ def save_lyrics_server(data: LyricsModel, current_user: dict = Depends(get_curre
 def delete_lyrics_server(current_user: dict = Depends(get_current_user)):
     """Exclui a letra salva do servidor."""
     try:
-        if os.path.exists(SAVED_LYRICS_FILE):
-            os.remove(SAVED_LYRICS_FILE)
+        lyrics_file = config_path(current_user, "saved_lyrics.txt")
+        if os.path.exists(lyrics_file):
+            os.remove(lyrics_file)
         return {"status": "deleted"}
     except Exception as e:
         logger.error(f"Erro ao excluir letra do servidor: {e}")
@@ -1449,7 +1648,7 @@ def delete_lyrics_server(current_user: dict = Depends(get_current_user)):
 
 
 
-# Sistema de Logs de Diagnóstico v5.0.1
+# Sistema de Logs de Diagnóstico v5.1.0
 DIAGNOSTIC_LOG_FILE = "/data/output/app_diagnostic.log"
 
 def log_diagnostic(message: str, level: str = "INFO"):
@@ -1467,26 +1666,42 @@ def log_diagnostic(message: str, level: str = "INFO"):
 
 @app.get("/api/logs/download")
 def download_diagnostic_logs(current_user: dict = Depends(get_current_user)):
-    """Endpoint para baixar os logs detalhados de diagnóstico do servidor."""
-    if os.path.exists(DIAGNOSTIC_LOG_FILE):
-        return FileResponse(
-            DIAGNOSTIC_LOG_FILE,
-            media_type="text/plain",
-            filename="sal0_karaoke_diagnostic_logs.txt"
-        )
-    # Se não existir ainda o arquivo de log dedicado, cria um com o estado atual
-    try:
-        log_diagnostic("Log de diagnóstico gerado pelo usuário.")
-        return FileResponse(
-            DIAGNOSTIC_LOG_FILE,
-            media_type="text/plain",
-            filename="sal0_karaoke_diagnostic_logs.txt"
-        )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Erro ao gerar arquivo de logs: {e}")
+    """Monta um relatório atual no momento do clique, limitado ao administrador."""
+    require_admin(current_user)
 
+    def read_tail(path: str, limit: int = 1024 * 1024) -> str:
+        if not os.path.exists(path):
+            return "(arquivo ainda não criado)"
+        try:
+            with open(path, "rb") as file:
+                file.seek(0, os.SEEK_END)
+                size = file.tell()
+                file.seek(max(0, size - limit))
+                return file.read().decode("utf-8", errors="replace")
+        except Exception as exc:
+            return f"(não foi possível ler: {type(exc).__name__})"
 
-PROFILES_FILE = "/data/output/profiles.json"
+    with state_lock:
+        current_state = dict(state)
+    report = "\n".join([
+        "Sal0 Karaokê v5.1.0 — diagnóstico ao vivo",
+        f"Gerado em: {time.strftime('%Y-%m-%d %H:%M:%S')}",
+        "",
+        "=== ESTADO ATUAL ===",
+        json.dumps(current_state, ensure_ascii=False, indent=2),
+        "",
+        "=== LOG DA APLICAÇÃO (TRECHO MAIS RECENTE) ===",
+        read_tail(RUNTIME_LOG_FILE),
+        "",
+        "=== LOG DE DIAGNÓSTICO (TRECHO MAIS RECENTE) ===",
+        read_tail(DIAGNOSTIC_LOG_FILE),
+    ])
+    return Response(
+        content=report,
+        media_type="text/plain; charset=utf-8",
+        headers={"Content-Disposition": "attachment; filename=sal0_karaoke_logs_atuais.txt"}
+    )
+
 
 class ProfileModel(BaseModel):
     name: str
@@ -1510,7 +1725,7 @@ class ProfileModel(BaseModel):
     save_to_library: bool = True
     only_remove_vocals: bool = False
 
-def load_profiles() -> dict:
+def load_profiles(user: dict) -> dict:
     """Carrega os perfis do arquivo JSON ou inicializa com valores padrão se não existir."""
     default_profiles = {
         "Padrão": {
@@ -1532,10 +1747,11 @@ def load_profiles() -> dict:
         }
     }
     
-    if not os.path.exists(PROFILES_FILE):
+    profiles_file = config_path(user, "profiles.json")
+    if not os.path.exists(profiles_file):
         try:
-            os.makedirs(os.path.dirname(PROFILES_FILE), exist_ok=True)
-            with open(PROFILES_FILE, "w", encoding="utf-8") as f:
+            os.makedirs(os.path.dirname(profiles_file), exist_ok=True)
+            with open(profiles_file, "w", encoding="utf-8") as f:
                 import json
                 json.dump(default_profiles, f, indent=4, ensure_ascii=False)
             return default_profiles
@@ -1544,7 +1760,7 @@ def load_profiles() -> dict:
             return default_profiles
             
     try:
-        with open(PROFILES_FILE, "r", encoding="utf-8") as f:
+        with open(profiles_file, "r", encoding="utf-8") as f:
             import json
             profiles = json.load(f)
             # Garantir retrocompatibilidade preenchendo campos ausentes
@@ -1583,12 +1799,12 @@ def load_profiles() -> dict:
 @app.get("/api/profiles")
 def get_profiles(current_user: dict = Depends(get_current_user)):
     """Retorna todos os perfis salvos."""
-    return load_profiles()
+    return load_profiles(current_user)
 
 @app.post("/api/profiles")
 def save_profile(profile: ProfileModel, current_user: dict = Depends(get_current_user)):
     """Salva ou atualiza um perfil de uso."""
-    profiles = load_profiles()
+    profiles = load_profiles(current_user)
     profiles[profile.name] = {
         "whisper_model": profile.whisper_model,
         "font_size": profile.font_size,
@@ -1611,7 +1827,7 @@ def save_profile(profile: ProfileModel, current_user: dict = Depends(get_current
         "only_remove_vocals": profile.only_remove_vocals
     }
     try:
-        with open(PROFILES_FILE, "w", encoding="utf-8") as f:
+        with open(config_path(current_user, "profiles.json"), "w", encoding="utf-8") as f:
             import json
             json.dump(profiles, f, indent=4, ensure_ascii=False)
         return {"status": "success", "profiles": profiles}
@@ -1623,11 +1839,11 @@ def delete_profile(name: str, current_user: dict = Depends(get_current_user)):
     """Remove um perfil de uso."""
     if name == "Padrão":
         raise HTTPException(status_code=400, detail="O perfil 'Padrão' não pode ser excluído.")
-    profiles = load_profiles()
+    profiles = load_profiles(current_user)
     if name in profiles:
         del profiles[name]
         try:
-            with open(PROFILES_FILE, "w", encoding="utf-8") as f:
+            with open(config_path(current_user, "profiles.json"), "w", encoding="utf-8") as f:
                 import json
                 json.dump(profiles, f, indent=4, ensure_ascii=False)
             return {"status": "success", "profiles": profiles}
@@ -1635,14 +1851,13 @@ def delete_profile(name: str, current_user: dict = Depends(get_current_user)):
             raise HTTPException(status_code=500, detail=f"Erro ao salvar arquivo após exclusão: {e}")
     raise HTTPException(status_code=404, detail="Perfil de uso não encontrado.")
 
-LAST_PROFILE_FILE = "/data/output/last_profile.json"
-
 @app.get("/api/last_profile")
 def get_last_profile(current_user: dict = Depends(get_current_user)):
     """Retorna o nome do último perfil utilizado."""
-    if os.path.exists(LAST_PROFILE_FILE):
+    last_profile_file = config_path(current_user, "last_profile.json")
+    if os.path.exists(last_profile_file):
         try:
-            with open(LAST_PROFILE_FILE, "r", encoding="utf-8") as f:
+            with open(last_profile_file, "r", encoding="utf-8") as f:
                 import json
                 return json.load(f)
         except Exception:
@@ -1653,8 +1868,9 @@ def get_last_profile(current_user: dict = Depends(get_current_user)):
 def save_last_profile(data: dict, current_user: dict = Depends(get_current_user)):
     """Salva o nome do último perfil utilizado."""
     try:
-        os.makedirs(os.path.dirname(LAST_PROFILE_FILE), exist_ok=True)
-        with open(LAST_PROFILE_FILE, "w", encoding="utf-8") as f:
+        last_profile_file = config_path(current_user, "last_profile.json")
+        os.makedirs(os.path.dirname(last_profile_file), exist_ok=True)
+        with open(last_profile_file, "w", encoding="utf-8") as f:
             import json
             json.dump(data, f, indent=4, ensure_ascii=False)
         return {"status": "success"}
@@ -1681,10 +1897,20 @@ def auth_status(x_session_token: str = Header(None)):
     session = sessions.get(x_session_token)
     if not session:
         return {"status": "login"}
+    username = session.get("username")
+    user_record = users.get(username)
+    if not user_record:
+        sessions.pop(x_session_token, None)
+        save_sessions(sessions)
+        return {"status": "login"}
+    if session.get("created_at") and (time.time() - session["created_at"]) > (30 * 24 * 3600):
+        sessions.pop(x_session_token, None)
+        save_sessions(sessions)
+        return {"status": "login"}
     return {
         "status": "authenticated",
-        "username": session.get("username"),
-        "role": session.get("role")
+        "username": username,
+        "role": user_record.get("role", "user")
     }
 
 @app.post("/api/setup_admin")
@@ -1698,6 +1924,7 @@ def setup_admin(data: dict):
     
     if not username or not password:
         raise HTTPException(status_code=400, detail="Usuário e senha são obrigatórios.")
+    validate_new_credentials(username, password)
         
     pw_hash, salt = hash_password(password)
     users[username] = {
@@ -1814,6 +2041,9 @@ def create_user(data: dict, current_user: dict = Depends(get_current_user)):
     
     if not username or not password:
         raise HTTPException(status_code=400, detail="Usuário e senha são obrigatórios.")
+    validate_new_credentials(username, password)
+    if role not in {"user", "admin"}:
+        raise HTTPException(status_code=400, detail="Função de usuário inválida.")
         
     users = load_users()
     if username in users:
@@ -1838,18 +2068,21 @@ def delete_user(username: str, current_user: dict = Depends(get_current_user)):
     if username in users:
         del users[username]
         save_users(users)
+        sessions = load_sessions()
+        sessions = {token: session for token, session in sessions.items() if session.get("username") != username}
+        save_sessions(sessions)
         return {"status": "success"}
     raise HTTPException(status_code=404, detail="Usuário não encontrado.")
 
 # --- SISTEMA DE BIBLIOTECA & HISTÓRICO ---
-LIBRARY_DIR = "/data/library"
 
 @app.get("/api/library")
 def get_library_files(current_user: dict = Depends(get_current_user)):
     """Retorna as listas de arquivos disponíveis na biblioteca (videos, photos, history)."""
     result = {"videos": [], "photos": [], "history": []}
+    library_dir = get_user_paths(current_user)["library"]
     for section in ["videos", "photos", "history"]:
-        path = os.path.join(LIBRARY_DIR, section)
+        path = os.path.join(library_dir, section)
         if os.path.exists(path):
             try:
                 files = sorted(os.listdir(path))
@@ -1868,7 +2101,7 @@ def upload_to_library(
     if section not in ["videos", "photos"]:
         raise HTTPException(status_code=400, detail="Seção de biblioteca inválida.")
     
-    target_dir = os.path.join(LIBRARY_DIR, section)
+    target_dir = os.path.join(get_user_paths(current_user)["library"], section)
     os.makedirs(target_dir, exist_ok=True)
     
     safe_name = os.path.basename(file.filename)
@@ -1893,11 +2126,12 @@ def save_to_history(data: dict, current_user: dict = Depends(get_current_user)):
     if not safe_title.lower().endswith(".mp4"):
         safe_title += ".mp4"
         
-    final_mp4 = "/data/output/final_karaoke.mp4"
+    paths = get_user_paths(current_user)
+    final_mp4 = os.path.join(paths["output"], "final_karaoke.mp4")
     if not os.path.exists(final_mp4):
         raise HTTPException(status_code=400, detail="Nenhum vídeo finalizado encontrado para salvar no histórico.")
         
-    dest_dir = os.path.join(LIBRARY_DIR, "history")
+    dest_dir = os.path.join(paths["library"], "history")
     os.makedirs(dest_dir, exist_ok=True)
     dest_path = os.path.join(dest_dir, safe_title)
     
@@ -1919,10 +2153,11 @@ def rename_library_file(
     current_user: dict = Depends(get_current_user)
 ):
     """Renomeia um arquivo na biblioteca (videos, photos ou history)."""
+    library_dir = get_user_paths(current_user)["library"]
     valid_sections = {
-        "videos": os.path.join(LIBRARY_DIR, "videos"),
-        "photos": os.path.join(LIBRARY_DIR, "photos"),
-        "history": os.path.join(LIBRARY_DIR, "history")
+        "videos": os.path.join(library_dir, "videos"),
+        "photos": os.path.join(library_dir, "photos"),
+        "history": os.path.join(library_dir, "history")
     }
     if section not in valid_sections:
         raise HTTPException(status_code=400, detail="Seção de biblioteca inválida.")
@@ -1965,7 +2200,7 @@ def delete_from_library(section: str, filename: str, current_user: dict = Depend
         raise HTTPException(status_code=400, detail="Seção inválida.")
         
     safe_filename = os.path.basename(filename)
-    file_path = os.path.join(LIBRARY_DIR, section, safe_filename)
+    file_path = os.path.join(get_user_paths(current_user)["library"], section, safe_filename)
     
     if os.path.exists(file_path):
         try:
@@ -1984,12 +2219,84 @@ def download_from_library(section: str, filename: str, current_user: dict = Depe
         raise HTTPException(status_code=400, detail="Seção inválida.")
         
     safe_filename = os.path.basename(filename)
-    file_path = os.path.join(LIBRARY_DIR, section, safe_filename)
+    file_path = os.path.join(get_user_paths(current_user)["library"], section, safe_filename)
     
     if os.path.exists(file_path):
         return FileResponse(file_path, filename=safe_filename)
         
     raise HTTPException(status_code=404, detail="Arquivo não encontrado na biblioteca.")
+
+
+@app.get("/api/library/preview/{section}/{filename}")
+def preview_from_library(section: str, filename: str, current_user: dict = Depends(get_current_user)):
+    """Abre áudio/vídeo na interface sem forçar download."""
+    if section not in ["videos", "photos", "history"]:
+        raise HTTPException(status_code=400, detail="Seção inválida.")
+    safe_filename = os.path.basename(filename)
+    file_path = os.path.join(get_user_paths(current_user)["library"], section, safe_filename)
+    if not os.path.isfile(file_path):
+        raise HTTPException(status_code=404, detail="Arquivo não encontrado na biblioteca.")
+    media_type = mimetypes.guess_type(file_path)[0] or "application/octet-stream"
+    return FileResponse(
+        file_path,
+        media_type=media_type,
+        headers={"Content-Disposition": "inline"}
+    )
+
+
+PUBLIC_DOWNLOADS_FILE = "/data/output/public_downloads.json"
+public_downloads_lock = threading.Lock()
+
+
+def create_public_download(owner: dict, history_filename: str) -> str | None:
+    if not history_filename:
+        return None
+    file_path = os.path.abspath(os.path.join(get_user_paths(owner)["library"], "history", os.path.basename(history_filename)))
+    if not os.path.isfile(file_path):
+        return None
+    download_token = uuid.uuid4().hex + uuid.uuid4().hex
+    with public_downloads_lock:
+        records = {}
+        if os.path.exists(PUBLIC_DOWNLOADS_FILE):
+            try:
+                with open(PUBLIC_DOWNLOADS_FILE, "r", encoding="utf-8") as file:
+                    records = json.load(file)
+            except Exception:
+                records = {}
+        records[download_token] = {
+            "owner_username": owner.get("username"),
+            "file_path": file_path,
+            "filename": os.path.basename(history_filename),
+            "created_at": time.time()
+        }
+        os.makedirs(os.path.dirname(PUBLIC_DOWNLOADS_FILE), exist_ok=True)
+        with open(PUBLIC_DOWNLOADS_FILE, "w", encoding="utf-8") as file:
+            json.dump(records, file, ensure_ascii=False, indent=2)
+    return download_token
+
+
+@app.get("/api/public/download/{download_token}")
+def public_download(download_token: str):
+    """Download direto por link aleatório enviado ao Telegram, sem expor sessão ou caminho."""
+    if not re.fullmatch(r"[a-f0-9]{64}", download_token or ""):
+        raise HTTPException(status_code=404, detail="Link inválido.")
+    with public_downloads_lock:
+        try:
+            with open(PUBLIC_DOWNLOADS_FILE, "r", encoding="utf-8") as file:
+                record = json.load(file).get(download_token)
+        except Exception:
+            record = None
+    if not record:
+        raise HTTPException(status_code=404, detail="Link não encontrado.")
+    file_path = os.path.abspath(str(record.get("file_path") or ""))
+    allowed_root = os.path.abspath("/data") + os.sep
+    if not file_path.startswith(allowed_root) or not os.path.isfile(file_path):
+        raise HTTPException(status_code=404, detail="Vídeo removido ou indisponível.")
+    return FileResponse(
+        file_path,
+        media_type="video/mp4",
+        filename=os.path.basename(record.get("filename") or "sal0_karaoke.mp4")
+    )
 
 class EditWordModel(BaseModel):
     word: str
@@ -2007,7 +2314,7 @@ class ContinueProcessModel(BaseModel):
 
 @app.get("/api/cache_info")
 def get_cache_info(current_user: dict = Depends(get_current_user)):
-    cache_dir = "/data/cache"
+    cache_dir = get_user_paths(current_user)["cache"]
     cache_meta_file = os.path.join(cache_dir, "cache_meta.json")
     if os.path.exists(cache_meta_file):
         try:
@@ -2040,7 +2347,7 @@ def get_cache_info(current_user: dict = Depends(get_current_user)):
 @app.get("/api/cache/background")
 def get_cached_background(current_user: dict = Depends(get_current_user)):
     """Serve o arquivo de background em cache (imagem ou vídeo) ou uma paisagem padrão como fallback."""
-    cache_dir = "/data/cache"
+    cache_dir = get_user_paths(current_user)["cache"]
     cache_meta_file = os.path.join(cache_dir, "cache_meta.json")
     if os.path.exists(cache_meta_file):
         try:
@@ -2072,6 +2379,7 @@ def get_cached_background(current_user: dict = Depends(get_current_user)):
 @app.post("/api/skip_edit")
 def skip_edit(current_user: dict = Depends(get_current_user)):
     """Continua o processamento sem alterar as legendas."""
+    require_task_control(current_user)
     global correction_event
     correction_event.set()
     return {"status": "success", "message": "Renderização retomada sem alterações."}
@@ -2079,11 +2387,13 @@ def skip_edit(current_user: dict = Depends(get_current_user)):
 
 @app.get("/api/segments_to_edit")
 def get_segments_to_edit(current_user: dict = Depends(get_current_user)):
+    require_task_control(current_user)
     global segments_to_edit
     return segments_to_edit
 
 @app.post("/api/continue_process")
 def continue_process(data: ContinueProcessModel, current_user: dict = Depends(get_current_user)):
+    require_task_control(current_user)
     global segments_to_edit, correction_event
     if not segments_to_edit:
         raise HTTPException(status_code=400, detail="Nenhum processamento aguardando correção.")
@@ -2142,7 +2452,8 @@ def continue_process(data: ContinueProcessModel, current_user: dict = Depends(ge
 @app.post("/api/cancel")
 def cancel_process(current_user: dict = Depends(get_current_user)):
     import process_manager as pm
-    logger.info("Solicitação de cancelamento de tarefa recebida do usuário.")
+    require_task_control(current_user)
+    logger.info("Solicitação de cancelamento recebida de %s.", current_user.get("username"))
     
     # 1. Definir o flag de cancelamento
     pm.cancel_event.set()
@@ -2169,13 +2480,7 @@ def cancel_process(current_user: dict = Depends(get_current_user)):
     # 4. Atualizar o estado do servidor para idle
     update_state("idle", "Idle", 0, error_message="Cancelado pelo usuário.")
     
-    # 5. Liberar o lock de processamento
-    if processing_lock.locked():
-        try:
-            processing_lock.release()
-        except Exception:
-            pass
-            
+    # O worker libera o lock no bloco finally, depois de realmente encerrar.
     return {"status": "success", "message": "Processamento cancelado com sucesso."}
 
 @app.get("/", response_class=HTMLResponse)
@@ -2189,7 +2494,29 @@ def read_index():
 def get_status(current_user: dict = Depends(get_current_user)):
     """Retorna o progresso atual do pipeline para pooling da interface web."""
     with state_lock:
-        return state
+        snapshot = dict(state)
+    owner = snapshot.get("owner_username")
+    owns_task = owner == current_user.get("username")
+    active = snapshot.get("status") in {"processing", "downloading", "waiting_for_user_correction", "awaiting_review"}
+    if owner and not owns_task and not is_admin(current_user):
+        if active:
+            return {
+                "status": "busy",
+                "step": "Servidor ocupado por outra criação",
+                "progress": 0,
+                "owned_by_current_user": False,
+                "can_cancel": False
+            }
+        return {"status": "idle", "owned_by_current_user": False, "can_cancel": False}
+    snapshot["owned_by_current_user"] = owns_task
+    snapshot["can_cancel"] = bool(active and (owns_task or is_admin(current_user)))
+    snapshot["result_available_to_current_user"] = owns_task
+    if not is_admin(current_user):
+        snapshot.pop("owner_username", None)
+        snapshot.pop("owner_role", None)
+        snapshot.pop("result_file", None)
+        snapshot.pop("public_download_token", None)
+    return snapshot
 
 def purge_audio_cache_directory(cache_dir: str):
     """Apaga todos os arquivos e subpastas de áudio do cache, preservando apenas imagens de fundo se necessário."""
@@ -2235,7 +2562,8 @@ def process_karaoke(
     library_audio: str = Form(None),
     library_bg: str = Form(None),
     save_to_library: bool = Form(False),
-    only_remove_vocals: bool = Form(False)
+    only_remove_vocals: bool = Form(False),
+    app_base_url: str = Form("")
 ):
     """
     Recebe os arquivos enviados, valida a concorrência e inicia o pipeline em segundo plano.
@@ -2246,7 +2574,7 @@ def process_karaoke(
             if state.get("status") in ["idle", "error", "done"]:
                 try:
                     processing_lock.release()
-                    logger.info("Failsafe v5.0.1: Lock de concorrência obsoleto liberado com sucesso.")
+                    logger.info("Failsafe v5.1.0: Lock de concorrência obsoleto liberado com sucesso.")
                 except Exception:
                     pass
             else:
@@ -2255,7 +2583,9 @@ def process_karaoke(
                     detail="O servidor está ocupado processando outro vídeo. Por favor, aguarde alguns minutos."
                 )
 
-    cache_dir = "/data/cache"
+    user_paths = get_user_paths(current_user)
+    cache_dir = user_paths["cache"]
+    library_dir = user_paths["library"]
     os.makedirs(cache_dir, exist_ok=True)
     cache_meta_file = os.path.join(cache_dir, "cache_meta.json")
 
@@ -2300,9 +2630,9 @@ def process_karaoke(
                 shutil.copyfileobj(bg_file.file, f)
             has_bg = True
             if save_to_library:
-                shutil.copy2(input_bg_path, os.path.join(LIBRARY_DIR, "photos", bg_filename))
+                shutil.copy2(input_bg_path, os.path.join(library_dir, "photos", bg_filename))
         elif library_bg:
-            src_bg = os.path.join(LIBRARY_DIR, "photos", library_bg)
+            src_bg = os.path.join(library_dir, "photos", library_bg)
             if os.path.exists(src_bg):
                 bg_ext = os.path.splitext(library_bg)[1]
                 bg_filename = library_bg
@@ -2330,7 +2660,7 @@ def process_karaoke(
 
             if save_to_library:
                 try:
-                    lib_video_dir = os.path.join(LIBRARY_DIR, "videos")
+                    lib_video_dir = os.path.join(library_dir, "videos")
                     os.makedirs(lib_video_dir, exist_ok=True)
                     safe_title = "".join([c for c in orig_name if c.isalnum() or c in ' ._-']).strip() or "youtube_download"
                     shutil.copy2(input_audio_path, os.path.join(lib_video_dir, f"{safe_title}{ext}"))
@@ -2366,7 +2696,7 @@ def process_karaoke(
 
     elif library_audio:
         import unicodedata
-        lib_video_dir = os.path.join(LIBRARY_DIR, "videos")
+        lib_video_dir = os.path.join(library_dir, "videos")
         lib_audio_path = os.path.join(lib_video_dir, library_audio)
         
         # Busca resiliente se o nome exato com acentos/caracteres especiais falhar
@@ -2421,9 +2751,9 @@ def process_karaoke(
                 shutil.copyfileobj(bg_file.file, f)
             has_bg = True
             if save_to_library:
-                shutil.copy2(input_bg_path, os.path.join(LIBRARY_DIR, "photos", bg_filename))
+                shutil.copy2(input_bg_path, os.path.join(library_dir, "photos", bg_filename))
         elif library_bg:
-            src_bg = os.path.join(LIBRARY_DIR, "photos", library_bg)
+            src_bg = os.path.join(library_dir, "photos", library_bg)
             if os.path.exists(src_bg):
                 bg_ext = os.path.splitext(library_bg)[1]
                 bg_filename = library_bg
@@ -2463,7 +2793,7 @@ def process_karaoke(
             shutil.copyfileobj(audio_file.file, f)
             
         if save_to_library:
-            shutil.copy2(input_audio_path, os.path.join(LIBRARY_DIR, "videos", audio_file.filename))
+            shutil.copy2(input_audio_path, os.path.join(library_dir, "videos", audio_file.filename))
             
         input_bg_path = None
         has_bg = False
@@ -2478,9 +2808,9 @@ def process_karaoke(
                 shutil.copyfileobj(bg_file.file, f)
             has_bg = True
             if save_to_library:
-                shutil.copy2(input_bg_path, os.path.join(LIBRARY_DIR, "photos", bg_filename))
+                shutil.copy2(input_bg_path, os.path.join(library_dir, "photos", bg_filename))
         elif library_bg:
-            src_bg = os.path.join(LIBRARY_DIR, "photos", library_bg)
+            src_bg = os.path.join(library_dir, "photos", library_bg)
             if os.path.exists(src_bg):
                 bg_ext = os.path.splitext(library_bg)[1]
                 bg_filename = library_bg
@@ -2550,7 +2880,7 @@ def process_karaoke(
             with open(cache_meta_file, "w", encoding="utf-8") as f:
                 json.dump(cached_meta, f, indent=4)
             if save_to_library:
-                shutil.copy2(input_bg_path, os.path.join(LIBRARY_DIR, "photos", bg_filename))
+                shutil.copy2(input_bg_path, os.path.join(library_dir, "photos", bg_filename))
         elif library_bg:
             if cached_meta.get("has_bg"):
                 old_ext = cached_meta.get("bg_ext", "")
@@ -2563,7 +2893,7 @@ def process_karaoke(
             bg_ext = os.path.splitext(library_bg)[1]
             bg_filename = library_bg
             input_bg_path = os.path.join(cache_dir, f"original_bg{bg_ext}")
-            shutil.copy2(os.path.join(LIBRARY_DIR, "photos", library_bg), input_bg_path)
+            shutil.copy2(os.path.join(library_dir, "photos", library_bg), input_bg_path)
             cached_meta["has_bg"] = True
             cached_meta["bg_ext"] = bg_ext
             cached_meta["bg_filename"] = bg_filename
@@ -2577,7 +2907,14 @@ def process_karaoke(
                 if not os.path.exists(input_bg_path):
                     input_bg_path = None
 
-    update_state("processing", "Uploading", 5, original_filename=orig_name)
+    update_state(
+        "processing",
+        "Uploading",
+        5,
+        original_filename=orig_name,
+        owner_username=current_user.get("username"),
+        owner_role=current_user.get("role")
+    )
         
     background_tasks.add_task(
         run_pipeline, 
@@ -2601,113 +2938,107 @@ def process_karaoke(
         enable_correction=enable_correction,
         keep_first_line_visible=keep_first_line_visible,
         youtube_url=youtube_url,
-        only_remove_vocals=only_remove_vocals
+        only_remove_vocals=only_remove_vocals,
+        owner_user=dict(current_user),
+        cache_dir=cache_dir,
+        output_dir=user_paths["output"],
+        library_dir=library_dir,
+        app_base_url=(app_base_url or "").strip()
     )
     
     return {"status": "processing"}
 
-def send_telegram_video_flow(token: str, chat_id: str, video_path: str, orig_name: str,
-                               base_url: str = "", external_url: str = ""):
-    """Auxiliar para envio de vídeo para o Telegram (v5.0.1). Inclui links de download quando o vídeo excede 50MB ou falha no envio."""
+def send_telegram_video_flow(
+    token: str,
+    chat_id: str,
+    video_path: str,
+    orig_name: str,
+    history_filename: str,
+    public_download_token: str,
+    base_url: str = "",
+    external_url: str = ""
+):
+    """Envia o vídeo e links diretos sem reutilizar a sessão web do usuário."""
     if not token or not chat_id:
         return
 
-    LIMIT_50MB = 50 * 1024 * 1024
-    
-    # Monta bloco de links HTML para o Telegram
-    def build_download_links(history_filename: str = None) -> str:
-        links = []
-        # Link interno (URL base do servidor local)
-        if base_url and base_url.strip():
-            token_q = ""
-            # Monta URL de download da biblioteca de histórico, se o arquivo foi salvo lá
-            if history_filename:
-                local_link = f"{base_url.rstrip('/')}/api/library/download/history/{requests.utils.quote(history_filename)}"
-            else:
-                local_link = f"{base_url.rstrip('/')}/api/download"
-            links.append(f'🏠 <a href="{local_link}">Download (rede local)</a>')
-        # Link externo (IP/URL configurado nas configurações)
-        if external_url and external_url.strip():
-            if history_filename:
-                ext_link = f"{external_url.rstrip('/')}/api/library/download/history/{requests.utils.quote(history_filename)}"
-            else:
-                ext_link = f"{external_url.rstrip('/')}/api/download"
-            links.append(f'🌐 <a href="{ext_link}">Download (acesso externo)</a>')
-        if not links:
+    limit_50mb = 50 * 1024 * 1024
+
+    def build_download_links() -> str:
+        if not public_download_token:
             return ""
-        return "\n" + "\n".join(links)
-    
-    # Função auxiliar para copiar vídeo final para a biblioteca de histórico
-    def save_video_to_history(video_path, orig_name):
-        try:
-            lib_history_dir = "/data/library/history"
-            os.makedirs(lib_history_dir, exist_ok=True)
-            safe_name = "".join([c for c in orig_name if c.isalnum() or c in ' ._-']).strip() or "video_final"
-            dest_filename = f"{safe_name}.mp4"
-            dest_path = os.path.join(lib_history_dir, dest_filename)
-            counter = 1
-            while os.path.exists(dest_path):
-                dest_filename = f"{safe_name}_{counter}.mp4"
-                dest_path = os.path.join(lib_history_dir, dest_filename)
-                counter += 1
-            shutil.copy2(video_path, dest_path)
-            logger.info(f"Vídeo de karaokê {orig_name} salvo automaticamente na biblioteca de histórico: {dest_path}")
-            return dest_filename
-        except Exception as err:
-            logger.error(f"Erro ao salvar vídeo na biblioteca de histórico: {err}")
-            return None
+        route = f"/api/public/download/{public_download_token}"
+        links = []
+        if base_url.strip():
+            links.append(f'🏠 <a href="{base_url.rstrip("/")}{route}">Baixar na rede local</a>')
+        if external_url.strip():
+            links.append(f'🌐 <a href="{external_url.rstrip("/")}{route}">Baixar pelo acesso externo</a>')
+        return "\n" + "\n".join(links) if links else ""
 
     try:
-        if os.path.exists(video_path) and os.path.getsize(video_path) > LIMIT_50MB:
-            file_size_mb = os.path.getsize(video_path) / (1024 * 1024)
-            logger.info(f"O vídeo {orig_name} tem {file_size_mb:.1f}MB, excedendo o limite de 50MB do Telegram.")
-            dest_name = save_video_to_history(video_path, orig_name)
-            download_block = build_download_links(dest_name)
-            
-            msg = (
-                f"🎬 <b>Sal0 Karaokê</b>: O vídeo de <b>{orig_name}</b> foi concluído!\n\n"
-                f"⚠️ Arquivo com <b>{file_size_mb:.1f}MB</b> (excede limite de 50MB do Telegram).\n"
-                f"💾 Salvo automaticamente na sua <b>Biblioteca</b>."
+        file_size = os.path.getsize(video_path)
+        download_block = build_download_links()
+        if file_size > limit_50mb:
+            file_size_mb = file_size / (1024 * 1024)
+            send_telegram_notification(
+                token,
+                chat_id,
+                f"🎬 <b>Sal0 Karaokê</b>: <b>{orig_name}</b> ficou pronto!\n\n"
+                f"O arquivo tem <b>{file_size_mb:.1f} MB</b> e está na Biblioteca como <b>{history_filename}</b>."
                 f"{download_block}"
             )
-            send_telegram_notification(token=token, chat_id=chat_id, message=msg)
             return
 
-        # Tentativa de envio para vídeos <= 50MB
-        url = f"https://api.telegram.org/bot{token}/sendVideo"
         success = False
         with open(video_path, "rb") as video_file:
-            files = {"video": video_file}
-            data = {
-                "chat_id": chat_id,
-                "caption": f"🎥 <b>Sal0 Karaokê</b>: Aqui está o seu vídeo de karaokê pronto para <b>{orig_name}</b>!",
-                "parse_mode": "HTML"
-            }
-            res = requests.post(url, data=data, files=files, timeout=90)
-            if res.status_code == 200:
-                success = True
-                logger.info("Vídeo enviado com sucesso para o Telegram.")
-            else:
-                logger.error(f"Telegram recusou envio do vídeo: {res.text}")
-
-        if success:
-            send_telegram_notification(
-                token=token, 
-                chat_id=chat_id, 
-                message=f"✅ <b>Sal0 Karaokê</b>: Processamento de <b>{orig_name}</b> concluído!"
+            response = requests.post(
+                f"https://api.telegram.org/bot{token}/sendVideo",
+                data={
+                    "chat_id": chat_id,
+                    "caption": f"🎥 <b>Sal0 Karaokê</b>: aqui está <b>{orig_name}</b>!",
+                    "parse_mode": "HTML"
+                },
+                files={"video": video_file},
+                timeout=90
             )
-        else:
-            dest_name = save_video_to_history(video_path, orig_name)
-            download_block = build_download_links(dest_name)
-            msg = (
-                f"🎬 <b>Sal0 Karaokê</b>: O vídeo de <b>{orig_name}</b> foi concluído!\n\n"
-                f"⚠️ Não foi possível enviar via Telegram. Disponível na <b>Biblioteca</b>."
-                f"{download_block}"
-            )
-            send_telegram_notification(token=token, chat_id=chat_id, message=msg)
+            success = response.status_code == 200
+            if not success:
+                logger.error("Telegram recusou o vídeo com HTTP %s.", response.status_code)
 
-    except Exception as e:
-        logger.error(f"Erro no envio em segundo plano para o Telegram: {e}")
+        status_text = "Vídeo enviado e salvo na sua Biblioteca." if success else "O envio do arquivo falhou, mas ele está salvo na sua Biblioteca."
+        send_telegram_notification(
+            token,
+            chat_id,
+            f"✅ <b>Sal0 Karaokê</b>: <b>{orig_name}</b> concluído. {status_text}{download_block}"
+        )
+    except Exception as exc:
+        logger.error("Erro no envio em segundo plano para o Telegram: %s", exc)
+
+
+def send_video_to_targets(
+    targets: list[dict],
+    video_path: str,
+    orig_name: str,
+    history_filename: str,
+    public_download_token: str,
+    base_url: str,
+    external_url: str
+):
+    for target in targets:
+        threading.Thread(
+            target=send_telegram_video_flow,
+            kwargs={
+                "token": target["telegram_token"],
+                "chat_id": target["telegram_chat_id"],
+                "video_path": video_path,
+                "orig_name": orig_name,
+                "history_filename": history_filename,
+                "public_download_token": public_download_token,
+                "base_url": base_url,
+                "external_url": external_url
+            },
+            daemon=True
+        ).start()
 
 def run_pipeline(
     input_audio_path: str, 
@@ -2730,7 +3061,12 @@ def run_pipeline(
     enable_correction: bool = False,
     keep_first_line_visible: bool = False,
     youtube_url: str = None,
-    only_remove_vocals: bool = False
+    only_remove_vocals: bool = False,
+    owner_user: dict = None,
+    cache_dir: str = None,
+    output_dir: str = None,
+    library_dir: str = None,
+    app_base_url: str = ""
 ):
     """Pipeline principal de processamento sequencial."""
     # Obter o lock de processamento exclusivo (segurança de job único)
@@ -2738,16 +3074,18 @@ def run_pipeline(
         logger.warning("Bloqueio de concorrência ativado: Processamento já em andamento.")
         return
         
-    # Carregar configuração global do Telegram do arquivo json
-    tele_config = load_telegram_config()
-    telegram_token = tele_config.get("telegram_token", "")
-    telegram_chat_id = tele_config.get("telegram_chat_id", "")
+    owner_user = owner_user or {"username": state.get("owner_username"), "role": state.get("owner_role", "user")}
+    owner_paths = get_user_paths(owner_user)
+    cache_dir = cache_dir or owner_paths["cache"]
+    output_dir = output_dir or owner_paths["output"]
+    library_dir = library_dir or owner_paths["library"]
+    saved_lyrics_file = os.path.join(output_dir, "saved_lyrics.txt")
+    telegram_targets = get_notification_targets(owner_user)
     
     # Carregar URL externa configurada pelo usuário (para links de download no Telegram)
     ext_url_cfg = load_external_url_config()
     telegram_external_url = ext_url_cfg.get("external_url", "")
-    # URL base interna do servidor (porta padrão 8000)
-    telegram_base_url = "http://localhost:8000"
+    telegram_base_url = app_base_url.strip()
     
     with state_lock:
         orig_name = state.get("original_filename", "final")
@@ -2758,14 +3096,9 @@ def run_pipeline(
         pm.clear_active_process()
         
         # Notificação Telegram: Apenas início resumido
-        send_telegram_notification(
-            telegram_token, 
-            telegram_chat_id, 
-            f"🎙️ <b>Sal0 Karaokê</b>: Iniciando processamento de <b>{orig_name}</b>..."
-        )
+        notify_targets(telegram_targets, f"🎙️ <b>Sal0 Karaokê</b>: Iniciando processamento de <b>{orig_name}</b>...")
 
         # Pasta de saída mapeada via volume docker-compose
-        output_dir = "/data/output"
         os.makedirs(output_dir, exist_ok=True)
         
         final_mp4_path = os.path.join(output_dir, "final_karaoke.mp4")
@@ -2778,7 +3111,6 @@ def run_pipeline(
             os.remove(final_ass_path)
 
         # Configurar diretório de cache persistente
-        cache_dir = "/data/cache"
         os.makedirs(cache_dir, exist_ok=True)
         cache_meta_file = os.path.join(cache_dir, "cache_meta.json")
         
@@ -2812,11 +3144,7 @@ def run_pipeline(
             if not already_downloaded:
                 pm.check_cancelled()
                 update_state("processing", "Downloading YouTube", 5)
-                send_telegram_notification(
-                    telegram_token, 
-                    telegram_chat_id, 
-                    f"🌐 <b>Sal0 Karaokê</b>: Iniciando download do YouTube..."
-                )
+                notify_targets(telegram_targets, "🌐 <b>Sal0 Karaokê</b>: Iniciando download do YouTube...")
                 
                 try:
                     input_audio_path, title = download_youtube(youtube_url, cache_dir)
@@ -2832,11 +3160,7 @@ def run_pipeline(
                         import json
                         json.dump(cached_meta, f, indent=4)
                         
-                    send_telegram_notification(
-                        telegram_token, 
-                        telegram_chat_id, 
-                        f"📥 <b>Sal0 Karaokê</b>: Download concluído! <b>{orig_name}</b>"
-                    )
+                    notify_targets(telegram_targets, f"📥 <b>Sal0 Karaokê</b>: Download concluído! <b>{orig_name}</b>")
                 except Exception as e:
                     logger.error(f"Erro ao baixar do YouTube: {e}")
                     raise RuntimeError(f"Falha ao baixar vídeo do YouTube: {e}")
@@ -2872,7 +3196,7 @@ def run_pipeline(
                 try:
                     with open(cache_meta_file, "w", encoding="utf-8") as f:
                         json.dump(cached_meta, f, indent=4)
-                    with open(SAVED_LYRICS_FILE, "w", encoding="utf-8") as f:
+                    with open(saved_lyrics_file, "w", encoding="utf-8") as f:
                         f.write(auto_lyrics)
                     logger.info(
                         "Letra guia encontrada automaticamente: %s — %s",
@@ -2922,7 +3246,7 @@ def run_pipeline(
             else:
                 pm.check_cancelled()
                 update_state("processing", "Extracting audio", 15)
-                send_telegram_notification(telegram_token, telegram_chat_id, "🎵 <b>Sal0 Karaokê</b>: Extraindo áudio (15%)")
+                notify_targets(telegram_targets, "🎵 <b>Sal0 Karaokê</b>: Extraindo áudio (15%)")
                 extract_audio(input_audio_path, converted_wav)
             
             pm.check_cancelled()
@@ -2937,7 +3261,7 @@ def run_pipeline(
             else:
                 pm.check_cancelled()
                 update_state("processing", "Separating vocals", 40)
-                send_telegram_notification(telegram_token, telegram_chat_id, "✂️ <b>Sal0 Karaokê</b>: Separando áudio (40%)")
+                notify_targets(telegram_targets, "✂️ <b>Sal0 Karaokê</b>: Separando áudio (40%)")
                 with tempfile.TemporaryDirectory() as demucs_tmp:
                     v_tmp, i_tmp = separate_vocals(converted_wav, demucs_tmp, update_callback=update_state)
                     shutil.move(v_tmp, vocals_wav)
@@ -2949,11 +3273,7 @@ def run_pipeline(
             if only_remove_vocals:
                 pm.check_cancelled()
                 update_state("processing", "Rendering final video", 95)
-                send_telegram_notification(
-                    telegram_token, 
-                    telegram_chat_id, 
-                    f"🎬 <b>Sal0 Karaokê</b>: Renderizando vídeo sem a voz do cantor (95%)"
-                )
+                notify_targets(telegram_targets, "🎬 <b>Sal0 Karaokê</b>: Renderizando vídeo sem a voz do cantor (95%)")
                 
                 # Forçar o uso do vídeo original enviado
                 render_karaoke_video(
@@ -2966,25 +3286,31 @@ def run_pipeline(
                 )
                 
                 pm.check_cancelled()
+                history_filename = save_video_to_history(final_mp4_path, orig_name, library_dir)
+                public_token = create_public_download(owner_user, history_filename)
+                save_result_metadata(output_dir, orig_name, history_filename)
                 update_state("processing", "Cleaning temporary files", 98)
-                update_state("done", "Done", 100, result_file=final_mp4_path)
+                update_state(
+                    "done",
+                    "Done",
+                    100,
+                    result_file=final_mp4_path,
+                    history_filename=history_filename,
+                    public_download_token=public_token
+                )
                 logger.info("Pipeline concluído: Vocais removidos do vídeo original com sucesso.")
                 
                 processing_lock.release()
                 
-                if telegram_token and telegram_chat_id:
-                    threading.Thread(
-                        target=send_telegram_video_flow,
-                        kwargs={
-                            "token": telegram_token,
-                            "chat_id": telegram_chat_id,
-                            "video_path": final_mp4_path,
-                            "orig_name": orig_name,
-                            "base_url": telegram_base_url,
-                            "external_url": telegram_external_url
-                        },
-                        daemon=True
-                    ).start()
+                send_video_to_targets(
+                    telegram_targets,
+                    final_mp4_path,
+                    orig_name,
+                    history_filename,
+                    public_token,
+                    telegram_base_url,
+                    telegram_external_url
+                )
                 return
             
             # Passo 3: Transcrever vocais com Whisper selecionado
@@ -3006,7 +3332,7 @@ def run_pipeline(
             if segments is None:
                 pm.check_cancelled()
                 update_state("processing", "Transcribing vocals", 70)
-                send_telegram_notification(telegram_token, telegram_chat_id, f"✍️ <b>Sal0 Karaokê</b>: Transcrevendo voz ({whisper_model}) (70%)")
+                notify_targets(telegram_targets, f"✍️ <b>Sal0 Karaokê</b>: Transcrevendo voz ({whisper_model}) (70%)")
                 
                 transcribe_audio = vocals_wav if transcribe_source == "vocals" else converted_wav
                 logger.info(f"Fonte de transcrição escolhida: {transcribe_audio} (Modo: {transcribe_source})")
@@ -3051,9 +3377,8 @@ def run_pipeline(
                 update_state("waiting_for_user_correction", "Correction", 75)
                 
                 # Notificação Telegram para o usuário entrar no app e editar
-                send_telegram_notification(
-                    telegram_token, 
-                    telegram_chat_id, 
+                notify_targets(
+                    telegram_targets,
                     f"⚠️ <b>Sal0 Karaokê</b>: A transcrição de <b>{orig_name}</b> está pronta para correção! "
                     "Entre no aplicativo web para revisar/corrigir a legenda e continuar a renderização."
                 )
@@ -3076,7 +3401,7 @@ def run_pipeline(
             
             # Passo 4: Gerar legendas ASS com efeitos de karaokê
             update_state("processing", "Generating subtitles", 80)
-            send_telegram_notification(telegram_token, telegram_chat_id, "📝 <b>Sal0 Karaokê</b>: Gerando legenda (80%)")
+            notify_targets(telegram_targets, "📝 <b>Sal0 Karaokê</b>: Gerando legenda (80%)")
             ass_path = os.path.join(tmpdir, "karaoke.ass")
             generate_ass_karaoke(
                 segments=segments, 
@@ -3097,7 +3422,7 @@ def run_pipeline(
             
             # Passo 5: Renderizar o vídeo final
             update_state("processing", "Rendering final video", 95)
-            send_telegram_notification(telegram_token, telegram_chat_id, "🎬 <b>Sal0 Karaokê</b>: Renderizando vídeo (95%)")
+            notify_targets(telegram_targets, "🎬 <b>Sal0 Karaokê</b>: Renderizando vídeo (95%)")
             bg_mode_param = "original_video" if (background_mode in ["original", "original_video"]) else background_mode
             render_karaoke_video(
                 instrumental_path=instrumental_wav,
@@ -3113,34 +3438,39 @@ def run_pipeline(
             # Salvar opcionalmente a legenda ASS final gerada junto com o MP4
             shutil.copy(ass_path, final_ass_path)
             
-            # Salvar AUTOMATICAMENTE uma cópia permanente no Histórico da Biblioteca (/data/library/history/)
-            save_video_to_history(final_mp4_path, orig_name)
+            # Salvar automaticamente no histórico privado do dono da tarefa.
+            history_filename = save_video_to_history(final_mp4_path, orig_name, library_dir)
+            public_token = create_public_download(owner_user, history_filename)
+            save_result_metadata(output_dir, orig_name, history_filename)
             
             # Passo 6: Limpar arquivos temporários (não removemos os uploads do cache)
             update_state("processing", "Cleaning temporary files", 98)
             logger.info("Preservando arquivos de entrada no cache para futuros reprocessamentos.")
 
             # Processamento local CONCLUÍDO na UI!
-            update_state("done", "Done", 100, result_file=final_mp4_path)
+            update_state(
+                "done",
+                "Done",
+                100,
+                result_file=final_mp4_path,
+                history_filename=history_filename,
+                public_download_token=public_token
+            )
             logger.info("Pipeline de Karaokê Maker concluído com sucesso!")
             
             # Liberar o lock de processamento imediatamente para que o usuário possa usar o site
             processing_lock.release()
 
             # Disparar envio do vídeo ao Telegram em segundo plano (thread separada)
-            if telegram_token and telegram_chat_id:
-                threading.Thread(
-                    target=send_telegram_video_flow,
-                    kwargs={
-                        "token": telegram_token,
-                        "chat_id": telegram_chat_id,
-                        "video_path": final_mp4_path,
-                        "orig_name": orig_name,
-                        "base_url": telegram_base_url,
-                        "external_url": telegram_external_url
-                    },
-                    daemon=True
-                ).start()
+            send_video_to_targets(
+                telegram_targets,
+                final_mp4_path,
+                orig_name,
+                history_filename,
+                public_token,
+                telegram_base_url,
+                telegram_external_url
+            )
             
     except Exception as e:
         logger.exception("Ocorreu um erro catastrófico durante o processamento do pipeline.")
@@ -3149,11 +3479,7 @@ def run_pipeline(
             update_state("idle", "Idle", 0, error_message="Processamento cancelado pelo usuário.")
         else:
             update_state("error", "Error", 0, error_message=str(e))
-            send_telegram_notification(
-                telegram_token, 
-                telegram_chat_id, 
-                f"❌ <b>Sal0 Karaokê</b>: Falha ao processar <b>{orig_name}</b>. Erro: {e}"
-            )
+            notify_targets(telegram_targets, f"❌ <b>Sal0 Karaokê</b>: Falha ao processar <b>{orig_name}</b>. Erro: {e}")
         
         # Preservamos os arquivos de entrada no cache mesmo após erro
         logger.info("Preservando arquivos de entrada no cache após erro para permitir repetições.")
@@ -3167,20 +3493,28 @@ def run_pipeline(
                 pass
 
 @app.get("/api/download")
-def download_file(current_user: dict = Depends(get_current_user)):
+def download_file(inline: bool = Query(False), current_user: dict = Depends(get_current_user)):
     """Endpoint para baixar o arquivo final de vídeo karaokê."""
-    file_path = "/data/output/final_karaoke.mp4"
+    output_dir = get_user_paths(current_user)["output"]
+    file_path = os.path.join(output_dir, "final_karaoke.mp4")
     if not os.path.exists(file_path):
         raise HTTPException(
             status_code=404, 
             detail="Arquivo de vídeo não encontrado. Por favor, processe um áudio primeiro."
         )
-    # Recuperar o nome original com sufixo _karaokê
-    with state_lock:
-        orig_name = state.get("original_filename", "final")
+    orig_name = "final"
+    meta_file = os.path.join(output_dir, "result_meta.json")
+    if os.path.exists(meta_file):
+        try:
+            with open(meta_file, "r", encoding="utf-8") as file:
+                orig_name = json.load(file).get("original_filename", "final")
+        except Exception:
+            pass
     download_name = f"{orig_name}_karaokê.mp4"
+    headers = {"Content-Disposition": 'inline; filename="sal0_karaoke_preview.mp4"'} if inline else None
     return FileResponse(
         file_path, 
         media_type="video/mp4", 
-        filename=download_name
+        filename=None if inline else download_name,
+        headers=headers
     )
