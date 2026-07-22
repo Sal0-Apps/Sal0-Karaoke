@@ -5,12 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sal0 Karaokê - Criador Local de Vídeos de Karaokê</title>
     <link rel="icon" type="image/png" href="/favicon.png">
-    
+
     <!-- Fontes Google -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Outfit:wght@400;600;700;800&display=swap" rel="stylesheet">
-    
+
     <style>
         :root {
             /* Tema Escuro (Padrão) */
@@ -699,19 +699,6 @@
             }
         }
 
-        .page-intro {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            gap: 1rem;
-            margin-bottom: 1rem;
-            padding: 0.9rem 1rem;
-            border: 1px solid var(--glass-border);
-            border-radius: var(--radius-md);
-            background: linear-gradient(135deg, rgba(139, 92, 246, 0.11), rgba(236, 72, 153, 0.06));
-        }
-        .page-intro h2 { margin: 0; font-size: 1rem; color: var(--text-main); }
-        .page-intro p { margin: 0.2rem 0 0; font-size: 0.76rem; color: var(--text-muted); }
         .user-chip {
             display: inline-flex;
             align-items: center;
@@ -726,10 +713,90 @@
         }
         .settings-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(min(360px, 100%), 1fr));
+            grid-template-columns: repeat(12, minmax(0, 1fr));
             gap: 1rem;
+            align-items: stretch;
         }
-        .settings-grid > .card { margin: 0; }
+        .settings-grid > .card { height: 100%; margin: 0; }
+        #modelManagerSection { grid-column: 1 / -1; }
+        #telegramSection { grid-column: 1 / 7; }
+        #externalUrlSection { grid-column: 7 / 13; }
+        #userManagementSection,
+        #logsSection { grid-column: 1 / -1; }
+        #userManagementSection .form-grid {
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 0.8rem;
+        }
+        .settings-grid.user-settings #telegramSection { grid-column: 1 / -1; }
+
+        .progress-copy {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 1rem;
+            margin-bottom: 0.8rem;
+        }
+        .progress-copy #statusMessage { margin: 0; }
+        .stage-progress-text {
+            flex: 0 0 auto;
+            max-width: 48%;
+            color: var(--text-muted);
+            font-size: 0.76rem;
+            line-height: 1.35;
+            text-align: right;
+        }
+
+        .media-seek-controls {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.65rem;
+            flex-wrap: wrap;
+            margin-top: -0.45rem;
+        }
+        .media-time-label {
+            min-width: 112px;
+            color: var(--text-muted);
+            font-size: 0.76rem;
+            text-align: center;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .correction-preview-toolbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.5rem;
+        }
+        .correction-preview-toolbar .btn-secondary {
+            padding: 0.35rem 0.55rem;
+            font-size: 0.74rem;
+        }
+        .correction-preview-meta {
+            flex: 1;
+            min-width: 0;
+            color: var(--text-muted);
+            font-size: 0.74rem;
+            text-align: center;
+            font-variant-numeric: tabular-nums;
+        }
+        .correction-segment {
+            display: flex;
+            flex-direction: column;
+            gap: 0.4rem;
+            padding: 0.75rem;
+            border: 1px solid var(--glass-border);
+            border-radius: 8px;
+            background: var(--input-bg);
+            cursor: pointer;
+            transition: border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+        }
+        .correction-segment:hover { border-color: var(--glass-border-light); }
+        .correction-segment.active {
+            border-color: var(--accent);
+            background: rgba(139, 92, 246, 0.1);
+            box-shadow: 0 0 0 2px var(--accent-glow);
+        }
         .media-preview {
             width: 100%;
             max-height: 430px;
@@ -751,9 +818,18 @@
         .preview-dialog-head { display: flex; justify-content: space-between; align-items: center; gap: 1rem; }
         .preview-dialog-head h3 { margin: 0; font-size: 0.95rem; color: var(--text-main); overflow-wrap: anywhere; }
         .compact-note { font-size: 0.76rem; color: var(--text-muted); line-height: 1.45; }
-        @media (max-width: 620px) {
-            .page-intro { align-items: flex-start; flex-direction: column; }
+        @media (max-width: 820px) {
             .settings-grid { grid-template-columns: 1fr; }
+            #modelManagerSection,
+            #telegramSection,
+            #externalUrlSection,
+            #userManagementSection,
+            #logsSection { grid-column: 1; }
+            #userManagementSection .form-grid { grid-template-columns: 1fr; }
+        }
+        @media (max-width: 620px) {
+            .progress-copy { flex-direction: column; gap: 0.35rem; }
+            .stage-progress-text { max-width: 100%; text-align: left; }
         }
 </style>
 </head>
@@ -784,13 +860,6 @@
         <!-- ABA 1: CRIAR KARAOKÊ -->
         <!-- ============================================================= -->
         <div id="createTabContent">
-            <div class="page-intro">
-                <div>
-                    <h2>Seu karaokê começa aqui</h2>
-                    <p>Escolha a música, ajuste o visual e deixe o processamento local fazer o resto.</p>
-                </div>
-                <span class="user-chip">1. Música · 2. Perfil · 3. Visual · 4. Criar</span>
-            </div>
             <!-- Form Principal -->
             <form id="karaokêForm">
                 <!-- BADGE DE REUTILIZAÇÃO DE CACHE RÁPIDA -->
@@ -824,7 +893,7 @@
                     <div id="audioYoutubeContainer" style="display: none;">
                         <input type="text" id="youtubeUrl" name="youtube_url" placeholder="Cole a URL do vídeo do YouTube..." class="input-text" style="margin-bottom: 0.5rem;">
                         <button type="button" id="btnDownloadYoutube" class="btn-secondary" style="width: 100%;">📥 Baixar</button>
-                        
+
                         <!-- BARRA DE PROGRESSO DEDICADA DE DOWNLOAD DO YOUTUBE (ÁUDIO/VÍDEO) -->
                         <div id="audioYtProgressBox" style="display: none; margin-top: 0.6rem; background: var(--input-bg); border: 1px solid var(--accent); border-radius: 10px; padding: 0.8rem;">
                             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.3rem;">
@@ -835,7 +904,7 @@
                                 <div id="audioYtProgressBar" style="width: 0%; height: 100%; background: linear-gradient(90deg, var(--accent), var(--pink-accent)); transition: width 0.3s ease;"></div>
                             </div>
                         </div>
-                        
+
                         <div id="audioYtSelectedBadge" style="display: none; margin-top: 0.5rem; background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.3); color: #34d399; padding: 0.5rem 0.8rem; border-radius: 8px; font-size: 0.8rem; font-weight: 600; align-items: center; gap: 0.4rem;">
                             <span>✓</span> <span id="audioYtSelectedText">Mídia do YouTube baixada e selecionada automaticamente!</span>
                         </div>
@@ -949,7 +1018,7 @@
                             <div id="bgYoutubeContainer" style="display: none;">
                                 <input type="text" id="bgYoutubeUrl" placeholder="URL de fundo do YouTube..." class="input-text" style="margin-bottom: 0.4rem;">
                                 <button type="button" id="btnDownloadBgYoutube" class="btn-secondary" style="width: 100%;">📥 Baixar Fundo</button>
-                                
+
                                 <!-- BARRA DE PROGRESSO DEDICADA DE DOWNLOAD DO YOUTUBE (FUNDO) -->
                                 <div id="bgYtProgressBox" style="display: none; margin-top: 0.6rem; background: var(--input-bg); border: 1px solid var(--pink-accent); border-radius: 10px; padding: 0.8rem;">
                                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.3rem;">
@@ -960,7 +1029,7 @@
                                         <div id="bgYtProgressBar" style="width: 0%; height: 100%; background: linear-gradient(90deg, var(--pink-accent), var(--accent)); transition: width 0.3s ease;"></div>
                                     </div>
                                 </div>
-                                
+
                                 <div id="bgYtSelectedBadge" style="display: none; margin-top: 0.5rem; background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.3); color: #34d399; padding: 0.5rem 0.8rem; border-radius: 8px; font-size: 0.8rem; font-weight: 600; align-items: center; gap: 0.4rem;">
                                     <span>✓</span> <span id="bgYtSelectedText">Fundo do YouTube baixado e selecionado automaticamente!</span>
                                 </div>
@@ -1005,7 +1074,7 @@
 
                     <!-- OPÇÕES AVANÇADAS EXPANSÍVEIS -->
                     <div id="advancedContent" style="display: none; margin-top: 1.2rem; padding-top: 1.2rem; border-top: 1px solid var(--glass-border);">
-                        
+
                         <!-- SEÇÃO DE SALVAR E GERENCIAR PERFIS (DENTRO DAS OPÇÕES AVANÇADAS) -->
                         <div style="background: var(--input-bg); border: 1px solid var(--glass-border); padding: 1rem; border-radius: var(--radius-md); margin-bottom: 1.2rem;">
                             <span class="label" style="font-size: 0.88rem; color: var(--text-main); margin-bottom: 0.6rem;">💾 Perfil de Ajustes</span>
@@ -1137,17 +1206,13 @@
                     <span id="progressPercent" style="font-size: 1.2rem; font-weight: 800; color: var(--accent);">0%</span>
                 </div>
 
-                <p id="statusMessage" style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 0.8rem;">Iniciando pipeline de inteligência artificial...</p>
-
-                <div class="progress-bar-bg">
-                    <div class="progress-bar-fill" id="progressBarFill"></div>
+                <div class="progress-copy">
+                    <p id="statusMessage" style="font-size: 0.9rem; color: var(--text-muted);">Iniciando processamento local...</p>
+                    <span id="stageProgressText" class="stage-progress-text"></span>
                 </div>
 
-                <div style="margin-top: 0.8rem;">
-                    <div class="progress-bar-bg" style="height: 6px;">
-                        <div class="progress-bar-fill" id="stepProgressBarFill" style="background: #10b981;"></div>
-                    </div>
-                    <span id="stepProgressPercent" style="font-size: 0.75rem; color: var(--text-muted); float: right; margin-top: 0.2rem;">0%</span>
+                <div class="progress-bar-bg" role="progressbar" aria-label="Progresso geral" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+                    <div class="progress-bar-fill" id="progressBarFill"></div>
                 </div>
 
                 <!-- Botão Cancelar -->
@@ -1157,14 +1222,14 @@
 
                 <!-- Timeline de Etapas -->
                 <div class="timeline" id="timeline" style="margin-top: 1rem;">
-                    <div class="timeline-step" id="step-Uploading"><div class="step-dot"></div><span>Carregando arquivo (Uploading)</span></div>
-                    <div class="timeline-step" id="step-Extracting"><div class="step-dot"></div><span>Extraindo áudio (Extracting audio)</span></div>
-                    <div class="timeline-step" id="step-Separating"><div class="step-dot"></div><span>Separando vocais do instrumental (Separating vocals)</span></div>
-                    <div class="timeline-step" id="step-Transcribing"><div class="step-dot"></div><span>Transcrevendo voz com Whisper (Transcribing)</span></div>
-                    <div class="timeline-step" id="step-Subtitles"><div class="step-dot"></div><span>Gerando legenda sincronizada ASS (Subtitles)</span></div>
-                    <div class="timeline-step" id="step-Rendering"><div class="step-dot"></div><span>Renderizando vídeo final (Rendering final video)</span></div>
-                    <div class="timeline-step" id="step-Cleaning"><div class="step-dot"></div><span>Limpando arquivos temporários (Cleaning)</span></div>
-                    <div class="timeline-step" id="step-Done"><div class="step-dot"></div><span>Concluído (Done)</span></div>
+                    <div class="timeline-step" id="step-Uploading"><div class="step-dot"></div><span>Carregando arquivo</span></div>
+                    <div class="timeline-step" id="step-Extracting"><div class="step-dot"></div><span>Extraindo áudio</span></div>
+                    <div class="timeline-step" id="step-Separating"><div class="step-dot"></div><span>Separando vocais do instrumental</span></div>
+                    <div class="timeline-step" id="step-Transcribing"><div class="step-dot"></div><span>Transcrevendo voz com Whisper</span></div>
+                    <div class="timeline-step" id="step-Subtitles"><div class="step-dot"></div><span>Gerando legenda sincronizada</span></div>
+                    <div class="timeline-step" id="step-Rendering"><div class="step-dot"></div><span>Renderizando vídeo final</span></div>
+                    <div class="timeline-step" id="step-Cleaning"><div class="step-dot"></div><span>Limpando arquivos temporários</span></div>
+                    <div class="timeline-step" id="step-Done"><div class="step-dot"></div><span>Concluído</span></div>
                 </div>
             </div>
 
@@ -1178,14 +1243,14 @@
                 </div>
                 <button type="button" id="btnContinueProcess" class="btn-primary" style="width: auto; padding: 0.5rem 1.2rem; font-size: 0.85rem;">🚀 Salvar e renderizar</button>
             </div>
-            
+
             <!-- Grid de Duas Colunas: Live Preview e Lista de Estrofes -->
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.5rem; margin-bottom: 1.5rem;">
-                
+
                 <!-- Coluna A: Mockup Live Preview -->
                 <div style="display: flex; flex-direction: column; gap: 0.8rem;">
                     <span style="font-size: 0.82rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">📺 Pré-visualização ao Vivo</span>
-                    
+
                     <!-- Container Mockup 16:9 -->
                     <div id="previewVideoMock" style="position: relative; width: 100%; aspect-ratio: 16/9; background: #000; border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; padding: 1.5rem; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.5);">
                         <img id="previewBgImage" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; z-index: 1; display: none;">
@@ -1194,12 +1259,17 @@
                             Selecione ou edite uma linha...
                         </div>
                     </div>
+                    <div class="correction-preview-toolbar">
+                        <button type="button" id="btnPreviousSegment" class="btn-secondary" aria-label="Legenda anterior">← Anterior</button>
+                        <span id="correctionPreviewMeta" class="correction-preview-meta">Selecione uma legenda</span>
+                        <button type="button" id="btnNextSegment" class="btn-secondary" aria-label="Próxima legenda">Próxima →</button>
+                    </div>
                 </div>
 
                 <!-- Coluna B: Lista de Estrofes com Edição de Tempos e Texto -->
                 <div style="display: flex; flex-direction: column; gap: 0.8rem;">
                     <span style="font-size: 0.82rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">📜 Estrofes & Tempos Transcritor</span>
-                    
+
                     <div id="correctionList" style="display: flex; flex-direction: column; gap: 0.8rem; max-height: 400px; overflow-y: auto; padding-right: 0.5rem;">
                         <!-- Preenchido dinamicamente via renderSegments() -->
                     </div>
@@ -1229,13 +1299,6 @@
         <!-- ABA 2: AJUSTES -->
         <!-- ============================================================= -->
         <div id="settingsTabContent" style="display: none;">
-            <div class="page-intro">
-                <div>
-                    <h2>Ajustes</h2>
-                    <p>Modelos, bot pessoal e ferramentas do servidor em blocos mais diretos.</p>
-                </div>
-                <span class="user-chip">O tema continua no topo da tela</span>
-            </div>
             <div class="settings-grid">
 
             <!-- Gerenciador de Modelos Whisper -->
@@ -1251,7 +1314,7 @@
             </div>
 
             <!-- Credenciais do Telegram -->
-            <div class="card">
+            <div class="card" id="telegramSection">
                 <div class="card-header">
                     <span class="card-title">✈️ Meu bot do Telegram</span>
                     <button type="button" id="btnEditTelegram" class="btn-secondary">✏️ Editar</button>
@@ -1273,7 +1336,7 @@
                         <input type="text" id="telegramChatIdInput" placeholder="Ex: 987654321" class="input-text">
                     </div>
                     <div style="grid-column: 1 / -1;">
-                        <button type="button" id="btnSaveTelegram" class="btn-primary" style="max-width: 220px;">💾 Salvar Telegram</button>
+                        <button type="button" id="btnSaveTelegram" class="btn-primary">💾 Salvar Telegram</button>
                     </div>
                 </div>
             </div>
@@ -1349,13 +1412,6 @@
         <!-- ABA 3: BIBLIOTECA & HISTÓRICO -->
         <!-- ============================================================= -->
         <div id="libraryTabContent" style="display: none; flex-direction: column; gap: 1.5rem;">
-            <div class="page-intro" style="margin-bottom: 0;">
-                <div>
-                    <h2>Minha Biblioteca</h2>
-                    <p>Arquivos desta conta, organizados entre originais, fundos e resultados.</p>
-                </div>
-                <span class="user-chip">🔒 Espaço privado da conta</span>
-            </div>
             <!-- Grid de Envio Rápido para a Biblioteca -->
             <div style="background: var(--input-bg); border: 1px solid var(--glass-border); padding: 1.2rem; border-radius: 12px; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr)); gap: 1rem;">
                 <div>
@@ -1413,7 +1469,7 @@
 
         <!-- RODAPÉ DISCRETO DA PÁGINA -->
         <footer>
-            Sal0 Karaokê v5.2.0
+            Sal0 Karaokê v5.2.1
         </footer>
 
     </div> <!-- Container End -->
@@ -1428,6 +1484,11 @@
             </div>
             <video id="libraryVideoPreview" class="media-preview" controls preload="metadata"></video>
             <img id="libraryImagePreview" class="media-preview" alt="Visualização do arquivo" style="display: none; object-fit: contain;">
+            <div id="mediaSeekControls" class="media-seek-controls">
+                <button type="button" id="btnSeekBackward" class="btn-secondary">↶ 10 s</button>
+                <span id="mediaTimeLabel" class="media-time-label">0:00 / 0:00</span>
+                <button type="button" id="btnSeekForward" class="btn-secondary">10 s ↷</button>
+            </div>
         </div>
     </div>
 
@@ -1435,7 +1496,7 @@
     <div id="helpModal" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.7); backdrop-filter: blur(12px); z-index: 9999; justify-content: center; align-items: center; padding: 1rem;">
         <div style="background: var(--bg-card); border: 1px solid var(--glass-border); border-radius: 20px; padding: 1.8rem; max-width: 620px; width: 100%; max-height: 85vh; overflow-y: auto; box-shadow: var(--shadow);">
             <h3 style="color: var(--text-main); margin-bottom: 1rem; font-family: 'Outfit', sans-serif;">📖 Manual do Sal0 Karaokê</h3>
-            
+
             <div style="display: flex; flex-direction: column; gap: 0.8rem; font-size: 0.85rem; color: var(--text-muted); line-height: 1.5;">
                 <p><strong style="color: var(--text-main);">O que ele faz?</strong><br>
                 O Sal0 Karaokê separa voz e instrumental, transcreve a música, sincroniza as legendas e renderiza o vídeo no seu próprio computador ou servidor. Só a busca opcional de letras e os downloads solicitados usam a internet.</p>
@@ -1510,6 +1571,7 @@
 
         function applyRoleUI() {
             const admin = currentUser?.role === 'admin';
+            document.querySelector('.settings-grid')?.classList.toggle('user-settings', !admin);
             ['modelManagerSection', 'externalUrlSection', 'userManagementSection', 'logsSection'].forEach(id => {
                 const element = document.getElementById(id);
                 if (element) element.style.display = admin ? '' : 'none';
@@ -1532,7 +1594,7 @@
             document.documentElement.setAttribute('data-theme', theme);
             localStorage.setItem('karaoke_theme', theme);
             const btnTheme = document.getElementById('btnToggleTheme');
-            
+
             if (btnTheme) {
                 btnTheme.innerText = theme === 'light' ? '☀️ Claro' : '🌙 Escuro';
             }
@@ -1557,10 +1619,10 @@
                 const res = await authFetch('/api/auth_status');
                 if (!res.ok) return false;
                 const data = await res.json();
-                
+
                 const setupModal = document.getElementById('setupModal');
                 const loginModal = document.getElementById('loginModal');
-                
+
                 if (data.status === 'setup') {
                     if (setupModal) setupModal.style.display = 'flex';
                     if (loginModal) loginModal.style.display = 'none';
@@ -1665,7 +1727,7 @@
                 const res = await authFetch('/api/profiles');
                 if (!res.ok) return;
                 allProfiles = await res.json();
-                
+
                 const profileSelect = document.getElementById('profileSelect');
                 if (!profileSelect) return;
 
@@ -1733,12 +1795,12 @@
                 const res = await authFetch('/api/models');
                 if (!res.ok) return;
                 const models = await res.json();
-                
+
                 const container = document.getElementById('modelsListContainer');
                 if (!container) return;
-                
+
                 container.innerHTML = "";
-                
+
                 const friendlyNames = {
                     "large-v3-turbo": "Large v3 Turbo (~1.5GB - Padrão Recomendado)",
                     "medium": "Medium (~1.5GB - Alternativa Estável / Fallback)",
@@ -1771,7 +1833,7 @@
                             </span>
                         </div>
                         <div>
-                            ${isDownloaded 
+                            ${isDownloaded
                                 ? `<button type="button" class="btn-secondary" disabled style="width: 100%; opacity: 0.6; cursor: default;">✓ Pronto para Uso</button>`
                                 : `<button type="button" class="btn-primary" style="width: 100%; font-size: 0.78rem; padding: 0.45rem;" onclick="downloadModel('${modelKey}', this)">📥 Baixar Modelo</button>`
                             }
@@ -1862,18 +1924,18 @@
                 const users = await res.json();
                 const container = document.getElementById('usersListContainer');
                 if (!container) return;
-                
+
                 container.innerHTML = "";
-                
+
                 users.forEach(u => {
                     const row = document.createElement('div');
                     row.className = "library-item";
                     row.style.padding = "0.6rem 0.9rem";
-                    
-                    const roleBadge = u.role === 'admin' 
+
+                    const roleBadge = u.role === 'admin'
                         ? `<span style="background: var(--accent); color: white; padding: 0.15rem 0.5rem; border-radius: 20px; font-size: 0.7rem;">👑 Admin</span>`
                         : `<span style="background: var(--glass-border); color: var(--text-muted); padding: 0.15rem 0.5rem; border-radius: 20px; font-size: 0.7rem;">👤 Usuário</span>`;
-                    
+
                     row.innerHTML = `
                         <div class="info">
                             <span style="font-weight: 600; color: var(--text-main);">${u.username}</span>
@@ -1977,7 +2039,33 @@
             const image = document.getElementById('libraryImagePreview');
             if (video) { video.pause(); video.removeAttribute('src'); video.load(); }
             if (image) image.removeAttribute('src');
+            updateMediaTimeLabel();
             if (modal) modal.style.display = 'none';
+        }
+
+        function formatMediaTime(value) {
+            if (!Number.isFinite(value) || value < 0) return '0:00';
+            const totalSeconds = Math.floor(value);
+            const hours = Math.floor(totalSeconds / 3600);
+            const minutes = Math.floor((totalSeconds % 3600) / 60);
+            const seconds = String(totalSeconds % 60).padStart(2, '0');
+            return hours > 0
+                ? `${hours}:${String(minutes).padStart(2, '0')}:${seconds}`
+                : `${minutes}:${seconds}`;
+        }
+
+        function updateMediaTimeLabel() {
+            const video = document.getElementById('libraryVideoPreview');
+            const label = document.getElementById('mediaTimeLabel');
+            if (!label) return;
+            label.textContent = `${formatMediaTime(video?.currentTime || 0)} / ${formatMediaTime(video?.duration || 0)}`;
+        }
+
+        function seekLibraryPreview(seconds) {
+            const video = document.getElementById('libraryVideoPreview');
+            if (!video || !Number.isFinite(video.duration)) return;
+            video.currentTime = Math.max(0, Math.min(video.duration, video.currentTime + seconds));
+            updateMediaTimeLabel();
         }
 
         function openMediaPreview(section, filename) {
@@ -1985,17 +2073,24 @@
             const title = document.getElementById('mediaPreviewTitle');
             const video = document.getElementById('libraryVideoPreview');
             const image = document.getElementById('libraryImagePreview');
+            const seekControls = document.getElementById('mediaSeekControls');
             const url = `/api/library/preview/${encodeURIComponent(section)}/${encodeURIComponent(filename)}?token=${encodeURIComponent(authToken)}`;
             const imageType = /\.(png|jpe?g|gif|webp|bmp)$/i.test(filename);
             if (title) title.textContent = filename;
             if (video) {
                 video.style.display = imageType ? 'none' : 'block';
-                if (!imageType) video.src = url;
+                if (!imageType) {
+                    video.src = url;
+                    video.currentTime = 0;
+                    video.load();
+                }
             }
             if (image) {
                 image.style.display = imageType ? 'block' : 'none';
                 if (imageType) image.src = url;
             }
+            if (seekControls) seekControls.style.display = imageType ? 'none' : 'flex';
+            updateMediaTimeLabel();
             if (modal) modal.style.display = 'flex';
         }
 
@@ -2080,7 +2175,7 @@
 
             // Alternadores de Tema
             const btnToggleTheme = document.getElementById('btnToggleTheme');
-            
+
             if (btnToggleTheme) {
                 btnToggleTheme.onclick = () => {
                     const current = document.documentElement.getAttribute('data-theme') || 'dark';
@@ -2096,7 +2191,17 @@
             if (btnCloseHelpModal && helpModal) btnCloseHelpModal.onclick = () => helpModal.style.display = 'none';
             const mediaPreviewModal = document.getElementById('mediaPreviewModal');
             const btnCloseMediaPreview = document.getElementById('btnCloseMediaPreview');
+            const libraryVideoPreview = document.getElementById('libraryVideoPreview');
+            const btnSeekBackward = document.getElementById('btnSeekBackward');
+            const btnSeekForward = document.getElementById('btnSeekForward');
             if (btnCloseMediaPreview) btnCloseMediaPreview.onclick = closeMediaPreview;
+            if (btnSeekBackward) btnSeekBackward.onclick = () => seekLibraryPreview(-10);
+            if (btnSeekForward) btnSeekForward.onclick = () => seekLibraryPreview(10);
+            if (libraryVideoPreview) {
+                libraryVideoPreview.addEventListener('loadedmetadata', updateMediaTimeLabel);
+                libraryVideoPreview.addEventListener('timeupdate', updateMediaTimeLabel);
+                libraryVideoPreview.addEventListener('durationchange', updateMediaTimeLabel);
+            }
             if (mediaPreviewModal) mediaPreviewModal.onclick = event => {
                 if (event.target === mediaPreviewModal) closeMediaPreview();
             };
@@ -2129,6 +2234,9 @@
                     audioYoutubeContainer.style.display = 'none';
                     audioLibraryContainer.style.display = 'none';
                     document.getElementById('libraryAudioHidden').value = '';
+                    const youtubeInput = document.getElementById('youtubeUrl');
+                    if (youtubeInput) youtubeInput.value = '';
+                    autoLookupLyricsForSong(getSuggestedLyricsQuery());
                 };
             }
             if (btnAudioModeYoutube) {
@@ -2141,6 +2249,7 @@
                     audioUploadContainer.style.display = 'none';
                     audioLibraryContainer.style.display = 'none';
                     document.getElementById('libraryAudioHidden').value = '';
+                    scheduleYoutubeLyricsIdentification(document.getElementById('youtubeUrl')?.value || '');
                 };
             }
             if (btnAudioModeLibrary) {
@@ -2152,6 +2261,7 @@
                     audioLibraryContainer.style.display = 'block';
                     audioUploadContainer.style.display = 'none';
                     audioYoutubeContainer.style.display = 'none';
+                    autoLookupLyricsForSong(getSuggestedLyricsQuery());
                 };
             }
 
@@ -2328,7 +2438,7 @@
 
                     btnDownloadYoutube.disabled = true;
                     btnDownloadYoutube.innerText = "⏳ Baixando no Servidor...";
-                    
+
                     const progressBox = document.getElementById('audioYoutubeProgressBox');
                     const statusTitle = document.getElementById('audioYtStatusTitle');
                     const statusPercent = document.getElementById('audioYtStatusPercent');
@@ -2536,7 +2646,7 @@
             }
 
             // Salvar e Deletar Perfis (Nas Opções Avançadas)
-            
+
             // Handlers de Salvar e Limpar Letra Personalizada (persiste no servidor via /api/lyrics)
             const btnSaveLyrics = document.getElementById('btnSaveLyrics');
             const btnClearLyrics = document.getElementById('btnClearLyrics');
@@ -2548,6 +2658,9 @@
             const lyricsSummary = document.getElementById('lyricsSummary');
             const appNotice = document.getElementById('appNotice');
             let lastAutoLyricsQuery = '';
+            let lyricsLookupGeneration = 0;
+            let autoLyricsController = null;
+            let youtubeLyricsTimer = null;
             let noticeTimer = null;
 
             function setLyricsPanel(open) {
@@ -2587,6 +2700,28 @@
                 } else {
                     lyricsBadge.style.display = 'none';
                 }
+            }
+
+            function normalizeLyricsSource(value) {
+                return String(value || '')
+                    .normalize('NFKD')
+                    .replace(/[\u0300-\u036f]/g, '')
+                    .replace(/[^a-zA-Z0-9]+/g, ' ')
+                    .trim()
+                    .toLowerCase();
+            }
+
+            function clearAutomaticLyricsState(message = '') {
+                if (lyricsText) lyricsText.value = '';
+                updateLyricsBadge('');
+                if (lyricsSearchResults) lyricsSearchResults.replaceChildren();
+                if (message) setLyricsSearchStatus(message);
+            }
+
+            function cancelAutomaticLyricsLookup() {
+                lyricsLookupGeneration += 1;
+                if (autoLyricsController) autoLyricsController.abort();
+                autoLyricsController = null;
             }
 
             if (btnSaveLyrics) {
@@ -2644,9 +2779,12 @@
             }
 
             function getSuggestedLyricsQuery() {
+                const selectedPreset = document.getElementById('libraryAudioHidden')?.value || '';
                 const libraryAudio = document.getElementById('libraryAudioSelect')?.value || '';
                 const uploadedAudio = document.getElementById('audioFile')?.files?.[0]?.name || '';
-                const filename = libraryAudio || uploadedAudio;
+                const libraryMode = document.getElementById('btnAudioModeLibrary')?.classList.contains('active');
+                const uploadMode = document.getElementById('btnAudioModeUpload')?.classList.contains('active');
+                const filename = selectedPreset || (libraryMode ? libraryAudio : '') || (uploadMode ? uploadedAudio : '');
                 return filename
                     .replace(/\.[^/.]+$/, '')
                     .replace(/_+/g, ' ')
@@ -2654,8 +2792,13 @@
                     .trim();
             }
 
-            async function importOnlineLyrics(result, button = null) {
+            async function importOnlineLyrics(result, button = null, lookupContext = null) {
                 if (!lyricsText) return false;
+                if (!lookupContext) cancelAutomaticLyricsLookup();
+                const isCurrentLookup = () => !lookupContext || (
+                    lookupContext.generation === lyricsLookupGeneration
+                    && !lookupContext.signal?.aborted
+                );
                 if (button) {
                     button.disabled = true;
                     button.innerText = '⏳ Importando...';
@@ -2675,6 +2818,7 @@
                         const response = await authFetch('/api/lyrics/fetch', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
+                            signal: lookupContext?.signal,
                             body: JSON.stringify({
                                 id: result.id,
                                 provider: result.provider,
@@ -2686,13 +2830,16 @@
                         if (!response.ok) throw new Error(payload.detail || 'Não foi possível obter a letra.');
                     }
 
+                    if (!isCurrentLookup()) return false;
                     lyricsText.value = payload.lyrics_text || '';
                     const saveResponse = await authFetch('/api/lyrics', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
+                        signal: lookupContext?.signal,
                         body: JSON.stringify({ lyrics_text: lyricsText.value })
                     });
                     if (!saveResponse.ok) throw new Error('A letra foi obtida, mas não pôde ser salva localmente.');
+                    if (!isCurrentLookup()) return false;
 
                     updateLyricsBadge(lyricsText.value);
                     if (lyricsSearchQuery) lyricsSearchQuery.value = `${payload.track_name} — ${payload.artist_name}`;
@@ -2700,6 +2847,7 @@
                     setLyricsSearchStatus('Letra salva localmente. Você pode revisar quando quiser.');
                     return true;
                 } catch (error) {
+                    if (error.name === 'AbortError') return false;
                     setLyricsSearchStatus(`Erro ao importar a letra: ${error.message}`, true);
                     if (button) {
                         button.disabled = false;
@@ -2710,53 +2858,142 @@
             }
 
             async function autoLookupLyricsForSong(query) {
-                if (!lyricsMode || lyricsMode.value !== 'auto' || (lyricsText && lyricsText.value.trim())) return;
+                if (!lyricsMode || lyricsMode.value !== 'auto') return;
+                if (youtubeLyricsTimer) {
+                    clearTimeout(youtubeLyricsTimer);
+                    youtubeLyricsTimer = null;
+                }
                 query = (query || '').trim();
-                if (query.length < 2 || query === lastAutoLyricsQuery) return;
-                lastAutoLyricsQuery = query;
+                const sourceKey = `song:${normalizeLyricsSource(query)}`;
+                if (query.length < 2 || sourceKey === lastAutoLyricsQuery) return;
+                lastAutoLyricsQuery = sourceKey;
+                cancelAutomaticLyricsLookup();
+                const generation = lyricsLookupGeneration;
+                autoLyricsController = new AbortController();
+                const signal = autoLyricsController.signal;
+                clearAutomaticLyricsState(`Buscando automaticamente a letra de "${query}"...`);
+                if (lyricsSearchQuery) lyricsSearchQuery.value = query;
                 setLyricsSearchStatus(`Buscando automaticamente a letra de "${query}"...`);
 
                 try {
+                    await authFetch('/api/lyrics', { method: 'DELETE', signal });
+                    if (generation !== lyricsLookupGeneration || signal.aborted) return;
                     const response = await authFetch('/api/lyrics/search', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
+                        signal,
                         body: JSON.stringify({ query })
                     });
                     const payload = await response.json();
                     if (!response.ok) throw new Error(payload.detail || 'Busca indisponível.');
+                    if (generation !== lyricsLookupGeneration || signal.aborted) return;
                     const result = (payload.results || []).find(item => item.has_lyrics && !item.instrumental);
                     if (!result) {
                         setLyricsSearchStatus('Nenhuma letra automática encontrada; você pode preencher manualmente.', true);
                         showLyricsNotice('ℹ️ Não encontrei uma letra agora. Você pode adicionar uma quando quiser.', true);
                         return;
                     }
-                    const imported = await importOnlineLyrics(result);
+                    const imported = await importOnlineLyrics(result, null, { generation, signal });
                     if (imported) {
                         setLyricsSearchStatus(`Letra encontrada para ${result.track_name} — ${result.artist_name}.`);
                         showLyricsNotice(`✓ Letra encontrada para ${result.track_name}.`);
                     }
                 } catch (error) {
+                    if (error.name === 'AbortError') return;
                     setLyricsSearchStatus('Não foi possível buscar a letra automaticamente. Você pode inserir a letra manualmente.', true);
                     showLyricsNotice('ℹ️ A busca de letra não respondeu. Você pode adicionar uma manualmente.', true);
+                } finally {
+                    if (generation === lyricsLookupGeneration) autoLyricsController = null;
                 }
+            }
+
+            async function identifyYoutubeLyrics(url) {
+                if (!lyricsMode || lyricsMode.value !== 'auto') return;
+                url = String(url || '').trim();
+                if (!url) return;
+
+                const sourceKey = `youtube:${url}`;
+                if (sourceKey === lastAutoLyricsQuery) return;
+                lastAutoLyricsQuery = sourceKey;
+                cancelAutomaticLyricsLookup();
+                const generation = lyricsLookupGeneration;
+                autoLyricsController = new AbortController();
+                const signal = autoLyricsController.signal;
+                clearAutomaticLyricsState('Identificando a música do YouTube...');
+
+                try {
+                    await authFetch('/api/lyrics', { method: 'DELETE', signal });
+                    const response = await authFetch('/api/youtube/metadata', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        signal,
+                        body: JSON.stringify({ youtube_url: url })
+                    });
+                    const payload = await response.json();
+                    if (!response.ok) throw new Error(payload.detail || 'Não foi possível identificar o vídeo.');
+                    if (generation !== lyricsLookupGeneration || signal.aborted) return;
+
+                    const title = String(payload.lyrics_query || payload.title || '').trim();
+                    if (!title) throw new Error('O vídeo não informou um título.');
+                    if (lyricsSearchQuery) lyricsSearchQuery.value = title;
+                    lastAutoLyricsQuery = '';
+                    await autoLookupLyricsForSong(title);
+                } catch (error) {
+                    if (error.name === 'AbortError') return;
+                    setLyricsSearchStatus('Não consegui identificar esse link agora. Ao iniciar o processo, o título será verificado novamente.', true);
+                } finally {
+                    if (generation === lyricsLookupGeneration) autoLyricsController = null;
+                }
+            }
+
+            function scheduleYoutubeLyricsIdentification(url) {
+                if (!lyricsMode || lyricsMode.value !== 'auto') return;
+                if (youtubeLyricsTimer) clearTimeout(youtubeLyricsTimer);
+                cancelAutomaticLyricsLookup();
+                lastAutoLyricsQuery = `pending-youtube:${String(url || '').trim()}`;
+                clearAutomaticLyricsState(
+                    url ? 'Identificando a nova música do YouTube...' : 'Cole um link para buscar a letra automaticamente.'
+                );
+                if (!String(url || '').trim()) return;
+                youtubeLyricsTimer = setTimeout(() => {
+                    lastAutoLyricsQuery = '';
+                    identifyYoutubeLyrics(url);
+                }, 650);
             }
 
             if (lyricsMode) {
                 lyricsMode.onchange = () => {
                     if (lyricsMode.value === 'manual') {
+                        if (youtubeLyricsTimer) clearTimeout(youtubeLyricsTimer);
+                        cancelAutomaticLyricsLookup();
+                        lastAutoLyricsQuery = '';
                         setLyricsSearchStatus('Modo manual ativo. A letra digitada será usada como prioridade.');
-                    } else if (lyricsText && lyricsText.value.trim()) {
-                        setLyricsSearchStatus('Uma letra já preenchida será preservada; limpe o campo para buscar automaticamente outra.');
                     } else {
-                        autoLookupLyricsForSong(getSuggestedLyricsQuery());
+                        lastAutoLyricsQuery = '';
+                        const suggestedQuery = getSuggestedLyricsQuery();
+                        const youtubeActive = document.getElementById('btnAudioModeYoutube')?.classList.contains('active');
+                        const youtubeUrl = document.getElementById('youtubeUrl')?.value || '';
+                        if (suggestedQuery) autoLookupLyricsForSong(suggestedQuery);
+                        else if (youtubeActive && youtubeUrl.trim()) scheduleYoutubeLyricsIdentification(youtubeUrl);
+                        else clearAutomaticLyricsState('Selecione uma música para buscar a letra automaticamente.');
                     }
                 };
+            }
+
+            const youtubeLyricsInput = document.getElementById('youtubeUrl');
+            if (youtubeLyricsInput) {
+                youtubeLyricsInput.addEventListener('input', () => {
+                    scheduleYoutubeLyricsIdentification(youtubeLyricsInput.value);
+                });
             }
 
             if (lyricsText) {
                 lyricsText.addEventListener('input', () => {
                     setLyricsSummary(lyricsText.value);
                     if (lyricsText.value.trim() && lyricsMode && lyricsMode.value === 'auto') {
+                        if (youtubeLyricsTimer) clearTimeout(youtubeLyricsTimer);
+                        cancelAutomaticLyricsLookup();
+                        lastAutoLyricsQuery = '';
                         lyricsMode.value = 'manual';
                         setLyricsSearchStatus('Entrada manual detectada; ela terá prioridade sobre a busca automática.');
                     }
@@ -3118,10 +3355,22 @@
                 e.preventDefault();
                 const btnSubmit = document.getElementById('btnSubmit');
                 const processCard = document.getElementById('processCard');
-                
+
                 btnSubmit.disabled = true;
                 btnSubmit.innerHTML = '<span>⏳</span> Iniciando Produção...';
                 processCard.style.display = 'block';
+                const initialProgress = document.getElementById('progressBarFill');
+                const initialPercent = document.getElementById('progressPercent');
+                const initialStatus = document.getElementById('statusMessage');
+                const initialStage = document.getElementById('stageProgressText');
+                if (initialProgress) {
+                    initialProgress.style.width = '0%';
+                    initialProgress.parentElement?.setAttribute('aria-valuenow', '0');
+                }
+                if (initialPercent) initialPercent.textContent = '0%';
+                if (initialStatus) initialStatus.textContent = 'Preparando a criação...';
+                if (initialStage) initialStage.textContent = '';
+                updateTimelineUI('Uploading');
 
                 const formData = new FormData(karaokêForm);
                 formData.set('app_base_url', window.location.origin);
@@ -3181,7 +3430,7 @@
             pollingInterval = setInterval(fetchStatus, 600);
         }
 
-        
+
         async function fetchCacheInfo() {
             try {
                 const res = await authFetch('/api/cache_info');
@@ -3205,9 +3454,10 @@
 
 
 
-        
+
         let isShowingCorrection = false;
         let currentSegments = [];
+        let selectedSegmentIndex = 0;
 
         async function loadCorrectionPanel() {
             try {
@@ -3218,7 +3468,7 @@
                         const cacheData = await cacheRes.json();
                         const previewBgImage = document.getElementById('previewBgImage');
                         const previewBgVideo = document.getElementById('previewBgVideo');
-                        
+
                         if (cacheData.has_cache) {
                             const token = localStorage.getItem('auth_token') || '';
                             const bgUrl = `/api/cache/background?token=${encodeURIComponent(token)}`;
@@ -3245,13 +3495,10 @@
                 // Carregar segmentos transcritos do servidor
                 const res = await authFetch('/api/segments_to_edit');
                 if (!res.ok) throw new Error("Falha ao obter legendas para correção.");
-                
+
                 currentSegments = await res.json();
+                selectedSegmentIndex = 0;
                 renderSegments();
-                
-                if (currentSegments && currentSegments.length > 0) {
-                    updatePreviewText(currentSegments[0].text);
-                }
 
                 initCorrectionButtonListeners();
                 const correctionCard = document.getElementById('correctionCard');
@@ -3286,6 +3533,43 @@
             }
         }
 
+        function selectCorrectionSegment(index, shouldScroll = false) {
+            if (!currentSegments.length) {
+                selectedSegmentIndex = 0;
+                updatePreviewText('');
+                const emptyMeta = document.getElementById('correctionPreviewMeta');
+                if (emptyMeta) emptyMeta.textContent = 'Nenhuma legenda disponível';
+                return;
+            }
+
+            selectedSegmentIndex = Math.max(0, Math.min(currentSegments.length - 1, index));
+            const selected = currentSegments[selectedSegmentIndex];
+            updatePreviewText(selected.text);
+
+            document.querySelectorAll('.correction-segment').forEach(card => {
+                card.classList.toggle('active', Number(card.dataset.segmentIndex) === selectedSegmentIndex);
+            });
+
+            const meta = document.getElementById('correctionPreviewMeta');
+            if (meta) {
+                meta.textContent = `Linha ${selectedSegmentIndex + 1} de ${currentSegments.length} · ${formatTimeMMSS(selected.start)} – ${formatTimeMMSS(selected.end)}`;
+            }
+
+            const previous = document.getElementById('btnPreviousSegment');
+            const next = document.getElementById('btnNextSegment');
+            if (previous) previous.disabled = selectedSegmentIndex === 0;
+            if (next) next.disabled = selectedSegmentIndex === currentSegments.length - 1;
+
+            if (shouldScroll) {
+                const activeCard = document.querySelector(`.correction-segment[data-segment-index="${selectedSegmentIndex}"]`);
+                activeCard?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }
+        }
+
+        function moveCorrectionSelection(offset) {
+            selectCorrectionSegment(selectedSegmentIndex + offset, true);
+        }
+
         function renderSegments() {
             const container = document.getElementById('correctionList');
             if (!container) return;
@@ -3293,18 +3577,21 @@
 
             if (!currentSegments || currentSegments.length === 0) {
                 container.innerHTML = "<p style='font-size: 0.82rem; color: var(--text-muted); text-align: center; padding: 1rem;'>Nenhuma estrofe transcrita para editar.</p>";
+                selectCorrectionSegment(0);
                 return;
             }
 
+            selectedSegmentIndex = Math.min(selectedSegmentIndex, currentSegments.length - 1);
+
             currentSegments.forEach((seg, idx) => {
                 const card = document.createElement('div');
-                card.style.display = "flex";
-                card.style.flexDirection = "column";
-                card.style.gap = "0.4rem";
-                card.style.background = "var(--input-bg)";
-                card.style.border = "1px solid var(--glass-border)";
-                card.style.padding = "0.75rem";
-                card.style.borderRadius = "8px";
+                card.className = 'correction-segment';
+                card.dataset.segmentIndex = idx;
+                card.tabIndex = 0;
+                card.onclick = () => selectCorrectionSegment(idx);
+                card.onfocus = event => {
+                    if (event.target === card) selectCorrectionSegment(idx);
+                };
 
                 const headerRow = document.createElement('div');
                 headerRow.style.display = "flex";
@@ -3325,8 +3612,11 @@
                 btnDelete.style.cursor = "pointer";
                 btnDelete.style.fontSize = "0.85rem";
                 btnDelete.title = "Excluir Linha";
-                btnDelete.onclick = () => {
+                btnDelete.onclick = event => {
+                    event.stopPropagation();
                     currentSegments.splice(idx, 1);
+                    if (selectedSegmentIndex > idx) selectedSegmentIndex -= 1;
+                    selectedSegmentIndex = Math.min(selectedSegmentIndex, Math.max(0, currentSegments.length - 1));
                     renderSegments();
                 };
 
@@ -3354,13 +3644,16 @@
                 startInput.style.width = "85px";
                 startInput.style.textAlign = "center";
                 startInput.value = formatTimeMMSS(seg.start || 0);
+                startInput.onfocus = () => selectCorrectionSegment(idx);
                 startInput.onchange = (e) => {
                     seg.start = parseTimeMMSS(e.target.value);
                     e.target.value = formatTimeMMSS(seg.start);
+                    selectCorrectionSegment(idx);
                 };
                 startInput.onblur = (e) => {
                     seg.start = parseTimeMMSS(e.target.value);
                     e.target.value = formatTimeMMSS(seg.start);
+                    selectCorrectionSegment(idx);
                 };
 
                 const endLabel = document.createElement('span');
@@ -3376,13 +3669,16 @@
                 endInput.style.width = "85px";
                 endInput.style.textAlign = "center";
                 endInput.value = formatTimeMMSS(seg.end || 0);
+                endInput.onfocus = () => selectCorrectionSegment(idx);
                 endInput.onchange = (e) => {
                     seg.end = parseTimeMMSS(e.target.value);
                     e.target.value = formatTimeMMSS(seg.end);
+                    selectCorrectionSegment(idx);
                 };
                 endInput.onblur = (e) => {
                     seg.end = parseTimeMMSS(e.target.value);
                     e.target.value = formatTimeMMSS(seg.end);
+                    selectCorrectionSegment(idx);
                 };
 
                 // Botões de ajuste fino (+0.5s / -0.5s)
@@ -3396,6 +3692,7 @@
                 btnNudgeMinus.onclick = () => {
                     seg.start = Math.max(0, (seg.start || 0) - 0.5);
                     startInput.value = formatTimeMMSS(seg.start);
+                    selectCorrectionSegment(idx);
                 };
 
                 const btnNudgePlus = document.createElement('button');
@@ -3408,6 +3705,7 @@
                 btnNudgePlus.onclick = () => {
                     seg.start = (seg.start || 0) + 0.5;
                     startInput.value = formatTimeMMSS(seg.start);
+                    selectCorrectionSegment(idx);
                 };
 
                 timeRow.appendChild(startLabel);
@@ -3424,14 +3722,16 @@
                 textInput.className = "input-text";
                 textInput.value = seg.text || "";
                 textInput.style.fontWeight = "500";
+                textInput.onfocus = () => selectCorrectionSegment(idx);
                 textInput.oninput = (e) => {
                     seg.text = e.target.value;
-                    updatePreviewText(seg.text);
+                    selectCorrectionSegment(idx);
                 };
 
                 card.appendChild(textInput);
                 container.appendChild(card);
             });
+            selectCorrectionSegment(selectedSegmentIndex);
         }
 
         function updatePreviewText(txt) {
@@ -3444,6 +3744,11 @@
         function initCorrectionButtonListeners() {
             const btnContinue = document.getElementById('btnContinueProcess');
             const btnSkip = document.getElementById('btnSkipEdit');
+            const btnPreviousSegment = document.getElementById('btnPreviousSegment');
+            const btnNextSegment = document.getElementById('btnNextSegment');
+
+            if (btnPreviousSegment) btnPreviousSegment.onclick = () => moveCorrectionSelection(-1);
+            if (btnNextSegment) btnNextSegment.onclick = () => moveCorrectionSelection(1);
 
             if (btnContinue) {
                 btnContinue.onclick = async () => {
@@ -3529,6 +3834,7 @@
                 const progressPercent = document.getElementById('progressPercent');
                 const progressBarFill = document.getElementById('progressBarFill');
                 const statusMessage = document.getElementById('statusMessage');
+                const stageProgressText = document.getElementById('stageProgressText');
                 const btnSubmit = document.getElementById('btnSubmit');
                 const downloadBox = document.getElementById('downloadBox');
                 const resultVideoPreview = document.getElementById('resultVideoPreview');
@@ -3543,6 +3849,7 @@
                     if (statusMessage) statusMessage.innerText = 'O servidor está ocupado com outra criação. Os detalhes ficam privados.';
                     if (progressPercent) progressPercent.innerText = '—';
                     if (progressBarFill) progressBarFill.style.width = '0%';
+                    if (stageProgressText) stageProgressText.textContent = '';
                     if (btnSubmit) { btnSubmit.disabled = true; btnSubmit.innerHTML = '⏳ Servidor ocupado'; }
                     if (downloadBox) downloadBox.style.display = 'none';
                 } else if (data.status === "processing" || data.status === "downloading") {
@@ -3551,9 +3858,22 @@
                     if (correctionCard) correctionCard.style.display = "none";
                     if (processCard) processCard.style.display = "block";
 
-                    if (statusMessage) statusMessage.innerText = `Etapa Atual: ${data.step || 'Processando...'}`;
-                    if (progressPercent) progressPercent.innerText = `${data.progress || 0}%`;
-                    if (progressBarFill) progressBarFill.style.width = `${data.progress || 0}%`;
+                    const overallProgress = Math.max(0, Math.min(100, Number(data.progress) || 0));
+                    if (statusMessage) statusMessage.innerText = data.step || 'Processando...';
+                    if (progressPercent) progressPercent.innerText = `${overallProgress}%`;
+                    if (progressBarFill) {
+                        progressBarFill.style.width = `${overallProgress}%`;
+                        progressBarFill.parentElement?.setAttribute('aria-valuenow', String(overallProgress));
+                    }
+                    if (stageProgressText) {
+                        stageProgressText.textContent = data.stage_detail || (
+                            data.stage_progress !== null
+                            && data.stage_progress !== undefined
+                            && Number.isFinite(Number(data.stage_progress))
+                                ? `${Number(data.stage_progress)}% desta etapa`
+                                : ''
+                        );
+                    }
                     if (btnSubmit) btnSubmit.disabled = true;
 
                     updateTimelineUI(data.step || "");

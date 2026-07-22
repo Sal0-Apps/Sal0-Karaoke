@@ -19,7 +19,7 @@ import hashlib
 import unicodedata
 from urllib.parse import quote
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException, BackgroundTasks, Header, Depends, Query, Request
-from fastapi.responses import HTMLResponse, FileResponse, Response
+from fastapi.responses import HTMLResponse, FileResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
@@ -116,7 +116,7 @@ def validate_new_credentials(username: str, password: str):
 def download_youtube(url: str, cache_dir: str) -> tuple[str, str]:
     """Baixa o melhor vídeo/áudio do YouTube usando yt-dlp com expurgo prévio e 'overwrites': True."""
     import yt_dlp
-    
+
     # Expurgo prévio obrigatorio de qualquer original_input.* no cache para impedir que o yt-dlp pule o download
     for f in os.listdir(cache_dir):
         if f.startswith("original_input."):
@@ -124,7 +124,7 @@ def download_youtube(url: str, cache_dir: str) -> tuple[str, str]:
                 os.remove(os.path.join(cache_dir, f))
             except Exception:
                 pass
-    
+
     ydl_opts_primary = {
         'format': 'bestvideo[height<=1080]+bestaudio/best[height<=1080]/best',
         'outtmpl': os.path.join(cache_dir, 'original_input.%(ext)s'),
@@ -134,7 +134,7 @@ def download_youtube(url: str, cache_dir: str) -> tuple[str, str]:
         'quiet': True,
         'no_warnings': True,
     }
-    
+
     ydl_opts_fallback = {
         'format': 'best',
         'outtmpl': os.path.join(cache_dir, 'original_input.%(ext)s'),
@@ -144,7 +144,7 @@ def download_youtube(url: str, cache_dir: str) -> tuple[str, str]:
         'quiet': True,
         'no_warnings': True,
     }
-    
+
     title = "YouTube Video"
     try:
         logger.info("Tentando baixar do YouTube com formato primário (<=1080p)...")
@@ -156,7 +156,7 @@ def download_youtube(url: str, cache_dir: str) -> tuple[str, str]:
         with yt_dlp.YoutubeDL(ydl_opts_fallback) as ydl:
             info = ydl.extract_info(url, download=True)
             title = info.get('title', 'YouTube Video')
-        
+
     # O arquivo final será .mp4 devido ao merge e remux
     file_path = os.path.join(cache_dir, 'original_input.mp4')
     if not os.path.exists(file_path):
@@ -293,6 +293,8 @@ state = {
     "status": "idle",          # idle, processing, done, error
     "step": "",                # Uploading, Extracting audio, Separating vocals, etc.
     "progress": 0,             # 0 a 100
+    "stage_progress": None,    # progresso interno opcional da etapa atual
+    "stage_detail": "",        # explicação curta da etapa, exibida sem uma segunda barra
     "error_message": "",
     "result_file": None,
     "original_filename": "final",
@@ -309,15 +311,15 @@ segments_to_edit = []
 def update_segment_words(original_seg: dict, new_text: str) -> dict:
     new_text = new_text.strip()
     original_seg["text"] = new_text
-    
+
     # Dividir o texto editado em palavras
     new_words_list = new_text.split()
     orig_words = original_seg.get("words", [])
-    
+
     if not new_words_list:
         original_seg["words"] = []
         return original_seg
-        
+
     # Se o número de palavras for o mesmo, apenas substitui o texto mantendo os timestamps
     if len(new_words_list) == len(orig_words):
         for idx, word_txt in enumerate(new_words_list):
@@ -334,7 +336,7 @@ def update_segment_words(original_seg: dict, new_text: str) -> dict:
         if total_dur <= 0:
             total_dur = 1.0
         word_dur = total_dur / len(new_words_list)
-        
+
         new_words = []
         for idx, word_txt in enumerate(new_words_list):
             w_start = start_time + idx * word_dur
@@ -346,7 +348,7 @@ def update_segment_words(original_seg: dict, new_text: str) -> dict:
                 "end": w_end
             })
         original_seg["words"] = new_words
-        
+
     return original_seg
 
 def clean_word(w: str) -> str:
@@ -416,13 +418,17 @@ def update_state(
     owner_username: str = None,
     owner_role: str = None,
     history_filename: str = None,
-    public_download_token: str = None
+    public_download_token: str = None,
+    stage_progress: int | None = None,
+    stage_detail: str = ""
 ):
     """Atualiza o estado global da aplicação de forma thread-safe e persiste no disco."""
     with state_lock:
         state["status"] = status
         state["step"] = step
         state["progress"] = progress
+        state["stage_progress"] = stage_progress
+        state["stage_detail"] = stage_detail
         state["error_message"] = error_message
         state["result_file"] = result_file
         if original_filename is not None:
@@ -437,7 +443,7 @@ def update_state(
             state["history_filename"] = history_filename
         if public_download_token is not None:
             state["public_download_token"] = public_download_token
-            
+
         try:
             os.makedirs(os.path.dirname(STATE_FILE), exist_ok=True)
             with open(STATE_FILE, "w", encoding="utf-8") as f:
@@ -457,22 +463,22 @@ def startup_event():
             with open(STATE_FILE, "r", encoding="utf-8") as f:
                 import json
                 saved_state = json.load(f)
-                
+
                 # Se o estado salvo era "processing", significa que o container foi finalizado abruptamente (por exemplo, por falta de RAM)
                 if saved_state.get("status") in {"processing", "downloading", "waiting_for_user_correction", "awaiting_review"}:
                     state.update(saved_state)
                     orig_name = saved_state.get("original_filename", "vídeo")
                     logger.warning("Detecção de reinicialização abrupta (possível OOM ou queda)!")
-                    
+
                     state["status"] = "error"
                     state["step"] = "Interrupted"
                     state["progress"] = 0
                     state["error_message"] = "O servidor foi interrompido inesperadamente (possivelmente ficou sem memória RAM ou o container reiniciou)."
-                    
+
                     # Salvar o estado de erro persistente
                     with open(STATE_FILE, "w", encoding="utf-8") as sf:
                         json.dump(state, sf, indent=4)
-                    
+
                     owner = user_from_username(saved_state.get("owner_username", ""))
                     for target in get_notification_targets(owner):
                         send_telegram_notification(
@@ -499,14 +505,14 @@ def save_video_to_history(video_path: str, orig_name: str, library_dir: str) -> 
         else:
             dest_filename = safe_name
             safe_name = os.path.splitext(safe_name)[0]
-            
+
         dest_path = os.path.join(lib_history_dir, dest_filename)
         counter = 1
         while os.path.exists(dest_path):
             dest_filename = f"{safe_name}_{counter}.mp4"
             dest_path = os.path.join(lib_history_dir, dest_filename)
             counter += 1
-            
+
         shutil.copy2(video_path, dest_path)
         logger.info(f"Vídeo de karaokê '{orig_name}' salvo com sucesso no Histórico: {dest_path}")
         return dest_filename
@@ -726,6 +732,47 @@ def get_yt_preset_bg_status(current_user: dict = Depends(get_current_user)):
 class YouTubePresetModel(BaseModel):
     youtube_url: str
 
+
+@app.post("/api/youtube/metadata")
+def get_youtube_metadata(
+    data: YouTubePresetModel,
+    current_user: dict = Depends(get_current_user)
+):
+    """Identifica o título sem baixar o vídeo, para orientar a busca de letra."""
+    url = (data.youtube_url or "").strip()
+    if len(url) > 2048 or not re.match(r"^https?://", url, re.IGNORECASE):
+        raise HTTPException(status_code=400, detail="Informe uma URL válida do YouTube.")
+
+    try:
+        import yt_dlp
+        options = {
+            "quiet": True,
+            "no_warnings": True,
+            "skip_download": True,
+            "noplaylist": True,
+            "socket_timeout": 10,
+        }
+        with yt_dlp.YoutubeDL(options) as ydl:
+            info = ydl.extract_info(url, download=False)
+        title = str((info or {}).get("title") or "").strip()
+        if not title:
+            raise HTTPException(status_code=404, detail="Não foi possível identificar o título desse vídeo.")
+        track = str((info or {}).get("track") or "").strip()
+        artist = str((info or {}).get("artist") or (info or {}).get("creator") or "").strip()
+        lyrics_query = f"{artist} - {track}" if artist and track else title
+        return {
+            "title": title,
+            "lyrics_query": lyrics_query,
+            "duration": (info or {}).get("duration"),
+            "uploader": str((info or {}).get("uploader") or "").strip(),
+        }
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.info("Não foi possível identificar metadados do YouTube: %s", type(exc).__name__)
+        raise HTTPException(status_code=502, detail="Não foi possível identificar esse vídeo agora.")
+
+
 model_download_status = {
     "large-v3-turbo": {"status": "idle", "progress": 0, "error": None},
     "medium": {"status": "idle", "progress": 0, "error": None},
@@ -748,7 +795,7 @@ def resolve_whisper_repo(model_size: str) -> str:
 def get_model_local_dir(model_size: str) -> str:
     """Retorna o diretório local válido contendo os pesos reais (model.bin com tamanho válido) do modelo Whisper."""
     key = model_size.lower().strip()
-    
+
     # Tamanho mínimo exigido em bytes para garantir que o modelo não está incompleto
     min_size_bytes = 300 * 1024 * 1024  # 300 MB padrão (para medium, large, turbo)
     if "tiny" in key:
@@ -809,11 +856,11 @@ def download_model_worker(model_size: str):
         logger.info(f"Iniciando download do modelo Whisper {model_size}...")
         model_download_status[model_size]["status"] = "downloading"
         model_download_status[model_size]["progress"] = 30
-        
+
         repo_id = resolve_whisper_repo(model_size)
         save_dir = "/data/output/models/whisper"
         os.makedirs(save_dir, exist_ok=True)
-        
+
         try:
             logger.info(f"Baixando repositório {repo_id} em {save_dir}...")
             model = WhisperModel(
@@ -834,7 +881,7 @@ def download_model_worker(model_size: str):
             )
             del model
             gc.collect()
-            
+
         model_download_status[model_size]["status"] = "done"
         model_download_status[model_size]["progress"] = 100
         logger.info(f"Download do modelo Whisper {model_size} concluído com sucesso!")
@@ -866,20 +913,20 @@ def start_model_download(req: ModelDownloadRequest, current_user: dict = Depends
     model_size = req.model_size or req.model
     if model_size not in model_download_status:
         raise HTTPException(status_code=400, detail="Modelo inválido.")
-        
+
     if model_download_status[model_size]["status"] == "downloading":
         return {"message": "Download já em andamento."}
-        
+
     model_download_status[model_size]["status"] = "downloading"
     model_download_status[model_size]["progress"] = 10
     model_download_status[model_size]["error"] = None
-    
+
     threading.Thread(
         target=download_model_worker,
         args=(model_size,),
         daemon=True
     ).start()
-    
+
     return {"message": f"Download do modelo {model_size} iniciado."}
 
 def run_youtube_download_bg(url: str, owner: dict):
@@ -888,9 +935,9 @@ def run_youtube_download_bg(url: str, owner: dict):
     cache_dir = paths["cache"]
     os.makedirs(cache_dir, exist_ok=True)
     cache_meta_file = os.path.join(cache_dir, "cache_meta.json")
-    
+
     yt_preset_statuses[status_key] = {"status": "downloading", "progress": 15, "title": "Conectando ao YouTube...", "filename": "", "error": None}
-    
+
     try:
         # Limpar áudios e segmentos legados da música anterior
         for old_f in ["original_converted.wav", "vocals.wav", "instrumental.wav", "transcribed_segments.json"]:
@@ -903,10 +950,10 @@ def run_youtube_download_bg(url: str, owner: dict):
 
         input_audio_path, title = download_youtube(url, cache_dir)
         ext = os.path.splitext(input_audio_path)[1]
-        
+
         yt_preset_statuses[status_key]["title"] = title
         yt_preset_statuses[status_key]["progress"] = 70
-        
+
         cached_meta = {
             "youtube_url": url,
             "original_filename": title,
@@ -919,7 +966,7 @@ def run_youtube_download_bg(url: str, owner: dict):
         }
         with open(cache_meta_file, "w", encoding="utf-8") as f:
             json.dump(cached_meta, f, indent=4)
-            
+
         dest_filename = os.path.basename(input_audio_path)
         try:
             lib_video_dir = os.path.join(paths["library"], "videos")
@@ -952,7 +999,7 @@ def run_youtube_download_bg(url: str, owner: dict):
 def download_bg_youtube(url: str, cache_dir: str) -> tuple[str, str]:
     """Baixa apenas o fluxo de vídeo do YouTube (sem áudio) para uso como fundo com expurgo e overwrites: True."""
     import yt_dlp
-    
+
     # Expurgo prévio obrigatorio de qualquer bg_yt_raw.* no cache
     for f in os.listdir(cache_dir):
         if f.startswith("bg_yt_raw.") or f.startswith("bg_yt_no_audio."):
@@ -960,7 +1007,7 @@ def download_bg_youtube(url: str, cache_dir: str) -> tuple[str, str]:
                 os.remove(os.path.join(cache_dir, f))
             except Exception:
                 pass
-    
+
     ydl_opts_primary = {
         'format': 'bestvideo[height<=1080]/bestvideo/best',
         'outtmpl': os.path.join(cache_dir, 'bg_yt_raw.%(ext)s'),
@@ -979,7 +1026,7 @@ def download_bg_youtube(url: str, cache_dir: str) -> tuple[str, str]:
         'quiet': True,
         'no_warnings': True,
     }
-    
+
     title = "Fundo YouTube"
     try:
         with yt_dlp.YoutubeDL(ydl_opts_primary) as ydl:
@@ -993,14 +1040,14 @@ def download_bg_youtube(url: str, cache_dir: str) -> tuple[str, str]:
                 title = info.get('title', 'Fundo YouTube')
         except Exception as err:
             logger.error(f"Erro fatal no download de fundo YouTube: {err}")
-        
+
     raw_file = os.path.join(cache_dir, 'bg_yt_raw.mp4')
     if not os.path.exists(raw_file):
         for f in os.listdir(cache_dir):
             if f.startswith("bg_yt_raw."):
                 raw_file = os.path.join(cache_dir, f)
                 break
-                
+
     # Remover o áudio usando ffmpeg (-an) para garantir 100% sem som
     no_audio_file = os.path.join(cache_dir, 'bg_yt_no_audio.mp4')
     try:
@@ -1009,7 +1056,7 @@ def download_bg_youtube(url: str, cache_dir: str) -> tuple[str, str]:
     except Exception as err:
         logger.error(f"Erro ao remover áudio do fundo com ffmpeg: {err}")
         no_audio_file = raw_file
-        
+
     return no_audio_file, title
 
 def run_bg_youtube_download_bg(url: str, owner: dict):
@@ -1017,16 +1064,16 @@ def run_bg_youtube_download_bg(url: str, owner: dict):
     paths = get_user_paths(owner)
     cache_dir = paths["cache"]
     os.makedirs(cache_dir, exist_ok=True)
-    
+
     yt_preset_statuses[status_key] = {"status": "downloading", "progress": 15, "title": "Conectando ao YouTube...", "filename": "", "error": None}
-    
+
     try:
         no_audio_path, title = download_bg_youtube(url, cache_dir)
         ext = os.path.splitext(no_audio_path)[1]
-        
+
         yt_preset_statuses[status_key]["title"] = title
         yt_preset_statuses[status_key]["progress"] = 70
-        
+
         dest_filename = os.path.basename(no_audio_path)
         try:
             lib_photos_dir = os.path.join(paths["library"], "photos")
@@ -1067,11 +1114,11 @@ def download_youtube_preset(
             status_code=429,
             detail="O servidor está ocupado processando outro vídeo. Por favor, aguarde alguns minutos."
         )
-        
+
     url = data.youtube_url.strip()
     if not url:
         raise HTTPException(status_code=400, detail="URL do YouTube vazia.")
-        
+
     threading.Thread(target=run_youtube_download_bg, args=(url, dict(current_user)), daemon=True).start()
     return {"status": "started"}
 
@@ -1086,11 +1133,11 @@ def download_bg_youtube_preset(
             status_code=429,
             detail="O servidor está ocupado processando outro vídeo. Por favor, aguarde alguns minutos."
         )
-        
+
     url = data.youtube_url.strip()
     if not url:
         raise HTTPException(status_code=400, detail="URL do YouTube vazia.")
-        
+
     threading.Thread(target=run_bg_youtube_download_bg, args=(url, dict(current_user)), daemon=True).start()
     return {"status": "started"}
 
@@ -1883,14 +1930,14 @@ def setup_admin(data: dict):
     users = load_users()
     if users:
         raise HTTPException(status_code=400, detail="O administrador já foi configurado.")
-        
+
     username = data.get("username", "").strip()
     password = data.get("password", "")
-    
+
     if not username or not password:
         raise HTTPException(status_code=400, detail="Usuário e senha são obrigatórios.")
     validate_new_credentials(username, password)
-        
+
     pw_hash, salt = hash_password(password)
     users[username] = {
         "password_hash": pw_hash,
@@ -1898,7 +1945,7 @@ def setup_admin(data: dict):
         "role": "admin"
     }
     save_users(users)
-    
+
     import time
     token = str(uuid.uuid4())
     sessions = load_sessions()
@@ -1942,7 +1989,7 @@ def login(data: dict):
                 info["count"] = 0
             _login_attempts[username] = info
         raise HTTPException(status_code=401, detail="Usuário ou senha incorretos.")
-        
+
     # Lógica de migração automática do SHA-256 legado para PBKDF2
     salt = user.get("salt")
     if not salt:
@@ -1962,7 +2009,7 @@ def login(data: dict):
         check_hash, _ = hash_password(password, salt=salt)
         if user.get("password_hash") != check_hash:
             raise HTTPException(status_code=401, detail="Usuário ou senha incorretos.")
-        
+
     # Reset contador de tentativas após login bem-sucedido
     with _login_lock:
         _login_attempts.pop(username, None)
@@ -1999,21 +2046,21 @@ def get_users(current_user: dict = Depends(get_current_user)):
 def create_user(data: dict, current_user: dict = Depends(get_current_user)):
     if current_user.get("role") != "admin":
         raise HTTPException(status_code=403, detail="Apenas administradores podem criar usuários.")
-        
+
     username = data.get("username", "").strip()
     password = data.get("password", "")
     role = data.get("role", "user")
-    
+
     if not username or not password:
         raise HTTPException(status_code=400, detail="Usuário e senha são obrigatórios.")
     validate_new_credentials(username, password)
     if role not in {"user", "admin"}:
         raise HTTPException(status_code=400, detail="Função de usuário inválida.")
-        
+
     users = load_users()
     if username in users:
         raise HTTPException(status_code=400, detail="Este usuário já existe.")
-        
+
     pw_hash, salt = hash_password(password)
     users[username] = {
         "password_hash": pw_hash,
@@ -2065,13 +2112,13 @@ def upload_to_library(
     """Realiza o upload direto de um arquivo para uma seção específica da biblioteca."""
     if section not in ["videos", "photos"]:
         raise HTTPException(status_code=400, detail="Seção de biblioteca inválida.")
-    
+
     target_dir = os.path.join(get_user_paths(current_user)["library"], section)
     os.makedirs(target_dir, exist_ok=True)
-    
+
     safe_name = os.path.basename(file.filename)
     dest_path = os.path.join(target_dir, safe_name)
-    
+
     try:
         with open(dest_path, "wb") as f:
             shutil.copyfileobj(file.file, f)
@@ -2086,20 +2133,20 @@ def save_to_history(data: dict, current_user: dict = Depends(get_current_user)):
     title = data.get("title", "").strip()
     if not title:
         raise HTTPException(status_code=400, detail="O título é obrigatório.")
-    
+
     safe_title = re.sub(r'[\\/*?:"<>|]', "", title)
     if not safe_title.lower().endswith(".mp4"):
         safe_title += ".mp4"
-        
+
     paths = get_user_paths(current_user)
     final_mp4 = os.path.join(paths["output"], "final_karaoke.mp4")
     if not os.path.exists(final_mp4):
         raise HTTPException(status_code=400, detail="Nenhum vídeo finalizado encontrado para salvar no histórico.")
-        
+
     dest_dir = os.path.join(paths["library"], "history")
     os.makedirs(dest_dir, exist_ok=True)
     dest_path = os.path.join(dest_dir, safe_title)
-    
+
     try:
         shutil.copy2(final_mp4, dest_path)
         logger.info(f"Vídeo de karaokê salvo no histórico: {safe_title}")
@@ -2113,8 +2160,8 @@ class RenameRequest(BaseModel):
 
 @app.put("/api/library/{section}/rename")
 def rename_library_file(
-    section: str, 
-    req: RenameRequest, 
+    section: str,
+    req: RenameRequest,
     current_user: dict = Depends(get_current_user)
 ):
     """Renomeia um arquivo na biblioteca (videos, photos ou history)."""
@@ -2163,10 +2210,10 @@ def delete_from_library(section: str, filename: str, current_user: dict = Depend
     """Exclui fisicamente um arquivo da biblioteca."""
     if section not in ["videos", "photos", "history"]:
         raise HTTPException(status_code=400, detail="Seção inválida.")
-        
+
     safe_filename = os.path.basename(filename)
     file_path = os.path.join(get_user_paths(current_user)["library"], section, safe_filename)
-    
+
     if os.path.exists(file_path):
         try:
             os.remove(file_path)
@@ -2174,7 +2221,7 @@ def delete_from_library(section: str, filename: str, current_user: dict = Depend
             return {"status": "success"}
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Erro ao remover arquivo: {e}")
-            
+
     raise HTTPException(status_code=404, detail="Arquivo não encontrado na biblioteca.")
 
 @app.get("/api/library/download/{section}/{filename}")
@@ -2182,18 +2229,95 @@ def download_from_library(section: str, filename: str, current_user: dict = Depe
     """Faz o download de um arquivo da biblioteca."""
     if section not in ["videos", "photos", "history"]:
         raise HTTPException(status_code=400, detail="Seção inválida.")
-        
+
     safe_filename = os.path.basename(filename)
     file_path = os.path.join(get_user_paths(current_user)["library"], section, safe_filename)
-    
+
     if os.path.exists(file_path):
         return FileResponse(file_path, filename=safe_filename)
-        
+
     raise HTTPException(status_code=404, detail="Arquivo não encontrado na biblioteca.")
 
 
+def iter_file_range(file_path: str, start: int, end: int, chunk_size: int = 1024 * 1024):
+    """Entrega somente o trecho solicitado para permitir seek em áudio e vídeo."""
+    with open(file_path, "rb") as media_file:
+        media_file.seek(start)
+        remaining = end - start + 1
+        while remaining > 0:
+            chunk = media_file.read(min(chunk_size, remaining))
+            if not chunk:
+                break
+            remaining -= len(chunk)
+            yield chunk
+
+
+def inline_file_response(file_path: str, media_type: str, request: Request):
+    """Responde a Range requests usadas pelos players HTML para avançar e voltar."""
+    file_size = os.path.getsize(file_path)
+    common_headers = {
+        "Accept-Ranges": "bytes",
+        "Content-Disposition": "inline"
+    }
+    range_header = request.headers.get("range", "").strip()
+
+    if not range_header:
+        return FileResponse(file_path, media_type=media_type, headers=common_headers)
+
+    match = re.fullmatch(r"bytes=(\d*)-(\d*)", range_header)
+    if not match:
+        return Response(
+            status_code=416,
+            headers={**common_headers, "Content-Range": f"bytes */{file_size}"}
+        )
+
+    start_text, end_text = match.groups()
+    if not start_text and not end_text:
+        return Response(
+            status_code=416,
+            headers={**common_headers, "Content-Range": f"bytes */{file_size}"}
+        )
+
+    if start_text:
+        start = int(start_text)
+        end = min(int(end_text), file_size - 1) if end_text else file_size - 1
+    else:
+        suffix_length = int(end_text)
+        if suffix_length <= 0:
+            return Response(
+                status_code=416,
+                headers={**common_headers, "Content-Range": f"bytes */{file_size}"}
+            )
+        start = max(file_size - suffix_length, 0)
+        end = file_size - 1
+
+    if start >= file_size or end < start:
+        return Response(
+            status_code=416,
+            headers={**common_headers, "Content-Range": f"bytes */{file_size}"}
+        )
+
+    content_length = end - start + 1
+    headers = {
+        **common_headers,
+        "Content-Range": f"bytes {start}-{end}/{file_size}",
+        "Content-Length": str(content_length)
+    }
+    return StreamingResponse(
+        iter_file_range(file_path, start, end),
+        status_code=206,
+        media_type=media_type,
+        headers=headers
+    )
+
+
 @app.get("/api/library/preview/{section}/{filename}")
-def preview_from_library(section: str, filename: str, current_user: dict = Depends(get_current_user)):
+def preview_from_library(
+    section: str,
+    filename: str,
+    request: Request,
+    current_user: dict = Depends(get_current_user)
+):
     """Abre áudio/vídeo na interface sem forçar download."""
     if section not in ["videos", "photos", "history"]:
         raise HTTPException(status_code=400, detail="Seção inválida.")
@@ -2202,11 +2326,7 @@ def preview_from_library(section: str, filename: str, current_user: dict = Depen
     if not os.path.isfile(file_path):
         raise HTTPException(status_code=404, detail="Arquivo não encontrado na biblioteca.")
     media_type = mimetypes.guess_type(file_path)[0] or "application/octet-stream"
-    return FileResponse(
-        file_path,
-        media_type=media_type,
-        headers={"Content-Disposition": "inline"}
-    )
+    return inline_file_response(file_path, media_type, request)
 
 
 PUBLIC_DOWNLOADS_FILE = "/data/output/public_downloads.json"
@@ -2288,7 +2408,7 @@ def get_cache_info(current_user: dict = Depends(get_current_user)):
                 meta = json.load(f)
             input_ext = meta.get("input_ext", "")
             has_audio = os.path.exists(os.path.join(cache_dir, f"original_input{input_ext}"))
-            
+
             bg_filename = None
             bg_is_video = False
             if meta.get("has_bg"):
@@ -2297,7 +2417,7 @@ def get_cache_info(current_user: dict = Depends(get_current_user)):
                     bg_filename = meta.get("bg_filename")
                     if bg_ext.lower() in [".mp4", ".webm", ".mov", ".mkv", ".avi"]:
                         bg_is_video = True
-            
+
             return {
                 "has_cache": has_audio,
                 "audio_filename": meta.get("audio_filename", "Áudio Atual"),
@@ -2332,12 +2452,12 @@ def get_cached_background(current_user: dict = Depends(get_current_user)):
                     return FileResponse(bg_path, media_type=media_type)
         except Exception:
             pass
-            
+
     # Fallback para paisagem aleatória
     default_bg = get_random_default_background()
     if default_bg and os.path.exists(default_bg):
         return FileResponse(default_bg, media_type="image/jpeg")
-    
+
     raise HTTPException(status_code=404, detail="Nenhum plano de fundo disponível em cache.")
 
 
@@ -2362,16 +2482,16 @@ def continue_process(data: ContinueProcessModel, current_user: dict = Depends(ge
     global segments_to_edit, correction_event
     if not segments_to_edit:
         raise HTTPException(status_code=400, detail="Nenhum processamento aguardando correção.")
-        
+
     updated_segments = []
     for s in data.segments:
         seg_text = s.text.strip()
         words_list = seg_text.split()
-        
+
         orig_words = []
         if s.words:
             orig_words = [{"word": w.word, "start": w.start, "end": w.end} for w in s.words]
-            
+
         if len(orig_words) == len(words_list):
             orig_dur = s.words[-1].end - s.words[0].start if len(s.words) > 0 else 0
             new_dur = s.end - s.start
@@ -2402,14 +2522,14 @@ def continue_process(data: ContinueProcessModel, current_user: dict = Depends(ge
                     "start": w_start,
                     "end": w_end
                 })
-                
+
         updated_segments.append({
             "start": s.start,
             "end": s.end,
             "text": seg_text,
             "words": words
         })
-        
+
     segments_to_edit = updated_segments
     correction_event.set()
     return {"status": "success"}
@@ -2419,10 +2539,10 @@ def cancel_process(current_user: dict = Depends(get_current_user)):
     import process_manager as pm
     require_task_control(current_user)
     logger.info("Solicitação de cancelamento recebida de %s.", current_user.get("username"))
-    
+
     # 1. Definir o flag de cancelamento
     pm.cancel_event.set()
-    
+
     # 2. Matar o subprocesso ativo (FFmpeg ou Demucs) se existir
     with pm.process_kill_lock:
         if pm.active_process:
@@ -2437,14 +2557,14 @@ def cancel_process(current_user: dict = Depends(get_current_user)):
                 except Exception:
                     pass
             pm.active_process = None
-            
+
     # 3. Forçar a liberação do evento de correção para desbloquear a thread se estiver pausada
     global correction_event
     correction_event.set()
-    
+
     # 4. Atualizar o estado do servidor para idle
     update_state("idle", "Idle", 0, error_message="Cancelado pelo usuário.")
-    
+
     # O worker libera o lock no bloco finally, depois de realmente encerrar.
     return {"status": "success", "message": "Processamento cancelado com sucesso."}
 
@@ -2548,7 +2668,7 @@ def process_karaoke(
                     pass
             else:
                 raise HTTPException(
-                    status_code=429, 
+                    status_code=429,
                     detail="O servidor está ocupado processando outro vídeo. Por favor, aguarde alguns minutos."
                 )
 
@@ -2561,6 +2681,10 @@ def process_karaoke(
     lyrics_mode = (lyrics_mode or "auto").strip().lower()
     if lyrics_mode not in {"auto", "manual"}:
         raise HTTPException(status_code=400, detail="Modo de letra inválido.")
+    if lyrics_mode == "auto":
+        # A letra automática pertence à mídia atual. Nunca reutilizar o texto
+        # enviado pelo navegador, que pode ter vindo da música anterior.
+        lyrics_text = ""
 
     # Se uma música da biblioteca foi explicitamente selecionada, anular youtube_url para priorizar a biblioteca
     if library_audio and library_audio.strip():
@@ -2585,12 +2709,12 @@ def process_karaoke(
                             input_audio_path = orig_file
             except Exception:
                 pass
-                
+
         input_bg_path = None
         has_bg = False
         bg_ext = None
         bg_filename = None
-        
+
         if bg_file and bg_file.filename:
             bg_ext = os.path.splitext(bg_file.filename)[1]
             bg_filename = bg_file.filename
@@ -2608,7 +2732,7 @@ def process_karaoke(
                 input_bg_path = os.path.join(cache_dir, f"original_bg{bg_ext}")
                 shutil.copy2(src_bg, input_bg_path)
                 has_bg = True
-            
+
         if not already_downloaded:
             logger.info(f"Novo processamento do YouTube solicitado ({youtube_url.strip()}). Limpando cache anterior...")
             for f_name in os.listdir(cache_dir):
@@ -2667,7 +2791,7 @@ def process_karaoke(
         import unicodedata
         lib_video_dir = os.path.join(library_dir, "videos")
         lib_audio_path = os.path.join(lib_video_dir, library_audio)
-        
+
         # Busca resiliente se o nome exato com acentos/caracteres especiais falhar
         if not os.path.exists(lib_audio_path):
             log_diagnostic(f"Arquivo exato '{library_audio}' não encontrado no caminho direto. Iniciando busca resiliente...", "WARNING")
@@ -2689,10 +2813,10 @@ def process_karaoke(
                 err_detail = f"Música '{library_audio}' não encontrada na Biblioteca. Arquivos disponíveis na pasta /data/library/videos: {avail_list}"
                 log_diagnostic(err_detail, "ERROR")
                 raise HTTPException(status_code=400, detail=err_detail)
-            
+
         orig_name = os.path.splitext(library_audio)[0]
         audio_ext = os.path.splitext(library_audio)[1]
-        
+
         logger.info("Nova música da biblioteca selecionada. Limpando cache anterior...")
         for f_name in os.listdir(cache_dir):
             f_path = os.path.join(cache_dir, f_name)
@@ -2703,15 +2827,15 @@ def process_karaoke(
                     shutil.rmtree(f_path)
             except Exception as e:
                 logger.error(f"Erro ao limpar cache: {e}")
-                
+
         input_audio_path = os.path.join(cache_dir, f"original_input{audio_ext}")
         shutil.copy2(lib_audio_path, input_audio_path)
-        
+
         input_bg_path = None
         has_bg = False
         bg_ext = None
         bg_filename = None
-        
+
         if bg_file and bg_file.filename:
             bg_ext = os.path.splitext(bg_file.filename)[1]
             bg_filename = bg_file.filename
@@ -2745,7 +2869,7 @@ def process_karaoke(
     elif audio_file and audio_file.filename and audio_file.filename.strip():
         orig_name = os.path.splitext(audio_file.filename)[0]
         audio_ext = os.path.splitext(audio_file.filename)[1]
-        
+
         logger.info("Novo upload recebido. Limpando cache anterior...")
         for f_name in os.listdir(cache_dir):
             f_path = os.path.join(cache_dir, f_name)
@@ -2756,19 +2880,19 @@ def process_karaoke(
                     shutil.rmtree(f_path)
             except Exception as e:
                 logger.error(f"Erro ao limpar cache: {e}")
-                
+
         input_audio_path = os.path.join(cache_dir, f"original_input{audio_ext}")
         with open(input_audio_path, "wb") as f:
             shutil.copyfileobj(audio_file.file, f)
-            
+
         if save_to_library:
             shutil.copy2(input_audio_path, os.path.join(library_dir, "videos", audio_file.filename))
-            
+
         input_bg_path = None
         has_bg = False
         bg_ext = None
         bg_filename = None
-        
+
         if bg_file and bg_file.filename:
             bg_ext = os.path.splitext(bg_file.filename)[1]
             bg_filename = bg_file.filename
@@ -2786,7 +2910,7 @@ def process_karaoke(
                 input_bg_path = os.path.join(cache_dir, f"original_bg{bg_ext}")
                 shutil.copy2(src_bg, input_bg_path)
                 has_bg = True
-            
+
         cached_meta = {
             "original_filename": orig_name,
             "audio_filename": audio_file.filename,
@@ -2807,28 +2931,28 @@ def process_karaoke(
                     cached_meta = json.load(f)
             except Exception:
                 pass
-                
+
         orig_name = cached_meta.get("original_filename")
         input_ext = cached_meta.get("input_ext")
-        
+
         if not orig_name or not input_ext:
             raise HTTPException(
                 status_code=400,
                 detail="Nenhum arquivo enviado, nenhuma URL e nenhum cache disponível no servidor."
             )
-            
+
         input_audio_path = os.path.join(cache_dir, f"original_input{input_ext}")
         if not os.path.exists(input_audio_path):
             raise HTTPException(
                 status_code=400,
                 detail="Arquivos de cache não encontrados. Por favor, envie uma música."
             )
-            
+
         if lyrics_text is not None:
             cached_meta["lyrics_text"] = lyrics_text
             with open(cache_meta_file, "w", encoding="utf-8") as f:
                 json.dump(cached_meta, f, indent=4)
-                
+
         if bg_file and bg_file.filename:
             if cached_meta.get("has_bg"):
                 old_ext = cached_meta.get("bg_ext", "")
@@ -2884,11 +3008,11 @@ def process_karaoke(
         owner_username=current_user.get("username"),
         owner_role=current_user.get("role")
     )
-        
+
     background_tasks.add_task(
-        run_pipeline, 
-        input_audio_path=input_audio_path, 
-        input_bg_path=input_bg_path, 
+        run_pipeline,
+        input_audio_path=input_audio_path,
+        input_bg_path=input_bg_path,
         whisper_model=whisper_model,
         font_size=font_size,
         text_color=text_color,
@@ -2915,7 +3039,7 @@ def process_karaoke(
         library_dir=library_dir,
         app_base_url=(app_base_url or "").strip()
     )
-    
+
     return {"status": "processing"}
 
 def send_telegram_video_flow(
@@ -3011,8 +3135,8 @@ def send_video_to_targets(
         ).start()
 
 def run_pipeline(
-    input_audio_path: str, 
-    input_bg_path: str = None, 
+    input_audio_path: str,
+    input_bg_path: str = None,
     whisper_model: str = "large-v3-turbo",
     font_size: int = 32,
     text_color: str = "#00FFFF",
@@ -3044,7 +3168,7 @@ def run_pipeline(
     if not processing_lock.acquire(blocking=False):
         logger.warning("Bloqueio de concorrência ativado: Processamento já em andamento.")
         return
-        
+
     owner_user = owner_user or {"username": state.get("owner_username"), "role": state.get("owner_role", "user")}
     owner_paths = get_user_paths(owner_user)
     cache_dir = cache_dir or owner_paths["cache"]
@@ -3052,29 +3176,29 @@ def run_pipeline(
     library_dir = library_dir or owner_paths["library"]
     saved_lyrics_file = os.path.join(output_dir, "saved_lyrics.txt")
     telegram_targets = get_notification_targets(owner_user)
-    
+
     # Carregar URL externa configurada pelo usuário (para links de download no Telegram)
     ext_url_cfg = load_external_url_config()
     telegram_external_url = ext_url_cfg.get("external_url", "")
     telegram_base_url = app_base_url.strip()
-    
+
     with state_lock:
         orig_name = state.get("original_filename", "final")
-        
+
     try:
         import process_manager as pm
         pm.cancel_event.clear()
         pm.clear_active_process()
-        
+
         # Notificação Telegram: Apenas início resumido
         notify_targets(telegram_targets, f"🎙️ <b>Sal0 Karaokê</b>: Iniciando processamento de <b>{orig_name}</b>...")
 
         # Pasta de saída mapeada via volume docker-compose
         os.makedirs(output_dir, exist_ok=True)
-        
+
         final_mp4_path = os.path.join(output_dir, "final_karaoke.mp4")
         final_ass_path = os.path.join(output_dir, "karaoke.ass")
-        
+
         # Limpar outputs anteriores se existirem
         if os.path.exists(final_mp4_path):
             os.remove(final_mp4_path)
@@ -3084,7 +3208,7 @@ def run_pipeline(
         # Configurar diretório de cache persistente
         os.makedirs(cache_dir, exist_ok=True)
         cache_meta_file = os.path.join(cache_dir, "cache_meta.json")
-        
+
         # Tentar ler metadados do cache anterior
         cached_meta = {}
         if os.path.exists(cache_meta_file):
@@ -3116,12 +3240,12 @@ def run_pipeline(
                 pm.check_cancelled()
                 update_state("processing", "Downloading YouTube", 5)
                 notify_targets(telegram_targets, "🌐 <b>Sal0 Karaokê</b>: Iniciando download do YouTube...")
-                
+
                 try:
                     input_audio_path, title = download_youtube(youtube_url, cache_dir)
                     orig_name = title
                     update_state("processing", "Extracting audio", 15, original_filename=orig_name)
-                    
+
                     ext = os.path.splitext(input_audio_path)[1]
                     cached_meta["youtube_url"] = youtube_url
                     cached_meta["original_filename"] = orig_name
@@ -3130,14 +3254,14 @@ def run_pipeline(
                     with open(cache_meta_file, "w", encoding="utf-8") as f:
                         import json
                         json.dump(cached_meta, f, indent=4)
-                        
+
                     notify_targets(telegram_targets, f"📥 <b>Sal0 Karaokê</b>: Download concluído! <b>{orig_name}</b>")
                 except Exception as e:
                     logger.error(f"Erro ao baixar do YouTube: {e}")
                     raise RuntimeError(f"Falha ao baixar vídeo do YouTube: {e}")
             else:
                 logger.info("Reaproveitando download do YouTube do cache.")
-                
+
         # Verificar se a música sendo processada agora é DIFERENTE da do cache
         # Se for diferente, apagamos todo o conteúdo do cache para começar do zero!
         if cached_meta.get("original_filename") != orig_name:
@@ -3156,9 +3280,19 @@ def run_pipeline(
                 import json
                 json.dump(cached_meta, f, indent=4)
 
-        # Busca automática de letra: não torna a internet obrigatória para o pipeline local.
-        lyrics_text = (lyrics_text or "").strip()
-        if lyrics_mode == "auto" and not lyrics_text:
+        # Busca automática de letra: sempre usa a identidade da mídia atual.
+        # O texto anterior é descartado para nunca orientar outra música.
+        lyrics_text = (lyrics_text or "").strip() if lyrics_mode == "manual" else ""
+        if lyrics_mode == "auto":
+            cached_meta["lyrics_text"] = ""
+            try:
+                with open(cache_meta_file, "w", encoding="utf-8") as f:
+                    json.dump(cached_meta, f, indent=4)
+                if os.path.exists(saved_lyrics_file):
+                    os.remove(saved_lyrics_file)
+            except Exception as clear_error:
+                logger.warning("Não foi possível limpar a letra automática anterior: %s", clear_error)
+
             update_state("processing", "Searching lyrics online", 10, original_filename=orig_name)
             auto_lyrics, auto_match = find_lyrics_automatically(orig_name)
             if auto_lyrics:
@@ -3208,7 +3342,7 @@ def run_pipeline(
         # Criar diretório temporário para todo o processamento intermediário (Demucs, Whisper, ASS)
         with tempfile.TemporaryDirectory() as tmpdir:
             logger.info(f"Diretório de trabalho temporário criado: {tmpdir}")
-            
+
             # Passo 1: Extrair / Converter áudio para WAV PCM
             converted_wav = os.path.join(cache_dir, "original_converted.wav")
             if os.path.exists(converted_wav):
@@ -3219,25 +3353,37 @@ def run_pipeline(
                 update_state("processing", "Extracting audio", 15)
                 notify_targets(telegram_targets, "🎵 <b>Sal0 Karaokê</b>: Extraindo áudio (15%)")
                 extract_audio(input_audio_path, converted_wav)
-            
+
             pm.check_cancelled()
-            
+
             # Passo 2: Separar vocais e instrumental via Demucs
             vocals_wav = os.path.join(cache_dir, "vocals.wav")
             instrumental_wav = os.path.join(cache_dir, "instrumental.wav")
-            
+
             if os.path.exists(vocals_wav) and os.path.exists(instrumental_wav):
                 logger.info("Aproveitando áudio separado pelo Demucs do cache.")
-                update_state("processing", "Separating vocals (cached)", 40)
+                update_state(
+                    "processing",
+                    "Vocais separados (cache)",
+                    55,
+                    stage_progress=100,
+                    stage_detail="Separação já disponível no cache"
+                )
             else:
                 pm.check_cancelled()
-                update_state("processing", "Separating vocals", 40)
-                notify_targets(telegram_targets, "✂️ <b>Sal0 Karaokê</b>: Separando áudio (40%)")
+                update_state(
+                    "processing",
+                    "Separando vocais do áudio",
+                    20,
+                    stage_progress=0,
+                    stage_detail="Preparando 4 análises locais"
+                )
+                notify_targets(telegram_targets, "✂️ <b>Sal0 Karaokê</b>: Iniciando a separação local de vocais")
                 with tempfile.TemporaryDirectory() as demucs_tmp:
                     v_tmp, i_tmp = separate_vocals(converted_wav, demucs_tmp, update_callback=update_state)
                     shutil.move(v_tmp, vocals_wav)
                     shutil.move(i_tmp, instrumental_wav)
-                    
+
             pm.check_cancelled()
 
             # Se only_remove_vocals estiver ativo, pulamos transcrição e legenda, indo direto para renderização
@@ -3245,7 +3391,7 @@ def run_pipeline(
                 pm.check_cancelled()
                 update_state("processing", "Rendering final video", 95)
                 notify_targets(telegram_targets, "🎬 <b>Sal0 Karaokê</b>: Renderizando vídeo sem a voz do cantor (95%)")
-                
+
                 # Forçar o uso do vídeo original enviado
                 render_karaoke_video(
                     instrumental_path=instrumental_wav,
@@ -3255,7 +3401,7 @@ def run_pipeline(
                     original_video_path=input_audio_path,
                     background_mode="original_video"
                 )
-                
+
                 pm.check_cancelled()
                 history_filename = save_video_to_history(final_mp4_path, orig_name, library_dir)
                 public_token = create_public_download(owner_user, history_filename)
@@ -3270,9 +3416,9 @@ def run_pipeline(
                     public_download_token=public_token
                 )
                 logger.info("Pipeline concluído: Vocais removidos do vídeo original com sucesso.")
-                
+
                 processing_lock.release()
-                
+
                 send_video_to_targets(
                     telegram_targets,
                     final_mp4_path,
@@ -3283,7 +3429,7 @@ def run_pipeline(
                     telegram_external_url
                 )
                 return
-            
+
             # Passo 3: Transcrever vocais com Whisper selecionado
             segments = None
             segments_cache_file = os.path.join(cache_dir, "transcribed_segments.json")
@@ -3303,15 +3449,15 @@ def run_pipeline(
                     update_state("processing", "Transcribing vocals (cached)", 70)
                 except Exception as e:
                     logger.error(f"Erro ao ler cache de segmentos transcritos: {e}")
-                    
+
             if segments is None:
                 pm.check_cancelled()
                 update_state("processing", "Transcribing vocals", 70)
                 notify_targets(telegram_targets, f"✍️ <b>Sal0 Karaokê</b>: Transcrevendo voz ({whisper_model}) (70%)")
-                
+
                 transcribe_audio = vocals_wav if transcribe_source == "vocals" else converted_wav
                 logger.info(f"Fonte de transcrição escolhida: {transcribe_audio} (Modo: {transcribe_source})")
-                
+
                 # Verificar status do modelo Whisper com is_model_downloaded() para exibir a mensagem correta na UI
                 if is_model_downloaded(whisper_model):
                     update_state("processing", f"Carregando Modelo Whisper {whisper_model} do disco e transcrevendo voz...", 65)
@@ -3340,9 +3486,9 @@ def run_pipeline(
                     with open(cache_meta_file, "w", encoding="utf-8") as f:
                         import json
                         json.dump(cached_meta, f, indent=4)
-            
+
             pm.check_cancelled()
-            
+
             if not segments:
                 raise ValueError("Nenhum vocal detectado ou transcrição vazia.")
 
@@ -3352,44 +3498,44 @@ def run_pipeline(
                 segments = align_lyrics(lyrics_text, segments)
 
             pm.check_cancelled()
-            
+
             # --- NOVO: Passo de Pausa e Correção de Legendas (se ativado pelo usuário) ---
             if enable_correction:
                 global segments_to_edit, correction_event
                 segments_to_edit = segments
                 correction_event.clear()
-                
+
                 update_state("waiting_for_user_correction", "Correction", 75)
-                
+
                 # Notificação Telegram para o usuário entrar no app e editar
                 notify_targets(
                     telegram_targets,
                     f"⚠️ <b>Sal0 Karaokê</b>: A transcrição de <b>{orig_name}</b> está pronta para correção! "
                     "Entre no aplicativo web para revisar/corrigir a legenda e continuar a renderização."
                 )
-                
+
                 logger.info("Aguardando o usuário corrigir as legendas na interface web...")
                 # Bloqueia a thread até o usuário enviar as correções pelo endpoint /api/continue_process
                 while not correction_event.is_set():
                     pm.check_cancelled()
                     correction_event.wait(timeout=1.0)
-                
+
                 logger.info("Retomando o processamento com as legendas corrigidas.")
                 segments = segments_to_edit
-                
+
                 # Salvar os segmentos corrigidos também no cache, para não perder o trabalho se refazer!
                 with open(segments_cache_file, "w", encoding="utf-8") as f:
                     import json
                     json.dump(segments, f, indent=4)
-            
+
             pm.check_cancelled()
-            
+
             # Passo 4: Gerar legendas ASS com efeitos de karaokê
             update_state("processing", "Generating subtitles", 80)
             notify_targets(telegram_targets, "📝 <b>Sal0 Karaokê</b>: Gerando legenda (80%)")
             ass_path = os.path.join(tmpdir, "karaoke.ass")
             generate_ass_karaoke(
-                segments=segments, 
+                segments=segments,
                 output_ass_path=ass_path,
                 font_size=font_size,
                 text_color_hex=text_color,
@@ -3402,9 +3548,9 @@ def run_pipeline(
                 show_next_line_preview=show_next_line_preview,
                 keep_first_line_visible=keep_first_line_visible
             )
-            
+
             pm.check_cancelled()
-            
+
             # Passo 5: Renderizar o vídeo final
             update_state("processing", "Rendering final video", 95)
             notify_targets(telegram_targets, "🎬 <b>Sal0 Karaokê</b>: Renderizando vídeo (95%)")
@@ -3417,17 +3563,17 @@ def run_pipeline(
                 original_video_path=input_audio_path,
                 background_mode=bg_mode_param
             )
-            
+
             pm.check_cancelled()
-            
+
             # Salvar opcionalmente a legenda ASS final gerada junto com o MP4
             shutil.copy(ass_path, final_ass_path)
-            
+
             # Salvar automaticamente no histórico privado do dono da tarefa.
             history_filename = save_video_to_history(final_mp4_path, orig_name, library_dir)
             public_token = create_public_download(owner_user, history_filename)
             save_result_metadata(output_dir, orig_name, history_filename)
-            
+
             # Passo 6: Limpar arquivos temporários (não removemos os uploads do cache)
             update_state("processing", "Cleaning temporary files", 98)
             logger.info("Preservando arquivos de entrada no cache para futuros reprocessamentos.")
@@ -3442,7 +3588,7 @@ def run_pipeline(
                 public_download_token=public_token
             )
             logger.info("Pipeline de Karaokê Maker concluído com sucesso!")
-            
+
             # Liberar o lock de processamento imediatamente para que o usuário possa usar o site
             processing_lock.release()
 
@@ -3456,7 +3602,7 @@ def run_pipeline(
                 telegram_base_url,
                 telegram_external_url
             )
-            
+
     except Exception as e:
         logger.exception("Ocorreu um erro catastrófico durante o processamento do pipeline.")
         # Se foi cancelado cooperativamente, salvar estado correspondente
@@ -3465,10 +3611,10 @@ def run_pipeline(
         else:
             update_state("error", "Error", 0, error_message=str(e))
             notify_targets(telegram_targets, f"❌ <b>Sal0 Karaokê</b>: Falha ao processar <b>{orig_name}</b>. Erro: {e}")
-        
+
         # Preservamos os arquivos de entrada no cache mesmo após erro
         logger.info("Preservando arquivos de entrada no cache após erro para permitir repetições.")
-            
+
     finally:
         # Liberar o processador de forma segura caso ainda esteja bloqueado
         if processing_lock.locked():
@@ -3478,13 +3624,17 @@ def run_pipeline(
                 pass
 
 @app.get("/api/download")
-def download_file(inline: bool = Query(False), current_user: dict = Depends(get_current_user)):
+def download_file(
+    request: Request,
+    inline: bool = Query(False),
+    current_user: dict = Depends(get_current_user)
+):
     """Endpoint para baixar o arquivo final de vídeo karaokê."""
     output_dir = get_user_paths(current_user)["output"]
     file_path = os.path.join(output_dir, "final_karaoke.mp4")
     if not os.path.exists(file_path):
         raise HTTPException(
-            status_code=404, 
+            status_code=404,
             detail="Arquivo de vídeo não encontrado. Por favor, processe um áudio primeiro."
         )
     orig_name = "final"
@@ -3496,10 +3646,10 @@ def download_file(inline: bool = Query(False), current_user: dict = Depends(get_
         except Exception:
             pass
     download_name = f"{orig_name}_karaokê.mp4"
-    headers = {"Content-Disposition": 'inline; filename="sal0_karaoke_preview.mp4"'} if inline else None
+    if inline:
+        return inline_file_response(file_path, "video/mp4", request)
     return FileResponse(
-        file_path, 
-        media_type="video/mp4", 
-        filename=None if inline else download_name,
-        headers=headers
+        file_path,
+        media_type="video/mp4",
+        filename=download_name
     )

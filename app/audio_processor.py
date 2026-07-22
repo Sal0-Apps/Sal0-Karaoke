@@ -96,7 +96,15 @@ def separate_vocals(audio_path: str, temp_output_dir: str, update_callback=None)
             env=env
         )
         pm.set_active_process(process)
-        
+
+        # O htdemucs_ft é um conjunto de quatro análises. Cada uma informa
+        # 0–100%, portanto o valor bruto reinicia várias vezes. Agregamos os
+        # ciclos para que o progresso geral nunca volte para trás.
+        total_passes = 4
+        current_pass = 0
+        last_raw_pct = None
+        best_stage_pct = 0
+
         import re
         for line in process.stdout:
             if pm.cancel_event.is_set():
@@ -107,12 +115,40 @@ def separate_vocals(audio_path: str, temp_output_dir: str, update_callback=None)
                 logger.info(f"[Demucs] {line_str}")
                 if update_callback:
                     if "downloading" in line_str.lower() or "download" in line_str.lower():
-                        update_callback("processing", "Baixando Modelo de IA Demucs (Aguarde a 1ª vez)...", 25)
-                    match = re.search(r'(\d+)%', line_str)
-                    if match:
-                        pct = int(match.group(1))
-                        scaled_pct = 25 + int(pct * 0.30)
-                        update_callback("processing", f"Separando vocais do áudio (Demucs {pct}%)", scaled_pct)
+                        update_callback(
+                            "processing",
+                            "Preparando separador de vocais",
+                            20,
+                            stage_detail="Baixando o modelo local do Demucs (somente na primeira vez)"
+                        )
+                    percentages = re.findall(r'(?<!\d)(100|[1-9]?\d)%', line_str)
+                    if percentages:
+                        raw_pct = int(percentages[-1])
+                        if (
+                            last_raw_pct is not None
+                            and last_raw_pct >= 90
+                            and raw_pct <= 15
+                            and current_pass < total_passes - 1
+                        ):
+                            current_pass += 1
+
+                        aggregate_pct = round(
+                            ((current_pass + (raw_pct / 100)) / total_passes) * 100
+                        )
+                        aggregate_pct = max(best_stage_pct, min(99, aggregate_pct))
+                        best_stage_pct = aggregate_pct
+                        overall_pct = 20 + round(aggregate_pct * 0.35)
+                        update_callback(
+                            "processing",
+                            "Separando vocais do áudio",
+                            overall_pct,
+                            stage_progress=aggregate_pct,
+                            stage_detail=(
+                                f"Análise {current_pass + 1} de {total_passes} · "
+                                f"{raw_pct}% desta análise"
+                            )
+                        )
+                        last_raw_pct = raw_pct
                 
         process.wait()
         pm.clear_active_process()
@@ -120,7 +156,16 @@ def separate_vocals(audio_path: str, temp_output_dir: str, update_callback=None)
         
         if process.returncode != 0:
             raise RuntimeError(f"Demucs falhou com código de retorno {process.returncode}")
-            
+
+        if update_callback:
+            update_callback(
+                "processing",
+                "Vocais separados com sucesso",
+                55,
+                stage_progress=100,
+                stage_detail=f"{total_passes} análises locais concluídas"
+            )
+
         logger.info("Separação do Demucs concluída com sucesso.")
         
         # Caminhos dos arquivos de saída gerados pelo Demucs

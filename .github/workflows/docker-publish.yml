@@ -64,15 +64,15 @@ jobs:
           body: |
             ## 🚀 Sal0 Karaoke v${{ env.VERSION_TAG }}
 
-            Uma versão voltada para casas com mais de uma conta: cada pessoa fica com seu próprio espaço, sem perder o jeitinho local do projeto.
+            Uma atualização de acabamento para deixar a criação mais clara, previsível e agradável em telas grandes e pequenas.
 
             ### ✨ Nesta versão
-            * Biblioteca, cache, letras, perfis, resultados e bot do Telegram separados por usuário.
-            * Permissões de tarefa e administração corrigidas.
-            * Preview do vídeo pronto e dos arquivos da Biblioteca dentro do app.
-            * Links diretos do Telegram, com endereço aleatório e suporte à URL externa.
-            * Logs gerados na hora, manual renovado e telas mais compactas.
-            * README refeito em UTF-8, com instalação, tutorial e cuidados reunidos num só lugar.
+            * Progresso do Demucs agregado entre as quatro análises, sem barras presas ou percentuais voltando para trás.
+            * Ajustes reorganizados no desktop e cabeçalhos redundantes removidos das abas.
+            * Player da Biblioteca com avanço, retorno e streaming por intervalos.
+            * Prévia da legenda ligada à estrofe selecionada, com navegação e tempos visíveis.
+            * Letra automática renovada ao trocar de música, inclusive com identificação prévia de links do YouTube.
+            * Proteção no servidor para nunca reaproveitar a letra automática de outra faixa.
 
             ### 🐋 Como executar esta versão:
             No seu `docker-compose.yml`, você pode travar a versão alterando a linha da imagem para:
