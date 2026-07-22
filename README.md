@@ -62,6 +62,8 @@ Abra `http://localhost:7885`. No primeiro acesso, o aplicativo pede a criação 
 
 Para canto, o filtro Silero VAD fica desligado por padrão: ele foi criado para detectar fala e pode cortar notas suaves ou sustentadas. Os perfis de voz difícil também evitam esse filtro; a opção continua disponível em **Mais ajustes** para gravações faladas ou muito ruidosas.
 
+Em **Mais ajustes**, deixar palavras ou caracteres por verso em zero ativa a divisão automática: o app cria frases curtas e mantém os tempos reconhecidos para cada palavra.
+
 O botão de tema claro/escuro fica sempre no topo da tela.
 
 ## Telegram e links diretos

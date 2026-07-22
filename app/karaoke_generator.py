@@ -3,6 +3,9 @@ import logging
 
 logger = logging.getLogger("karaoke")
 
+AUTO_WORDS_PER_LINE = 7
+AUTO_MAX_CHARS_LINE = 42
+
 def format_time(seconds: float) -> str:
     """Converte segundos para o formato de tempo do ASS: H:MM:SS.CS (Centisegundos)."""
     h = int(seconds // 3600)
@@ -43,6 +46,11 @@ def split_and_wrap_segments(
     - Limite de caracteres por linha (max_chars_line)
     - Quebra de frase por pontuação (vírgula, ponto final, exclamação, etc)
     """
+    # A interface apresenta 0 como "Automático". Antes, porém, zero acabava
+    # desativando o limite por completo e um segmento longo do Whisper virava
+    # uma única fala ASS com várias linhas sobrepostas na tela.
+    effective_words_per_line = words_per_line if words_per_line > 0 else AUTO_WORDS_PER_LINE
+    effective_max_chars_line = max_chars_line if max_chars_line > 0 else AUTO_MAX_CHARS_LINE
     new_segments = []
     
     for seg in segments:
@@ -59,7 +67,19 @@ def split_and_wrap_segments(
         for i, w_info in enumerate(words):
             word_text = w_info["word"]
             clean_word = word_text.strip()
-            
+
+            # Encerra o verso atual antes da palavra que ultrapassaria o limite.
+            # O player deixa de precisar quebrar visualmente um único evento ASS.
+            next_chars_count = current_chars_count + len(word_text)
+            if current_chunk and (
+                current_words_count >= effective_words_per_line
+                or next_chars_count > effective_max_chars_line
+            ):
+                chunks.append(current_chunk)
+                current_chunk = []
+                current_words_count = 0
+                current_chars_count = 0
+
             current_chunk.append(w_info)
             current_words_count += 1
             current_chars_count += len(word_text)
@@ -67,11 +87,11 @@ def split_and_wrap_segments(
             should_break = False
             
             # 1. Limite de palavras
-            if words_per_line > 0 and current_words_count >= words_per_line:
+            if current_words_count >= effective_words_per_line:
                 should_break = True
                 
             # 2. Limite de caracteres
-            if max_chars_line > 0 and current_chars_count >= max_chars_line:
+            if current_chars_count >= effective_max_chars_line:
                 should_break = True
                 
             # 3. Quebra em pontuações (vírgula, ponto, interrogação, etc.)
@@ -107,6 +127,16 @@ def split_and_wrap_segments(
                 "words": chunk
             })
             
+    logger.info(
+        "Segmentação de versos: %s segmentos de entrada -> %s versos; "
+        "limites solicitados=%s palavras/%s caracteres, efetivos=%s/%s.",
+        len(segments),
+        len(new_segments),
+        words_per_line,
+        max_chars_line,
+        effective_words_per_line,
+        effective_max_chars_line,
+    )
     return new_segments
 
 def insert_instrumental_breaks(segments: list[dict]) -> list[dict]:

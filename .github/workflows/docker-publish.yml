@@ -64,15 +64,13 @@ jobs:
           body: |
             ## 🚀 Sal0 Karaoke v${{ env.VERSION_TAG }}
 
-            Uma atualização de acabamento para deixar a criação mais clara, previsível e agradável em telas grandes e pequenas.
+            Uma correção pequena e importante para o karaokê voltar a acompanhar cada verso sem formar blocos enormes na tela.
 
             ### ✨ Nesta versão
-            * Progresso do Demucs agregado entre as quatro análises, sem barras presas ou percentuais voltando para trás.
-            * Ajustes reorganizados no desktop e cabeçalhos redundantes removidos das abas.
-            * Player da Biblioteca com avanço, retorno e streaming por intervalos.
-            * Prévia da legenda ligada à estrofe selecionada, com navegação e tempos visíveis.
-            * Letra automática renovada ao trocar de música, inclusive com identificação prévia de links do YouTube.
-            * Proteção no servidor para nunca reaproveitar a letra automática de outra faixa.
+            * O valor 0 agora funciona de verdade como segmentação automática.
+            * Segmentos longos do Whisper são divididos em versos curtos antes da criação do ASS.
+            * Os tempos originais de cada palavra continuam preservados.
+            * A prévia da próxima frase deixa de empilhar blocos grandes sobre a legenda ativa.
 
             ### 🐋 Como executar esta versão:
             No seu `docker-compose.yml`, você pode travar a versão alterando a linha da imagem para:
