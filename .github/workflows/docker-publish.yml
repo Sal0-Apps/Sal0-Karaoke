@@ -21,6 +21,9 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Validate subtitle and easy-mode rules
+        run: python -m unittest discover -s tests -v
+
       - name: Log in to the Container registry
         uses: docker/login-action@v3
         with:
@@ -64,13 +67,15 @@ jobs:
           body: |
             ## 🚀 Sal0 Karaoke v${{ env.VERSION_TAG }}
 
-            Uma correção pequena e importante para o karaokê voltar a acompanhar cada verso sem formar blocos enormes na tela.
+            Uma versão para quem quer criar com um clique — e para quem quer continuar ajustando cada detalhe.
 
             ### ✨ Nesta versão
-            * O valor 0 agora funciona de verdade como segmentação automática.
-            * Segmentos longos do Whisper são divididos em versos curtos antes da criação do ASS.
-            * Os tempos originais de cada palavra continuam preservados.
-            * A prévia da próxima frase deixa de empilhar blocos grandes sobre a legenda ativa.
+            * Novo **Modo Fácil**: escolha a música, um fundo opcional e deixe o restante com o aplicativo.
+            * Padrão inicial com Large V3 Turbo, letra 50 e perfil Voz difícil, configurável pelo administrador para todas as contas.
+            * Busca automática de letra sem bloquear o processo quando nenhuma fonte responde.
+            * Fundos por upload, Biblioteca ou YouTube; sem escolha, o vídeo original é usado automaticamente.
+            * Versos mais naturais, guiados pelas linhas da letra, pausas e pontuação — sem cortes arbitrários do Whisper.
+            * A legenda atual permanece visível até a próxima entrar, sem sumir entre dois versos.
 
             ### 🐋 Como executar esta versão:
             No seu `docker-compose.yml`, você pode travar a versão alterando a linha da imagem para:

@@ -3,8 +3,11 @@ import logging
 
 logger = logging.getLogger("karaoke")
 
-AUTO_WORDS_PER_LINE = 7
-AUTO_MAX_CHARS_LINE = 42
+AUTO_WORDS_PER_LINE = 9
+AUTO_MAX_CHARS_LINE = 54
+AUTO_HARD_WORDS_PER_LINE = 15
+AUTO_HARD_CHARS_LINE = 86
+AUTO_MAX_LINE_DURATION = 10.0
 
 def format_time(seconds: float) -> str:
     """Converte segundos para o formato de tempo do ASS: H:MM:SS.CS (Centisegundos)."""
@@ -37,107 +40,100 @@ def html_color_to_ass(hex_color: str) -> str:
 def split_and_wrap_segments(
     segments: list[dict],
     words_per_line: int = 0,
-    max_chars_line: int = 40,
-    break_on_punctuation: bool = True
+    max_chars_line: int = 0,
+    break_on_punctuation: bool = True,
 ) -> list[dict]:
-    r"""
-    Divide os segmentos de transcrição em partes menores com base nas restrições de:
-    - Quantidade máxima de palavras por linha (words_per_line)
-    - Limite de caracteres por linha (max_chars_line)
-    - Quebra de frase por pontuação (vírgula, ponto final, exclamação, etc)
+    """Cria versos legiveis sem usar os cortes internos do Whisper como regra.
+
+    A letra oficial, quando encontrada, fornece marcadores de fim de verso. Sem
+    ela, pontuacao, pausas e os limites suaves guiam a divisao. Um limite duro
+    continua protegendo a tela contra blocos excessivamente grandes.
     """
-    # A interface apresenta 0 como "Automático". Antes, porém, zero acabava
-    # desativando o limite por completo e um segmento longo do Whisper virava
-    # uma única fala ASS com várias linhas sobrepostas na tela.
-    effective_words_per_line = words_per_line if words_per_line > 0 else AUTO_WORDS_PER_LINE
-    effective_max_chars_line = max_chars_line if max_chars_line > 0 else AUTO_MAX_CHARS_LINE
-    new_segments = []
-    
-    for seg in segments:
-        words = seg.get("words", [])
+    soft_words = words_per_line if words_per_line > 0 else AUTO_WORDS_PER_LINE
+    soft_chars = max_chars_line if max_chars_line > 0 else AUTO_MAX_CHARS_LINE
+    hard_words = words_per_line if words_per_line > 0 else AUTO_HARD_WORDS_PER_LINE
+    hard_chars = max_chars_line if max_chars_line > 0 else AUTO_HARD_CHARS_LINE
+    word_stream = []
+    passthrough_segments = []
+
+    for segment_index, segment in enumerate(segments):
+        words = segment.get("words", [])
         if not words:
-            new_segments.append(seg)
+            passthrough_segments.append(segment)
             continue
-            
-        current_chunk = []
-        current_words_count = 0
-        current_chars_count = 0
-        chunks = []
-        
-        for i, w_info in enumerate(words):
-            word_text = w_info["word"]
-            clean_word = word_text.strip()
-
-            # Encerra o verso atual antes da palavra que ultrapassaria o limite.
-            # O player deixa de precisar quebrar visualmente um único evento ASS.
-            next_chars_count = current_chars_count + len(word_text)
-            if current_chunk and (
-                current_words_count >= effective_words_per_line
-                or next_chars_count > effective_max_chars_line
-            ):
-                chunks.append(current_chunk)
-                current_chunk = []
-                current_words_count = 0
-                current_chars_count = 0
-
-            current_chunk.append(w_info)
-            current_words_count += 1
-            current_chars_count += len(word_text)
-            
-            should_break = False
-            
-            # 1. Limite de palavras
-            if current_words_count >= effective_words_per_line:
-                should_break = True
-                
-            # 2. Limite de caracteres
-            if current_chars_count >= effective_max_chars_line:
-                should_break = True
-                
-            # 3. Quebra em pontuações (vírgula, ponto, interrogação, etc.)
-            if break_on_punctuation and i < len(words) - 1:
-                if clean_word and clean_word[-1] in (',', '.', '?', '!', ';', ':', '(', ')'):
-                    should_break = True
-            
-            # 4. Quebra por silêncio/pausa maior entre palavras (ex: pausa de voz > 0.5s)
-            if i < len(words) - 1:
-                next_w = words[i+1]
-                gap = next_w["start"] - w_info["end"]
-                if gap >= 0.5:
-                    should_break = True
-                    
-            if should_break and i < len(words) - 1:
-                chunks.append(current_chunk)
-                current_chunk = []
-                current_words_count = 0
-                current_chars_count = 0
-                
-        if current_chunk:
-            chunks.append(current_chunk)
-            
-        for chunk in chunks:
-            chunk_text = "".join([w["word"] for w in chunk]).strip()
-            chunk_start = chunk[0]["start"]
-            chunk_end = chunk[-1]["end"]
-            
-            new_segments.append({
-                "start": chunk_start,
-                "end": chunk_end,
-                "text": chunk_text,
-                "words": chunk
+        for word_index, word_info in enumerate(words):
+            word_stream.append({
+                "word": word_info,
+                "source_end": word_index == len(words) - 1,
+                "source_segment": segment_index,
             })
-            
+
+    chunks = []
+    current_chunk = []
+    for index, entry in enumerate(word_stream):
+        word_info = entry["word"]
+        current_chunk.append(word_info)
+        clean_text = str(word_info.get("word", "")).strip()
+        chunk_text = "".join(str(word.get("word", "")) for word in current_chunk).strip()
+        word_count = len(current_chunk)
+        char_count = len(chunk_text)
+        duration = float(word_info.get("end", 0)) - float(current_chunk[0].get("start", 0))
+
+        next_entry = word_stream[index + 1] if index + 1 < len(word_stream) else None
+        next_word = next_entry["word"] if next_entry else None
+        gap = (
+            float(next_word.get("start", 0)) - float(word_info.get("end", 0))
+            if next_word else 0.0
+        )
+        official_line_end = bool(word_info.get("lyric_line_break"))
+        strong_punctuation = bool(clean_text and clean_text[-1] in ".?!;:")
+        soft_punctuation = bool(clean_text and clean_text[-1] == ",")
+        reached_soft_target = word_count >= soft_words or char_count >= soft_chars
+        reached_hard_limit = (
+            word_count >= hard_words
+            or char_count >= hard_chars
+            or duration >= AUTO_MAX_LINE_DURATION
+        )
+        natural_soft_boundary = (
+            (break_on_punctuation and soft_punctuation and word_count >= 5)
+            or gap >= 0.30
+            or entry["source_end"]
+        )
+        should_break = (
+            official_line_end
+            or (break_on_punctuation and strong_punctuation and word_count >= 3)
+            or (gap >= 0.75 and word_count >= 2)
+            or (reached_soft_target and natural_soft_boundary)
+            or reached_hard_limit
+            or next_entry is None
+        )
+
+        if should_break:
+            chunks.append(current_chunk)
+            current_chunk = []
+
+    new_segments = [
+        {
+            "start": chunk[0]["start"],
+            "end": chunk[-1]["end"],
+            "text": "".join(str(word.get("word", "")) for word in chunk).strip(),
+            "words": chunk,
+        }
+        for chunk in chunks
+    ]
+    new_segments.extend(passthrough_segments)
+    new_segments.sort(key=lambda item: float(item.get("start", 0)))
     logger.info(
-        "Segmentação de versos: %s segmentos de entrada -> %s versos; "
-        "limites solicitados=%s palavras/%s caracteres, efetivos=%s/%s.",
+        "Segmentacao inteligente: %s segmentos -> %s versos; alvos=%s/%s, protecao=%s/%s.",
         len(segments),
         len(new_segments),
-        words_per_line,
-        max_chars_line,
-        effective_words_per_line,
-        effective_max_chars_line,
+        soft_words,
+        soft_chars,
+        hard_words,
+        hard_chars,
     )
     return new_segments
+
 
 def insert_instrumental_breaks(segments: list[dict]) -> list[dict]:
     """
@@ -256,14 +252,14 @@ def generate_ass_karaoke(
     if show_instrumental:
         segments = insert_instrumental_breaks(segments)
     
-    # 3. Estender a exibição dos versos até 0.3 segundos antes do início do próximo (se não for instrumental)
+    # 3. Manter o verso atual visível até a entrada do próximo, sem um vazio artificial.
     for idx in range(len(segments) - 1):
         curr = segments[idx]
         nxt = segments[idx + 1]
         if "Instrumental" not in nxt["text"] and "Instrumental" not in curr["text"]:
             gap = nxt["start"] - curr["end"]
-            if gap > 0.3:
-                curr["end"] = nxt["start"] - 0.3
+            if gap > 0:
+                curr["end"] = nxt["start"]
     
     # 4. Determinar o alinhamento ASS (2 = base centro, 5 = meio centro, 8 = topo centro)
     alignment = 2

@@ -718,7 +718,8 @@
             align-items: stretch;
         }
         .settings-grid > .card { height: 100%; margin: 0; }
-        #modelManagerSection { grid-column: 1 / -1; }
+        #modelManagerSection,
+        #easyModeSettingsSection { grid-column: 1 / -1; }
         #telegramSection { grid-column: 1 / 7; }
         #externalUrlSection { grid-column: 7 / 13; }
         #userManagementSection,
@@ -818,14 +819,64 @@
         .preview-dialog-head { display: flex; justify-content: space-between; align-items: center; gap: 1rem; }
         .preview-dialog-head h3 { margin: 0; font-size: 0.95rem; color: var(--text-main); overflow-wrap: anywhere; }
         .compact-note { font-size: 0.76rem; color: var(--text-muted); line-height: 1.45; }
+        .creator-mode-switch {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.45rem;
+            padding: 0.4rem;
+            margin-bottom: 1rem;
+            border: 1px solid var(--glass-border);
+            border-radius: var(--radius-md);
+            background: var(--bg-card);
+        }
+        .creator-mode-btn {
+            border: 0;
+            border-radius: var(--radius-sm);
+            padding: 0.7rem 1rem;
+            color: var(--text-muted);
+            background: transparent;
+            font-weight: 700;
+            cursor: pointer;
+        }
+        .creator-mode-btn.active {
+            color: #fff;
+            background: linear-gradient(135deg, var(--accent), var(--pink-accent));
+            box-shadow: 0 4px 14px var(--accent-glow);
+        }
+        .easy-hero {
+            background: linear-gradient(135deg, rgba(139, 92, 246, 0.16), rgba(236, 72, 153, 0.08));
+            border-color: rgba(139, 92, 246, 0.38);
+        }
+        .easy-intro { margin-bottom: 1rem; color: var(--text-muted); font-size: 0.84rem; line-height: 1.55; }
+        .easy-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+        .easy-step { min-width: 0; padding: 1rem; border: 1px solid var(--glass-border); border-radius: var(--radius-md); background: var(--input-bg); }
+        .easy-step-title { display: block; margin-bottom: 0.7rem; font-weight: 700; font-size: 0.88rem; }
+        .easy-tabs { display: flex; gap: 0.35rem; flex-wrap: wrap; margin-bottom: 0.7rem; }
+        .easy-tabs .btn-tab-small { flex: 1; min-width: 86px; }
+        .easy-file {
+            display: flex;
+            min-height: 86px;
+            padding: 0.8rem;
+            border: 2px dashed var(--glass-border-light);
+            border-radius: var(--radius-md);
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            color: var(--text-muted);
+            cursor: pointer;
+        }
+        .easy-summary { display: flex; gap: 0.45rem; flex-wrap: wrap; margin: 1rem 0; }
+        .easy-summary span { padding: 0.35rem 0.55rem; border-radius: 999px; background: rgba(139, 92, 246, 0.13); color: var(--text-main); font-size: 0.72rem; }
         @media (max-width: 820px) {
             .settings-grid { grid-template-columns: 1fr; }
             #modelManagerSection,
+            #easyModeSettingsSection,
             #telegramSection,
             #externalUrlSection,
             #userManagementSection,
             #logsSection { grid-column: 1; }
             #userManagementSection .form-grid { grid-template-columns: 1fr; }
+            .easy-grid { grid-template-columns: 1fr; }
         }
         @media (max-width: 620px) {
             .progress-copy { flex-direction: column; gap: 0.35rem; }
@@ -860,6 +911,69 @@
         <!-- ABA 1: CRIAR KARAOKÊ -->
         <!-- ============================================================= -->
         <div id="createTabContent">
+            <div id="creatorModeSwitch" class="creator-mode-switch" style="display: none;">
+                <button type="button" id="btnCreatorEasy" class="creator-mode-btn">✨ Modo Fácil</button>
+                <button type="button" id="btnCreatorAdvanced" class="creator-mode-btn active">🎛️ Modo Completo</button>
+            </div>
+
+            <form id="easyModeForm" style="display: none;">
+                <div class="card easy-hero">
+                    <span class="card-title">✨ Criar sem complicação</span>
+                    <p class="easy-intro">Escolha a música, defina um fundo apenas se quiser e pronto. A letra é procurada automaticamente; se não for encontrada, o karaokê continua normalmente.</p>
+
+                    <div class="easy-grid">
+                        <section class="easy-step">
+                            <span class="easy-step-title">1. Escolha a música</span>
+                            <div class="easy-tabs">
+                                <button type="button" id="easyAudioUploadTab" class="btn-tab-small active">Enviar</button>
+                                <button type="button" id="easyAudioYoutubeTab" class="btn-tab-small">YouTube</button>
+                                <button type="button" id="easyAudioLibraryTab" class="btn-tab-small">Biblioteca</button>
+                            </div>
+                            <div id="easyAudioUploadBox">
+                                <label class="easy-file" for="easyAudioFile"><span id="easyAudioFileText">Clique para escolher uma música ou vídeo</span></label>
+                                <input type="file" id="easyAudioFile" accept=".mp3,.wav,.flac,.m4a,.mp4,.mkv,.avi" style="display: none;">
+                            </div>
+                            <div id="easyAudioYoutubeBox" style="display: none;">
+                                <input type="url" id="easyYoutubeUrl" class="input-text" placeholder="Cole o link da música no YouTube">
+                            </div>
+                            <div id="easyAudioLibraryBox" style="display: none;">
+                                <select id="easyLibraryAudio" class="select-input"><option value="">Escolha na biblioteca...</option></select>
+                            </div>
+                        </section>
+
+                        <section class="easy-step">
+                            <span class="easy-step-title">2. Fundo (opcional)</span>
+                            <select id="easyBackgroundType" class="select-input" style="margin-bottom: 0.7rem;">
+                                <option value="original" selected>Usar o vídeo original automaticamente</option>
+                                <option value="upload">Enviar imagem ou vídeo</option>
+                                <option value="library">Escolher na biblioteca</option>
+                                <option value="youtube">Usar um vídeo do YouTube</option>
+                            </select>
+                            <div id="easyBackgroundUploadBox" style="display: none;">
+                                <label class="easy-file" for="easyBgFile"><span id="easyBgFileText">Clique para escolher o fundo</span></label>
+                                <input type="file" id="easyBgFile" accept="image/*,video/*" style="display: none;">
+                            </div>
+                            <div id="easyBackgroundLibraryBox" style="display: none;">
+                                <select id="easyLibraryBg" class="select-input"><option value="">Escolha um fundo...</option></select>
+                            </div>
+                            <div id="easyBackgroundYoutubeBox" style="display: none;">
+                                <input type="url" id="easyBgYoutubeUrl" class="input-text" placeholder="Cole o link do vídeo de fundo">
+                                <p class="compact-note" style="margin-top: 0.4rem;">O áudio desse vídeo será removido automaticamente.</p>
+                            </div>
+                        </section>
+                    </div>
+
+                    <div class="easy-summary">
+                        <span id="easySummaryModel">Large V3 Turbo</span>
+                        <span id="easySummaryFont">Letra 50</span>
+                        <span id="easySummaryPreset">Voz difícil</span>
+                        <span>Letra automática</span>
+                        <span>Sem pausa para revisão</span>
+                    </div>
+                    <button type="submit" id="easySubmitBtn" class="btn-primary">🎬 Criar meu karaokê</button>
+                </div>
+            </form>
+
             <!-- Form Principal -->
             <form id="karaokêForm">
                 <!-- BADGE DE REUTILIZAÇÃO DE CACHE RÁPIDA -->
@@ -1313,6 +1427,40 @@
                 </div>
             </div>
 
+            <div class="card" id="easyModeSettingsSection">
+                <div class="card-header">
+                    <span class="card-title">✨ Modo Fácil</span>
+                </div>
+                <p class="compact-note" style="margin-bottom: 1rem;">Estas escolhas valem para todas as contas. No Modo Fácil, o usuário vê apenas música, fundo e criar.</p>
+                <div class="form-grid">
+                    <div class="form-group">
+                        <span class="label">Disponível</span>
+                        <select id="easyModeEnabled" class="select-input"><option value="true">Sim</option><option value="false">Não</option></select>
+                    </div>
+                    <div class="form-group">
+                        <span class="label">Modelo</span>
+                        <select id="easyModeModel" class="select-input">
+                            <option value="large-v3-turbo">Large V3 Turbo</option><option value="large-v3">Large V3</option><option value="medium">Medium</option><option value="small">Small</option><option value="tiny">Tiny</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <span class="label">Tamanho da letra</span>
+                        <input type="number" id="easyModeFontSize" min="24" max="72" value="50" class="input-text">
+                    </div>
+                    <div class="form-group">
+                        <span class="label">Perfil da voz</span>
+                        <select id="easyModePreset" class="select-input"><option value="difficult">Voz difícil</option><option value="karaoke">Karaokê equilibrado</option><option value="continuous">Canto contínuo</option><option value="fast">Criação rápida</option></select>
+                    </div>
+                    <div class="form-group">
+                        <span class="label">Áudio para transcrever</span>
+                        <select id="easyModeSource" class="select-input"><option value="original">Original (preserva a voz)</option><option value="vocals">Voz separada pelo Demucs</option></select>
+                    </div>
+                    <div style="display: flex; align-items: flex-end;">
+                        <button type="button" id="btnSaveEasyMode" class="btn-primary">Salvar Modo Fácil</button>
+                    </div>
+                </div>
+            </div>
+
             <!-- Credenciais do Telegram -->
             <div class="card" id="telegramSection">
                 <div class="card-header">
@@ -1469,7 +1617,7 @@
 
         <!-- RODAPÉ DISCRETO DA PÁGINA -->
         <footer>
-            Sal0 Karaokê v5.2.2
+            Sal0 Karaokê v5.3.0
         </footer>
 
     </div> <!-- Container End -->
@@ -1502,6 +1650,7 @@
                 O Sal0 Karaokê separa voz e instrumental, transcreve a música, sincroniza as legendas e renderiza o vídeo no seu próprio computador ou servidor. Só a busca opcional de letras e os downloads solicitados usam a internet.</p>
 
                 <p><strong style="color: var(--text-main);">Primeiro karaokê, passo a passo</strong></p>
+                <p><strong style="color: var(--accent);">✨ Modo Fácil:</strong> escolha a música, deixe o vídeo original como fundo ou informe outro e clique em criar. O aplicativo procura a letra, usa o perfil definido pelo administrador, salva o resultado e envia o aviso automaticamente. Se não encontrar letra, segue sem interromper.</p>
                 <ol style="margin-left: 1.2rem; display: flex; flex-direction: column; gap: 0.5rem;">
                     <li><strong style="color: var(--accent);">1. Música:</strong> envie um arquivo, cole um link do YouTube ou escolha algo da sua Biblioteca.</li>
                     <li><strong style="color: var(--accent);">2. Perfil:</strong> comece com “Karaokê equilibrado”. Use “Canto contínuo” para notas longas, “Voz difícil ou mix” quando a separação estiver ruim e “Criação rápida” para testes.</li>
@@ -1512,12 +1661,12 @@
                 </ol>
 
                 <p><strong style="color: var(--text-main);">Dica de sincronia</strong><br>
-                O filtro Silero VAD fica desligado nos perfis de canto porque notas suaves e sustentadas nem sempre se parecem com fala. Ative-o nos ajustes avançados apenas quando o áudio tiver muito ruído ou for principalmente falado.</p>
+                O filtro Silero VAD fica desligado nos perfis de canto porque notas suaves e sustentadas nem sempre se parecem com fala. Ative-o nos ajustes avançados apenas quando o áudio tiver muito ruído ou for principalmente falado. No automático, os versos seguem primeiro as linhas da letra encontrada e depois as pausas e a pontuação; a linha atual permanece visível até a próxima começar.</p>
 
                 <p><strong style="color: var(--text-main);">Contas, Biblioteca e Telegram</strong></p>
                 <ul style="margin-left: 1.2rem; display: flex; flex-direction: column; gap: 0.3rem;">
                     <li>• Cada usuário comum vê apenas biblioteca, cache, letras, perfis, resultados e bot próprios.</li>
-                    <li>• O administrador gerencia contas, modelos, URL externa e diagnóstico, além de receber os avisos de todas as tarefas.</li>
+                    <li>• O administrador gerencia contas, modelos, Modo Fácil, URL externa e diagnóstico, além de receber os avisos de todas as tarefas.</li>
                     <li>• Configure seu bot em Ajustes. O link do Telegram é um download direto com endereço aleatório; não compartilhe a mensagem com quem não deve receber o vídeo.</li>
                     <li>• O botão de tema claro/escuro fica no topo e vale somente para este navegador.</li>
                 </ul>
@@ -1562,6 +1711,9 @@
         const authToken = localStorage.getItem('karaoke_token') || localStorage.getItem('auth_token') || '';
         let currentUser = null;
         let allProfiles = {};
+        let easyModeConfig = null;
+        let currentCreatorMode = 'advanced';
+        let easyAudioMode = 'upload';
 
         function escapeHtml(value) {
             return String(value ?? '').replace(/[&<>'"]/g, char => ({
@@ -1572,7 +1724,7 @@
         function applyRoleUI() {
             const admin = currentUser?.role === 'admin';
             document.querySelector('.settings-grid')?.classList.toggle('user-settings', !admin);
-            ['modelManagerSection', 'externalUrlSection', 'userManagementSection', 'logsSection'].forEach(id => {
+            ['modelManagerSection', 'easyModeSettingsSection', 'externalUrlSection', 'userManagementSection', 'logsSection'].forEach(id => {
                 const element = document.getElementById(id);
                 if (element) element.style.display = admin ? '' : 'none';
             });
@@ -1587,6 +1739,98 @@
                     ? 'Bot do administrador: recebe as suas criações e os avisos de todas as contas.'
                     : 'Seu bot pessoal recebe somente as suas criações. O administrador também recebe os avisos do sistema.';
             }
+        }
+
+        function setCreatorMode(mode, remember = true) {
+            if (mode === 'easy' && !easyModeConfig?.enabled) mode = 'advanced';
+            currentCreatorMode = mode;
+            const easyForm = document.getElementById('easyModeForm');
+            const advancedForm = document.getElementById('karaokêForm');
+            const easyButton = document.getElementById('btnCreatorEasy');
+            const advancedButton = document.getElementById('btnCreatorAdvanced');
+            if (easyForm) easyForm.style.display = mode === 'easy' ? 'block' : 'none';
+            if (advancedForm) advancedForm.style.display = mode === 'advanced' ? 'block' : 'none';
+            easyButton?.classList.toggle('active', mode === 'easy');
+            advancedButton?.classList.toggle('active', mode === 'advanced');
+            if (remember) localStorage.setItem('karaoke_creator_mode', mode);
+        }
+
+        function refreshEasySummary(config) {
+            const presetLabels = { difficult: 'Voz difícil', karaoke: 'Karaokê equilibrado', continuous: 'Canto contínuo', fast: 'Criação rápida' };
+            const model = document.getElementById('easySummaryModel');
+            const font = document.getElementById('easySummaryFont');
+            const preset = document.getElementById('easySummaryPreset');
+            if (model) model.textContent = String(config.whisper_model || 'large-v3-turbo').replaceAll('-', ' ');
+            if (font) font.textContent = `Letra ${config.font_size || 50}`;
+            if (preset) preset.textContent = presetLabels[config.transcription_preset] || 'Voz difícil';
+        }
+
+        async function fetchEasyModeConfig() {
+            try {
+                const response = await authFetch('/api/easy-mode');
+                if (!response.ok) return;
+                easyModeConfig = await response.json();
+                refreshEasySummary(easyModeConfig);
+                const switcher = document.getElementById('creatorModeSwitch');
+                if (switcher) switcher.style.display = easyModeConfig.enabled ? 'grid' : 'none';
+                const values = {
+                    easyModeEnabled: String(Boolean(easyModeConfig.enabled)),
+                    easyModeModel: easyModeConfig.whisper_model,
+                    easyModeFontSize: easyModeConfig.font_size,
+                    easyModePreset: easyModeConfig.transcription_preset,
+                    easyModeSource: easyModeConfig.transcribe_source,
+                };
+                Object.entries(values).forEach(([id, value]) => {
+                    const element = document.getElementById(id);
+                    if (element) element.value = String(value);
+                });
+                const preferred = localStorage.getItem('karaoke_creator_mode') || 'easy';
+                setCreatorMode(easyModeConfig.enabled ? preferred : 'advanced', false);
+            } catch (error) {
+                console.warn('Não foi possível carregar o Modo Fácil.', error);
+                setCreatorMode('advanced', false);
+            }
+        }
+
+        function setEasyAudioMode(mode) {
+            easyAudioMode = mode;
+            ['upload', 'youtube', 'library'].forEach(item => {
+                const suffix = item.charAt(0).toUpperCase() + item.slice(1);
+                const tab = document.getElementById(`easyAudio${suffix}Tab`);
+                const box = document.getElementById(`easyAudio${suffix}Box`);
+                tab?.classList.toggle('active', item === mode);
+                if (box) box.style.display = item === mode ? 'block' : 'none';
+            });
+        }
+
+        function updateEasyBackgroundFields() {
+            const type = document.getElementById('easyBackgroundType')?.value || 'original';
+            const mapping = { upload: 'easyBackgroundUploadBox', library: 'easyBackgroundLibraryBox', youtube: 'easyBackgroundYoutubeBox' };
+            Object.entries(mapping).forEach(([key, id]) => {
+                const element = document.getElementById(id);
+                if (element) element.style.display = key === type ? 'block' : 'none';
+            });
+        }
+
+        async function prepareEasyYoutubeBackground(url) {
+            const startResponse = await authFetch('/api/download-bg-youtube-preset', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ youtube_url: url })
+            });
+            if (!startResponse.ok) {
+                const error = await startResponse.json().catch(() => ({}));
+                throw new Error(error.detail || 'Não foi possível baixar o fundo do YouTube.');
+            }
+            for (let attempt = 0; attempt < 600; attempt += 1) {
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                const statusResponse = await authFetch('/api/youtube-preset-status/bg');
+                if (!statusResponse.ok) continue;
+                const status = await statusResponse.json();
+                if (status.status === 'done' && status.filename) return status.filename;
+                if (status.status === 'error') throw new Error(status.error || 'Falha no vídeo de fundo.');
+            }
+            throw new Error('O download do fundo demorou mais que o esperado.');
         }
 
         // GERENCIAMENTO DE TEMA (ESCURO COMO PADRÃO)
@@ -2028,6 +2272,8 @@
                 renderLibrarySection(document.getElementById('libHistoryList'), 'history', data.history, '🎬', 'Nenhum resultado nesta conta.');
                 fillLibrarySelect(document.getElementById('libraryAudioSelect'), data.videos, 'Selecione uma música da biblioteca...');
                 fillLibrarySelect(document.getElementById('libraryBgSelect'), data.photos, 'Selecione um fundo da biblioteca...');
+                fillLibrarySelect(document.getElementById('easyLibraryAudio'), data.videos, 'Escolha na biblioteca...');
+                fillLibrarySelect(document.getElementById('easyLibraryBg'), data.photos, 'Escolha um fundo...');
             } catch (e) {
                 console.error('Erro ao carregar biblioteca:', e);
             }
@@ -2172,6 +2418,112 @@
         // INICIALIZAÇÃO E LISTENERS DE EVENTOS
         window.addEventListener('DOMContentLoaded', async () => {
             initTheme();
+
+            document.getElementById('btnCreatorEasy')?.addEventListener('click', () => setCreatorMode('easy'));
+            document.getElementById('btnCreatorAdvanced')?.addEventListener('click', () => setCreatorMode('advanced'));
+            document.getElementById('easyAudioUploadTab')?.addEventListener('click', () => setEasyAudioMode('upload'));
+            document.getElementById('easyAudioYoutubeTab')?.addEventListener('click', () => setEasyAudioMode('youtube'));
+            document.getElementById('easyAudioLibraryTab')?.addEventListener('click', () => setEasyAudioMode('library'));
+            document.getElementById('easyBackgroundType')?.addEventListener('change', updateEasyBackgroundFields);
+            document.getElementById('easyAudioFile')?.addEventListener('change', event => {
+                const file = event.target.files?.[0];
+                const label = document.getElementById('easyAudioFileText');
+                if (label) label.textContent = file?.name || 'Clique para escolher uma música ou vídeo';
+            });
+            document.getElementById('easyBgFile')?.addEventListener('change', event => {
+                const file = event.target.files?.[0];
+                const label = document.getElementById('easyBgFileText');
+                if (label) label.textContent = file?.name || 'Clique para escolher o fundo';
+            });
+
+            document.getElementById('btnSaveEasyMode')?.addEventListener('click', async () => {
+                const button = document.getElementById('btnSaveEasyMode');
+                const payload = {
+                    enabled: document.getElementById('easyModeEnabled')?.value === 'true',
+                    whisper_model: document.getElementById('easyModeModel')?.value || 'large-v3-turbo',
+                    font_size: Number(document.getElementById('easyModeFontSize')?.value || 50),
+                    transcription_preset: document.getElementById('easyModePreset')?.value || 'difficult',
+                    transcribe_source: document.getElementById('easyModeSource')?.value || 'original',
+                    show_next_line_preview: easyModeConfig?.show_next_line_preview ?? true,
+                    show_instrumental: easyModeConfig?.show_instrumental ?? true,
+                };
+                if (button) { button.disabled = true; button.textContent = 'Salvando...'; }
+                try {
+                    const response = await authFetch('/api/easy-mode', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload),
+                    });
+                    const result = await response.json().catch(() => ({}));
+                    if (!response.ok) throw new Error(result.detail || 'Não foi possível salvar.');
+                    await fetchEasyModeConfig();
+                    alert('Modo Fácil atualizado para todas as contas.');
+                } catch (error) {
+                    alert('Erro ao salvar o Modo Fácil: ' + error.message);
+                } finally {
+                    if (button) { button.disabled = false; button.textContent = 'Salvar Modo Fácil'; }
+                }
+            });
+
+            document.getElementById('easyModeForm')?.addEventListener('submit', async event => {
+                event.preventDefault();
+                const button = document.getElementById('easySubmitBtn');
+                const formData = new FormData();
+                formData.set('easy_mode', 'true');
+                formData.set('app_base_url', window.location.origin);
+
+                if (easyAudioMode === 'upload') {
+                    const file = document.getElementById('easyAudioFile')?.files?.[0];
+                    if (!file) { alert('Escolha uma música ou vídeo.'); return; }
+                    formData.set('audio_file', file, file.name);
+                } else if (easyAudioMode === 'youtube') {
+                    const url = document.getElementById('easyYoutubeUrl')?.value.trim();
+                    if (!url) { alert('Cole o link da música no YouTube.'); return; }
+                    formData.set('youtube_url', url);
+                } else {
+                    const filename = document.getElementById('easyLibraryAudio')?.value;
+                    if (!filename) { alert('Escolha uma música da biblioteca.'); return; }
+                    formData.set('library_audio', filename);
+                }
+
+                const backgroundType = document.getElementById('easyBackgroundType')?.value || 'original';
+                if (button) { button.disabled = true; button.textContent = backgroundType === 'youtube' ? 'Baixando fundo...' : 'Iniciando...'; }
+                try {
+                    if (backgroundType === 'upload') {
+                        const file = document.getElementById('easyBgFile')?.files?.[0];
+                        if (!file) throw new Error('Escolha a imagem ou o vídeo de fundo.');
+                        formData.set('bg_file', file, file.name);
+                    } else if (backgroundType === 'library') {
+                        const filename = document.getElementById('easyLibraryBg')?.value;
+                        if (!filename) throw new Error('Escolha um fundo da biblioteca.');
+                        formData.set('library_bg', filename);
+                    } else if (backgroundType === 'youtube') {
+                        const url = document.getElementById('easyBgYoutubeUrl')?.value.trim();
+                        if (!url) throw new Error('Cole o link do vídeo de fundo.');
+                        const filename = await prepareEasyYoutubeBackground(url);
+                        formData.set('library_bg', filename);
+                    }
+
+                    if (button) button.textContent = 'Preparando a criação...';
+                    const processCard = document.getElementById('processCard');
+                    if (processCard) processCard.style.display = 'block';
+                    const progress = document.getElementById('progressBarFill');
+                    const percent = document.getElementById('progressPercent');
+                    const status = document.getElementById('statusMessage');
+                    if (progress) progress.style.width = '0%';
+                    if (percent) percent.textContent = '0%';
+                    if (status) status.textContent = 'Preparando a criação fácil...';
+                    updateTimelineUI('Uploading');
+
+                    const response = await authFetch('/api/process', { method: 'POST', body: formData });
+                    const result = await response.json().catch(() => ({}));
+                    if (!response.ok) throw new Error(result.detail || 'Não foi possível iniciar a criação.');
+                    startPolling();
+                } catch (error) {
+                    alert('Erro no Modo Fácil: ' + error.message);
+                    if (button) { button.disabled = false; button.textContent = '🎬 Criar meu karaokê'; }
+                }
+            });
 
             // Alternadores de Tema
             const btnToggleTheme = document.getElementById('btnToggleTheme');
@@ -3308,6 +3660,7 @@
             if (!isAuthenticated) return;
 
             // CARREGAR DADOS SALVOS NO SERVIDOR
+            await fetchEasyModeConfig();
             await fetchTelegramConfig();
             await fetchProfiles();
             if (currentUser?.role === 'admin') {
@@ -3836,6 +4189,8 @@
                 const statusMessage = document.getElementById('statusMessage');
                 const stageProgressText = document.getElementById('stageProgressText');
                 const btnSubmit = document.getElementById('btnSubmit');
+                const easyForm = document.getElementById('easyModeForm');
+                const easySubmitBtn = document.getElementById('easySubmitBtn');
                 const downloadBox = document.getElementById('downloadBox');
                 const resultVideoPreview = document.getElementById('resultVideoPreview');
                 document.querySelectorAll('.btn-cancel-task').forEach(button => {
@@ -3843,7 +4198,7 @@
                 });
 
                 if (data.status === "busy") {
-                    if (formCard) formCard.style.display = 'block';
+                    setCreatorMode(currentCreatorMode, false);
                     if (correctionCard) correctionCard.style.display = 'none';
                     if (processCard) processCard.style.display = 'block';
                     if (statusMessage) statusMessage.innerText = 'O servidor está ocupado com outra criação. Os detalhes ficam privados.';
@@ -3851,10 +4206,12 @@
                     if (progressBarFill) progressBarFill.style.width = '0%';
                     if (stageProgressText) stageProgressText.textContent = '';
                     if (btnSubmit) { btnSubmit.disabled = true; btnSubmit.innerHTML = '⏳ Servidor ocupado'; }
+                    if (easySubmitBtn) { easySubmitBtn.disabled = true; easySubmitBtn.innerHTML = '⏳ Servidor ocupado'; }
                     if (downloadBox) downloadBox.style.display = 'none';
                 } else if (data.status === "processing" || data.status === "downloading") {
                     // TRAVA DE PROCESSO ÚNICO: Ocultar o formulário enquanto houver processo ativo
                     if (formCard) formCard.style.display = "none";
+                    if (easyForm) easyForm.style.display = "none";
                     if (correctionCard) correctionCard.style.display = "none";
                     if (processCard) processCard.style.display = "block";
 
@@ -3875,11 +4232,13 @@
                         );
                     }
                     if (btnSubmit) btnSubmit.disabled = true;
+                    if (easySubmitBtn) easySubmitBtn.disabled = true;
 
                     updateTimelineUI(data.step || "");
                 } else if (data.status === "waiting_for_user_correction" || data.status === "awaiting_review") {
                     // PAUSA PARA EDIÇÃO DE LEGENDA PRÉ-RENDERIZAÇÃO
                     if (formCard) formCard.style.display = "none";
+                    if (easyForm) easyForm.style.display = "none";
                     if (processCard) processCard.style.display = "none";
                     if (correctionCard) correctionCard.style.display = "block";
 
@@ -3891,7 +4250,7 @@
                     if (pollingInterval) clearInterval(pollingInterval);
                     if (processCard) processCard.style.display = "none";
                     if (correctionCard) correctionCard.style.display = "none";
-                    if (formCard) formCard.style.display = "block"; // Restaurar o formulário de criação
+                    setCreatorMode(currentCreatorMode, false);
 
                     if (data.status === "done" && data.result_available_to_current_user && data.original_filename && !data.original_filename.includes("Baixando")) {
                         if (downloadBox) downloadBox.style.display = "block";
@@ -3903,6 +4262,7 @@
                         downloadBox.style.display = 'none';
                     }
                     if (btnSubmit) { btnSubmit.disabled = false; btnSubmit.innerHTML = '🎬 Criar Karaokê'; }
+                    if (easySubmitBtn) { easySubmitBtn.disabled = false; easySubmitBtn.innerHTML = '🎬 Criar meu karaokê'; }
                     isShowingCorrection = false;
                     await fetchCacheInfo();
                     await loadLibrary();
@@ -3910,8 +4270,9 @@
                     if (pollingInterval) clearInterval(pollingInterval);
                     if (processCard) processCard.style.display = "none";
                     if (correctionCard) correctionCard.style.display = "none";
-                    if (formCard) formCard.style.display = "block"; // Restaurar o formulário de criação
+                    setCreatorMode(currentCreatorMode, false);
                     if (btnSubmit) { btnSubmit.disabled = false; btnSubmit.innerHTML = '🎬 Criar Karaokê'; }
+                    if (easySubmitBtn) { easySubmitBtn.disabled = false; easySubmitBtn.innerHTML = '🎬 Criar meu karaokê'; }
                     isShowingCorrection = false;
                 }
             } catch (e) {}

@@ -9,6 +9,7 @@ Transforme uma música em um vídeo de karaokê sem mandar seu áudio para uma n
 | Parte | Possibilidades |
 |---|---|
 | Música | Upload de áudio ou vídeo, link do YouTube e Biblioteca local |
+| Modo Fácil | Música, fundo opcional e um botão; o restante segue o padrão do administrador |
 | Voz | Separação de vocal e instrumental com Demucs |
 | Legenda | Transcrição local com Faster-Whisper e modos por sílaba, palavra ou linha |
 | Perfis | Opções prontas para karaokê equilibrado, canto contínuo, voz difícil/mix e criação rápida, além dos perfis pessoais |
@@ -53,6 +54,14 @@ Abra `http://localhost:7885`. No primeiro acesso, o aplicativo pede a criação 
 
 ## Um primeiro karaokê
 
+### Modo Fácil
+
+Abra **Criar → Modo Fácil**, escolha uma música e clique em criar. Você pode deixar o fundo em **vídeo original**, enviar uma imagem ou vídeo, escolher algo da Biblioteca ou colar um link do YouTube. A letra é procurada automaticamente; se nenhuma fonte responder, o processo segue normalmente e sem pausa para revisão.
+
+O administrador define esse padrão em **Ajustes → Modo Fácil**. A configuração inicial usa **Large V3 Turbo**, perfil **Voz difícil**, fonte **50** e transcrição do áudio original para evitar que uma separação imperfeita esconda palavras.
+
+### Modo Completo
+
 1. Em **Criar**, envie uma música, use o YouTube ou escolha um item da Biblioteca.
 2. Escolha um **Perfil da música**. **Karaokê equilibrado** é o ponto de partida recomendado.
 3. Deixe **Letra automática** ativa ou abra o bloco para colar uma letra manualmente.
@@ -62,7 +71,7 @@ Abra `http://localhost:7885`. No primeiro acesso, o aplicativo pede a criação 
 
 Para canto, o filtro Silero VAD fica desligado por padrão: ele foi criado para detectar fala e pode cortar notas suaves ou sustentadas. Os perfis de voz difícil também evitam esse filtro; a opção continua disponível em **Mais ajustes** para gravações faladas ou muito ruidosas.
 
-Em **Mais ajustes**, deixar palavras ou caracteres por verso em zero ativa a divisão automática: o app cria frases curtas e mantém os tempos reconhecidos para cada palavra.
+Em **Mais ajustes**, deixar palavras ou caracteres por verso em zero ativa a divisão inteligente. Quando existe letra-guia, as linhas originais orientam o fim de cada verso; sem ela, o app considera pontuação, pausas e duração. Os cortes internos do Whisper não dividem mais uma frase por conta própria, e a linha atual permanece visível até a próxima começar.
 
 O botão de tema claro/escuro fica sempre no topo da tela.
 

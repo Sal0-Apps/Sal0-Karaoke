@@ -365,7 +365,14 @@ def align_lyrics(official_lyrics_text: str, transcribed_segments: list[dict]) ->
     pelo Whisper recebem a grafia da letra oficial; versos ausentes permanecem
     ausentes e toda a estrutura temporal original é preservada.
     """
-    official_words = [word for word in official_lyrics_text.split() if clean_word(word)]
+    official_words = []
+    official_line_ends = set()
+    for lyric_line in official_lyrics_text.splitlines():
+        line_words = [word for word in lyric_line.split() if clean_word(word)]
+        if not line_words:
+            continue
+        official_words.extend(line_words)
+        official_line_ends.add(len(official_words) - 1)
     if not official_words or not transcribed_segments:
         return transcribed_segments
 
@@ -373,6 +380,8 @@ def align_lyrics(official_lyrics_text: str, transcribed_segments: list[dict]) ->
     transcribed_words = []
     for source_segment in transcribed_segments:
         copied_words = [dict(word) for word in source_segment.get("words", [])]
+        for copied_word in copied_words:
+            copied_word.pop("lyric_line_break", None)
         copied_segment = {**source_segment, "words": copied_words}
         guided_segments.append(copied_segment)
         for copied_word in copied_words:
@@ -389,12 +398,15 @@ def align_lyrics(official_lyrics_text: str, transcribed_segments: list[dict]) ->
 
     for block in matcher.get_matching_blocks():
         for offset in range(block.size):
-            official_word = official_words[block.a + offset].strip()
+            official_index = block.a + offset
+            official_word = official_words[official_index].strip()
             target_word = transcribed_words[block.b + offset]
             current_text = str(target_word.get("word", ""))
             leading_space = current_text[:len(current_text) - len(current_text.lstrip())]
             trailing_space = current_text[len(current_text.rstrip()):]
             target_word["word"] = f"{leading_space}{official_word}{trailing_space}"
+            if official_index in official_line_ends:
+                target_word["lyric_line_break"] = True
             matched += 1
 
     for segment in guided_segments:
@@ -663,6 +675,72 @@ EXTERNAL_URL_FILE = "/data/output/external_url.json"
 
 class ExternalUrlModel(BaseModel):
     external_url: str
+
+
+EASY_MODE_FILE = "/data/output/easy_mode.json"
+EASY_MODE_DEFAULTS = {
+    "enabled": True,
+    "whisper_model": "large-v3-turbo",
+    "font_size": 50,
+    "transcription_preset": "difficult",
+    "transcribe_source": "original",
+    "show_next_line_preview": True,
+    "show_instrumental": True,
+}
+
+
+class EasyModeModel(BaseModel):
+    enabled: bool = True
+    whisper_model: str = "large-v3-turbo"
+    font_size: int = 50
+    transcription_preset: str = "difficult"
+    transcribe_source: str = "original"
+    show_next_line_preview: bool = True
+    show_instrumental: bool = True
+
+
+def normalize_easy_mode_config(config: dict | None = None) -> dict:
+    normalized = {**EASY_MODE_DEFAULTS, **(config or {})}
+    if normalized["whisper_model"] not in {"large-v3-turbo", "large-v3", "medium", "small", "tiny"}:
+        normalized["whisper_model"] = EASY_MODE_DEFAULTS["whisper_model"]
+    if normalized["transcription_preset"] not in {"karaoke", "continuous", "difficult", "fast"}:
+        normalized["transcription_preset"] = EASY_MODE_DEFAULTS["transcription_preset"]
+    if normalized["transcribe_source"] not in {"original", "vocals"}:
+        normalized["transcribe_source"] = EASY_MODE_DEFAULTS["transcribe_source"]
+    normalized["font_size"] = max(24, min(72, int(normalized.get("font_size", 50))))
+    normalized["enabled"] = bool(normalized.get("enabled", True))
+    normalized["show_next_line_preview"] = bool(normalized.get("show_next_line_preview", True))
+    normalized["show_instrumental"] = bool(normalized.get("show_instrumental", True))
+    return normalized
+
+
+def load_easy_mode_config() -> dict:
+    if not os.path.exists(EASY_MODE_FILE):
+        return dict(EASY_MODE_DEFAULTS)
+    try:
+        with open(EASY_MODE_FILE, "r", encoding="utf-8") as file:
+            return normalize_easy_mode_config(json.load(file))
+    except Exception as exc:
+        logger.warning("Nao foi possivel carregar o Modo Facil: %s", exc)
+        return dict(EASY_MODE_DEFAULTS)
+
+
+@app.get("/api/easy-mode")
+def get_easy_mode_config(current_user: dict = Depends(get_current_user)):
+    return load_easy_mode_config()
+
+
+@app.post("/api/easy-mode")
+def save_easy_mode_config(config: EasyModeModel, current_user: dict = Depends(get_current_user)):
+    require_admin(current_user)
+    normalized = normalize_easy_mode_config(config.dict())
+    try:
+        os.makedirs(os.path.dirname(EASY_MODE_FILE), exist_ok=True)
+        with open(EASY_MODE_FILE, "w", encoding="utf-8") as file:
+            json.dump(normalized, file, indent=4, ensure_ascii=False)
+        return {"status": "success", "config": normalized}
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Erro ao salvar o Modo Facil: {exc}")
 
 def load_external_url_config() -> dict:
     """Carrega a URL/IP externo do disco."""
@@ -1143,7 +1221,7 @@ def download_bg_youtube_preset(
 
 
 LRCLIB_API_URL = "https://lrclib.net/api"
-LRCLIB_USER_AGENT = "Sal0-Karaoke/5.1.0 (+https://github.com/Sal0-Apps/Sal0-Karaoke)"
+LRCLIB_USER_AGENT = "Sal0-Karaoke/5.3.0 (+https://github.com/Sal0-Apps/Sal0-Karaoke)"
 LYRICS_OVH_API_URL = "https://api.lyrics.ovh/v1"
 LYRICS_PROVIDER_TIMEOUT = (3.05, 6)
 MUSIXMATCH_API_URL = "https://apic-desktop.musixmatch.com/ws/1.1"
@@ -1571,7 +1649,7 @@ def delete_lyrics_server(current_user: dict = Depends(get_current_user)):
 
 
 
-# Sistema de Logs de Diagnóstico v5.1.0
+# Sistema de Logs de Diagnóstico v5.3.0
 DIAGNOSTIC_LOG_FILE = "/data/output/app_diagnostic.log"
 
 def log_diagnostic(message: str, level: str = "INFO"):
@@ -1607,7 +1685,7 @@ def download_diagnostic_logs(current_user: dict = Depends(get_current_user)):
     with state_lock:
         current_state = dict(state)
     report = "\n".join([
-        "Sal0 Karaokê v5.1.0 — diagnóstico ao vivo",
+        "Sal0 Karaokê v5.3.0 — diagnóstico ao vivo",
         f"Gerado em: {time.strftime('%Y-%m-%d %H:%M:%S')}",
         "",
         "=== ESTADO ATUAL ===",
@@ -2649,11 +2727,38 @@ def process_karaoke(
     library_bg: str = Form(None),
     save_to_library: bool = Form(False),
     only_remove_vocals: bool = Form(False),
-    app_base_url: str = Form("")
+    app_base_url: str = Form(""),
+    easy_mode: bool = Form(False)
 ):
     """
     Recebe os arquivos enviados, valida a concorrência e inicia o pipeline em segundo plano.
     """
+    if easy_mode:
+        easy_config = load_easy_mode_config()
+        if not easy_config.get("enabled", True):
+            raise HTTPException(status_code=403, detail="O Modo Facil foi desativado pelo administrador.")
+        whisper_model = easy_config["whisper_model"]
+        font_size = easy_config["font_size"]
+        text_color = "#00FFFF"
+        text_position = "bottom"
+        subtitle_mode = "syllable"
+        words_per_line = 0
+        max_chars_line = 0
+        break_on_punctuation = True
+        enable_vad = False
+        transcription_preset = easy_config["transcription_preset"]
+        background_mode = "image" if (bg_file or library_bg) else "original"
+        show_instrumental = easy_config["show_instrumental"]
+        transcribe_source = easy_config["transcribe_source"]
+        show_next_line_preview = easy_config["show_next_line_preview"]
+        lyrics_text = None
+        lyrics_mode = "auto"
+        enable_correction = False
+        keep_first_line_visible = False
+        pause_for_editing = False
+        save_to_library = True
+        only_remove_vocals = False
+
     if transcription_preset not in {"karaoke", "continuous", "difficult", "fast"}:
         raise HTTPException(status_code=400, detail="Perfil de leitura da voz inválido.")
 
@@ -2663,7 +2768,7 @@ def process_karaoke(
             if state.get("status") in ["idle", "error", "done"]:
                 try:
                     processing_lock.release()
-                    logger.info("Failsafe v5.1.0: Lock de concorrência obsoleto liberado com sucesso.")
+                    logger.info("Failsafe: lock de concorrência obsoleto liberado com sucesso.")
                 except Exception:
                     pass
             else:
