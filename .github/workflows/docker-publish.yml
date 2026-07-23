@@ -64,24 +64,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           name: Sal0 Karaoke v${{ env.VERSION_TAG }}
-          body: |
-            ## 🚀 Sal0 Karaoke v${{ env.VERSION_TAG }}
-
-            O YouTube agora entra direto no fluxo de criação, sem etapas soltas no caminho.
-
-            ### ✨ Nesta versão
-            * Música e fundo do YouTube são preparados automaticamente ao clicar em criar, tanto no Modo Fácil quanto no Completo.
-            * Todo link do YouTube mostra o nome do vídeo identificado na própria interface.
-            * A Biblioteca ganhou importação direta do YouTube para músicas, vídeos e fundos, ao lado do upload de arquivos.
-            * A tela **Produzindo** mostra um resumo compacto da faixa, letra-guia, modelo, modo e fundo em uso.
-            * O download final foi corrigido e agora usa o nome original da música seguido de **Karaokê**.
-            * O processamento de áudio, separação, transcrição, sincronização e renderização continua local.
-
-            ### 🐋 Como executar esta versão:
-            No seu `docker-compose.yml`, você pode travar a versão alterando a linha da imagem para:
-            ```yaml
-            image: ${{ env.IMAGE_TAG }}:${{ env.VERSION_TAG }}
-            ```
+          generate_release_notes: true
           draft: false
           prerelease: false
         env:
