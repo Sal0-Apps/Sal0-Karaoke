@@ -8,19 +8,21 @@ Transforme uma música em um vídeo de karaokê sem mandar seu áudio para uma n
 
 | Parte | Possibilidades |
 |---|---|
-| Música | Upload de áudio ou vídeo, link do YouTube e Biblioteca local |
+| Música | Upload, Biblioteca ou link do YouTube identificado e preparado ao criar |
 | Modo Fácil | Música, fundo opcional e um botão; o restante segue o padrão do administrador |
 | Voz | Separação de vocal e instrumental com Demucs |
 | Legenda | Transcrição local com Faster-Whisper e modos por sílaba, palavra ou linha |
 | Perfis | Opções prontas para karaokê equilibrado, canto contínuo, voz difícil/mix e criação rápida, além dos perfis pessoais |
 | Letra-guia | Texto manual ou busca opcional em LRCLIB, Lyrics.ovh e Musixmatch |
-| Visual | Vídeo original, cor, imagem, vídeo, Biblioteca ou YouTube |
+| Visual | Vídeo original, cor, imagem, vídeo, Biblioteca ou fundo do YouTube |
 | Revisão | Editor de texto e tempos antes da renderização |
-| Resultado | Preview no app, download em MP4 e histórico permanente |
+| Resultado | Preview, download como `Música - Karaokê.mp4` e histórico permanente |
 | Telegram | Bot pessoal por usuário, avisos e vídeo ou link direto |
 | Contas | Espaços separados para Biblioteca, cache, letras, perfis, bot e resultados |
 
 Todo o processamento de mídia continua local. Quando a busca automática de letra é usada, apenas o nome da música e do artista é consultado na internet; a letra encontrada serve como guia para a transcrição.
+
+Nas telas de criação, basta colar o link: o nome do vídeo aparece na interface e o download necessário acontece ao clicar em criar. Os botões para baixar e guardar uma música ou um fundo antes do processo ficam na **Biblioteca**.
 
 ## Contas sem misturar os discos
 
@@ -56,7 +58,7 @@ Abra `http://localhost:7885`. No primeiro acesso, o aplicativo pede a criação 
 
 ### Modo Fácil
 
-Para usuários comuns, **Modo Fácil** é a primeira aba de criação. Para administradores, ele aparece como a segunda aba, depois do **Modo Completo**. Escolha uma música e clique em criar; o fundo pode seguir o padrão do administrador, receber um arquivo, vir da Biblioteca ou usar um link do YouTube.
+Para usuários comuns, **Modo Fácil** é a primeira aba de criação. Para administradores, ele aparece como a segunda aba, depois do **Modo Completo**. Escolha uma música e clique em criar; links do YouTube são identificados na própria tela e o fundo pode seguir o padrão do administrador, receber um arquivo, vir da Biblioteca ou usar outro link do YouTube.
 
 O administrador define o perfil global em **Ajustes → Modo Fácil**. Todas as opções técnicas do fluxo completo ficam disponíveis ali — modelo, perfil da voz, fonte da transcrição, VAD, letra, modo e aparência da legenda, segmentação, fundo padrão, revisão e salvamento — sem deixar a tela do usuário comum complicada.
 
@@ -64,11 +66,11 @@ Os valores iniciais continuam sendo **Large V3 Turbo**, perfil **Voz difícil**,
 
 ### Modo Completo
 
-1. Em **Criar**, envie uma música, use o YouTube ou escolha um item da Biblioteca.
+1. Em **Criar**, envie uma música, cole um link do YouTube ou escolha um item da Biblioteca.
 2. Escolha um **Perfil da música**. **Karaokê equilibrado** é o ponto de partida recomendado.
 3. Deixe **Letra automática** ativa ou abra o bloco para colar uma letra manualmente.
 4. Escolha o fundo e, se quiser, abra **Mais ajustes** para personalizar legenda e revisão.
-5. Clique em **Criar Karaokê** e acompanhe as etapas.
+5. Clique em **Criar Karaokê** e acompanhe as etapas com o resumo da música, letra, modelo e fundo em uso.
 6. Quando terminar, assista no próprio app, baixe o MP4 ou abra **Biblioteca → Resultados**.
 
 Para canto, o filtro Silero VAD fica desligado por padrão: ele foi criado para detectar fala e pode cortar notas suaves ou sustentadas. Os perfis de voz difícil também evitam esse filtro; a opção continua disponível em **Mais ajustes** para gravações faladas ou muito ruidosas.

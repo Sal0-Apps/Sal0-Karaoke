@@ -746,6 +746,68 @@
             line-height: 1.35;
             text-align: right;
         }
+        .youtube-identification {
+            display: none;
+            align-items: center;
+            gap: 0.45rem;
+            min-width: 0;
+            margin-top: 0.45rem;
+            padding: 0.48rem 0.65rem;
+            border: 1px solid rgba(139, 92, 246, 0.3);
+            border-radius: 9px;
+            background: rgba(139, 92, 246, 0.1);
+            color: var(--text-main);
+            font-size: 0.74rem;
+        }
+        .youtube-identification span:last-child {
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .youtube-identification.is-error {
+            border-color: rgba(245, 158, 11, 0.32);
+            background: rgba(245, 158, 11, 0.1);
+            color: #fbbf24;
+        }
+        .process-summary {
+            display: none;
+            grid-template-columns: minmax(220px, 1.6fr) repeat(3, minmax(130px, auto));
+            gap: 0.5rem;
+            margin-bottom: 0.85rem;
+        }
+        .process-summary-item {
+            display: flex;
+            align-items: center;
+            gap: 0.38rem;
+            min-width: 0;
+            padding: 0.5rem 0.65rem;
+            border: 1px solid var(--glass-border);
+            border-radius: 9px;
+            background: var(--input-bg);
+            color: var(--text-muted);
+            font-size: 0.72rem;
+        }
+        .process-summary-item span:last-child {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .process-summary-item:first-child { color: var(--text-main); font-weight: 700; }
+        .library-import-stack { display: grid; gap: 0.65rem; }
+        .library-youtube-import {
+            padding-top: 0.65rem;
+            border-top: 1px solid var(--glass-border);
+        }
+        .library-youtube-row { display: flex; gap: 0.5rem; align-items: center; }
+        .library-youtube-row .input-text { min-width: 0; flex: 1; }
+        .library-youtube-row .btn-primary { width: auto; flex: 0 0 auto; white-space: nowrap; }
+        .library-import-progress {
+            display: none;
+            margin-top: 0.5rem;
+            color: var(--text-muted);
+            font-size: 0.72rem;
+        }
 
         .media-seek-controls {
             display: flex;
@@ -919,12 +981,16 @@
             #userManagementSection .form-grid { grid-template-columns: 1fr; }
             .easy-grid { grid-template-columns: 1fr; }
             .easy-config-fields { grid-template-columns: 1fr 1fr; }
+            .process-summary { grid-template-columns: 1fr 1fr; }
         }
         @media (max-width: 620px) {
             .progress-copy { flex-direction: column; gap: 0.35rem; }
             .stage-progress-text { max-width: 100%; text-align: left; }
             .easy-config-fields { grid-template-columns: 1fr; }
             .creator-mode-btn { padding-inline: 0.55rem; font-size: 0.78rem; }
+            .process-summary { grid-template-columns: 1fr; }
+            .library-youtube-row { align-items: stretch; flex-direction: column; }
+            .library-youtube-row .btn-primary { width: 100%; }
         }
 </style>
 </head>
@@ -985,6 +1051,7 @@
                             </div>
                             <div id="easyAudioYoutubeBox" style="display: none;">
                                 <input type="url" id="easyYoutubeUrl" class="input-text" placeholder="Cole o link da música no YouTube">
+                                <div id="easyYoutubeTitleBadge" class="youtube-identification" aria-live="polite"><span>▶️</span><span id="easyYoutubeTitleText"></span></div>
                             </div>
                             <div id="easyAudioLibraryBox" style="display: none;">
                                 <select id="easyLibraryAudio" class="select-input"><option value="">Escolha na biblioteca...</option></select>
@@ -1008,6 +1075,7 @@
                             </div>
                             <div id="easyBackgroundYoutubeBox" style="display: none;">
                                 <input type="url" id="easyBgYoutubeUrl" class="input-text" placeholder="Cole o link do vídeo de fundo">
+                                <div id="easyBgYoutubeTitleBadge" class="youtube-identification" aria-live="polite"><span>🎞️</span><span id="easyBgYoutubeTitleText"></span></div>
                                 <p class="compact-note" style="margin-top: 0.4rem;">O áudio desse vídeo será removido automaticamente.</p>
                             </div>
                         </section>
@@ -1055,23 +1123,9 @@
                     </div>
 
                     <div id="audioYoutubeContainer" style="display: none;">
-                        <input type="text" id="youtubeUrl" name="youtube_url" placeholder="Cole a URL do vídeo do YouTube..." class="input-text" style="margin-bottom: 0.5rem;">
-                        <button type="button" id="btnDownloadYoutube" class="btn-secondary" style="width: 100%;">📥 Baixar</button>
-
-                        <!-- BARRA DE PROGRESSO DEDICADA DE DOWNLOAD DO YOUTUBE (ÁUDIO/VÍDEO) -->
-                        <div id="audioYtProgressBox" style="display: none; margin-top: 0.6rem; background: var(--input-bg); border: 1px solid var(--accent); border-radius: 10px; padding: 0.8rem;">
-                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.3rem;">
-                                <span id="audioYtStatusTitle" style="font-size: 0.8rem; font-weight: 600; color: var(--accent);">⏳ Conectando ao YouTube...</span>
-                                <span id="audioYtStatusPercent" style="font-size: 0.78rem; font-weight: 700; color: var(--text-main);">0%</span>
-                            </div>
-                            <div style="width: 100%; height: 6px; background: rgba(255,255,255,0.1); border-radius: 4px; overflow: hidden;">
-                                <div id="audioYtProgressBar" style="width: 0%; height: 100%; background: linear-gradient(90deg, var(--accent), var(--pink-accent)); transition: width 0.3s ease;"></div>
-                            </div>
-                        </div>
-
-                        <div id="audioYtSelectedBadge" style="display: none; margin-top: 0.5rem; background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.3); color: #34d399; padding: 0.5rem 0.8rem; border-radius: 8px; font-size: 0.8rem; font-weight: 600; align-items: center; gap: 0.4rem;">
-                            <span>✓</span> <span id="audioYtSelectedText">Mídia do YouTube baixada e selecionada automaticamente!</span>
-                        </div>
+                        <input type="url" id="youtubeUrl" name="youtube_url" placeholder="Cole a URL do vídeo do YouTube..." class="input-text">
+                        <div id="youtubeTitleBadge" class="youtube-identification" aria-live="polite"><span>▶️</span><span id="youtubeTitleText"></span></div>
+                        <p class="compact-note" style="margin: 0.45rem 0 0;">Ao criar, o vídeo será preparado automaticamente.</p>
                     </div>
 
                     <div id="audioLibraryContainer" style="display: none;">
@@ -1180,23 +1234,9 @@
                             </div>
 
                             <div id="bgYoutubeContainer" style="display: none;">
-                                <input type="text" id="bgYoutubeUrl" placeholder="URL de fundo do YouTube..." class="input-text" style="margin-bottom: 0.4rem;">
-                                <button type="button" id="btnDownloadBgYoutube" class="btn-secondary" style="width: 100%;">📥 Baixar Fundo</button>
-
-                                <!-- BARRA DE PROGRESSO DEDICADA DE DOWNLOAD DO YOUTUBE (FUNDO) -->
-                                <div id="bgYtProgressBox" style="display: none; margin-top: 0.6rem; background: var(--input-bg); border: 1px solid var(--pink-accent); border-radius: 10px; padding: 0.8rem;">
-                                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.3rem;">
-                                        <span id="bgYtStatusTitle" style="font-size: 0.8rem; font-weight: 600; color: var(--pink-accent);">⏳ Conectando ao YouTube...</span>
-                                        <span id="bgYtStatusPercent" style="font-size: 0.78rem; font-weight: 700; color: var(--text-main);">0%</span>
-                                    </div>
-                                    <div style="width: 100%; height: 6px; background: rgba(255,255,255,0.1); border-radius: 4px; overflow: hidden;">
-                                        <div id="bgYtProgressBar" style="width: 0%; height: 100%; background: linear-gradient(90deg, var(--pink-accent), var(--accent)); transition: width 0.3s ease;"></div>
-                                    </div>
-                                </div>
-
-                                <div id="bgYtSelectedBadge" style="display: none; margin-top: 0.5rem; background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.3); color: #34d399; padding: 0.5rem 0.8rem; border-radius: 8px; font-size: 0.8rem; font-weight: 600; align-items: center; gap: 0.4rem;">
-                                    <span>✓</span> <span id="bgYtSelectedText">Fundo do YouTube baixado e selecionado automaticamente!</span>
-                                </div>
+                                <input type="url" id="bgYoutubeUrl" placeholder="URL de fundo do YouTube..." class="input-text">
+                                <div id="bgYoutubeTitleBadge" class="youtube-identification" aria-live="polite"><span>🎞️</span><span id="bgYoutubeTitleText"></span></div>
+                                <p class="compact-note" style="margin: 0.45rem 0 0;">Ao criar, o fundo será preparado e ficará sem áudio.</p>
                             </div>
 
                             <div id="bgLibraryContainer" style="display: none;">
@@ -1373,6 +1413,13 @@
                 <div class="progress-copy">
                     <p id="statusMessage" style="font-size: 0.9rem; color: var(--text-muted);">Iniciando processamento local...</p>
                     <span id="stageProgressText" class="stage-progress-text"></span>
+                </div>
+
+                <div id="processSummary" class="process-summary" aria-live="polite">
+                    <div class="process-summary-item"><span>🎵</span><span id="processSummaryTitle"></span></div>
+                    <div class="process-summary-item"><span>📝</span><span id="processSummaryLyrics"></span></div>
+                    <div class="process-summary-item"><span>🤖</span><span id="processSummaryModel"></span></div>
+                    <div class="process-summary-item"><span>🖼️</span><span id="processSummaryBackground"></span></div>
                 </div>
 
                 <div class="progress-bar-bg" role="progressbar" aria-label="Progresso geral" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
@@ -1631,23 +1678,43 @@
             <div style="background: var(--input-bg); border: 1px solid var(--glass-border); padding: 1.2rem; border-radius: 12px; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr)); gap: 1rem;">
                 <div>
                     <h4 style="margin: 0 0 0.5rem 0; font-size: 0.9rem; color: var(--text-main);">➕ Música ou vídeo</h4>
-                    <form id="libAudioUploadForm" style="display: flex; gap: 0.5rem; align-items: center;">
-                        <input type="file" id="libAudioFile" accept="audio/*,video/*" style="display: none;">
-                        <div id="libAudioUploadArea" class="btn-secondary" style="flex: 1; text-align: center; cursor: pointer; padding: 0.6rem; font-size: 0.8rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-                            <span id="libAudioFileName">Escolher Arquivo...</span>
-                        </div>
-                        <button type="submit" class="btn-primary" style="width: auto; padding: 0.6rem 1rem; font-size: 0.8rem;">Enviar</button>
-                    </form>
+                    <div class="library-import-stack">
+                        <form id="libAudioUploadForm" style="display: flex; gap: 0.5rem; align-items: center;">
+                            <input type="file" id="libAudioFile" accept="audio/*,video/*" style="display: none;">
+                            <div id="libAudioUploadArea" class="btn-secondary" style="flex: 1; text-align: center; cursor: pointer; padding: 0.6rem; font-size: 0.8rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                                <span id="libAudioFileName">Escolher Arquivo...</span>
+                            </div>
+                            <button type="submit" class="btn-primary" style="width: auto; padding: 0.6rem 1rem; font-size: 0.8rem;">Enviar</button>
+                        </form>
+                        <form id="libAudioYoutubeForm" class="library-youtube-import">
+                            <div class="library-youtube-row">
+                                <input type="url" id="libAudioYoutubeUrl" class="input-text" placeholder="Link do YouTube para guardar">
+                                <button type="button" id="btnLibDownloadYoutube" class="btn-primary">📥 Baixar</button>
+                            </div>
+                            <div id="libAudioYoutubeTitleBadge" class="youtube-identification" aria-live="polite"><span>▶️</span><span id="libAudioYoutubeTitleText"></span></div>
+                            <div id="audioYtProgressBox" class="library-import-progress"><span id="audioYtStatusTitle">Preparando...</span> · <strong id="audioYtStatusPercent">0%</strong></div>
+                        </form>
+                    </div>
                 </div>
                 <div>
                     <h4 style="margin: 0 0 0.5rem 0; font-size: 0.9rem; color: var(--text-main);">🖼️ Fundo</h4>
-                    <form id="libBgUploadForm" style="display: flex; gap: 0.5rem; align-items: center;">
-                        <input type="file" id="libBgFile" accept="image/*,video/*" style="display: none;">
-                        <div id="libBgUploadArea" class="btn-secondary" style="flex: 1; text-align: center; cursor: pointer; padding: 0.6rem; font-size: 0.8rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-                            <span id="libBgFileName">Escolher Fundo...</span>
-                        </div>
-                        <button type="submit" class="btn-primary" style="width: auto; padding: 0.6rem 1rem; font-size: 0.8rem; background: linear-gradient(135deg, #ec4899, #8b5cf6);">Enviar</button>
-                    </form>
+                    <div class="library-import-stack">
+                        <form id="libBgUploadForm" style="display: flex; gap: 0.5rem; align-items: center;">
+                            <input type="file" id="libBgFile" accept="image/*,video/*" style="display: none;">
+                            <div id="libBgUploadArea" class="btn-secondary" style="flex: 1; text-align: center; cursor: pointer; padding: 0.6rem; font-size: 0.8rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                                <span id="libBgFileName">Escolher Fundo...</span>
+                            </div>
+                            <button type="submit" class="btn-primary" style="width: auto; padding: 0.6rem 1rem; font-size: 0.8rem; background: linear-gradient(135deg, #ec4899, #8b5cf6);">Enviar</button>
+                        </form>
+                        <form id="libBgYoutubeForm" class="library-youtube-import">
+                            <div class="library-youtube-row">
+                                <input type="url" id="libBgYoutubeUrl" class="input-text" placeholder="Link do YouTube para usar como fundo">
+                                <button type="button" id="btnLibDownloadBgYoutube" class="btn-primary">📥 Baixar</button>
+                            </div>
+                            <div id="libBgYoutubeTitleBadge" class="youtube-identification" aria-live="polite"><span>🎞️</span><span id="libBgYoutubeTitleText"></span></div>
+                            <div id="bgYtProgressBox" class="library-import-progress"><span id="bgYtStatusTitle">Preparando...</span> · <strong id="bgYtStatusPercent">0%</strong></div>
+                        </form>
+                    </div>
                 </div>
             </div>
 
@@ -1684,7 +1751,7 @@
 
         <!-- RODAPÉ DISCRETO DA PÁGINA -->
         <footer>
-            Sal0 Karaokê v5.4.0
+            Sal0 Karaokê v5.4.1
         </footer>
 
     </div> <!-- Container End -->
@@ -1781,6 +1848,7 @@
         let easyModeConfig = null;
         let currentCreatorMode = 'advanced';
         let easyAudioMode = 'upload';
+        let clientPreparationInProgress = false;
 
         function escapeHtml(value) {
             return String(value ?? '').replace(/[&<>'"]/g, char => ({
@@ -1926,25 +1994,173 @@
             });
         }
 
-        async function prepareEasyYoutubeBackground(url) {
-            const startResponse = await authFetch('/api/download-bg-youtube-preset', {
+        const youtubeMetadataCache = new Map();
+        const youtubeTitleTimers = new Map();
+
+        async function fetchYoutubeMetadata(url) {
+            const normalizedUrl = String(url || '').trim();
+            if (!normalizedUrl) throw new Error('Cole um link do YouTube.');
+            if (youtubeMetadataCache.has(normalizedUrl)) return youtubeMetadataCache.get(normalizedUrl);
+            const request = authFetch('/api/youtube/metadata', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ youtube_url: normalizedUrl })
+            }).then(async response => {
+                const payload = await response.json().catch(() => ({}));
+                if (!response.ok) throw new Error(payload.detail || 'Não foi possível identificar o vídeo.');
+                return payload;
+            }).catch(error => {
+                youtubeMetadataCache.delete(normalizedUrl);
+                throw error;
+            });
+            youtubeMetadataCache.set(normalizedUrl, request);
+            return request;
+        }
+
+        function setYoutubeIdentification(input, badge, text, message, isError = false) {
+            if (!badge || !text) return;
+            if (!message) {
+                badge.style.display = 'none';
+                badge.classList.remove('is-error');
+                text.textContent = '';
+                if (input) delete input.dataset.youtubeTitle;
+                return;
+            }
+            badge.style.display = 'flex';
+            badge.classList.toggle('is-error', isError);
+            text.textContent = message;
+        }
+
+        function attachYoutubeIdentification(inputId, badgeId, textId) {
+            const input = document.getElementById(inputId);
+            const badge = document.getElementById(badgeId);
+            const text = document.getElementById(textId);
+            if (!input || !badge || !text) return;
+
+            const identify = () => {
+                const url = input.value.trim();
+                if (youtubeTitleTimers.has(inputId)) clearTimeout(youtubeTitleTimers.get(inputId));
+                if (!url) {
+                    setYoutubeIdentification(input, badge, text, '');
+                    return;
+                }
+                delete input.dataset.youtubeTitle;
+                setYoutubeIdentification(input, badge, text, 'Identificando o vídeo...');
+                if (!/^https?:\/\//i.test(url)) return;
+                const timer = setTimeout(async () => {
+                    try {
+                        const metadata = await fetchYoutubeMetadata(url);
+                        if (input.value.trim() !== url) return;
+                        input.dataset.youtubeTitle = metadata.title || '';
+                        setYoutubeIdentification(input, badge, text, `Vídeo: ${metadata.title}`);
+                    } catch (error) {
+                        if (input.value.trim() !== url) return;
+                        setYoutubeIdentification(input, badge, text, 'Não consegui identificar o título agora.', true);
+                    }
+                }, 500);
+                youtubeTitleTimers.set(inputId, timer);
+            };
+            input.addEventListener('input', identify);
+            input.addEventListener('change', identify);
+        }
+
+        async function importYoutubeToLibrary(url, kind, onStatus = () => {}) {
+            const isBackground = kind === 'background';
+            const startResponse = await authFetch(isBackground ? '/api/download-bg-youtube-preset' : '/api/download-youtube-preset', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ youtube_url: url })
             });
             if (!startResponse.ok) {
                 const error = await startResponse.json().catch(() => ({}));
-                throw new Error(error.detail || 'Não foi possível baixar o fundo do YouTube.');
+                throw new Error(error.detail || 'Não foi possível iniciar o download do YouTube.');
             }
             for (let attempt = 0; attempt < 600; attempt += 1) {
                 await new Promise(resolve => setTimeout(resolve, 1000));
-                const statusResponse = await authFetch('/api/youtube-preset-status/bg');
+                const statusResponse = await authFetch(isBackground ? '/api/youtube-preset-status/bg' : '/api/youtube-preset-status/audio');
                 if (!statusResponse.ok) continue;
                 const status = await statusResponse.json();
-                if (status.status === 'done' && status.filename) return status.filename;
-                if (status.status === 'error') throw new Error(status.error || 'Falha no vídeo de fundo.');
+                onStatus(status);
+                if (status.status === 'done' && status.filename) return status;
+                if (status.status === 'error') throw new Error(status.error || 'Falha ao baixar o vídeo.');
             }
-            throw new Error('O download do fundo demorou mais que o esperado.');
+            throw new Error('O download demorou mais que o esperado.');
+        }
+
+        async function prepareYoutubeBackground(url, onStatus = () => {}) {
+            const status = await importYoutubeToLibrary(url, 'background', onStatus);
+            return status.filename;
+        }
+
+        function renderProcessSummary(summary = {}) {
+            const container = document.getElementById('processSummary');
+            if (!container) return;
+            const values = {
+                processSummaryTitle: summary.title || '',
+                processSummaryLyrics: summary.lyrics || '',
+                processSummaryModel: [summary.mode, summary.model].filter(Boolean).join(' · '),
+                processSummaryBackground: summary.background || '',
+            };
+            let visibleItems = 0;
+            Object.entries(values).forEach(([id, value]) => {
+                const element = document.getElementById(id);
+                const item = element?.closest('.process-summary-item');
+                if (element) element.textContent = value;
+                if (item) item.style.display = value ? 'flex' : 'none';
+                if (value) visibleItems += 1;
+            });
+            container.style.display = visibleItems ? 'grid' : 'none';
+        }
+
+        function selectedOptionText(id) {
+            const select = document.getElementById(id);
+            return select?.selectedOptions?.[0]?.textContent?.trim() || select?.value || '';
+        }
+
+        function buildClientProcessSummary(easyMode = false) {
+            let title = '';
+            let lyrics = '';
+            let model = '';
+            let mode = easyMode ? 'Modo Fácil' : 'Modo Completo';
+            let background = '';
+
+            if (easyMode) {
+                if (easyAudioMode === 'youtube') {
+                    const input = document.getElementById('easyYoutubeUrl');
+                    title = input?.dataset.youtubeTitle || 'Vídeo do YouTube';
+                } else if (easyAudioMode === 'library') {
+                    title = selectedOptionText('easyLibraryAudio');
+                } else {
+                    title = document.getElementById('easyAudioFile')?.files?.[0]?.name || '';
+                }
+                const config = easyModeConfig || {};
+                model = config.whisper_model || 'Large V3 Turbo';
+                lyrics = config.lyrics_mode === 'auto' ? 'Buscando letra-guia' : 'Somente Whisper';
+                const bgType = document.getElementById('easyBackgroundType')?.value || 'original';
+                if (bgType === 'youtube') {
+                    const input = document.getElementById('easyBgYoutubeUrl');
+                    background = input?.dataset.youtubeTitle || 'Fundo do YouTube';
+                } else if (bgType === 'library') background = selectedOptionText('easyLibraryBg');
+                else if (bgType === 'upload') background = document.getElementById('easyBgFile')?.files?.[0]?.name || 'Fundo enviado';
+                else background = bgType === 'color' ? 'Cor sólida' : 'Vídeo original';
+            } else {
+                if (document.getElementById('btnAudioModeYoutube')?.classList.contains('active')) {
+                    const input = document.getElementById('youtubeUrl');
+                    title = input?.dataset.youtubeTitle || 'Vídeo do YouTube';
+                } else if (document.getElementById('btnAudioModeLibrary')?.classList.contains('active')) {
+                    title = selectedOptionText('libraryAudioSelect');
+                } else title = document.getElementById('audioFile')?.files?.[0]?.name || 'Mídia em cache';
+                const lyricsModeValue = document.getElementById('lyricsMode')?.value || 'auto';
+                const manualLyrics = document.getElementById('lyricsText')?.value.trim();
+                lyrics = lyricsModeValue === 'auto' ? 'Buscando letra-guia' : (manualLyrics ? 'Letra manual + Whisper' : 'Somente Whisper');
+                model = selectedOptionText('whisperModel');
+                if (document.getElementById('btnBgModeYoutube')?.classList.contains('active')) {
+                    const input = document.getElementById('bgYoutubeUrl');
+                    background = input?.dataset.youtubeTitle || 'Fundo do YouTube';
+                } else if (document.getElementById('btnBgModeLibrary')?.classList.contains('active')) background = selectedOptionText('libraryBgSelect');
+                else background = document.getElementById('bgFile')?.files?.[0]?.name || selectedOptionText('backgroundMode') || 'Visual padrão';
+            }
+            return { title, lyrics, model, mode, background };
         }
 
         // GERENCIAMENTO DE TEMA (ESCURO COMO PADRÃO)
@@ -2620,7 +2836,18 @@
                 }
 
                 const backgroundType = document.getElementById('easyBackgroundType')?.value || 'original';
+                clientPreparationInProgress = true;
                 if (button) { button.disabled = true; button.textContent = backgroundType === 'youtube' ? 'Baixando fundo...' : 'Iniciando...'; }
+                const processCard = document.getElementById('processCard');
+                if (processCard) processCard.style.display = 'block';
+                renderProcessSummary(buildClientProcessSummary(true));
+                const progress = document.getElementById('progressBarFill');
+                const percent = document.getElementById('progressPercent');
+                const status = document.getElementById('statusMessage');
+                if (progress) progress.style.width = '0%';
+                if (percent) percent.textContent = '0%';
+                if (status) status.textContent = backgroundType === 'youtube' ? 'Preparando o fundo do YouTube...' : 'Preparando a criação fácil...';
+                updateTimelineUI('Uploading');
                 try {
                     if (backgroundType === 'upload') {
                         const file = document.getElementById('easyBgFile')?.files?.[0];
@@ -2633,28 +2860,25 @@
                     } else if (backgroundType === 'youtube') {
                         const url = document.getElementById('easyBgYoutubeUrl')?.value.trim();
                         if (!url) throw new Error('Cole o link do vídeo de fundo.');
-                        const filename = await prepareEasyYoutubeBackground(url);
+                        const filename = await prepareYoutubeBackground(url, current => {
+                            if (status) status.textContent = `Preparando fundo: ${current.title || 'vídeo do YouTube'}...`;
+                        });
                         formData.set('library_bg', filename);
                     }
 
                     if (button) button.textContent = 'Preparando a criação...';
-                    const processCard = document.getElementById('processCard');
-                    if (processCard) processCard.style.display = 'block';
-                    const progress = document.getElementById('progressBarFill');
-                    const percent = document.getElementById('progressPercent');
-                    const status = document.getElementById('statusMessage');
-                    if (progress) progress.style.width = '0%';
-                    if (percent) percent.textContent = '0%';
                     if (status) status.textContent = 'Preparando a criação fácil...';
-                    updateTimelineUI('Uploading');
 
                     const response = await authFetch('/api/process', { method: 'POST', body: formData });
                     const result = await response.json().catch(() => ({}));
                     if (!response.ok) throw new Error(result.detail || 'Não foi possível iniciar a criação.');
+                    clientPreparationInProgress = false;
                     startPolling();
                 } catch (error) {
+                    clientPreparationInProgress = false;
                     alert('Erro no Modo Fácil: ' + error.message);
                     if (button) { button.disabled = false; button.textContent = '✨ Criar meu karaokê'; }
+                    if (processCard) processCard.style.display = 'none';
                 }
             });
 
@@ -2910,21 +3134,21 @@
                 };
             }
 
-            // Downloads Independentes do YouTube (Formulário permanece visível com progresso dedicado)
+            // Importações do YouTube pertencem à Biblioteca e têm progresso próprio.
             let audioYtPollInterval = null;
             let bgYtPollInterval = null;
 
-            const btnDownloadYoutube = document.getElementById('btnDownloadYoutube');
+            const btnDownloadYoutube = document.getElementById('btnLibDownloadYoutube');
             if (btnDownloadYoutube) {
                 btnDownloadYoutube.onclick = async () => {
-                    const urlInput = document.getElementById('youtubeUrl');
+                    const urlInput = document.getElementById('libAudioYoutubeUrl');
                     const url = urlInput ? urlInput.value.trim() : '';
                     if (!url) { alert("Digite a URL do vídeo do YouTube."); return; }
 
                     btnDownloadYoutube.disabled = true;
                     btnDownloadYoutube.innerText = "⏳ Baixando no Servidor...";
 
-                    const progressBox = document.getElementById('audioYoutubeProgressBox');
+                    const progressBox = document.getElementById('audioYtProgressBox');
                     const statusTitle = document.getElementById('audioYtStatusTitle');
                     const statusPercent = document.getElementById('audioYtStatusPercent');
                     const progressBar = document.getElementById('audioYtProgressBar');
@@ -2962,16 +3186,10 @@
                                         btnDownloadYoutube.disabled = false;
                                         btnDownloadYoutube.innerText = "📥 Baixar";
 
-                                        // Recarregar biblioteca e selecionar automaticamente a mídia baixada
+                                        // Recarregar a biblioteca sem alterar a criação em andamento.
                                         await loadLibrary();
-                                        const hiddenLib = document.getElementById('libraryAudioHidden');
-                                        const selectAudio = document.getElementById('libraryAudioSelect');
-                                        if (hiddenLib) hiddenLib.value = stData.filename;
-                                        if (selectAudio) selectAudio.value = stData.filename;
-                                        if (selectAudio) selectAudio.dispatchEvent(new Event('change'));
-
-                                        if (selectedBadge) selectedBadge.style.display = "flex";
-                                        if (selectedText) selectedText.innerText = `✓ Mídia baixada e selecionada automaticamente: "${stData.filename}"`;
+                                        if (selectedBadge) selectedBadge.style.display = "none";
+                                        if (selectedText) selectedText.innerText = `✓ Mídia guardada: "${stData.filename}"`;
                                     } else if (stData.status === "error") {
                                         clearInterval(audioYtPollInterval);
                                         if (progressBox) progressBox.style.display = "none";
@@ -2990,19 +3208,23 @@
                         alert("Erro: " + e.message);
                     }
                 };
+                document.getElementById('libAudioYoutubeForm')?.addEventListener('submit', event => {
+                    event.preventDefault();
+                    btnDownloadYoutube.click();
+                });
             }
 
-            const btnDownloadBgYoutube = document.getElementById('btnDownloadBgYoutube');
+            const btnDownloadBgYoutube = document.getElementById('btnLibDownloadBgYoutube');
             if (btnDownloadBgYoutube) {
                 btnDownloadBgYoutube.onclick = async () => {
-                    const urlInput = document.getElementById('bgYoutubeUrl');
+                    const urlInput = document.getElementById('libBgYoutubeUrl');
                     const url = urlInput ? urlInput.value.trim() : '';
                     if (!url) { alert("Digite a URL do YouTube de Fundo."); return; }
 
                     btnDownloadBgYoutube.disabled = true;
                     btnDownloadBgYoutube.innerText = "⏳ Baixando Fundo no Servidor...";
 
-                    const progressBox = document.getElementById('bgYoutubeProgressBox');
+                    const progressBox = document.getElementById('bgYtProgressBox');
                     const statusTitle = document.getElementById('bgYtStatusTitle');
                     const statusPercent = document.getElementById('bgYtStatusPercent');
                     const progressBar = document.getElementById('bgYtProgressBar');
@@ -3040,15 +3262,10 @@
                                         btnDownloadBgYoutube.disabled = false;
                                         btnDownloadBgYoutube.innerText = "📥 Baixar Fundo";
 
-                                        // Recarregar biblioteca e selecionar automaticamente o fundo baixado
+                                        // Recarregar a biblioteca sem alterar o fundo da criação atual.
                                         await loadLibrary();
-                                        const hiddenBg = document.getElementById('libraryBgHidden');
-                                        const selectBg = document.getElementById('libraryBgSelect');
-                                        if (hiddenBg) hiddenBg.value = stData.filename;
-                                        if (selectBg) selectBg.value = stData.filename;
-
-                                        if (selectedBadge) selectedBadge.style.display = "flex";
-                                        if (selectedText) selectedText.innerText = `✓ Fundo baixado e selecionado automaticamente: "${stData.filename}"`;
+                                        if (selectedBadge) selectedBadge.style.display = "none";
+                                        if (selectedText) selectedText.innerText = `✓ Fundo guardado: "${stData.filename}"`;
                                     } else if (stData.status === "error") {
                                         clearInterval(bgYtPollInterval);
                                         if (progressBox) progressBox.style.display = "none";
@@ -3067,6 +3284,10 @@
                         alert("Erro: " + e.message);
                     }
                 };
+                document.getElementById('libBgYoutubeForm')?.addEventListener('submit', event => {
+                    event.preventDefault();
+                    btnDownloadBgYoutube.click();
+                });
             }
 
             // Cancelar Processamento
@@ -3093,20 +3314,13 @@
             // Download Result
             const btnDownloadResult = document.getElementById('btnDownloadResult');
             if (btnDownloadResult) {
-                btnDownloadResult.onclick = async () => {
-                    try {
-                        const res = await authFetch('/api/download');
-                        if (!res.ok) throw new Error("Erro no download.");
-                        const blob = await res.blob();
-                        const url = window.URL.createObjectURL(blob);
-                        const a = document.createElement('a');
-                        a.href = url;
-                        a.download = 'sal0_karaoke_video_final.mp4';
-                        document.body.appendChild(a);
-                        a.click();
-                        a.remove();
-                        window.URL.revokeObjectURL(url);
-                    } catch (e) { alert("Erro ao baixar: " + e.message); }
+                btnDownloadResult.onclick = () => {
+                    const link = document.createElement('a');
+                    link.href = `/api/download?token=${encodeURIComponent(authToken)}&t=${Date.now()}`;
+                    link.rel = 'noopener';
+                    document.body.appendChild(link);
+                    link.click();
+                    link.remove();
                 };
             }
 
@@ -3408,14 +3622,7 @@
 
                 try {
                     await authFetch('/api/lyrics', { method: 'DELETE', signal });
-                    const response = await authFetch('/api/youtube/metadata', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        signal,
-                        body: JSON.stringify({ youtube_url: url })
-                    });
-                    const payload = await response.json();
-                    if (!response.ok) throw new Error(payload.detail || 'Não foi possível identificar o vídeo.');
+                    const payload = await fetchYoutubeMetadata(url);
                     if (generation !== lyricsLookupGeneration || signal.aborted) return;
 
                     const title = String(payload.lyrics_query || payload.title || '').trim();
@@ -3792,6 +3999,15 @@
             const isAuthenticated = await checkAuth();
             if (!isAuthenticated) return;
 
+            [
+                ['youtubeUrl', 'youtubeTitleBadge', 'youtubeTitleText'],
+                ['bgYoutubeUrl', 'bgYoutubeTitleBadge', 'bgYoutubeTitleText'],
+                ['easyYoutubeUrl', 'easyYoutubeTitleBadge', 'easyYoutubeTitleText'],
+                ['easyBgYoutubeUrl', 'easyBgYoutubeTitleBadge', 'easyBgYoutubeTitleText'],
+                ['libAudioYoutubeUrl', 'libAudioYoutubeTitleBadge', 'libAudioYoutubeTitleText'],
+                ['libBgYoutubeUrl', 'libBgYoutubeTitleBadge', 'libBgYoutubeTitleText'],
+            ].forEach(args => attachYoutubeIdentification(...args));
+
             // CARREGAR DADOS SALVOS NO SERVIDOR
             await fetchEasyModeConfig();
             await fetchTelegramConfig();
@@ -3843,6 +4059,7 @@
                 const processCard = document.getElementById('processCard');
 
                 btnSubmit.disabled = true;
+                clientPreparationInProgress = true;
                 btnSubmit.innerHTML = '<span>⏳</span> Iniciando Produção...';
                 processCard.style.display = 'block';
                 const initialProgress = document.getElementById('progressBarFill');
@@ -3857,20 +4074,55 @@
                 if (initialStatus) initialStatus.textContent = 'Preparando a criação...';
                 if (initialStage) initialStage.textContent = '';
                 updateTimelineUI('Uploading');
+                renderProcessSummary(buildClientProcessSummary(false));
 
                 const formData = new FormData(karaokêForm);
                 formData.set('app_base_url', window.location.origin);
                 try {
+                    const youtubeAudioActive = document.getElementById('btnAudioModeYoutube')?.classList.contains('active');
+                    const libraryAudioActive = document.getElementById('btnAudioModeLibrary')?.classList.contains('active');
+                    if (youtubeAudioActive) {
+                        formData.delete('audio_file');
+                        formData.delete('library_audio');
+                    } else if (libraryAudioActive) {
+                        formData.delete('audio_file');
+                        formData.delete('youtube_url');
+                    } else {
+                        formData.delete('youtube_url');
+                        formData.delete('library_audio');
+                    }
+
+                    const youtubeBackgroundActive = document.getElementById('btnBgModeYoutube')?.classList.contains('active');
+                    const libraryBackgroundActive = document.getElementById('btnBgModeLibrary')?.classList.contains('active');
+                    if (youtubeBackgroundActive) {
+                        const backgroundUrl = document.getElementById('bgYoutubeUrl')?.value.trim();
+                        if (!backgroundUrl) throw new Error('Cole o link do vídeo de fundo.');
+                        formData.delete('bg_file');
+                        btnSubmit.innerHTML = '<span>⏳</span> Preparando Fundo...';
+                        if (initialStatus) initialStatus.textContent = 'Preparando o fundo do YouTube...';
+                        const filename = await prepareYoutubeBackground(backgroundUrl, current => {
+                            if (initialStatus) initialStatus.textContent = `Preparando fundo: ${current.title || 'vídeo do YouTube'}...`;
+                        });
+                        formData.set('library_bg', filename);
+                    } else if (libraryBackgroundActive) {
+                        formData.delete('bg_file');
+                    } else {
+                        formData.delete('library_bg');
+                    }
+                    if (initialStatus) initialStatus.textContent = 'Preparando a criação...';
                     const res = await authFetch('/api/process', { method: 'POST', body: formData });
                     if (!res.ok) {
                         const err = await res.json();
                         throw new Error(err.detail || "Erro ao iniciar produção.");
                     }
+                    clientPreparationInProgress = false;
                     startPolling();
                 } catch (err) {
+                    clientPreparationInProgress = false;
                     alert("Erro ao enviar: " + err.message);
                     btnSubmit.disabled = false;
                     btnSubmit.innerHTML = '🎬 Criar Karaokê';
+                    processCard.style.display = 'none';
                 }
             });
         }
@@ -4330,7 +4582,11 @@
                     button.style.display = data.can_cancel ? '' : 'none';
                 });
 
+                if (clientPreparationInProgress && ['idle', 'done', 'error'].includes(data.status)) return;
+
                 if (data.status === "busy") {
+                    clientPreparationInProgress = false;
+                    renderProcessSummary({});
                     setCreatorMode(currentCreatorMode);
                     if (correctionCard) correctionCard.style.display = 'none';
                     if (processCard) processCard.style.display = 'block';
@@ -4342,6 +4598,7 @@
                     if (easySubmitBtn) { easySubmitBtn.disabled = true; easySubmitBtn.innerHTML = '⏳ Servidor ocupado'; }
                     if (downloadBox) downloadBox.style.display = 'none';
                 } else if (data.status === "processing" || data.status === "downloading") {
+                    clientPreparationInProgress = false;
                     // TRAVA DE PROCESSO ÚNICO: Ocultar o formulário enquanto houver processo ativo
                     if (formCard) formCard.style.display = "none";
                     if (easyForm) easyForm.style.display = "none";
@@ -4366,6 +4623,8 @@
                     }
                     if (btnSubmit) btnSubmit.disabled = true;
                     if (easySubmitBtn) easySubmitBtn.disabled = true;
+
+                    renderProcessSummary(data.process_summary || {});
 
                     updateTimelineUI(data.step || "");
                 } else if (data.status === "waiting_for_user_correction" || data.status === "awaiting_review") {

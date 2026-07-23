@@ -67,14 +67,15 @@ jobs:
           body: |
             ## 🚀 Sal0 Karaoke v${{ env.VERSION_TAG }}
 
-            O Modo Fácil agora é simples para quem usa e completo para quem administra.
+            O YouTube agora entra direto no fluxo de criação, sem etapas soltas no caminho.
 
             ### ✨ Nesta versão
-            * **Modo Completo** é a primeira aba do administrador; **Modo Fácil** é a primeira aba dos usuários comuns.
-            * O administrador pode definir todas as opções técnicas do Modo Fácil em um perfil global organizado por seções.
-            * Os padrões atuais — Large V3 Turbo, Voz difícil, fonte 50 e áudio original — foram preservados.
-            * Nova tela guiada com identidade visual completa, etapas claras, ícones e resumo do perfil aplicado.
-            * Música e fundo continuam aceitando upload, Biblioteca e YouTube sem expor configurações técnicas ao usuário comum.
+            * Música e fundo do YouTube são preparados automaticamente ao clicar em criar, tanto no Modo Fácil quanto no Completo.
+            * Todo link do YouTube mostra o nome do vídeo identificado na própria interface.
+            * A Biblioteca ganhou importação direta do YouTube para músicas, vídeos e fundos, ao lado do upload de arquivos.
+            * A tela **Produzindo** mostra um resumo compacto da faixa, letra-guia, modelo, modo e fundo em uso.
+            * O download final foi corrigido e agora usa o nome original da música seguido de **Karaokê**.
+            * O processamento de áudio, separação, transcrição, sincronização e renderização continua local.
 
             ### 🐋 Como executar esta versão:
             No seu `docker-compose.yml`, você pode travar a versão alterando a linha da imagem para:

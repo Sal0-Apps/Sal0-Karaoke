@@ -301,7 +301,8 @@ state = {
     "owner_username": None,
     "owner_role": None,
     "history_filename": None,
-    "public_download_token": None
+    "public_download_token": None,
+    "process_summary": {}
 }
 
 # Evento global para pausar e continuar o processamento (revisão de legenda)
@@ -432,7 +433,8 @@ def update_state(
     history_filename: str = None,
     public_download_token: str = None,
     stage_progress: int | None = None,
-    stage_detail: str = ""
+    stage_detail: str = "",
+    process_summary: dict | None = None
 ):
     """Atualiza o estado global da aplicação de forma thread-safe e persiste no disco."""
     with state_lock:
@@ -455,6 +457,8 @@ def update_state(
             state["history_filename"] = history_filename
         if public_download_token is not None:
             state["public_download_token"] = public_download_token
+        if process_summary is not None:
+            state["process_summary"] = dict(process_summary)
 
         try:
             os.makedirs(os.path.dirname(STATE_FILE), exist_ok=True)
@@ -463,6 +467,20 @@ def update_state(
                 json.dump(state, f, indent=4)
         except Exception as e:
             logger.error(f"Erro ao salvar estado no disco: {e}")
+
+
+def update_process_summary(**changes):
+    """Atualiza apenas o resumo curto exibido durante a produção."""
+    with state_lock:
+        summary = dict(state.get("process_summary") or {})
+        summary.update({key: value for key, value in changes.items() if value is not None})
+        state["process_summary"] = summary
+        try:
+            os.makedirs(os.path.dirname(STATE_FILE), exist_ok=True)
+            with open(STATE_FILE, "w", encoding="utf-8") as f:
+                json.dump(state, f, indent=4, ensure_ascii=False)
+        except Exception as e:
+            logger.error(f"Erro ao salvar resumo do processamento: {e}")
 
 @app.on_event("startup")
 def startup_event():
@@ -504,6 +522,20 @@ def startup_event():
             logger.error(f"Erro ao carregar estado inicial no startup: {e}")
 
 
+def karaoke_download_filename(original_name: str) -> str:
+    """Monta um nome portátil preservando o título original da música."""
+    raw_name = str(original_name or "").strip()
+    root, extension = os.path.splitext(raw_name)
+    if extension.lower() in {".mp3", ".wav", ".flac", ".m4a", ".aac", ".ogg", ".mp4", ".mkv", ".avi", ".mov", ".webm"}:
+        raw_name = root
+    safe_name = re.sub(r'[\x00-\x1f<>:"/\\|?*]', "", raw_name)
+    safe_name = re.sub(r"\s+", " ", safe_name).strip(" ._-") or "Sal0 Karaokê"
+    safe_name = safe_name[:180].rstrip(" ._-")
+    if safe_name.casefold().endswith(" - karaokê") or safe_name.casefold().endswith(" - karaoke"):
+        return f"{safe_name}.mp4"
+    return f"{safe_name} - Karaokê.mp4"
+
+
 def save_video_to_history(video_path: str, orig_name: str, library_dir: str) -> str:
     """Salva uma cópia permanente no histórico do dono da tarefa."""
     if not video_path or not os.path.exists(video_path):
@@ -511,17 +543,13 @@ def save_video_to_history(video_path: str, orig_name: str, library_dir: str) -> 
     try:
         lib_history_dir = os.path.join(library_dir, "history")
         os.makedirs(lib_history_dir, exist_ok=True)
-        safe_name = "".join([c for c in orig_name if c.isalnum() or c in ' ._-']).strip() or "video_karaoke"
-        if not safe_name.lower().endswith(".mp4"):
-            dest_filename = f"{safe_name}.mp4"
-        else:
-            dest_filename = safe_name
-            safe_name = os.path.splitext(safe_name)[0]
+        dest_filename = karaoke_download_filename(orig_name)
+        safe_name = os.path.splitext(dest_filename)[0]
 
         dest_path = os.path.join(lib_history_dir, dest_filename)
         counter = 1
         while os.path.exists(dest_path):
-            dest_filename = f"{safe_name}_{counter}.mp4"
+            dest_filename = f"{safe_name} ({counter}).mp4"
             dest_path = os.path.join(lib_history_dir, dest_filename)
             counter += 1
 
@@ -1238,6 +1266,9 @@ def download_youtube_preset(
     if not url:
         raise HTTPException(status_code=400, detail="URL do YouTube vazia.")
 
+    yt_preset_statuses[youtube_status_key(current_user, "audio")] = {
+        "status": "starting", "progress": 5, "title": "Identificando vídeo...", "filename": "", "error": None
+    }
     threading.Thread(target=run_youtube_download_bg, args=(url, dict(current_user)), daemon=True).start()
     return {"status": "started"}
 
@@ -1257,12 +1288,15 @@ def download_bg_youtube_preset(
     if not url:
         raise HTTPException(status_code=400, detail="URL do YouTube vazia.")
 
+    yt_preset_statuses[youtube_status_key(current_user, "background")] = {
+        "status": "starting", "progress": 5, "title": "Identificando vídeo...", "filename": "", "error": None
+    }
     threading.Thread(target=run_bg_youtube_download_bg, args=(url, dict(current_user)), daemon=True).start()
     return {"status": "started"}
 
 
 LRCLIB_API_URL = "https://lrclib.net/api"
-LRCLIB_USER_AGENT = "Sal0-Karaoke/5.4.0 (+https://github.com/Sal0-Apps/Sal0-Karaoke)"
+LRCLIB_USER_AGENT = "Sal0-Karaoke/5.4.1 (+https://github.com/Sal0-Apps/Sal0-Karaoke)"
 LYRICS_OVH_API_URL = "https://api.lyrics.ovh/v1"
 LYRICS_PROVIDER_TIMEOUT = (3.05, 6)
 MUSIXMATCH_API_URL = "https://apic-desktop.musixmatch.com/ws/1.1"
@@ -1690,7 +1724,7 @@ def delete_lyrics_server(current_user: dict = Depends(get_current_user)):
 
 
 
-# Sistema de Logs de Diagnóstico v5.4.0
+# Sistema de Logs de Diagnóstico v5.4.1
 DIAGNOSTIC_LOG_FILE = "/data/output/app_diagnostic.log"
 
 def log_diagnostic(message: str, level: str = "INFO"):
@@ -1726,7 +1760,7 @@ def download_diagnostic_logs(current_user: dict = Depends(get_current_user)):
     with state_lock:
         current_state = dict(state)
     report = "\n".join([
-        "Sal0 Karaokê v5.4.0 — diagnóstico ao vivo",
+        "Sal0 Karaokê v5.4.1 — diagnóstico ao vivo",
         f"Gerado em: {time.strftime('%Y-%m-%d %H:%M:%S')}",
         "",
         "=== ESTADO ATUAL ===",
@@ -3150,13 +3184,47 @@ def process_karaoke(
                 if not os.path.exists(input_bg_path):
                     input_bg_path = None
 
+    model_labels = {
+        "large-v3-turbo": "Large V3 Turbo",
+        "large-v3": "Large V3",
+        "medium": "Medium",
+        "small": "Small",
+        "tiny": "Tiny",
+    }
+    if lyrics_mode == "auto":
+        lyrics_summary = "Buscando letra-guia"
+    elif (lyrics_text or "").strip():
+        lyrics_summary = "Letra manual + Whisper"
+    else:
+        lyrics_summary = "Somente Whisper"
+
+    if library_bg:
+        background_summary = os.path.splitext(os.path.basename(library_bg))[0].replace("_sem_audio", "")
+    elif bg_file and bg_file.filename:
+        background_summary = os.path.splitext(bg_file.filename)[0]
+    elif background_mode == "original":
+        background_summary = "Vídeo original"
+    elif background_mode == "color":
+        background_summary = "Cor sólida"
+    else:
+        background_summary = "Visual padrão"
+
+    process_summary = {
+        "title": orig_name,
+        "lyrics": lyrics_summary,
+        "model": model_labels.get(whisper_model, whisper_model),
+        "mode": "Modo Fácil" if easy_mode else "Modo Completo",
+        "background": background_summary,
+    }
+
     update_state(
         "processing",
         "Uploading",
         5,
         original_filename=orig_name,
         owner_username=current_user.get("username"),
-        owner_role=current_user.get("role")
+        owner_role=current_user.get("role"),
+        process_summary=process_summary
     )
 
     background_tasks.add_task(
@@ -3447,6 +3515,7 @@ def run_pipeline(
             auto_lyrics, auto_match = find_lyrics_automatically(orig_name)
             if auto_lyrics:
                 lyrics_text = auto_lyrics
+                update_process_summary(lyrics="Letra-guia + Whisper")
                 cached_meta["lyrics_text"] = auto_lyrics
                 try:
                     with open(cache_meta_file, "w", encoding="utf-8") as f:
@@ -3461,6 +3530,7 @@ def run_pipeline(
                 except Exception as save_error:
                     logger.warning("A letra automática foi encontrada, mas não pôde ser salva: %s", save_error)
             else:
+                update_process_summary(lyrics="Somente Whisper")
                 logger.info("Seguindo sem letra guia automática para '%s'.", orig_name)
 
         # Invalidação Inteligente de Cache: comparar o hash/tamanho do arquivo de entrada atual com o cache
@@ -3795,7 +3865,7 @@ def download_file(
                 orig_name = json.load(file).get("original_filename", "final")
         except Exception:
             pass
-    download_name = f"{orig_name}_karaokê.mp4"
+    download_name = karaoke_download_filename(orig_name)
     if inline:
         return inline_file_response(file_path, "video/mp4", request)
     return FileResponse(
