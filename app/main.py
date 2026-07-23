@@ -682,10 +682,23 @@ EASY_MODE_DEFAULTS = {
     "enabled": True,
     "whisper_model": "large-v3-turbo",
     "font_size": 50,
+    "text_color": "#00FFFF",
+    "text_position": "bottom",
+    "subtitle_mode": "syllable",
+    "words_per_line": 0,
+    "max_chars_line": 0,
+    "break_on_punctuation": True,
+    "enable_vad": False,
     "transcription_preset": "difficult",
+    "background_mode": "original",
     "transcribe_source": "original",
     "show_next_line_preview": True,
     "show_instrumental": True,
+    "lyrics_mode": "auto",
+    "enable_correction": False,
+    "keep_first_line_visible": False,
+    "save_to_library": True,
+    "only_remove_vocals": False,
 }
 
 
@@ -693,10 +706,23 @@ class EasyModeModel(BaseModel):
     enabled: bool = True
     whisper_model: str = "large-v3-turbo"
     font_size: int = 50
+    text_color: str = "#00FFFF"
+    text_position: str = "bottom"
+    subtitle_mode: str = "syllable"
+    words_per_line: int = 0
+    max_chars_line: int = 0
+    break_on_punctuation: bool = True
+    enable_vad: bool = False
     transcription_preset: str = "difficult"
+    background_mode: str = "original"
     transcribe_source: str = "original"
     show_next_line_preview: bool = True
     show_instrumental: bool = True
+    lyrics_mode: str = "auto"
+    enable_correction: bool = False
+    keep_first_line_visible: bool = False
+    save_to_library: bool = True
+    only_remove_vocals: bool = False
 
 
 def normalize_easy_mode_config(config: dict | None = None) -> dict:
@@ -707,10 +733,25 @@ def normalize_easy_mode_config(config: dict | None = None) -> dict:
         normalized["transcription_preset"] = EASY_MODE_DEFAULTS["transcription_preset"]
     if normalized["transcribe_source"] not in {"original", "vocals"}:
         normalized["transcribe_source"] = EASY_MODE_DEFAULTS["transcribe_source"]
+    if normalized["text_position"] not in {"bottom", "middle", "top"}:
+        normalized["text_position"] = EASY_MODE_DEFAULTS["text_position"]
+    if normalized["subtitle_mode"] not in {"syllable", "word", "line", "phrase"}:
+        normalized["subtitle_mode"] = EASY_MODE_DEFAULTS["subtitle_mode"]
+    if normalized["background_mode"] not in {"original", "image", "color"}:
+        normalized["background_mode"] = EASY_MODE_DEFAULTS["background_mode"]
+    if normalized["lyrics_mode"] not in {"auto", "manual"}:
+        normalized["lyrics_mode"] = EASY_MODE_DEFAULTS["lyrics_mode"]
+    if not re.fullmatch(r"#[0-9A-Fa-f]{6}", str(normalized.get("text_color", ""))):
+        normalized["text_color"] = EASY_MODE_DEFAULTS["text_color"]
     normalized["font_size"] = max(24, min(72, int(normalized.get("font_size", 50))))
-    normalized["enabled"] = bool(normalized.get("enabled", True))
-    normalized["show_next_line_preview"] = bool(normalized.get("show_next_line_preview", True))
-    normalized["show_instrumental"] = bool(normalized.get("show_instrumental", True))
+    normalized["words_per_line"] = max(0, min(30, int(normalized.get("words_per_line", 0))))
+    normalized["max_chars_line"] = max(0, min(100, int(normalized.get("max_chars_line", 0))))
+    for bool_key in (
+        "enabled", "break_on_punctuation", "enable_vad", "show_next_line_preview",
+        "show_instrumental", "enable_correction", "keep_first_line_visible",
+        "save_to_library", "only_remove_vocals",
+    ):
+        normalized[bool_key] = bool(normalized.get(bool_key, EASY_MODE_DEFAULTS[bool_key]))
     return normalized
 
 
@@ -1221,7 +1262,7 @@ def download_bg_youtube_preset(
 
 
 LRCLIB_API_URL = "https://lrclib.net/api"
-LRCLIB_USER_AGENT = "Sal0-Karaoke/5.3.0 (+https://github.com/Sal0-Apps/Sal0-Karaoke)"
+LRCLIB_USER_AGENT = "Sal0-Karaoke/5.4.0 (+https://github.com/Sal0-Apps/Sal0-Karaoke)"
 LYRICS_OVH_API_URL = "https://api.lyrics.ovh/v1"
 LYRICS_PROVIDER_TIMEOUT = (3.05, 6)
 MUSIXMATCH_API_URL = "https://apic-desktop.musixmatch.com/ws/1.1"
@@ -1649,7 +1690,7 @@ def delete_lyrics_server(current_user: dict = Depends(get_current_user)):
 
 
 
-# Sistema de Logs de Diagnóstico v5.3.0
+# Sistema de Logs de Diagnóstico v5.4.0
 DIAGNOSTIC_LOG_FILE = "/data/output/app_diagnostic.log"
 
 def log_diagnostic(message: str, level: str = "INFO"):
@@ -1685,7 +1726,7 @@ def download_diagnostic_logs(current_user: dict = Depends(get_current_user)):
     with state_lock:
         current_state = dict(state)
     report = "\n".join([
-        "Sal0 Karaokê v5.3.0 — diagnóstico ao vivo",
+        "Sal0 Karaokê v5.4.0 — diagnóstico ao vivo",
         f"Gerado em: {time.strftime('%Y-%m-%d %H:%M:%S')}",
         "",
         "=== ESTADO ATUAL ===",
@@ -2739,25 +2780,29 @@ def process_karaoke(
             raise HTTPException(status_code=403, detail="O Modo Facil foi desativado pelo administrador.")
         whisper_model = easy_config["whisper_model"]
         font_size = easy_config["font_size"]
-        text_color = "#00FFFF"
-        text_position = "bottom"
-        subtitle_mode = "syllable"
-        words_per_line = 0
-        max_chars_line = 0
-        break_on_punctuation = True
-        enable_vad = False
+        text_color = easy_config["text_color"]
+        text_position = easy_config["text_position"]
+        subtitle_mode = easy_config["subtitle_mode"]
+        words_per_line = easy_config["words_per_line"]
+        max_chars_line = easy_config["max_chars_line"]
+        break_on_punctuation = easy_config["break_on_punctuation"]
+        enable_vad = easy_config["enable_vad"]
         transcription_preset = easy_config["transcription_preset"]
-        background_mode = "image" if (bg_file or library_bg) else "original"
+        configured_background = easy_config["background_mode"]
+        background_mode = (
+            "image" if (bg_file or library_bg)
+            else ("original" if configured_background == "image" else configured_background)
+        )
         show_instrumental = easy_config["show_instrumental"]
         transcribe_source = easy_config["transcribe_source"]
         show_next_line_preview = easy_config["show_next_line_preview"]
         lyrics_text = None
-        lyrics_mode = "auto"
-        enable_correction = False
-        keep_first_line_visible = False
+        lyrics_mode = easy_config["lyrics_mode"]
+        enable_correction = easy_config["enable_correction"]
+        keep_first_line_visible = easy_config["keep_first_line_visible"]
         pause_for_editing = False
-        save_to_library = True
-        only_remove_vocals = False
+        save_to_library = easy_config["save_to_library"]
+        only_remove_vocals = easy_config["only_remove_vocals"]
 
     if transcription_preset not in {"karaoke", "continuous", "difficult", "fast"}:
         raise HTTPException(status_code=400, detail="Perfil de leitura da voz inválido.")

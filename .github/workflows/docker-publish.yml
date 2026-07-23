@@ -67,15 +67,14 @@ jobs:
           body: |
             ## 🚀 Sal0 Karaoke v${{ env.VERSION_TAG }}
 
-            Uma versão para quem quer criar com um clique — e para quem quer continuar ajustando cada detalhe.
+            O Modo Fácil agora é simples para quem usa e completo para quem administra.
 
             ### ✨ Nesta versão
-            * Novo **Modo Fácil**: escolha a música, um fundo opcional e deixe o restante com o aplicativo.
-            * Padrão inicial com Large V3 Turbo, letra 50 e perfil Voz difícil, configurável pelo administrador para todas as contas.
-            * Busca automática de letra sem bloquear o processo quando nenhuma fonte responde.
-            * Fundos por upload, Biblioteca ou YouTube; sem escolha, o vídeo original é usado automaticamente.
-            * Versos mais naturais, guiados pelas linhas da letra, pausas e pontuação — sem cortes arbitrários do Whisper.
-            * A legenda atual permanece visível até a próxima entrar, sem sumir entre dois versos.
+            * **Modo Completo** é a primeira aba do administrador; **Modo Fácil** é a primeira aba dos usuários comuns.
+            * O administrador pode definir todas as opções técnicas do Modo Fácil em um perfil global organizado por seções.
+            * Os padrões atuais — Large V3 Turbo, Voz difícil, fonte 50 e áudio original — foram preservados.
+            * Nova tela guiada com identidade visual completa, etapas claras, ícones e resumo do perfil aplicado.
+            * Música e fundo continuam aceitando upload, Biblioteca e YouTube sem expor configurações técnicas ao usuário comum.
 
             ### 🐋 Como executar esta versão:
             No seu `docker-compose.yml`, você pode travar a versão alterando a linha da imagem para:

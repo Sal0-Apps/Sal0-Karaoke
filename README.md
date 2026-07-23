@@ -56,9 +56,11 @@ Abra `http://localhost:7885`. No primeiro acesso, o aplicativo pede a criação 
 
 ### Modo Fácil
 
-Abra **Criar → Modo Fácil**, escolha uma música e clique em criar. Você pode deixar o fundo em **vídeo original**, enviar uma imagem ou vídeo, escolher algo da Biblioteca ou colar um link do YouTube. A letra é procurada automaticamente; se nenhuma fonte responder, o processo segue normalmente e sem pausa para revisão.
+Para usuários comuns, **Modo Fácil** é a primeira aba de criação. Para administradores, ele aparece como a segunda aba, depois do **Modo Completo**. Escolha uma música e clique em criar; o fundo pode seguir o padrão do administrador, receber um arquivo, vir da Biblioteca ou usar um link do YouTube.
 
-O administrador define esse padrão em **Ajustes → Modo Fácil**. A configuração inicial usa **Large V3 Turbo**, perfil **Voz difícil**, fonte **50** e transcrição do áudio original para evitar que uma separação imperfeita esconda palavras.
+O administrador define o perfil global em **Ajustes → Modo Fácil**. Todas as opções técnicas do fluxo completo ficam disponíveis ali — modelo, perfil da voz, fonte da transcrição, VAD, letra, modo e aparência da legenda, segmentação, fundo padrão, revisão e salvamento — sem deixar a tela do usuário comum complicada.
+
+Os valores iniciais continuam sendo **Large V3 Turbo**, perfil **Voz difícil**, fonte **50**, transcrição do áudio original, letra automática, prévia da próxima frase e renderização direta sem revisão.
 
 ### Modo Completo
 
