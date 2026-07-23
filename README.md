@@ -9,7 +9,7 @@ Transforme uma música em um vídeo de karaokê sem mandar seu áudio para uma n
 | Parte | Possibilidades |
 |---|---|
 | Música | Upload, Biblioteca ou link do YouTube identificado e preparado ao criar |
-| Modo Fácil | Música, fundo opcional e um botão; o restante segue o padrão do administrador |
+| Modo Rápido | Link, arquivo ou Biblioteca, fundo opcional e um botão; o restante segue o padrão do administrador |
 | Voz | Separação de vocal e instrumental com Demucs |
 | Legenda | Transcrição local com Faster-Whisper e modos por sílaba, palavra ou linha |
 | Perfis | Opções prontas para karaokê equilibrado, canto contínuo, voz difícil/mix e criação rápida, além dos perfis pessoais |
@@ -56,15 +56,19 @@ Abra `http://localhost:7885`. No primeiro acesso, o aplicativo pede a criação 
 
 ## Um primeiro karaokê
 
-### Modo Fácil
+### Modo Rápido
 
-Para usuários comuns, **Modo Fácil** é a primeira aba de criação. Para administradores, ele aparece como a segunda aba, depois do **Modo Completo**. Escolha uma música e clique em criar; links do YouTube são identificados na própria tela e o fundo pode seguir o padrão do administrador, receber um arquivo, vir da Biblioteca ou usar outro link do YouTube.
+O **Modo Rápido** é a primeira aba de criação para todas as contas. Link do YouTube, arquivo local e Biblioteca ficam disponíveis ao mesmo tempo: basta interagir com a opção desejada e clicar em criar. Música, vídeo, imagem e fundo também podem ser arrastados diretamente para seus campos.
 
-O administrador define o perfil global em **Ajustes → Modo Fácil**. Todas as opções técnicas do fluxo completo ficam disponíveis ali — modelo, perfil da voz, fonte da transcrição, VAD, letra, modo e aparência da legenda, segmentação, fundo padrão, revisão e salvamento — sem deixar a tela do usuário comum complicada.
+O seletor entre **Rápido** e **Detalhado** acompanha a rolagem da tela. Durante uma produção ele fica temporariamente bloqueado e os dois formulários são ocultados, evitando iniciar outra configuração por engano.
 
-Os valores iniciais continuam sendo **Large V3 Turbo**, perfil **Voz difícil**, fonte **50**, transcrição do áudio original, letra automática, prévia da próxima frase e renderização direta sem revisão.
+Quando nenhum fundo é informado, o app sorteia uma imagem ou vídeo da coleção marcada pelo administrador. Se a coleção estiver vazia, usa o vídeo original. Os arquivos da coleção continuam privados na Biblioteca administrativa: o usuário recebe somente o fundo sorteado durante o processamento.
 
-### Modo Completo
+O administrador define o perfil global em **Ajustes → Modo Rápido**. Todas as opções técnicas ficam disponíveis ali — modelo, perfil da voz, fonte da transcrição, VAD, letra, aparência da legenda, coleção de fundos, revisão e salvamento — sem carregar a tela rápida.
+
+Os valores iniciais são **Large V3 Turbo**, perfil **Voz difícil**, fonte **50**, vocais separados pelo Demucs, letra automática, texto centralizado, prévia da próxima frase e renderização direta sem revisão.
+
+### Modo Detalhado
 
 1. Em **Criar**, envie uma música, cole um link do YouTube ou escolha um item da Biblioteca.
 2. Escolha um **Perfil da música**. **Karaokê equilibrado** é o ponto de partida recomendado.
@@ -72,6 +76,8 @@ Os valores iniciais continuam sendo **Large V3 Turbo**, perfil **Voz difícil**,
 4. Escolha o fundo e, se quiser, abra **Mais ajustes** para personalizar legenda e revisão.
 5. Clique em **Criar Karaokê** e acompanhe as etapas com o resumo da música, letra, modelo e fundo em uso.
 6. Quando terminar, assista no próprio app, baixe o MP4 ou abra **Biblioteca → Resultados**.
+
+A página consulta o estado do servidor continuamente, sem reaproveitar respostas antigas do navegador. Ao voltar para a aba ou recuperar a conexão, ela confere o processamento imediatamente.
 
 Para canto, o filtro Silero VAD fica desligado por padrão: ele foi criado para detectar fala e pode cortar notas suaves ou sustentadas. Os perfis de voz difícil também evitam esse filtro; a opção continua disponível em **Mais ajustes** para gravações faladas ou muito ruidosas.
 

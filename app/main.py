@@ -16,13 +16,14 @@ import re
 import difflib
 import json
 import hashlib
+import random
 import unicodedata
 from urllib.parse import quote
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException, BackgroundTasks, Header, Depends, Query, Request
 from fastapi.responses import HTMLResponse, FileResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 # Módulos do pipeline local
 from audio_processor import extract_audio, separate_vocals
@@ -707,19 +708,22 @@ class ExternalUrlModel(BaseModel):
 
 EASY_MODE_FILE = "/data/output/easy_mode.json"
 EASY_MODE_DEFAULTS = {
+    "config_version": 2,
     "enabled": True,
     "whisper_model": "large-v3-turbo",
     "font_size": 50,
-    "text_color": "#00FFFF",
-    "text_position": "bottom",
+    "text_color": "#008080",
+    "text_position": "middle",
     "subtitle_mode": "syllable",
     "words_per_line": 0,
     "max_chars_line": 0,
     "break_on_punctuation": True,
     "enable_vad": False,
     "transcription_preset": "difficult",
-    "background_mode": "original",
-    "transcribe_source": "original",
+    "background_mode": "random_library",
+    "random_backgrounds": [],
+    "random_background_owner": "",
+    "transcribe_source": "vocals",
     "show_next_line_preview": True,
     "show_instrumental": True,
     "lyrics_mode": "auto",
@@ -731,19 +735,22 @@ EASY_MODE_DEFAULTS = {
 
 
 class EasyModeModel(BaseModel):
+    config_version: int = 2
     enabled: bool = True
     whisper_model: str = "large-v3-turbo"
     font_size: int = 50
-    text_color: str = "#00FFFF"
-    text_position: str = "bottom"
+    text_color: str = "#008080"
+    text_position: str = "middle"
     subtitle_mode: str = "syllable"
     words_per_line: int = 0
     max_chars_line: int = 0
     break_on_punctuation: bool = True
     enable_vad: bool = False
     transcription_preset: str = "difficult"
-    background_mode: str = "original"
-    transcribe_source: str = "original"
+    background_mode: str = "random_library"
+    random_backgrounds: list[str] = Field(default_factory=list)
+    random_background_owner: str = ""
+    transcribe_source: str = "vocals"
     show_next_line_preview: bool = True
     show_instrumental: bool = True
     lyrics_mode: str = "auto"
@@ -754,7 +761,12 @@ class EasyModeModel(BaseModel):
 
 
 def normalize_easy_mode_config(config: dict | None = None) -> dict:
-    normalized = {**EASY_MODE_DEFAULTS, **(config or {})}
+    submitted = config or {}
+    normalized = {
+        key: submitted.get(key, default)
+        for key, default in EASY_MODE_DEFAULTS.items()
+    }
+    normalized["config_version"] = EASY_MODE_DEFAULTS["config_version"]
     if normalized["whisper_model"] not in {"large-v3-turbo", "large-v3", "medium", "small", "tiny"}:
         normalized["whisper_model"] = EASY_MODE_DEFAULTS["whisper_model"]
     if normalized["transcription_preset"] not in {"karaoke", "continuous", "difficult", "fast"}:
@@ -765,7 +777,7 @@ def normalize_easy_mode_config(config: dict | None = None) -> dict:
         normalized["text_position"] = EASY_MODE_DEFAULTS["text_position"]
     if normalized["subtitle_mode"] not in {"syllable", "word", "line", "phrase"}:
         normalized["subtitle_mode"] = EASY_MODE_DEFAULTS["subtitle_mode"]
-    if normalized["background_mode"] not in {"original", "image", "color"}:
+    if normalized["background_mode"] not in {"original", "image", "color", "random_library"}:
         normalized["background_mode"] = EASY_MODE_DEFAULTS["background_mode"]
     if normalized["lyrics_mode"] not in {"auto", "manual"}:
         normalized["lyrics_mode"] = EASY_MODE_DEFAULTS["lyrics_mode"]
@@ -774,6 +786,18 @@ def normalize_easy_mode_config(config: dict | None = None) -> dict:
     normalized["font_size"] = max(24, min(72, int(normalized.get("font_size", 50))))
     normalized["words_per_line"] = max(0, min(30, int(normalized.get("words_per_line", 0))))
     normalized["max_chars_line"] = max(0, min(100, int(normalized.get("max_chars_line", 0))))
+    random_backgrounds = normalized.get("random_backgrounds", [])
+    if not isinstance(random_backgrounds, list):
+        random_backgrounds = []
+    clean_backgrounds = []
+    for filename in random_backgrounds:
+        safe_name = os.path.basename(str(filename).strip().replace("\\", "/"))
+        if safe_name and not safe_name.startswith(".") and safe_name not in clean_backgrounds:
+            clean_backgrounds.append(safe_name)
+        if len(clean_backgrounds) >= 100:
+            break
+    normalized["random_backgrounds"] = clean_backgrounds
+    normalized["random_background_owner"] = str(normalized.get("random_background_owner", "")).strip()[:100]
     for bool_key in (
         "enabled", "break_on_punctuation", "enable_vad", "show_next_line_preview",
         "show_instrumental", "enable_correction", "keep_first_line_visible",
@@ -785,31 +809,87 @@ def normalize_easy_mode_config(config: dict | None = None) -> dict:
 
 def load_easy_mode_config() -> dict:
     if not os.path.exists(EASY_MODE_FILE):
-        return dict(EASY_MODE_DEFAULTS)
+        return normalize_easy_mode_config()
     try:
         with open(EASY_MODE_FILE, "r", encoding="utf-8") as file:
-            return normalize_easy_mode_config(json.load(file))
+            saved_config = json.load(file)
+        if int(saved_config.get("config_version", 0) or 0) < EASY_MODE_DEFAULTS["config_version"]:
+            # A configuração já aprovada pelo administrador é preservada. Somente
+            # o novo padrão de fundo passa a usar a coleção aleatória.
+            saved_config["config_version"] = EASY_MODE_DEFAULTS["config_version"]
+            saved_config["background_mode"] = "random_library"
+            saved_config.setdefault("random_backgrounds", [])
+            saved_config.setdefault("random_background_owner", "")
+        return normalize_easy_mode_config(saved_config)
     except Exception as exc:
-        logger.warning("Nao foi possivel carregar o Modo Facil: %s", exc)
-        return dict(EASY_MODE_DEFAULTS)
+        logger.warning("Não foi possível carregar o Modo Rápido: %s", exc)
+        return normalize_easy_mode_config()
 
 
 @app.get("/api/easy-mode")
 def get_easy_mode_config(current_user: dict = Depends(get_current_user)):
-    return load_easy_mode_config()
+    config = load_easy_mode_config()
+    if not is_admin(current_user):
+        config.pop("random_backgrounds", None)
+        config.pop("random_background_owner", None)
+    return config
 
 
 @app.post("/api/easy-mode")
 def save_easy_mode_config(config: EasyModeModel, current_user: dict = Depends(get_current_user)):
     require_admin(current_user)
     normalized = normalize_easy_mode_config(config.dict())
+    photos_dir = os.path.join(get_user_paths(current_user)["library"], "photos")
+    normalized["random_backgrounds"] = [
+        filename for filename in normalized["random_backgrounds"]
+        if os.path.isfile(os.path.join(photos_dir, filename))
+    ]
+    normalized["random_background_owner"] = current_user.get("username", "")
     try:
         os.makedirs(os.path.dirname(EASY_MODE_FILE), exist_ok=True)
         with open(EASY_MODE_FILE, "w", encoding="utf-8") as file:
             json.dump(normalized, file, indent=4, ensure_ascii=False)
         return {"status": "success", "config": normalized}
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Erro ao salvar o Modo Facil: {exc}")
+        raise HTTPException(status_code=500, detail=f"Erro ao salvar o Modo Rápido: {exc}")
+
+
+QUICK_BACKGROUND_STAGE_PREFIX = ".quick_random_background"
+
+
+def stage_quick_random_background(config: dict, current_user: dict) -> tuple[str | None, str | None]:
+    """Copia um fundo global sorteado para uma área oculta da conta solicitante."""
+    owner = user_from_username(config.get("random_background_owner", ""))
+    if not owner or not is_admin(owner):
+        return None, None
+
+    owner_photos = os.path.join(get_user_paths(owner)["library"], "photos")
+    candidates = [
+        filename for filename in config.get("random_backgrounds", [])
+        if os.path.isfile(os.path.join(owner_photos, filename))
+    ]
+    if not candidates:
+        return None, None
+
+    selected = random.choice(candidates)
+    source_path = os.path.join(owner_photos, selected)
+    target_dir = os.path.join(get_user_paths(current_user)["library"], "photos")
+    extension = os.path.splitext(selected)[1].lower()
+    staged_name = f"{QUICK_BACKGROUND_STAGE_PREFIX}{extension}"
+    staged_path = os.path.join(target_dir, staged_name)
+    try:
+        for filename in os.listdir(target_dir):
+            if filename.startswith(QUICK_BACKGROUND_STAGE_PREFIX):
+                previous_path = os.path.join(target_dir, filename)
+                if os.path.isfile(previous_path):
+                    os.remove(previous_path)
+        shutil.copy2(source_path, staged_path)
+    except OSError as exc:
+        logger.warning("Não foi possível preparar o fundo aleatório do Modo Rápido: %s", exc)
+        return None, None
+
+    display_name = os.path.splitext(selected)[0].replace("_sem_audio", "")
+    return staged_name, display_name
 
 def load_external_url_config() -> dict:
     """Carrega a URL/IP externo do disco."""
@@ -1296,7 +1376,7 @@ def download_bg_youtube_preset(
 
 
 LRCLIB_API_URL = "https://lrclib.net/api"
-LRCLIB_USER_AGENT = "Sal0-Karaoke/5.4.1 (+https://github.com/Sal0-Apps/Sal0-Karaoke)"
+LRCLIB_USER_AGENT = "Sal0-Karaoke/5.5.0 (+https://github.com/Sal0-Apps/Sal0-Karaoke)"
 LYRICS_OVH_API_URL = "https://api.lyrics.ovh/v1"
 LYRICS_PROVIDER_TIMEOUT = (3.05, 6)
 MUSIXMATCH_API_URL = "https://apic-desktop.musixmatch.com/ws/1.1"
@@ -1724,7 +1804,7 @@ def delete_lyrics_server(current_user: dict = Depends(get_current_user)):
 
 
 
-# Sistema de Logs de Diagnóstico v5.4.1
+# Sistema de Logs de Diagnóstico v5.5.0
 DIAGNOSTIC_LOG_FILE = "/data/output/app_diagnostic.log"
 
 def log_diagnostic(message: str, level: str = "INFO"):
@@ -1760,7 +1840,7 @@ def download_diagnostic_logs(current_user: dict = Depends(get_current_user)):
     with state_lock:
         current_state = dict(state)
     report = "\n".join([
-        "Sal0 Karaokê v5.4.1 — diagnóstico ao vivo",
+        "Sal0 Karaokê v5.5.0 — diagnóstico ao vivo",
         f"Gerado em: {time.strftime('%Y-%m-%d %H:%M:%S')}",
         "",
         "=== ESTADO ATUAL ===",
@@ -2729,8 +2809,10 @@ def read_index():
     return templates.TemplateResponse("index.html", {"request": {}})
 
 @app.get("/api/status")
-def get_status(current_user: dict = Depends(get_current_user)):
-    """Retorna o progresso atual do pipeline para pooling da interface web."""
+def get_status(response: Response, current_user: dict = Depends(get_current_user)):
+    """Retorna o progresso atual sem permitir que o navegador reutilize estado antigo."""
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    response.headers["Pragma"] = "no-cache"
     with state_lock:
         snapshot = dict(state)
     owner = snapshot.get("owner_username")
@@ -2803,15 +2885,18 @@ def process_karaoke(
     save_to_library: bool = Form(False),
     only_remove_vocals: bool = Form(False),
     app_base_url: str = Form(""),
-    easy_mode: bool = Form(False)
+    easy_mode: bool = Form(False),
+    easy_background_choice: str = Form("default")
 ):
     """
     Recebe os arquivos enviados, valida a concorrência e inicia o pipeline em segundo plano.
     """
+    quick_random_background_requested = False
+    quick_background_title = ""
     if easy_mode:
         easy_config = load_easy_mode_config()
         if not easy_config.get("enabled", True):
-            raise HTTPException(status_code=403, detail="O Modo Facil foi desativado pelo administrador.")
+            raise HTTPException(status_code=403, detail="O Modo Rápido foi desativado pelo administrador.")
         whisper_model = easy_config["whisper_model"]
         font_size = easy_config["font_size"]
         text_color = easy_config["text_color"]
@@ -2823,10 +2908,23 @@ def process_karaoke(
         enable_vad = easy_config["enable_vad"]
         transcription_preset = easy_config["transcription_preset"]
         configured_background = easy_config["background_mode"]
-        background_mode = (
-            "image" if (bg_file or library_bg)
-            else ("original" if configured_background == "image" else configured_background)
+        easy_background_choice = (easy_background_choice or "default").strip().lower()
+        if easy_background_choice not in {"default", "original"}:
+            easy_background_choice = "default"
+        has_explicit_background = bool((bg_file and bg_file.filename) or library_bg)
+        quick_random_background_requested = bool(
+            not has_explicit_background
+            and easy_background_choice != "original"
+            and configured_background == "random_library"
         )
+        if has_explicit_background:
+            background_mode = "image"
+        elif easy_background_choice == "original":
+            background_mode = "original"
+        elif configured_background in {"image", "random_library"}:
+            background_mode = "original"
+        else:
+            background_mode = configured_background
         show_instrumental = easy_config["show_instrumental"]
         transcribe_source = easy_config["transcribe_source"]
         show_next_line_preview = easy_config["show_next_line_preview"]
@@ -2861,6 +2959,13 @@ def process_karaoke(
     library_dir = user_paths["library"]
     os.makedirs(cache_dir, exist_ok=True)
     cache_meta_file = os.path.join(cache_dir, "cache_meta.json")
+
+    if quick_random_background_requested:
+        library_bg, quick_background_title = stage_quick_random_background(easy_config, current_user)
+        if library_bg:
+            background_mode = "image"
+        else:
+            background_mode = "original"
 
     lyrics_mode = (lyrics_mode or "auto").strip().lower()
     if lyrics_mode not in {"auto", "manual"}:
@@ -3198,7 +3303,9 @@ def process_karaoke(
     else:
         lyrics_summary = "Somente Whisper"
 
-    if library_bg:
+    if quick_background_title:
+        background_summary = f"Fundo surpresa: {quick_background_title}"
+    elif library_bg:
         background_summary = os.path.splitext(os.path.basename(library_bg))[0].replace("_sem_audio", "")
     elif bg_file and bg_file.filename:
         background_summary = os.path.splitext(bg_file.filename)[0]
@@ -3213,7 +3320,7 @@ def process_karaoke(
         "title": orig_name,
         "lyrics": lyrics_summary,
         "model": model_labels.get(whisper_model, whisper_model),
-        "mode": "Modo Fácil" if easy_mode else "Modo Completo",
+        "mode": "Modo Rápido" if easy_mode else "Modo Detalhado",
         "background": background_summary,
     }
 
