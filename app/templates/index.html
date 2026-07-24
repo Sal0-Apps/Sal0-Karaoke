@@ -78,6 +78,8 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
+            gap: 0.8rem;
+            flex-wrap: wrap;
             margin-bottom: 1.5rem;
             background: var(--header-bg);
             backdrop-filter: blur(12px);
@@ -86,6 +88,7 @@
             padding: 0.9rem 1.4rem;
             border-radius: var(--radius-lg);
             box-shadow: var(--shadow);
+            overflow: hidden;
             transition: all 0.3s ease;
         }
 
@@ -93,6 +96,8 @@
             display: flex;
             align-items: center;
             gap: 0.8rem;
+            min-width: 0;
+            flex: 1 1 220px;
         }
 
         .logo-img {
@@ -112,12 +117,20 @@
             display: flex;
             align-items: center;
             gap: 0.5rem;
+            min-width: 0;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
         .header-actions {
             display: flex;
             gap: 0.5rem;
             align-items: center;
+            justify-content: flex-end;
+            flex-wrap: wrap;
+            min-width: 0;
+            flex: 1 1 320px;
         }
 
         .header-btn {
@@ -635,6 +648,39 @@
         }
             /* ESTILOS DE BIBLIOTECA RESPONSIVA PARA DISPOSITIVOS MÓVEIS */
         @media (max-width: 640px) {
+            body {
+                padding-left: 0.75rem;
+                padding-right: 0.75rem;
+            }
+            header {
+                padding: 0.85rem 1rem;
+                align-items: flex-start;
+            }
+            .logo-area {
+                width: 100%;
+                flex-basis: 100%;
+            }
+            h1 {
+                font-size: 1.16rem;
+            }
+            .header-actions {
+                width: 100%;
+                flex-basis: 100%;
+                justify-content: flex-start;
+            }
+            .header-btn {
+                flex: 1 1 calc(33.333% - 0.35rem);
+                justify-content: center;
+                min-width: 0;
+                padding: 0.5rem 0.55rem;
+                font-size: 0.76rem;
+            }
+            .user-chip {
+                order: -1;
+                width: 100%;
+                max-width: none;
+                justify-content: center;
+            }
             .card {
                 padding: 1rem;
                 margin-bottom: 1rem;
@@ -698,6 +744,14 @@
                 font-size: 0.75rem;
             }
         }
+        @media (max-width: 420px) {
+            .header-btn {
+                flex: 1 1 calc(50% - 0.35rem);
+            }
+            #btnLogout {
+                flex-basis: 100%;
+            }
+        }
 
         .user-chip {
             display: inline-flex;
@@ -710,6 +764,69 @@
             color: var(--text-muted);
             font-size: 0.72rem;
             white-space: nowrap;
+            min-width: 0;
+            max-width: min(100%, 260px);
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        /*
+         * O WebView Android pode ficar numa largura intermediária: larga demais
+         * para a regra de celular antiga, mas sem espaço para marca, usuário e
+         * todos os controles na mesma linha. A partir daqui o cabeçalho assume
+         * uma grade, mantendo cada botão dentro do card.
+         */
+        @media (max-width: 820px) {
+            body {
+                overflow-x: hidden;
+            }
+            .container,
+            header {
+                min-width: 0;
+                max-width: 100%;
+            }
+            header {
+                align-items: flex-start;
+            }
+            .logo-area {
+                width: 100%;
+                flex: 1 1 100%;
+            }
+            .header-actions {
+                width: 100%;
+                flex: 1 1 100%;
+                display: grid;
+                grid-template-columns: repeat(3, minmax(0, 1fr));
+                gap: 0.45rem;
+            }
+            .user-chip {
+                grid-column: 1 / -1;
+                width: 100%;
+                max-width: none;
+                justify-content: center;
+            }
+            .header-btn {
+                width: 100%;
+                min-width: 0;
+                justify-content: center;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                padding: 0.5rem 0.4rem;
+            }
+        }
+        @media (max-width: 460px) {
+            .header-actions {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+            #btnLogout {
+                grid-column: 1 / -1;
+            }
+        }
+        @media (max-width: 640px) {
+            .user-chip {
+                max-width: none;
+            }
         }
         .settings-grid {
             display: grid;
@@ -1879,7 +1996,7 @@
 
         <!-- RODAPÉ DISCRETO DA PÁGINA -->
         <footer>
-            Sal0 Karaokê v5.5.0
+                Sal0 Karaokê v5.6.0
         </footer>
 
     </div> <!-- Container End -->

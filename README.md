@@ -54,6 +54,22 @@ docker compose up -d
 
 Abra `http://localhost:7885`. No primeiro acesso, o aplicativo pede a criação da conta administradora.
 
+## Aplicativo para Android
+
+O APK é gerado e atualizado localmente, separado das Releases públicas do GitHub. Ele não é apenas um atalho para o navegador: a primeira abertura pede o nome da rede Wi-Fi, o endereço local e o endereço externo do servidor. A partir daí:
+
+| Situação | O que acontece |
+|---|---|
+| Wi-Fi configurado | Testa e abre o endereço local |
+| Dados móveis ou outra rede | Testa e abre o endereço externo |
+| Endereço preferido indisponível | Tenta o outro endereço automaticamente |
+| Rede muda com o app aberto | Refaz a escolha e troca de rota |
+| Interface do Docker é atualizada | A nova interface aparece sem reinstalar o APK |
+
+Uploads, downloads, vídeo em tela cheia, sessão, retorno e abertura de links são integrados ao Android. O app só mantém dentro dele os dois endereços configurados; links para outros sites são enviados ao navegador do aparelho.
+
+Quando a interface web muda, a nova versão aparece assim que o Docker é atualizado. Quando o código nativo do Android muda, o APK deve ser recompilado e instalado localmente com a mesma assinatura de lançamento. As credenciais de assinatura ficam somente na máquina que faz o build e nunca entram no repositório.
+
 ## Um primeiro karaokê
 
 ### Modo Rápido

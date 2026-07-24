@@ -52,3 +52,12 @@ logs/
 *.swo
 .DS_Store
 Thumbs.db
+
+# === ANDROID ===
+/android/.gradle/
+/android/local.properties
+/android/app/build/
+/android/build/
+/android/*.keystore
+/android/*.jks
+/android/*.apk
