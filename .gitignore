@@ -1,0 +1,63 @@
+# === DADOS GERADOS PELO APP (não commitar) ===
+/data/cache/*
+/data/output/*
+!/data/cache/.gitkeep
+!/data/output/.gitkeep
+
+# === PYTHON ===
+*.pyc
+*.pyo
+*.pyd
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# === BACKUPS E ARQUIVOS TEMPORÁRIOS LOCAIS ===
+v224_backup/
+zip_extract_*/
+scratch/
+*.zip
+*.bak
+*.tmp
+
+# === CREDENCIAIS E TOKENS (NUNCA commitar no Git) ===
+.env
+.env.*
+!.env.example
+.env_deploy
+*.token
+*.key
+*.pem
+*.p12
+*.pfx
+deploy_credentials.txt
+*_secret.txt
+github_token.txt
+
+# === LOGS ===
+*.log
+logs/
+
+# === BANCO DE DADOS ===
+*.db
+*.sqlite
+*.sqlite3
+
+# === IDEs E FERRAMENTAS ===
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# === ANDROID ===
+/android/.gradle/
+/android/local.properties
+/android/app/build/
+/android/build/
+/android/*.keystore
+/android/*.jks
+/android/*.apk
