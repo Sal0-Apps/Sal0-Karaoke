@@ -4,6 +4,8 @@ Aplicação local e auto-hospedada para transformar músicas em vídeos de karao
 
 Esta é a versão final publicada deste repositório. O objetivo desta documentação é registrar, de forma independente e verificável, a arquitetura, os requisitos, o funcionamento, os limites e as referências técnicas do software. Não há promessa de acompanhamento contínuo, suporte permanente ou compatibilidade futura.
 
+Documentação pública: [Segurança](SECURITY.md) · [Privacidade](PRIVACY.md) · [Status do projeto](PROJECT_STATUS.md) · [Licença](LICENSE)
+
 ## Visão geral
 
 O fluxo de criação é composto por cinco fases:
@@ -107,6 +109,18 @@ Cada conta pode informar o token do próprio bot e o Chat ID correspondente. O s
 - modelos de IA e processamento de vídeo exigem espaço em disco, memória e tempo compatíveis com o hardware;
 - esta documentação não constitui garantia de disponibilidade, suporte, segurança ou compatibilidade com serviços externos;
 - o administrador é responsável pela exposição da porta, proxy, HTTPS, backups e políticas de retenção do servidor.
+
+## Uso responsável
+
+O Sal0 Karaokê é apenas uma ferramenta. Cada usuário é responsável por respeitar a legislação do seu país, os direitos autorais aplicáveis e os termos dos serviços que decidir utilizar.
+
+O projeto não distribui músicas, não distribui vídeos, não distribui letras protegidas por direitos autorais e não incentiva pirataria. O usuário deve utilizar apenas arquivos, obras, permissões e integrações para os quais tenha autorização adequada.
+
+## Suporte
+
+Issues sobre bugs críticos são bem-vindas quando não contêm dados sensíveis e quando seguem as orientações de segurança. Vulnerabilidades devem ser comunicadas conforme [SECURITY.md](SECURITY.md), e não em uma Issue pública.
+
+O projeto está em manutenção mínima. Não há garantia de novas funcionalidades, respostas rápidas, correções para todos os ambientes ou suporte contínuo.
 
 ## Referências técnicas
 
