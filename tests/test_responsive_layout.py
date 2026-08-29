@@ -19,10 +19,9 @@ class ResponsiveLayoutTests(unittest.TestCase):
         self.assertIn("grid-template-columns: repeat(3, minmax(0, 1fr));", HTML)
         self.assertNotIn("grid-template-columns: repeat(3, 1fr);", HTML)
 
-    def test_dynamic_result_rows_have_shrinkable_content_and_actions(self):
-        self.assertIn(".queue-item > *,", HTML)
+    def test_dynamic_queue_rows_have_shrinkable_content_and_actions(self):
+        self.assertIn(".queue-item > *", HTML)
         self.assertIn('class="queue-actions"', HTML)
-        self.assertIn('class="admin-result-actions"', HTML)
         self.assertIn("overflow-wrap: anywhere;", HTML)
 
     def test_fixed_auto_fit_grid_respects_narrow_cards(self):

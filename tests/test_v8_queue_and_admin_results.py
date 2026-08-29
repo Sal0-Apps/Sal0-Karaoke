@@ -59,11 +59,19 @@ class VersionEightQueueTests(unittest.TestCase):
         self.assertIn("Os formulários permanecem fechados.", HTML)
         self.assertIn('formData.set(\'youtube_url\', url)', HTML)
 
-    def test_admin_has_explicit_cross_profile_results(self):
+    def test_duplicate_admin_results_panel_is_not_rendered(self):
         self.assertIn('@app.get("/api/admin/results")', MAIN)
         self.assertIn('@app.get("/api/admin/results/{owner_key}/{filename}")', MAIN)
-        self.assertIn('id="adminResultsSection"', HTML)
-        self.assertIn("fetchAdminResults()", HTML)
+        self.assertNotIn('id="adminResultsSection"', HTML)
+        self.assertNotIn("Resultados de todos os perfis", HTML)
+        self.assertNotIn("fetchAdminResults()", HTML)
+
+    def test_background_upload_button_uses_the_standard_primary_color(self):
+        start = HTML.index('id="libBgUploadForm"')
+        end = HTML.index('</form>', start)
+        form = HTML[start:end]
+        self.assertIn('class="btn-primary"', form)
+        self.assertNotIn('#ec4899', form)
 
     def test_version_is_8_for_web_android_and_release_build(self):
         self.assertIn("Sal0 Karaokê v8.0.0", HTML)

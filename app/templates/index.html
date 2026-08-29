@@ -1359,10 +1359,8 @@
             box-shadow: 0 0 24px rgba(73, 174, 239, 0.25);
         }
         .easy-hero-icon img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; }
-        .queue-list,
-        .admin-results-list { display: flex; flex-direction: column; gap: 0.55rem; }
-        .queue-item,
-        .admin-result-item {
+        .queue-list { display: flex; flex-direction: column; gap: 0.55rem; }
+        .queue-item {
             display: grid;
             grid-template-columns: minmax(0, 1fr) auto;
             gap: 0.75rem;
@@ -1374,14 +1372,10 @@
             min-width: 0;
             max-width: 100%;
         }
-        .queue-item > *,
-        .admin-result-item > * { min-width: 0; max-width: 100%; }
-        .queue-title,
-        .admin-result-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700; }
-        .queue-meta,
-        .admin-result-meta { color: var(--text-muted); font-size: 0.72rem; margin-top: 0.22rem; overflow-wrap: anywhere; }
-        .queue-actions,
-        .admin-result-actions {
+        .queue-item > * { min-width: 0; max-width: 100%; }
+        .queue-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700; }
+        .queue-meta { color: var(--text-muted); font-size: 0.72rem; margin-top: 0.22rem; overflow-wrap: anywhere; }
+        .queue-actions {
             display: flex;
             align-items: center;
             justify-content: flex-end;
@@ -1411,15 +1405,12 @@
             text-shadow: 0 0 10px var(--accent-glow);
         }
         @media (max-width: 640px) {
-            .queue-item,
-            .admin-result-item { grid-template-columns: 1fr; }
-            .queue-title,
-            .admin-result-title {
+            .queue-item { grid-template-columns: 1fr; }
+            .queue-title {
                 white-space: normal;
                 overflow-wrap: anywhere;
             }
-            .queue-actions,
-            .admin-result-actions { justify-content: flex-start; }
+            .queue-actions { justify-content: flex-start; }
             .creator-mode-btn {
                 grid-template-columns: 1fr;
                 grid-template-areas: "icon" "title";
@@ -2230,15 +2221,6 @@
         <!-- ABA 3: BIBLIOTECA & HISTÓRICO -->
         <!-- ============================================================= -->
         <div id="libraryTabContent" style="display: none; flex-direction: column; gap: 1.5rem;">
-            <div class="card" id="adminResultsSection" style="display: none; margin: 0;">
-                <div class="card-header">
-                    <span class="card-title"><span class="line-glyph">◎</span> Resultados de todos os perfis</span>
-                    <button type="button" id="btnRefreshAdminResults" class="btn-secondary">↻ Atualizar</button>
-                </div>
-                <p class="compact-note" style="margin-bottom: 0.8rem;">Visualize ou baixe qualquer vídeo concluído, identificado pelo perfil responsável.</p>
-                <div id="adminResultsList" class="admin-results-list"><span class="compact-note">Carregando resultados...</span></div>
-            </div>
-
             <!-- Grid de Envio Rápido para a Biblioteca -->
             <div style="background: var(--input-bg); border: 1px solid var(--glass-border); padding: 1.2rem; border-radius: 12px; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr)); gap: 1rem;">
                 <div>
@@ -2269,7 +2251,7 @@
                             <div id="libBgUploadArea" class="btn-secondary" style="flex: 1; text-align: center; cursor: pointer; padding: 0.6rem; font-size: 0.8rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
                                 <span id="libBgFileName">Clique ou arraste um fundo</span>
                             </div>
-                            <button type="submit" class="btn-primary" style="width: auto; padding: 0.6rem 1rem; font-size: 0.8rem; background: linear-gradient(135deg, #ec4899, #8b5cf6);">Enviar</button>
+                            <button type="submit" class="btn-primary" style="width: auto; padding: 0.6rem 1rem; font-size: 0.8rem;">Enviar</button>
                         </form>
                         <form id="libBgYoutubeForm" class="library-youtube-import">
                             <div class="library-youtube-row">
@@ -2431,7 +2413,7 @@
         function applyRoleUI() {
             const admin = currentUser?.role === 'admin';
             document.querySelector('.settings-grid')?.classList.toggle('user-settings', !admin);
-            ['modelManagerSection', 'youtubeToolsSection', 'easyModeSettingsSection', 'externalUrlSection', 'userManagementSection', 'logsSection', 'adminResultsSection'].forEach(id => {
+            ['modelManagerSection', 'youtubeToolsSection', 'easyModeSettingsSection', 'externalUrlSection', 'userManagementSection', 'logsSection'].forEach(id => {
                 const element = document.getElementById(id);
                 if (element) element.style.display = admin ? '' : 'none';
             });
@@ -3316,63 +3298,6 @@
             return `${(value / (1024 * 1024)).toFixed(1)} MB`;
         }
 
-        async function fetchAdminResults() {
-            if (currentUser?.role !== 'admin') return;
-            const container = document.getElementById('adminResultsList');
-            try {
-                const response = await authFetch('/api/admin/results', { cache: 'no-store' });
-                if (!response.ok) return;
-                const data = await response.json();
-                const results = data.results || [];
-                if (!container) return;
-                if (!results.length) {
-                    container.innerHTML = '<span class="compact-note">Nenhum vídeo concluído foi encontrado.</span>';
-                    return;
-                }
-                container.innerHTML = results.map(item => {
-                    const owner = encodeURIComponent(item.owner_key).replace(/'/g, '%27');
-                    const filename = encodeURIComponent(item.filename).replace(/'/g, '%27');
-                    return `
-                        <div class="admin-result-item">
-                            <div>
-                                <div class="admin-result-title">${escapeHtml(item.filename)}</div>
-                                <div class="admin-result-meta">Perfil: ${escapeHtml(item.owner)} · ${formatFileSize(item.size)}</div>
-                            </div>
-                            <div class="admin-result-actions">
-                                ${item.kind === 'subtitle' ? '' : `<button type="button" class="btn-secondary" onclick="previewAdminResult('${owner}', '${filename}')">▷ Visualizar</button>`}
-                                <button type="button" class="btn-secondary" onclick="downloadAdminResult('${owner}', '${filename}')">↓ Baixar</button>
-                            </div>
-                        </div>
-                    `;
-                }).join('');
-            } catch (error) {
-                if (container) container.innerHTML = `<span class="compact-note">Falha ao carregar resultados: ${escapeHtml(error.message)}</span>`;
-            }
-        }
-
-        function previewAdminResult(owner, filename) {
-            const modal = document.getElementById('mediaPreviewModal');
-            const video = document.getElementById('libraryVideoPreview');
-            const image = document.getElementById('libraryImagePreview');
-            const heading = document.getElementById('mediaPreviewTitle');
-            if (heading) heading.textContent = decodeURIComponent(filename);
-            if (image) image.style.display = 'none';
-            if (video) {
-                video.style.display = 'block';
-                video.src = `/api/admin/results/${owner}/${filename}?inline=true&token=${encodeURIComponent(authToken)}&t=${Date.now()}`;
-                video.load();
-            }
-            if (modal) modal.style.display = 'flex';
-        }
-
-        function downloadAdminResult(owner, filename) {
-            const link = document.createElement('a');
-            link.href = `/api/admin/results/${owner}/${filename}?token=${encodeURIComponent(authToken)}`;
-            document.body.appendChild(link);
-            link.click();
-            link.remove();
-        }
-
         // FUNÇÃO PARA CARREGAR CONFIGURAÇÃO DO TELEGRAM
         async function fetchTelegramConfig() {
             try {
@@ -3748,7 +3673,6 @@
             });
 
             document.getElementById('btnUpdateYoutubeTools')?.addEventListener('click', updateYoutubeTools);
-            document.getElementById('btnRefreshAdminResults')?.addEventListener('click', fetchAdminResults);
 
             document.getElementById('btnSaveEasyMode')?.addEventListener('click', async () => {
                 const button = document.getElementById('btnSaveEasyMode');
@@ -5168,7 +5092,7 @@
                 })(),
             ];
             if (currentUser?.role === 'admin') {
-                initialLoads.push(fetchExternalUrlConfig(), fetchUsers(), fetchModelsStatus(), fetchYoutubeToolsStatus(), fetchAdminResults());
+                initialLoads.push(fetchExternalUrlConfig(), fetchUsers(), fetchModelsStatus(), fetchYoutubeToolsStatus());
             }
             await Promise.allSettled(initialLoads);
         });
