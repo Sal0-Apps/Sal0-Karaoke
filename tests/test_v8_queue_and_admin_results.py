@@ -40,6 +40,25 @@ class VersionEightQueueTests(unittest.TestCase):
         self.assertIn("if (activeJobs.length <= 1)", HTML)
         self.assertNotIn("queueResultUrl", HTML)
 
+    def test_queue_accepts_owner_and_admin_but_blocks_other_profiles(self):
+        tree = ast.parse(MAIN)
+        function = next(
+            node for node in tree.body
+            if isinstance(node, ast.FunctionDef) and node.name == "ensure_processing_queue_access"
+        )
+        source = ast.get_source_segment(MAIN, function)
+        self.assertIn("is_admin(current_user)", source)
+        self.assertIn('active_job.get("owner_username") != current_user.get("username")', source)
+        self.assertIn("status_code=409", source)
+        self.assertIn('not (youtube_url or "").strip()', source)
+        self.assertIn("somente novos links do YouTube", source)
+        self.assertIn("ensure_processing_queue_access(", MAIN)
+        self.assertIn("data.owned_by_current_user || currentUser?.role === 'admin'", HTML)
+        self.assertIn('id="queueLinkCard"', HTML)
+        self.assertIn('id="queueYoutubeUrl"', HTML)
+        self.assertIn("Os formulários permanecem fechados.", HTML)
+        self.assertIn('formData.set(\'youtube_url\', url)', HTML)
+
     def test_admin_has_explicit_cross_profile_results(self):
         self.assertIn('@app.get("/api/admin/results")', MAIN)
         self.assertIn('@app.get("/api/admin/results/{owner_key}/{filename}")', MAIN)

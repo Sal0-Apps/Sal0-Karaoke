@@ -629,6 +629,32 @@ def ensure_processing_queue_capacity(username: str):
         raise HTTPException(status_code=429, detail="Sua fila atingiu o limite de 25 vídeos pendentes.")
 
 
+def ensure_processing_queue_access(
+    current_user: dict,
+    youtube_url: str = None,
+    audio_filename: str = None,
+    library_audio: str = None,
+):
+    """Durante um trabalho ativo, permite somente novos links ao dono ou administrador."""
+    with processing_queue_lock:
+        active_job = next(
+            (job for job in processing_queue if job.get("status") == "processing"),
+            None,
+        )
+    if not active_job:
+        return
+    if not is_admin(current_user) and active_job.get("owner_username") != current_user.get("username"):
+        raise HTTPException(
+            status_code=409,
+            detail="Aguarde: o servidor está processando um trabalho de outro perfil.",
+        )
+    if not (youtube_url or "").strip() or (audio_filename or "").strip() or (library_audio or "").strip():
+        raise HTTPException(
+            status_code=409,
+            detail="Durante o processamento, somente novos links do YouTube podem ser adicionados à fila.",
+        )
+
+
 def active_queue_pipeline_for_user(current_user: dict) -> dict:
     """Retorna os parâmetros do trabalho ativo visível ao usuário, quando existir."""
     with processing_queue_lock:
@@ -3533,6 +3559,12 @@ def process_karaoke(
     """
     Recebe os arquivos enviados, valida a concorrência e inicia o pipeline em segundo plano.
     """
+    ensure_processing_queue_access(
+        current_user,
+        youtube_url=youtube_url,
+        audio_filename=audio_file.filename if audio_file else None,
+        library_audio=library_audio,
+    )
     ensure_processing_queue_capacity(current_user.get("username"))
     translation_language = (translation_language or "pt").strip().lower()
     if translation_language not in SUPPORTED_TARGET_LANGUAGES:
