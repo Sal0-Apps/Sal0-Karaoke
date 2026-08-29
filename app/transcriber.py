@@ -153,7 +153,9 @@ def transcribe_vocals(
     cpu_threads: int = None,
     enable_vad: bool = False,
     transcription_preset: str = "karaoke",
-) -> list[dict]:
+    task: str = "transcribe",
+    return_info: bool = False,
+) -> list[dict] | tuple[list[dict], dict]:
     """
     Transcrição local de vocais com Faster-Whisper e ajustes próprios para canto.
     - Tenta primeiro carregar por caminho direto local sem chamadas de rede.
@@ -236,6 +238,7 @@ def transcribe_vocals(
 
     logger.info(f"Iniciando transcrição (Silero VAD={enable_vad}): {vocals_path}")
     transcribe_options = {
+        "task": "translate" if task == "translate" else "transcribe",
         "word_timestamps": True,
         "beam_size": beam_size,
         "patience": preset["patience"],
@@ -293,4 +296,11 @@ def transcribe_vocals(
         except Exception as e_align:
             logger.warning(f"Aviso ao estabilizar timestamps: {e_align}")
 
+    transcription_info = {
+        "language": str(getattr(info, "language", "") or "").strip().lower(),
+        "language_probability": float(getattr(info, "language_probability", 0.0) or 0.0),
+        "task": "translate" if task == "translate" else "transcribe",
+    }
+    if return_info:
+        return structured_segments, transcription_info
     return structured_segments

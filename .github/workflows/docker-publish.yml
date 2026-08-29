@@ -73,7 +73,7 @@ jobs:
       - name: Build Android APK
         if: startsWith(github.ref, 'refs/tags/v')
         working-directory: android
-        run: gradle --no-daemon :app:assembleRelease -PVERSION_NAME=${{ env.VERSION_TAG }} -PVERSION_CODE=70000
+        run: gradle --no-daemon :app:assembleRelease -PVERSION_NAME=${{ env.VERSION_TAG }} -PVERSION_CODE=80000
 
       - name: Create GitHub Release
         if: startsWith(github.ref, 'refs/tags/v')

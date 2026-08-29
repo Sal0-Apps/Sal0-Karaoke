@@ -13,20 +13,19 @@
 
     <style>
         :root {
-            /* Tema Escuro (Padrão) */
-            --bg-primary: #0a0914;
-            --bg-card: rgba(20, 18, 38, 0.85);
-            --bg-card-hover: rgba(28, 25, 54, 0.95);
-            --glass-border: rgba(255, 255, 255, 0.1);
-            --glass-border-light: rgba(255, 255, 255, 0.18);
-            --accent: #8b5cf6;
-            --accent-glow: rgba(139, 92, 246, 0.4);
-            --pink-accent: #ec4899;
-            --text-main: #f3f4f6;
-            --text-muted: #9ca3af;
-            --input-bg: rgba(0, 0, 0, 0.25);
-            --header-bg: rgba(20, 18, 38, 0.85);
-            --shadow: 0 10px 30px rgba(0,0,0,0.3);
+            --bg-primary: #050b12;
+            --bg-card: rgba(8, 20, 31, 0.92);
+            --bg-card-hover: rgba(12, 35, 54, 0.96);
+            --glass-border: rgba(73, 174, 239, 0.2);
+            --glass-border-light: rgba(73, 174, 239, 0.48);
+            --accent: #49aeef;
+            --accent-glow: rgba(73, 174, 239, 0.32);
+            --pink-accent: #1976b9;
+            --text-main: #eef8ff;
+            --text-muted: #91adc0;
+            --input-bg: rgba(2, 10, 18, 0.72);
+            --header-bg: rgba(6, 17, 27, 0.94);
+            --shadow: 0 18px 48px rgba(0, 5, 12, 0.46);
             --radius-lg: 18px;
             --radius-md: 12px;
             --radius-sm: 8px;
@@ -34,14 +33,14 @@
 
         [data-theme="light"] {
             /* Tema Claro */
-            --bg-primary: #f8fafc;
+            --bg-primary: #edf7fd;
             --bg-card: #ffffff;
             --bg-card-hover: #f1f5f9;
             --glass-border: #e2e8f0;
             --glass-border-light: #cbd5e1;
-            --accent: #8b5cf6;
-            --accent-glow: rgba(139, 92, 246, 0.25);
-            --pink-accent: #ec4899;
+            --accent: #168bd2;
+            --accent-glow: rgba(22, 139, 210, 0.22);
+            --pink-accent: #0b5f99;
             --text-main: #0f172a;
             --text-muted: #64748b;
             --input-bg: #f8fafc;
@@ -55,10 +54,13 @@
             padding: 0;
             font-family: 'Inter', sans-serif;
             -webkit-font-smoothing: antialiased;
+            font-variant-emoji: text;
         }
 
         body {
-            background-color: var(--bg-primary);
+            background:
+                radial-gradient(circle at 50% -20%, rgba(73, 174, 239, 0.18), transparent 42%),
+                linear-gradient(180deg, #050b12 0%, var(--bg-primary) 48%, #02070c 100%);
             color: var(--text-main);
             min-height: 100vh;
             display: flex;
@@ -105,7 +107,7 @@
             height: 36px;
             object-fit: contain;
             border-radius: 8px;
-            box-shadow: 0 0 12px rgba(139, 92, 246, 0.4);
+            box-shadow: 0 0 18px rgba(73, 174, 239, 0.42);
         }
 
         h1 {
@@ -280,7 +282,7 @@
             font-size: 0.95rem;
             cursor: pointer;
             transition: all 0.2s ease;
-            box-shadow: 0 6px 20px rgba(139, 92, 246, 0.35);
+            box-shadow: 0 6px 22px rgba(73, 174, 239, 0.28);
             display: flex;
             align-items: center;
             justify-content: center;
@@ -289,7 +291,7 @@
 
         .btn-primary:hover {
             transform: translateY(-2px);
-            box-shadow: 0 8px 25px rgba(139, 92, 246, 0.5);
+            box-shadow: 0 9px 28px rgba(73, 174, 239, 0.42);
         }
 
         .btn-primary:disabled {
@@ -836,6 +838,7 @@
         }
         .settings-grid > .card { height: 100%; margin: 0; }
         #modelManagerSection,
+        #youtubeToolsSection,
         #easyModeSettingsSection { grid-column: 1 / -1; }
         #telegramSection { grid-column: 1 / 7; }
         #externalUrlSection { grid-column: 7 / 13; }
@@ -1000,7 +1003,7 @@
         .compact-note { font-size: 0.76rem; color: var(--text-muted); line-height: 1.45; }
         .creator-mode-switch {
             display: grid;
-            grid-template-columns: 1fr 1fr;
+            grid-template-columns: repeat(3, 1fr);
             gap: 0.45rem;
             padding: 0.42rem;
             margin-bottom: 1.15rem;
@@ -1191,6 +1194,7 @@
         @media (max-width: 820px) {
             .settings-grid { grid-template-columns: 1fr; }
             #modelManagerSection,
+            #youtubeToolsSection,
             #easyModeSettingsSection,
             #telegramSection,
             #externalUrlSection,
@@ -1215,6 +1219,69 @@
             .library-youtube-row { align-items: stretch; flex-direction: column; }
             .library-youtube-row .btn-primary { width: 100%; }
         }
+        .easy-hero,
+        .card,
+        header,
+        .nav-tabs {
+            border-color: rgba(73, 174, 239, 0.22);
+        }
+        .easy-hero {
+            background:
+                radial-gradient(circle at 8% 0%, rgba(73, 174, 239, 0.2), transparent 34%),
+                radial-gradient(circle at 95% 100%, rgba(25, 118, 185, 0.17), transparent 38%),
+                var(--bg-card);
+        }
+        .easy-hero-icon {
+            width: 54px;
+            height: 54px;
+            padding: 5px;
+            border-radius: 50%;
+            background: #06111d;
+            border: 1px solid rgba(73, 174, 239, 0.55);
+            box-shadow: 0 0 24px rgba(73, 174, 239, 0.25);
+        }
+        .easy-hero-icon img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; }
+        .queue-list,
+        .admin-results-list { display: flex; flex-direction: column; gap: 0.55rem; }
+        .queue-item,
+        .admin-result-item {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            gap: 0.75rem;
+            align-items: center;
+            padding: 0.75rem 0.85rem;
+            border: 1px solid rgba(73, 174, 239, 0.18);
+            border-radius: 12px;
+            background: rgba(3, 14, 24, 0.65);
+        }
+        .queue-title,
+        .admin-result-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700; }
+        .queue-meta,
+        .admin-result-meta { color: var(--text-muted); font-size: 0.72rem; margin-top: 0.22rem; }
+        .queue-status {
+            display: inline-flex;
+            padding: 0.22rem 0.5rem;
+            border: 1px solid rgba(73, 174, 239, 0.3);
+            border-radius: 999px;
+            color: var(--accent);
+            background: rgba(73, 174, 239, 0.1);
+            font-size: 0.68rem;
+            font-weight: 800;
+        }
+        .line-glyph { color: var(--accent); text-shadow: 0 0 12px var(--accent-glow); }
+        .quick-choice-icon,
+        .creator-mode-icon,
+        .process-summary-item > span:first-child,
+        .youtube-identification > span:first-child {
+            font-family: 'Segoe UI Symbol', 'Noto Sans Symbols 2', sans-serif;
+            color: var(--accent);
+            filter: grayscale(1) sepia(1) saturate(6) hue-rotate(155deg) brightness(1.2);
+            text-shadow: 0 0 10px var(--accent-glow);
+        }
+        @media (max-width: 640px) {
+            .queue-item,
+            .admin-result-item { grid-template-columns: 1fr; }
+        }
 </style>
 </head>
 <body>
@@ -1227,17 +1294,17 @@
             </div>
             <div class="header-actions">
                 <span id="currentUserChip" class="user-chip" style="display: none;"></span>
-                <button type="button" class="header-btn" id="btnToggleTheme" title="Alternar Tema (Escuro / Claro)" style="padding: 0.35rem 0.65rem; font-size: 0.78rem;">🌙 Escuro</button>
-                <button type="button" class="header-btn" id="btnOpenHelp">❓ Manual</button>
-                <button type="button" class="header-btn" id="btnLogout" style="color: #fca5a5; background: rgba(239,68,68,0.15); border-color: rgba(239,68,68,0.3);">🚪 Sair</button>
+                <button type="button" class="header-btn" id="btnToggleTheme" title="Alternar Tema (Escuro / Claro)" style="padding: 0.35rem 0.65rem; font-size: 0.78rem;"><span class="line-glyph">◐</span> Escuro</button>
+                <button type="button" class="header-btn" id="btnOpenHelp"><span class="line-glyph">?</span> Manual</button>
+                <button type="button" class="header-btn" id="btnLogout" style="color: #fca5a5; background: rgba(239,68,68,0.15); border-color: rgba(239,68,68,0.3);">↪ Sair</button>
             </div>
         </header>
 
         <!-- NAVEGAÇÃO ENTRE ABAS -->
         <div class="nav-tabs">
-            <button type="button" class="tab-btn active" id="tabBtnCreate">🎬 Criar</button>
-            <button type="button" class="tab-btn" id="tabBtnSettings">⚙️ Ajustes</button>
-            <button type="button" class="tab-btn" id="tabBtnLibrary">📚 Biblioteca</button>
+            <button type="button" class="tab-btn active" id="tabBtnCreate"><span class="line-glyph">◉</span> Criar</button>
+            <button type="button" class="tab-btn" id="tabBtnSettings"><span class="line-glyph">⌁</span> Ajustes</button>
+            <button type="button" class="tab-btn" id="tabBtnLibrary"><span class="line-glyph">▣</span> Biblioteca</button>
         </div>
 
         <!-- ============================================================= -->
@@ -1251,12 +1318,15 @@
                 <button type="button" id="btnCreatorAdvanced" class="creator-mode-btn" role="tab" aria-selected="false" title="Controle completo da transcrição, legenda e visual">
                     <span class="creator-mode-icon">🎛️</span><span class="creator-mode-title">Detalhado</span><span class="creator-mode-hint">Todas as opções</span>
                 </button>
+                <button type="button" id="btnCreatorSubtitle" class="creator-mode-btn" role="tab" aria-selected="false" title="Preserva o áudio e gera vídeo legendado com arquivo SRT">
+                    <span class="creator-mode-icon">▤</span><span class="creator-mode-title">Legendar vídeo</span><span class="creator-mode-hint">Vídeo + SRT traduzido</span>
+                </button>
             </div>
 
             <form id="easyModeForm">
                 <div class="card easy-hero">
                     <div class="easy-hero-head">
-                        <div class="easy-hero-icon">🎤</div>
+                        <div class="easy-hero-icon"><img src="/favicon.png" alt=""></div>
                         <div>
                             <span class="easy-kicker">Modo Rápido</span>
                             <span class="card-title">Cole, escolha e cante</span>
@@ -1277,7 +1347,7 @@
                                     <span class="quick-choice-icon">🎵</span>
                                     <span class="quick-choice-label" id="easyAudioFileText">Escolher arquivo</span>
                                     <span class="quick-choice-hint">Clique ou arraste música/vídeo</span>
-                                    <input type="file" id="easyAudioFile" accept=".mp3,.wav,.flac,.m4a,.mp4,.mkv,.avi" style="display: none;">
+                                    <input type="file" id="easyAudioFile" accept=".mp3,.wav,.flac,.m4a,.mp4,.mkv,.avi" multiple style="display: none;">
                                 </label>
                                 <div id="easyAudioLibraryBox" class="quick-choice-card">
                                     <span class="quick-choice-label">📚 Minha Biblioteca</span>
@@ -1331,6 +1401,64 @@
                 </div>
             </form>
 
+            <form id="subtitleModeForm" style="display: none;">
+                <div class="card easy-hero">
+                    <div class="easy-hero-head">
+                        <div class="easy-hero-icon"><img src="/favicon.png" alt=""></div>
+                        <div>
+                            <span class="easy-kicker">Legendar vídeo</span>
+                            <span class="card-title">Preserve a fala e gere SRT traduzido</span>
+                            <p class="easy-intro">Sem limite definido de duração, sem separação vocal e sem escolha de fundo. O áudio original permanece no vídeo final e o SRT pode ser baixado separadamente.</p>
+                        </div>
+                    </div>
+
+                    <div class="card" style="margin: 1rem 0; box-shadow: none;">
+                        <div class="card-header"><span class="card-title"><span class="line-glyph">1</span> Vídeo de origem</span></div>
+                        <div class="form-grid">
+                            <label class="upload-area" id="subtitleUploadArea" for="subtitleVideoFile" style="min-height: 112px; display:flex; flex-direction:column; align-items:center; justify-content:center; cursor:pointer; border:2px dashed var(--glass-border-light); border-radius:14px; background:var(--input-bg);" data-drop-zone>
+                                <span class="line-glyph" style="font-size:1.5rem;">＋</span>
+                                <strong id="subtitleVideoFileText">Escolher um ou mais vídeos</strong>
+                                <span class="compact-note">MP4, MKV, AVI, MOV ou WEBM</span>
+                                <input type="file" id="subtitleVideoFile" accept="video/*,.mkv,.avi" multiple style="display:none;">
+                            </label>
+                            <div style="display:flex; flex-direction:column; gap:0.65rem;">
+                                <div class="form-group">
+                                    <span class="label">Link do YouTube</span>
+                                    <input type="url" id="subtitleYoutubeUrl" class="input-text" placeholder="Ou cole a URL do vídeo">
+                                    <div id="subtitleYoutubeTitleBadge" class="youtube-identification" aria-live="polite"><span>▶</span><span id="subtitleYoutubeTitleText"></span></div>
+                                </div>
+                                <div class="form-group">
+                                    <span class="label">Vídeo da Biblioteca</span>
+                                    <select id="subtitleLibraryVideo" class="select-input"><option value="">Ou escolha na Biblioteca...</option></select>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card" style="margin: 0 0 1rem; box-shadow: none;">
+                        <div class="card-header"><span class="card-title"><span class="line-glyph">2</span> Transcrição, tradução e estilo</span></div>
+                        <div class="form-grid">
+                            <div class="form-group"><span class="label">Idioma do SRT</span><select id="subtitleTranslationLanguage" class="select-input"><option value="pt" selected>Português</option><option value="en">Inglês</option><option value="es">Espanhol</option><option value="original">Idioma original (sem tradução)</option></select></div>
+                            <div class="form-group"><span class="label">Modelo Whisper</span><select id="subtitleWhisperModel" class="select-input"><option value="large-v3-turbo">Large V3 Turbo</option><option value="large-v3">Large V3 (máxima)</option><option value="medium">Medium</option><option value="small">Small</option><option value="tiny">Tiny</option></select></div>
+                            <div class="form-group"><span class="label">Leitura da fala</span><select id="subtitleTranscriptionPreset" class="select-input"><option value="difficult">Voz difícil</option><option value="karaoke">Equilibrada</option><option value="continuous">Fala contínua</option><option value="fast">Rápida</option></select></div>
+                            <div class="form-group"><span class="label">Filtro de fala (VAD)</span><select id="subtitleEnableVad" class="select-input"><option value="true">Ligado (recomendado para fala)</option><option value="false">Desligado</option></select></div>
+                            <div class="form-group"><span class="label">Modo visual da legenda</span><select id="subtitleVisualMode" class="select-input"><option value="line">Linha completa</option><option value="word">Palavra por palavra</option><option value="syllable">Varredura</option></select></div>
+                            <div class="form-group"><span class="label">Revisar antes de renderizar</span><select id="subtitleEnableCorrection" class="select-input"><option value="false">Não</option><option value="true">Sim</option></select></div>
+                            <div class="form-group"><span class="label">Posição</span><select id="subtitleTextPosition" class="select-input"><option value="bottom">Inferior</option><option value="middle">Central</option><option value="top">Superior</option></select></div>
+                            <div class="form-group"><span class="label">Cor</span><input type="color" id="subtitleTextColor" value="#00FFFF" class="input-text" style="height:38px; padding:0.25rem;"></div>
+                            <div class="form-group"><span class="label">Tamanho da fonte</span><input type="number" id="subtitleFontSize" min="20" max="96" value="50" class="input-text"></div>
+                            <div class="form-group"><span class="label">Palavras por linha (0 = auto)</span><input type="number" id="subtitleWordsPerLine" min="0" max="30" value="0" class="input-text"></div>
+                            <div class="form-group"><span class="label">Caracteres por linha (0 = auto)</span><input type="number" id="subtitleMaxCharsLine" min="0" max="100" value="0" class="input-text"></div>
+                            <div class="form-group"><span class="label">Quebrar por pontuação</span><select id="subtitleBreakPunctuation" class="select-input"><option value="true">Sim</option><option value="false">Não</option></select></div>
+                            <div class="form-group"><span class="label">Legenda desde o início</span><select id="subtitleFirstLine" class="select-input"><option value="false">Não</option><option value="true">Sim</option></select></div>
+                            <div class="form-group"><span class="label">Salvar original na Biblioteca</span><select id="subtitleSaveLibrary" class="select-input"><option value="true">Sim</option><option value="false">Não</option></select></div>
+                        </div>
+                        <p class="compact-note" style="margin-top:0.8rem;">A tradução é processada localmente. No primeiro uso de tradução para português ou espanhol, o modelo multilíngue é baixado para o volume persistente do servidor.</p>
+                    </div>
+                    <button type="submit" id="subtitleSubmitBtn" class="btn-primary easy-submit">▤ Gerar vídeo legendado + SRT</button>
+                </div>
+            </form>
+
             <!-- Form Principal -->
             <form id="karaokêForm" style="display: none;">
                 <!-- BADGE DE REUTILIZAÇÃO DE CACHE RÁPIDA -->
@@ -1356,7 +1484,7 @@
                             <span style="font-size: 1.6rem; margin-bottom: 0.2rem;">🎵</span>
                             <p id="audioTextName" style="font-size: 0.85rem; margin: 0; font-weight: 500;">Arraste a música/vídeo aqui ou clique para buscar</p>
                             <p style="font-size: 0.68rem; color: var(--text-muted); margin: 0;">MP3, WAV, FLAC, M4A, MP4, MKV...</p>
-                            <input type="file" id="audioFile" name="audio_file" accept=".mp3,.wav,.flac,.m4a,.mp4,.mkv,.avi" style="display: none;">
+                            <input type="file" id="audioFile" name="audio_file" accept=".mp3,.wav,.flac,.m4a,.mp4,.mkv,.avi" multiple style="display: none;">
                             <div id="audioBadge" style="display: none; background: var(--accent); color: white; padding: 0.2rem 0.6rem; border-radius: 20px; font-size: 0.72rem; margin-top: 0.3rem;"></div>
                         </div>
                     </div>
@@ -1642,6 +1770,15 @@
                 </div>
             </form>
 
+            <div class="card" id="queueCard">
+                <div class="card-header">
+                    <span class="card-title"><span class="line-glyph">≡</span> Fila de processamento</span>
+                    <span id="queueCountBadge" class="queue-status">0 aguardando</span>
+                </div>
+                <p class="compact-note" style="margin-bottom: 0.8rem;">Selecione vários arquivos de uma vez. O servidor prepara um vídeo por vez, sem sobrescrever os demais.</p>
+                <div id="processingQueueList" class="queue-list"><span class="compact-note">A fila está vazia.</span></div>
+            </div>
+
             <!-- CARD DE PROGRESSO DE PRODUÇÃO -->
             <div class="card" id="processCard" style="display: none;">
                 <div class="card-header">
@@ -1740,6 +1877,7 @@
                 <video id="resultVideoPreview" class="media-preview" controls preload="metadata"></video>
                 <div style="display: flex; justify-content: center; gap: 0.55rem; flex-wrap: wrap;">
                     <button type="button" id="btnDownloadResult" class="btn-primary" style="background: linear-gradient(135deg, #10b981, #059669); width: auto;">⬇️ Baixar MP4</button>
+                    <button type="button" id="btnDownloadSubtitles" class="btn-primary" style="display:none; width:auto;">▤ Baixar SRT</button>
                     <button type="button" id="btnOpenResultLibrary" class="btn-secondary">📚 Abrir Biblioteca</button>
                 </div>
             </div>
@@ -1761,6 +1899,25 @@
                 <div id="modelsListContainer" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr)); gap: 0.8rem;">
                     <!-- Preenchido via JS fetchModelsStatus() -->
                 </div>
+            </div>
+
+            <div class="card" id="youtubeToolsSection">
+                <div class="card-header">
+                    <span class="card-title">▶️ Compatibilidade com YouTube</span>
+                    <button type="button" id="btnUpdateYoutubeTools" class="btn-secondary">↻ Atualizar mecanismo</button>
+                </div>
+                <p class="compact-note">O YouTube altera seus mecanismos com frequência. A atualização é instalada no volume persistente do servidor e continua disponível após reiniciar o contêiner.</p>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr)); gap: 0.7rem; margin-top: 0.8rem;">
+                    <div style="background: var(--input-bg); border: 1px solid var(--glass-border); border-radius: 10px; padding: 0.8rem;">
+                        <span class="label">yt-dlp</span>
+                        <strong id="youtubeToolsVersion" style="display: block; margin-top: 0.25rem;">Consultando...</strong>
+                    </div>
+                    <div style="background: var(--input-bg); border: 1px solid var(--glass-border); border-radius: 10px; padding: 0.8rem;">
+                        <span class="label">Runtime JavaScript</span>
+                        <strong id="youtubeToolsDeno" style="display: block; margin-top: 0.25rem;">Consultando...</strong>
+                    </div>
+                </div>
+                <p id="youtubeToolsMessage" class="compact-note" style="margin: 0.75rem 0 0;">Consultando o estado do mecanismo...</p>
             </div>
 
             <div class="card" id="easyModeSettingsSection">
@@ -1920,6 +2077,15 @@
         <!-- ABA 3: BIBLIOTECA & HISTÓRICO -->
         <!-- ============================================================= -->
         <div id="libraryTabContent" style="display: none; flex-direction: column; gap: 1.5rem;">
+            <div class="card" id="adminResultsSection" style="display: none; margin: 0;">
+                <div class="card-header">
+                    <span class="card-title"><span class="line-glyph">◎</span> Resultados de todos os perfis</span>
+                    <button type="button" id="btnRefreshAdminResults" class="btn-secondary">↻ Atualizar</button>
+                </div>
+                <p class="compact-note" style="margin-bottom: 0.8rem;">Visualize ou baixe qualquer vídeo concluído, identificado pelo perfil responsável.</p>
+                <div id="adminResultsList" class="admin-results-list"><span class="compact-note">Carregando resultados...</span></div>
+            </div>
+
             <!-- Grid de Envio Rápido para a Biblioteca -->
             <div style="background: var(--input-bg); border: 1px solid var(--glass-border); padding: 1.2rem; border-radius: 12px; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr)); gap: 1rem;">
                 <div>
@@ -1997,7 +2163,7 @@
 
         <!-- RODAPÉ DISCRETO DA PÁGINA -->
         <footer>
-                     Sal0 Karaokê v7.0.0
+                     Sal0 Karaokê v8.0.0
         </footer>
 
     </div> <!-- Container End -->
@@ -2099,6 +2265,8 @@
         let clientPreparationInProgress = false;
         let creationUiLocked = false;
         let lastKnownServerStatus = 'unknown';
+        let youtubeToolsPollTimer = null;
+        let processingQueuePollTimer = null;
 
         function escapeHtml(value) {
             return String(value ?? '').replace(/[&<>'"]/g, char => ({
@@ -2109,7 +2277,7 @@
         function applyRoleUI() {
             const admin = currentUser?.role === 'admin';
             document.querySelector('.settings-grid')?.classList.toggle('user-settings', !admin);
-            ['modelManagerSection', 'easyModeSettingsSection', 'externalUrlSection', 'userManagementSection', 'logsSection'].forEach(id => {
+            ['modelManagerSection', 'youtubeToolsSection', 'easyModeSettingsSection', 'externalUrlSection', 'userManagementSection', 'logsSection', 'adminResultsSection'].forEach(id => {
                 const element = document.getElementById(id);
                 if (element) element.style.display = admin ? '' : 'none';
             });
@@ -2141,14 +2309,19 @@
             currentCreatorMode = mode;
             const easyForm = document.getElementById('easyModeForm');
             const advancedForm = document.getElementById('karaokêForm');
+            const subtitleForm = document.getElementById('subtitleModeForm');
             const easyButton = document.getElementById('btnCreatorEasy');
             const advancedButton = document.getElementById('btnCreatorAdvanced');
+            const subtitleButton = document.getElementById('btnCreatorSubtitle');
             if (easyForm) easyForm.style.display = !creationUiLocked && mode === 'easy' ? 'block' : 'none';
             if (advancedForm) advancedForm.style.display = !creationUiLocked && mode === 'advanced' ? 'block' : 'none';
+            if (subtitleForm) subtitleForm.style.display = !creationUiLocked && mode === 'subtitle' ? 'block' : 'none';
             easyButton?.classList.toggle('active', mode === 'easy');
             advancedButton?.classList.toggle('active', mode === 'advanced');
+            subtitleButton?.classList.toggle('active', mode === 'subtitle');
             easyButton?.setAttribute('aria-selected', String(mode === 'easy'));
             advancedButton?.setAttribute('aria-selected', String(mode === 'advanced'));
+            subtitleButton?.setAttribute('aria-selected', String(mode === 'subtitle'));
         }
 
         function setCreationUiLocked(locked) {
@@ -2156,9 +2329,11 @@
             const switcher = document.getElementById('creatorModeSwitch');
             const easyButton = document.getElementById('btnCreatorEasy');
             const advancedButton = document.getElementById('btnCreatorAdvanced');
+            const subtitleButton = document.getElementById('btnCreatorSubtitle');
             switcher?.classList.toggle('is-locked', creationUiLocked);
             if (easyButton) easyButton.disabled = creationUiLocked;
             if (advancedButton) advancedButton.disabled = creationUiLocked;
+            if (subtitleButton) subtitleButton.disabled = creationUiLocked;
             setCreatorMode(currentCreatorMode);
         }
 
@@ -2207,6 +2382,7 @@
             renderEasyRandomBackgroundChoices(latestLibraryPhotos);
             updateEasyModeRandomBackgroundSection();
             refreshEasySummary(config);
+            applySubtitleModeDefaults(config);
             const defaultBackground = document.getElementById('easyDefaultBackgroundOption');
             if (defaultBackground) {
                 const labels = {
@@ -2219,6 +2395,29 @@
             }
         }
 
+        function applySubtitleModeDefaults(config) {
+            const values = {
+                subtitleWhisperModel: config.whisper_model || 'large-v3-turbo',
+                subtitleTranscriptionPreset: config.transcription_preset || 'difficult',
+                subtitleVisualMode: config.subtitle_mode === 'phrase' ? 'line' : (config.subtitle_mode || 'line'),
+                subtitleEnableCorrection: Boolean(config.enable_correction),
+                subtitleTextPosition: config.text_position || 'bottom',
+                subtitleTextColor: config.text_color || '#00FFFF',
+                subtitleFontSize: config.font_size || 50,
+                subtitleWordsPerLine: config.words_per_line || 0,
+                subtitleMaxCharsLine: config.max_chars_line || 0,
+                subtitleBreakPunctuation: Boolean(config.break_on_punctuation),
+                subtitleFirstLine: Boolean(config.keep_first_line_visible),
+                subtitleSaveLibrary: Boolean(config.save_to_library),
+            };
+            Object.entries(values).forEach(([id, value]) => {
+                const element = document.getElementById(id);
+                if (element) element.value = String(value);
+            });
+            const vad = document.getElementById('subtitleEnableVad');
+            if (vad) vad.value = 'true';
+        }
+
         async function fetchEasyModeConfig() {
             try {
                 const response = await authFetch('/api/easy-mode');
@@ -2226,7 +2425,7 @@
                 easyModeConfig = await response.json();
                 applyEasyModeConfigToControls(easyModeConfig);
                 const switcher = document.getElementById('creatorModeSwitch');
-                if (switcher) switcher.style.display = easyModeConfig.enabled ? 'grid' : 'none';
+                if (switcher) switcher.style.display = 'grid';
                 setCreatorMode(easyModeConfig.enabled ? 'easy' : 'advanced');
             } catch (error) {
                 console.warn('Não foi possível carregar o Modo Rápido.', error);
@@ -2351,15 +2550,17 @@
                 event.preventDefault();
                 dragDepth = 0;
                 zone.classList.remove('is-dragging');
-                const file = event.dataTransfer?.files?.[0];
-                if (!file) return;
-                if (!inputAcceptsFile(input, file)) {
-                    alert(`O arquivo “${file.name}” não é compatível com este campo.`);
+                const droppedFiles = Array.from(event.dataTransfer?.files || []);
+                const files = input.multiple ? droppedFiles : droppedFiles.slice(0, 1);
+                if (!files.length) return;
+                const incompatible = files.find(file => !inputAcceptsFile(input, file));
+                if (incompatible) {
+                    alert(`O arquivo “${incompatible.name}” não é compatível com este campo.`);
                     return;
                 }
                 try {
                     const transfer = new DataTransfer();
-                    transfer.items.add(file);
+                    files.forEach(file => transfer.items.add(file));
                     input.files = transfer.files;
                     input.dispatchEvent(new Event('change', { bubbles: true }));
                 } catch (error) {
@@ -2816,6 +3017,227 @@
             } catch (e) { alert("Erro ao baixar modelo: " + e.message); }
         }
 
+        function renderYoutubeToolsStatus(data) {
+            const version = document.getElementById('youtubeToolsVersion');
+            const deno = document.getElementById('youtubeToolsDeno');
+            const message = document.getElementById('youtubeToolsMessage');
+            const button = document.getElementById('btnUpdateYoutubeTools');
+            const update = data?.update || {};
+
+            if (version) {
+                const source = data?.source === 'persistent' ? 'atualização persistente' : 'imagem Docker';
+                version.textContent = data?.yt_dlp_version ? `${data.yt_dlp_version} · ${source}` : 'Não disponível';
+            }
+            if (deno) deno.textContent = data?.deno_version || 'Não instalado — recrie a imagem Docker';
+            if (message) {
+                message.textContent = update.error
+                    ? `${update.message || 'Falha na atualização'} ${update.error}`
+                    : (update.message || 'Mecanismo pronto para uso.');
+                message.style.color = update.status === 'error' ? '#fca5a5' : 'var(--text-muted)';
+            }
+            if (button) {
+                button.disabled = update.status === 'updating';
+                button.textContent = update.status === 'updating' ? '⏳ Atualizando...' : '↻ Atualizar mecanismo';
+            }
+        }
+
+        async function fetchYoutubeToolsStatus() {
+            if (currentUser?.role !== 'admin') return;
+            try {
+                const response = await authFetch('/api/youtube-tools/status');
+                if (!response.ok) return;
+                const data = await response.json();
+                renderYoutubeToolsStatus(data);
+                clearTimeout(youtubeToolsPollTimer);
+                if (data?.update?.status === 'updating') {
+                    youtubeToolsPollTimer = setTimeout(fetchYoutubeToolsStatus, 2500);
+                }
+            } catch (error) {
+                console.error('Erro ao consultar o mecanismo do YouTube:', error);
+            }
+        }
+
+        async function updateYoutubeTools() {
+            const button = document.getElementById('btnUpdateYoutubeTools');
+            if (button) {
+                button.disabled = true;
+                button.textContent = '⏳ Preparando...';
+            }
+            try {
+                const response = await authFetch('/api/youtube-tools/update', { method: 'POST' });
+                const data = await response.json().catch(() => ({}));
+                if (!response.ok) throw new Error(data.detail || 'Não foi possível iniciar a atualização.');
+                await fetchYoutubeToolsStatus();
+            } catch (error) {
+                alert(`Erro ao atualizar o mecanismo do YouTube: ${error.message}`);
+                await fetchYoutubeToolsStatus();
+            }
+        }
+
+        function queueStatusLabel(job) {
+            if (job.status === 'queued') return `Aguardando · posição ${job.position || '—'}`;
+            if (job.status === 'processing') return 'Processando agora';
+            if (job.status === 'done') return 'Concluído';
+            if (job.status === 'cancelled') return 'Cancelado';
+            if (job.status === 'error') return 'Falhou';
+            return job.status || 'Desconhecido';
+        }
+
+        function queueResultUrl(job, filename) {
+            const encodedFilename = encodeURIComponent(filename || '');
+            if (currentUser?.role === 'admin') {
+                const ownerKey = job.owner_role === 'admin' ? '__admin__' : job.owner_username;
+                return `/api/admin/results/${encodeURIComponent(ownerKey)}/${encodedFilename}?token=${encodeURIComponent(authToken)}`;
+            }
+            return `/api/library/download/history/${encodedFilename}?token=${encodeURIComponent(authToken)}`;
+        }
+
+        function renderProcessingQueue(jobs) {
+            const container = document.getElementById('processingQueueList');
+            const badge = document.getElementById('queueCountBadge');
+            if (!container || !badge) return;
+            const pending = jobs.filter(job => ['queued', 'processing'].includes(job.status));
+            badge.textContent = `${pending.filter(job => job.status === 'queued').length} aguardando`;
+            if (!jobs.length) {
+                container.innerHTML = '<span class="compact-note">A fila está vazia.</span>';
+                return;
+            }
+            container.innerHTML = jobs.slice(0, 20).map(job => `
+                <div class="queue-item">
+                    <div>
+                        <div class="queue-title">${escapeHtml(job.title || 'Vídeo')}</div>
+                        <div class="queue-meta">${currentUser?.role === 'admin' ? `${escapeHtml(job.owner_username || 'perfil')} · ` : ''}${escapeHtml(job.message || '')}</div>
+                    </div>
+                    <div style="display:flex; align-items:center; gap:0.45rem; flex-wrap:wrap; justify-content:flex-end;">
+                        <span class="queue-status">${escapeHtml(queueStatusLabel(job))}</span>
+                        ${job.status === 'queued' ? `<button type="button" class="btn-secondary" onclick="removeQueuedJob('${encodeURIComponent(job.id)}')">Remover</button>` : ''}
+                        ${job.status === 'done' && job.history_filename ? `<a class="btn-secondary" style="text-decoration:none;" href="${queueResultUrl(job, job.history_filename)}">MP4</a>` : ''}
+                        ${job.status === 'done' && job.subtitle_filename ? `<a class="btn-secondary" style="text-decoration:none;" href="${queueResultUrl(job, job.subtitle_filename)}">SRT</a>` : ''}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        async function fetchProcessingQueue() {
+            try {
+                const response = await authFetch('/api/queue', { cache: 'no-store' });
+                if (!response.ok) return;
+                const data = await response.json();
+                const jobs = data.jobs || [];
+                renderProcessingQueue(jobs);
+                clearTimeout(processingQueuePollTimer);
+                if (jobs.some(job => ['queued', 'processing'].includes(job.status))) {
+                    processingQueuePollTimer = setTimeout(fetchProcessingQueue, 3000);
+                }
+            } catch (error) {
+                console.error('Erro ao consultar a fila:', error);
+            }
+        }
+
+        async function removeQueuedJob(jobId) {
+            const response = await authFetch(`/api/queue/${jobId}`, { method: 'DELETE' });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                alert(data.detail || 'Não foi possível remover o item da fila.');
+                return;
+            }
+            await fetchProcessingQueue();
+        }
+
+        function cloneFormData(source) {
+            const copy = new FormData();
+            for (const [key, value] of source.entries()) copy.append(key, value);
+            return copy;
+        }
+
+        async function submitProcessBatch(baseFormData, audioFiles = []) {
+            const files = Array.from(audioFiles || []);
+            const submissions = files.length ? files : [null];
+            const results = [];
+            for (const [index, file] of submissions.entries()) {
+                const formData = cloneFormData(baseFormData);
+                formData.delete('audio_file');
+                if (file) formData.set('audio_file', file, file.name);
+                const response = await authFetch('/api/process', { method: 'POST', body: formData });
+                const result = await response.json().catch(() => ({}));
+                if (!response.ok) {
+                    throw new Error(`${file?.name || 'vídeo'}: ${result.detail || 'não foi possível adicionar à fila.'}`);
+                }
+                results.push(result);
+                clearTimeout(processingQueuePollTimer);
+                processingQueuePollTimer = setTimeout(fetchProcessingQueue, 150);
+                const buttonId = currentCreatorMode === 'easy'
+                    ? 'easySubmitBtn'
+                    : (currentCreatorMode === 'subtitle' ? 'subtitleSubmitBtn' : 'btnSubmit');
+                const button = document.getElementById(buttonId);
+                if (button && submissions.length > 1) button.textContent = `Enviando ${index + 1}/${submissions.length}...`;
+            }
+            return results;
+        }
+
+        function formatFileSize(bytes) {
+            const value = Number(bytes) || 0;
+            if (value < 1024 * 1024) return `${Math.max(1, Math.round(value / 1024))} KB`;
+            return `${(value / (1024 * 1024)).toFixed(1)} MB`;
+        }
+
+        async function fetchAdminResults() {
+            if (currentUser?.role !== 'admin') return;
+            const container = document.getElementById('adminResultsList');
+            try {
+                const response = await authFetch('/api/admin/results', { cache: 'no-store' });
+                if (!response.ok) return;
+                const data = await response.json();
+                const results = data.results || [];
+                if (!container) return;
+                if (!results.length) {
+                    container.innerHTML = '<span class="compact-note">Nenhum vídeo concluído foi encontrado.</span>';
+                    return;
+                }
+                container.innerHTML = results.map(item => {
+                    const owner = encodeURIComponent(item.owner_key).replace(/'/g, '%27');
+                    const filename = encodeURIComponent(item.filename).replace(/'/g, '%27');
+                    return `
+                        <div class="admin-result-item">
+                            <div>
+                                <div class="admin-result-title">${escapeHtml(item.filename)}</div>
+                                <div class="admin-result-meta">Perfil: ${escapeHtml(item.owner)} · ${formatFileSize(item.size)}</div>
+                            </div>
+                            <div style="display:flex; gap:0.45rem; flex-wrap:wrap; justify-content:flex-end;">
+                                ${item.kind === 'subtitle' ? '' : `<button type="button" class="btn-secondary" onclick="previewAdminResult('${owner}', '${filename}')">▷ Visualizar</button>`}
+                                <button type="button" class="btn-secondary" onclick="downloadAdminResult('${owner}', '${filename}')">↓ Baixar</button>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            } catch (error) {
+                if (container) container.innerHTML = `<span class="compact-note">Falha ao carregar resultados: ${escapeHtml(error.message)}</span>`;
+            }
+        }
+
+        function previewAdminResult(owner, filename) {
+            const modal = document.getElementById('mediaPreviewModal');
+            const video = document.getElementById('libraryVideoPreview');
+            const image = document.getElementById('libraryImagePreview');
+            const heading = document.getElementById('mediaPreviewTitle');
+            if (heading) heading.textContent = decodeURIComponent(filename);
+            if (image) image.style.display = 'none';
+            if (video) {
+                video.style.display = 'block';
+                video.src = `/api/admin/results/${owner}/${filename}?inline=true&token=${encodeURIComponent(authToken)}&t=${Date.now()}`;
+                video.load();
+            }
+            if (modal) modal.style.display = 'flex';
+        }
+
+        function downloadAdminResult(owner, filename) {
+            const link = document.createElement('a');
+            link.href = `/api/admin/results/${owner}/${filename}?token=${encodeURIComponent(authToken)}`;
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+        }
+
         // FUNÇÃO PARA CARREGAR CONFIGURAÇÃO DO TELEGRAM
         async function fetchTelegramConfig() {
             try {
@@ -2942,7 +3364,8 @@
                 if (section === 'photos') actions.appendChild(makeLibraryButton('🖼️ Usar', '', () => useBgFromLibrary(file)));
 
                 const ext = (file.split('.').pop() || '').toLowerCase();
-                if (section === 'history' || ['mp4', 'mkv', 'webm', 'mov', 'avi', 'mp3', 'wav', 'm4a', 'flac', 'png', 'jpg', 'jpeg', 'gif', 'webp'].includes(ext)) {
+                if (ext === 'srt') fileIcon.textContent = '▤';
+                if (['mp4', 'mkv', 'webm', 'mov', 'avi', 'mp3', 'wav', 'm4a', 'flac', 'png', 'jpg', 'jpeg', 'gif', 'webp'].includes(ext)) {
                     actions.appendChild(makeLibraryButton('▶️ Ver', 'btn-secondary', () => openMediaPreview(section, file)));
                 }
                 if (section === 'history') {
@@ -2979,6 +3402,8 @@
                 fillLibrarySelect(document.getElementById('libraryBgSelect'), data.photos, 'Selecione um fundo da biblioteca...');
                 fillLibrarySelect(document.getElementById('easyLibraryAudio'), data.videos, 'Escolha na biblioteca...');
                 fillLibrarySelect(document.getElementById('easyLibraryBg'), data.photos, 'Escolha um fundo...');
+                const libraryVideos = (data.videos || []).filter(file => ['mp4', 'mkv', 'avi', 'mov', 'webm', 'm4v'].includes((file.split('.').pop() || '').toLowerCase()));
+                fillLibrarySelect(document.getElementById('subtitleLibraryVideo'), libraryVideos, 'Ou escolha na Biblioteca...');
                 latestLibraryPhotos = data.photos || [];
                 easyRandomBackgroundSelection = new Set(
                     [...easyRandomBackgroundSelection].filter(filename => latestLibraryPhotos.includes(filename))
@@ -3143,6 +3568,7 @@
 
             document.getElementById('btnCreatorEasy')?.addEventListener('click', () => setCreatorMode('easy'));
             document.getElementById('btnCreatorAdvanced')?.addEventListener('click', () => setCreatorMode('advanced'));
+            document.getElementById('btnCreatorSubtitle')?.addEventListener('click', () => setCreatorMode('subtitle'));
             document.getElementById('easyYoutubeUrl')?.addEventListener('focus', () => setEasyAudioMode('youtube'));
             document.getElementById('easyYoutubeUrl')?.addEventListener('input', event => {
                 if (event.target.value.trim()) setEasyAudioMode('youtube');
@@ -3161,9 +3587,10 @@
             });
             document.getElementById('easyModeBackgroundMode')?.addEventListener('change', updateEasyModeRandomBackgroundSection);
             document.getElementById('easyAudioFile')?.addEventListener('change', event => {
-                const file = event.target.files?.[0];
+                const files = Array.from(event.target.files || []);
+                const file = files[0];
                 const label = document.getElementById('easyAudioFileText');
-                if (label) label.textContent = file?.name || 'Escolher arquivo';
+                if (label) label.textContent = files.length > 1 ? `${files.length} arquivos selecionados` : (file?.name || 'Escolher arquivo');
                 if (file) setEasyAudioMode('upload');
             });
             document.getElementById('easyBgFile')?.addEventListener('change', event => {
@@ -3172,11 +3599,19 @@
                 if (label) label.textContent = file?.name || 'Escolher fundo';
                 if (file) setEasyBackgroundType('upload');
             });
+            document.getElementById('subtitleVideoFile')?.addEventListener('change', event => {
+                const files = Array.from(event.target.files || []);
+                const label = document.getElementById('subtitleVideoFileText');
+                if (label) label.textContent = files.length > 1 ? `${files.length} vídeos selecionados` : (files[0]?.name || 'Escolher um ou mais vídeos');
+            });
 
             document.getElementById('btnResetEasyModeDefaults')?.addEventListener('click', () => {
                 applyEasyModeConfigToControls(easyModeClientDefaults);
                 alert('Os valores padrão foram preenchidos. Clique em “Salvar perfil do Modo Rápido” para aplicá-los.');
             });
+
+            document.getElementById('btnUpdateYoutubeTools')?.addEventListener('click', updateYoutubeTools);
+            document.getElementById('btnRefreshAdminResults')?.addEventListener('click', fetchAdminResults);
 
             document.getElementById('btnSaveEasyMode')?.addEventListener('click', async () => {
                 const button = document.getElementById('btnSaveEasyMode');
@@ -3229,11 +3664,12 @@
                 const formData = new FormData();
                 formData.set('easy_mode', 'true');
                 formData.set('app_base_url', window.location.origin);
+                let audioFiles = [];
 
                 if (easyAudioMode === 'upload') {
-                    const file = document.getElementById('easyAudioFile')?.files?.[0];
-                    if (!file) { alert('Escolha uma música ou vídeo.'); return; }
-                    formData.set('audio_file', file, file.name);
+                    audioFiles = Array.from(document.getElementById('easyAudioFile')?.files || []);
+                    if (!audioFiles.length) { alert('Escolha uma ou mais músicas ou vídeos.'); return; }
+                    if (audioFiles.length > 25) { alert('Envie no máximo 25 arquivos por vez.'); return; }
                 } else if (easyAudioMode === 'youtube') {
                     const url = document.getElementById('easyYoutubeUrl')?.value.trim();
                     if (!url) { alert('Cole o link da música no YouTube.'); return; }
@@ -3281,10 +3717,14 @@
                     if (button) button.textContent = 'Preparando a criação...';
                     if (status) status.textContent = 'Preparando a criação rápida...';
 
-                    const response = await authFetch('/api/process', { method: 'POST', body: formData });
-                    const result = await response.json().catch(() => ({}));
-                    if (!response.ok) throw new Error(result.detail || 'Não foi possível iniciar a criação.');
+                    const results = await submitProcessBatch(formData, audioFiles);
                     clientPreparationInProgress = false;
+                    setCreationUiLocked(false);
+                    if (button) {
+                        button.disabled = false;
+                        button.textContent = results.length > 1 ? `${results.length} vídeos adicionados à fila` : 'Adicionar outro vídeo';
+                    }
+                    await fetchProcessingQueue();
                     startPolling();
                 } catch (error) {
                     clientPreparationInProgress = false;
@@ -3292,6 +3732,82 @@
                     alert('Erro no Modo Rápido: ' + error.message);
                     if (button) { button.disabled = false; button.textContent = '⚡ Criar meu karaokê'; }
                     if (processCard) processCard.style.display = 'none';
+                }
+            });
+
+            document.getElementById('subtitleModeForm')?.addEventListener('submit', async event => {
+                event.preventDefault();
+                const button = document.getElementById('subtitleSubmitBtn');
+                const processCard = document.getElementById('processCard');
+                const status = document.getElementById('statusMessage');
+                const audioFiles = Array.from(document.getElementById('subtitleVideoFile')?.files || []);
+                const youtubeUrl = document.getElementById('subtitleYoutubeUrl')?.value.trim() || '';
+                const libraryVideo = document.getElementById('subtitleLibraryVideo')?.value || '';
+                const selectedSources = Number(audioFiles.length > 0) + Number(Boolean(youtubeUrl)) + Number(Boolean(libraryVideo));
+                if (selectedSources !== 1) {
+                    alert('Escolha apenas uma origem: arquivos, link do YouTube ou vídeo da Biblioteca.');
+                    return;
+                }
+                if (audioFiles.length > 25) {
+                    alert('Envie no máximo 25 vídeos por vez.');
+                    return;
+                }
+
+                const formData = new FormData();
+                formData.set('subtitle_only', 'true');
+                formData.set('translation_language', document.getElementById('subtitleTranslationLanguage')?.value || 'pt');
+                formData.set('whisper_model', document.getElementById('subtitleWhisperModel')?.value || 'large-v3-turbo');
+                formData.set('transcription_preset', document.getElementById('subtitleTranscriptionPreset')?.value || 'difficult');
+                formData.set('enable_vad', document.getElementById('subtitleEnableVad')?.value || 'true');
+                formData.set('subtitle_mode', document.getElementById('subtitleVisualMode')?.value || 'line');
+                formData.set('enable_correction', document.getElementById('subtitleEnableCorrection')?.value || 'false');
+                formData.set('text_position', document.getElementById('subtitleTextPosition')?.value || 'bottom');
+                formData.set('text_color', document.getElementById('subtitleTextColor')?.value || '#00FFFF');
+                formData.set('font_size', document.getElementById('subtitleFontSize')?.value || '50');
+                formData.set('words_per_line', document.getElementById('subtitleWordsPerLine')?.value || '0');
+                formData.set('max_chars_line', document.getElementById('subtitleMaxCharsLine')?.value || '0');
+                formData.set('break_on_punctuation', document.getElementById('subtitleBreakPunctuation')?.value || 'true');
+                formData.set('keep_first_line_visible', document.getElementById('subtitleFirstLine')?.value || 'false');
+                formData.set('save_to_library', document.getElementById('subtitleSaveLibrary')?.value || 'true');
+                formData.set('background_mode', 'original');
+                formData.set('transcribe_source', 'original');
+                formData.set('show_instrumental', 'false');
+                formData.set('show_next_line_preview', 'false');
+                formData.set('lyrics_mode', 'manual');
+                formData.set('only_remove_vocals', 'false');
+                formData.set('app_base_url', window.location.origin);
+                if (youtubeUrl) formData.set('youtube_url', youtubeUrl);
+                if (libraryVideo) formData.set('library_audio', libraryVideo);
+
+                clientPreparationInProgress = true;
+                lastKnownServerStatus = 'preparing';
+                setCreationUiLocked(true);
+                if (button) { button.disabled = true; button.textContent = 'Adicionando à fila...'; }
+                if (processCard) processCard.style.display = 'block';
+                if (status) status.textContent = 'Preparando o vídeo para transcrição...';
+                renderProcessSummary({
+                    title: audioFiles.length > 1 ? `${audioFiles.length} vídeos` : (audioFiles[0]?.name || youtubeUrl || libraryVideo),
+                    lyrics: `SRT · ${(document.getElementById('subtitleTranslationLanguage')?.selectedOptions?.[0]?.textContent || 'Português')}`,
+                    model: document.getElementById('subtitleWhisperModel')?.selectedOptions?.[0]?.textContent || 'Large V3 Turbo',
+                    background: 'Vídeo original · áudio preservado',
+                });
+                updateTimelineUI('Uploading');
+                try {
+                    const results = await submitProcessBatch(formData, audioFiles);
+                    clientPreparationInProgress = false;
+                    setCreationUiLocked(false);
+                    if (button) {
+                        button.disabled = false;
+                        button.textContent = results.length > 1 ? `${results.length} vídeos adicionados à fila` : 'Adicionar outro vídeo';
+                    }
+                    await fetchProcessingQueue();
+                    startPolling();
+                } catch (error) {
+                    clientPreparationInProgress = false;
+                    setCreationUiLocked(false);
+                    if (button) { button.disabled = false; button.textContent = '▤ Gerar vídeo legendado + SRT'; }
+                    if (processCard) processCard.style.display = 'none';
+                    alert('Erro ao legendar vídeo: ' + error.message);
                 }
             });
 
@@ -3437,10 +3953,11 @@
                 audioUploadArea.onclick = () => audioFile.click();
                 audioFile.onchange = () => {
                     if (audioFile.files && audioFile.files[0]) {
-                        const fname = audioFile.files[0].name;
-                        document.getElementById('audioTextName').innerText = fname;
+                        const files = Array.from(audioFile.files);
+                        const fname = files[0].name;
+                        document.getElementById('audioTextName').innerText = files.length > 1 ? `${files.length} arquivos selecionados para a fila` : fname;
                         const badge = document.getElementById('audioBadge');
-                        badge.innerText = `✓ Arquivo carregado: ${fname}`;
+                        badge.innerText = files.length > 1 ? `✓ ${files.length} vídeos prontos para envio` : `✓ Arquivo carregado: ${fname}`;
                         badge.style.display = 'inline-block';
                         autoLookupLyricsForSong(getSuggestedLyricsQuery());
                     }
@@ -3498,6 +4015,7 @@
                 ['easyAudioUploadBox', 'easyAudioFile'],
                 ['easyBackgroundUploadBox', 'easyBgFile'],
                 ['audioUploadArea', 'audioFile'],
+                ['subtitleUploadArea', 'subtitleVideoFile'],
                 ['bgUploadArea', 'bgFile'],
                 ['libAudioUploadArea', 'libAudioFile'],
                 ['libBgUploadArea', 'libBgFile'],
@@ -3738,6 +4256,17 @@
                 btnDownloadResult.onclick = () => {
                     const link = document.createElement('a');
                     link.href = `/api/download?token=${encodeURIComponent(authToken)}&t=${Date.now()}`;
+                    link.rel = 'noopener';
+                    document.body.appendChild(link);
+                    link.click();
+                    link.remove();
+                };
+            }
+            const btnDownloadSubtitles = document.getElementById('btnDownloadSubtitles');
+            if (btnDownloadSubtitles) {
+                btnDownloadSubtitles.onclick = () => {
+                    const link = document.createElement('a');
+                    link.href = `/api/download-subtitles?token=${encodeURIComponent(authToken)}&t=${Date.now()}`;
                     link.rel = 'noopener';
                     document.body.appendChild(link);
                     link.click();
@@ -4424,6 +4953,7 @@
                 ['youtubeUrl', 'youtubeTitleBadge', 'youtubeTitleText'],
                 ['bgYoutubeUrl', 'bgYoutubeTitleBadge', 'bgYoutubeTitleText'],
                 ['easyYoutubeUrl', 'easyYoutubeTitleBadge', 'easyYoutubeTitleText'],
+                ['subtitleYoutubeUrl', 'subtitleYoutubeTitleBadge', 'subtitleYoutubeTitleText'],
                 ['easyBgYoutubeUrl', 'easyBgYoutubeTitleBadge', 'easyBgYoutubeTitleText'],
                 ['libAudioYoutubeUrl', 'libAudioYoutubeTitleBadge', 'libAudioYoutubeTitleText'],
                 ['libBgYoutubeUrl', 'libBgYoutubeTitleBadge', 'libBgYoutubeTitleText'],
@@ -4440,6 +4970,7 @@
                 fetchProfiles(),
                 loadLibrary(),
                 fetchCacheInfo(),
+                fetchProcessingQueue(),
                 (async () => {
                     try {
                         const lyricsRes = await authFetch('/api/lyrics');
@@ -4455,7 +4986,7 @@
                 })(),
             ];
             if (currentUser?.role === 'admin') {
-                initialLoads.push(fetchExternalUrlConfig(), fetchUsers(), fetchModelsStatus());
+                initialLoads.push(fetchExternalUrlConfig(), fetchUsers(), fetchModelsStatus(), fetchYoutubeToolsStatus(), fetchAdminResults());
             }
             await Promise.allSettled(initialLoads);
         });
@@ -4503,6 +5034,7 @@
 
                 const formData = new FormData(karaokêForm);
                 formData.set('app_base_url', window.location.origin);
+                let audioFiles = [];
                 try {
                     const youtubeAudioActive = document.getElementById('btnAudioModeYoutube')?.classList.contains('active');
                     const libraryAudioActive = document.getElementById('btnAudioModeLibrary')?.classList.contains('active');
@@ -4513,6 +5045,9 @@
                         formData.delete('audio_file');
                         formData.delete('youtube_url');
                     } else {
+                        audioFiles = Array.from(document.getElementById('audioFile')?.files || []);
+                        if (audioFiles.length > 25) throw new Error('Envie no máximo 25 arquivos por vez.');
+                        formData.delete('audio_file');
                         formData.delete('youtube_url');
                         formData.delete('library_audio');
                     }
@@ -4535,12 +5070,12 @@
                         formData.delete('library_bg');
                     }
                     if (initialStatus) initialStatus.textContent = 'Preparando a criação...';
-                    const res = await authFetch('/api/process', { method: 'POST', body: formData });
-                    if (!res.ok) {
-                        const err = await res.json();
-                        throw new Error(err.detail || "Erro ao iniciar produção.");
-                    }
+                    const results = await submitProcessBatch(formData, audioFiles);
                     clientPreparationInProgress = false;
+                    setCreationUiLocked(false);
+                    btnSubmit.disabled = false;
+                    btnSubmit.textContent = results.length > 1 ? `${results.length} vídeos adicionados à fila` : 'Adicionar outro vídeo';
+                    await fetchProcessingQueue();
                     startPolling();
                 } catch (err) {
                     clientPreparationInProgress = false;
@@ -4559,7 +5094,7 @@
                 { id: 'step-Extracting', keys: ['extracting', 'áudio'] },
                 { id: 'step-Separating', keys: ['separating', 'demucs', 'vocais'] },
                 { id: 'step-Transcribing', keys: ['transcribing', 'whisper'] },
-                { id: 'step-Subtitles', keys: ['subtitles', 'legenda', 'ass'] },
+                { id: 'step-Subtitles', keys: ['subtitles', 'legenda', 'ass', 'translating', 'traduz'] },
                 { id: 'step-Rendering', keys: ['rendering', 'renderizando'] },
                 { id: 'step-Cleaning', keys: ['cleaning', 'limpando'] },
                 { id: 'step-Done', keys: ['done', 'concluído', 'finalizado'] }
@@ -5040,8 +5575,11 @@
                 const btnSubmit = document.getElementById('btnSubmit');
                 const easyForm = document.getElementById('easyModeForm');
                 const easySubmitBtn = document.getElementById('easySubmitBtn');
+                const subtitleForm = document.getElementById('subtitleModeForm');
+                const subtitleSubmitBtn = document.getElementById('subtitleSubmitBtn');
                 const downloadBox = document.getElementById('downloadBox');
                 const resultVideoPreview = document.getElementById('resultVideoPreview');
+                const btnDownloadSubtitles = document.getElementById('btnDownloadSubtitles');
                 document.querySelectorAll('.btn-cancel-task').forEach(button => {
                     button.style.display = data.can_cancel ? '' : 'none';
                 });
@@ -5060,6 +5598,7 @@
                     if (stageProgressText) stageProgressText.textContent = '';
                     if (btnSubmit) { btnSubmit.disabled = true; btnSubmit.innerHTML = '⏳ Servidor ocupado'; }
                     if (easySubmitBtn) { easySubmitBtn.disabled = true; easySubmitBtn.innerHTML = '⏳ Servidor ocupado'; }
+                    if (subtitleSubmitBtn) { subtitleSubmitBtn.disabled = true; subtitleSubmitBtn.innerHTML = '⏳ Servidor ocupado'; }
                     if (downloadBox) downloadBox.style.display = 'none';
                 } else if (data.status === "processing" || data.status === "downloading") {
                     clientPreparationInProgress = false;
@@ -5067,6 +5606,7 @@
                     // TRAVA DE PROCESSO ÚNICO: Ocultar o formulário enquanto houver processo ativo
                     if (formCard) formCard.style.display = "none";
                     if (easyForm) easyForm.style.display = "none";
+                    if (subtitleForm) subtitleForm.style.display = "none";
                     if (correctionCard) correctionCard.style.display = "none";
                     if (processCard) processCard.style.display = "block";
 
@@ -5088,6 +5628,7 @@
                     }
                     if (btnSubmit) btnSubmit.disabled = true;
                     if (easySubmitBtn) easySubmitBtn.disabled = true;
+                    if (subtitleSubmitBtn) subtitleSubmitBtn.disabled = true;
 
                     renderProcessSummary(data.process_summary || {});
 
@@ -5097,6 +5638,7 @@
                     // PAUSA PARA EDIÇÃO DE LEGENDA PRÉ-RENDERIZAÇÃO
                     if (formCard) formCard.style.display = "none";
                     if (easyForm) easyForm.style.display = "none";
+                    if (subtitleForm) subtitleForm.style.display = "none";
                     if (processCard) processCard.style.display = "none";
                     if (correctionCard) correctionCard.style.display = "block";
 
@@ -5115,11 +5657,14 @@
                             resultVideoPreview.src = `/api/download?inline=true&token=${encodeURIComponent(authToken)}&t=${Date.now()}`;
                             resultVideoPreview.load();
                         }
+                        if (btnDownloadSubtitles) btnDownloadSubtitles.style.display = data.subtitle_filename ? '' : 'none';
                     } else if (downloadBox) {
                         downloadBox.style.display = 'none';
+                        if (btnDownloadSubtitles) btnDownloadSubtitles.style.display = 'none';
                     }
                     if (btnSubmit) { btnSubmit.disabled = false; btnSubmit.innerHTML = '🎬 Criar Karaokê'; }
                     if (easySubmitBtn) { easySubmitBtn.disabled = false; easySubmitBtn.innerHTML = '⚡ Criar meu karaokê'; }
+                    if (subtitleSubmitBtn) { subtitleSubmitBtn.disabled = false; subtitleSubmitBtn.innerHTML = '▤ Gerar vídeo legendado + SRT'; }
                     isShowingCorrection = false;
                     if (statusChanged && previousStatus !== 'unknown') {
                         await Promise.allSettled([fetchCacheInfo(), loadLibrary()]);
@@ -5130,6 +5675,7 @@
                     setCreationUiLocked(false);
                     if (btnSubmit) { btnSubmit.disabled = false; btnSubmit.innerHTML = '🎬 Criar Karaokê'; }
                     if (easySubmitBtn) { easySubmitBtn.disabled = false; easySubmitBtn.innerHTML = '⚡ Criar meu karaokê'; }
+                    if (subtitleSubmitBtn) { subtitleSubmitBtn.disabled = false; subtitleSubmitBtn.innerHTML = '▤ Gerar vídeo legendado + SRT'; }
                     isShowingCorrection = false;
                 }
             } catch (error) {

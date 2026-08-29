@@ -58,15 +58,15 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class MainActivity extends ComponentActivity {
-    private static final int COLOR_BACKGROUND = Color.rgb(9, 7, 20);
-    private static final int COLOR_SURFACE = Color.rgb(18, 16, 36);
-    private static final int COLOR_SURFACE_ALT = Color.rgb(27, 22, 49);
-    private static final int COLOR_BORDER = Color.rgb(56, 45, 84);
-    private static final int COLOR_TEXT = Color.rgb(248, 247, 255);
-    private static final int COLOR_MUTED = Color.rgb(174, 165, 196);
-    private static final int COLOR_PURPLE = Color.rgb(168, 85, 247);
-    private static final int COLOR_PINK = Color.rgb(236, 72, 153);
-    private static final int COLOR_CYAN = Color.rgb(34, 211, 238);
+    private static final int COLOR_BACKGROUND = Color.rgb(5, 11, 18);
+    private static final int COLOR_SURFACE = Color.rgb(8, 20, 31);
+    private static final int COLOR_SURFACE_ALT = Color.rgb(12, 35, 54);
+    private static final int COLOR_BORDER = Color.rgb(38, 94, 130);
+    private static final int COLOR_TEXT = Color.rgb(238, 248, 255);
+    private static final int COLOR_MUTED = Color.rgb(145, 173, 192);
+    private static final int COLOR_PURPLE = Color.rgb(73, 174, 239);
+    private static final int COLOR_PINK = Color.rgb(25, 118, 185);
+    private static final int COLOR_CYAN = Color.rgb(73, 174, 239);
     private static final int COLOR_GREEN = Color.rgb(16, 185, 129);
 
     private static final int REQUEST_FILES = 1001;
@@ -212,7 +212,7 @@ public class MainActivity extends ComponentActivity {
         scroll.addView(page, matchWrap());
 
         ImageView logo = new ImageView(this);
-        logo.setImageResource(com.sal0.karaoke.R.drawable.app_icon);
+        logo.setImageResource(com.sal0.karaoke.R.drawable.app_icon_v8);
         logo.setScaleType(ImageView.ScaleType.CENTER_CROP);
         LinearLayout.LayoutParams logoParams = new LinearLayout.LayoutParams(dp(92), dp(92));
         logoParams.bottomMargin = dp(14);
@@ -391,7 +391,7 @@ public class MainActivity extends ComponentActivity {
         browserContainer.addView(toolbar, new LinearLayout.LayoutParams(-1, dp(58)));
 
         ImageView logo = new ImageView(this);
-        logo.setImageResource(com.sal0.karaoke.R.drawable.app_icon);
+        logo.setImageResource(com.sal0.karaoke.R.drawable.app_icon_v8);
         logo.setScaleType(ImageView.ScaleType.CENTER_CROP);
         toolbar.addView(logo, new LinearLayout.LayoutParams(dp(38), dp(38)));
 
@@ -676,9 +676,10 @@ public class MainActivity extends ComponentActivity {
         offlineOverlay.setBackground(rounded(COLOR_SURFACE, COLOR_BORDER, 22));
         offlineOverlay.setVisibility(View.GONE);
 
-        TextView icon = text("🎤", 38, COLOR_TEXT, false);
-        icon.setGravity(Gravity.CENTER);
-        offlineOverlay.addView(icon, matchWrap());
+        ImageView icon = new ImageView(this);
+        icon.setImageResource(com.sal0.karaoke.R.drawable.app_icon_v8);
+        icon.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        offlineOverlay.addView(icon, new LinearLayout.LayoutParams(dp(68), dp(68)));
         TextView heading = text("Servidor fora de alcance", 19, COLOR_TEXT, true);
         heading.setGravity(Gravity.CENTER);
         LinearLayout.LayoutParams headingParams = matchWrap();
@@ -1000,7 +1001,7 @@ public class MainActivity extends ComponentActivity {
         button.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
         GradientDrawable gradient = new GradientDrawable(
             GradientDrawable.Orientation.LEFT_RIGHT,
-            new int[]{Color.rgb(109, 40, 217), COLOR_PINK}
+            new int[]{COLOR_PURPLE, COLOR_PINK}
         );
         gradient.setCornerRadius(dp(14));
         button.setBackground(gradient);
@@ -1020,6 +1021,7 @@ public class MainActivity extends ComponentActivity {
 
     private Button iconButton(String label, String description) {
         Button button = secondaryButton(label);
+        button.setTextColor(COLOR_CYAN);
         button.setTextSize(20);
         button.setContentDescription(description);
         button.setPadding(0, 0, 0, 0);

@@ -1,6 +1,8 @@
 import socket
 socket.setdefaulttimeout(120)  # Timeout de 120s para impedir travamentos de socket em downloads de IA
 import os
+import sys
+import importlib
 import uuid
 import shutil
 import logging
@@ -19,7 +21,7 @@ import hashlib
 import random
 import unicodedata
 from urllib.parse import quote
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException, BackgroundTasks, Header, Depends, Query, Request
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Header, Depends, Query, Request
 from fastapi.responses import HTMLResponse, FileResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -28,6 +30,7 @@ from pydantic import BaseModel, Field
 # Módulos do pipeline local
 from audio_processor import extract_audio, separate_vocals
 from transcriber import transcribe_vocals
+from subtitle_translator import translate_subtitle_segments, write_srt, SUPPORTED_TARGET_LANGUAGES
 from karaoke_generator import generate_ass_karaoke
 from video_renderer import render_karaoke_video, check_has_video
 
@@ -114,58 +117,118 @@ def validate_new_credentials(username: str, password: str):
     if len(password or "") < 8:
         raise HTTPException(status_code=400, detail="A senha deve ter pelo menos 8 caracteres.")
 
+
+YT_DLP_RUNTIME_DIR = "/data/output/yt_dlp_runtime"
+YT_DLP_STAGING_DIR = "/data/output/yt_dlp_runtime_staging"
+YT_DLP_BACKUP_DIR = "/data/output/yt_dlp_runtime_previous"
+yt_dlp_operation_lock = threading.RLock()
+
+
+class YtDlpLogAdapter:
+    """Encaminha avisos úteis do yt-dlp ao log do servidor sem expor a interface a ruído interno."""
+
+    def debug(self, message):
+        if not str(message).startswith("[debug]"):
+            logger.debug("yt-dlp: %s", message)
+
+    def warning(self, message):
+        logger.warning("yt-dlp: %s", message)
+
+    def error(self, message):
+        logger.error("yt-dlp: %s", message)
+
+
+def load_yt_dlp(force_reload: bool = False):
+    """Carrega primeiro a cópia persistente atualizada pelo administrador, quando disponível."""
+    if os.path.isdir(YT_DLP_RUNTIME_DIR) and YT_DLP_RUNTIME_DIR not in sys.path:
+        sys.path.insert(0, YT_DLP_RUNTIME_DIR)
+
+    if force_reload:
+        for module_name in tuple(sys.modules):
+            if module_name == "yt_dlp" or module_name.startswith("yt_dlp."):
+                sys.modules.pop(module_name, None)
+        importlib.invalidate_caches()
+
+    return importlib.import_module("yt_dlp")
+
+
+def yt_dlp_version() -> str:
+    load_yt_dlp()
+    version_module = importlib.import_module("yt_dlp.version")
+    return str(getattr(version_module, "__version__", "desconhecida"))
+
+
+def youtube_download_options(outtmpl: str | None = None) -> dict:
+    """Opções resilientes compartilhadas pelos downloads e pela leitura de metadados."""
+    options = {
+        "noplaylist": True,
+        "socket_timeout": 30,
+        "retries": 10,
+        "fragment_retries": 10,
+        "extractor_retries": 5,
+        "file_access_retries": 3,
+        "concurrent_fragment_downloads": 4,
+        "overwrites": True,
+        "quiet": True,
+        "no_warnings": True,
+        "logger": YtDlpLogAdapter(),
+    }
+    if outtmpl:
+        options["outtmpl"] = outtmpl
+    return options
+
+
+def find_downloaded_file(cache_dir: str, prefix: str) -> str:
+    candidates = [
+        os.path.join(cache_dir, filename)
+        for filename in os.listdir(cache_dir)
+        if filename.startswith(f"{prefix}.") and not filename.endswith((".part", ".ytdl"))
+    ]
+    candidates = [path for path in candidates if os.path.isfile(path) and os.path.getsize(path) > 0]
+    if not candidates:
+        raise RuntimeError("O YouTube não entregou um arquivo de mídia válido.")
+    return max(candidates, key=os.path.getmtime)
+
+
 def download_youtube(url: str, cache_dir: str) -> tuple[str, str]:
     """Baixa o melhor vídeo/áudio do YouTube usando yt-dlp com expurgo prévio e 'overwrites': True."""
-    import yt_dlp
+    with yt_dlp_operation_lock:
+        yt_dlp = load_yt_dlp()
 
-    # Expurgo prévio obrigatorio de qualquer original_input.* no cache para impedir que o yt-dlp pule o download
-    for f in os.listdir(cache_dir):
-        if f.startswith("original_input."):
+        # Expurgo prévio obrigatório para impedir o reaproveitamento de download incompleto.
+        for filename in os.listdir(cache_dir):
+            if filename.startswith("original_input."):
+                try:
+                    os.remove(os.path.join(cache_dir, filename))
+                except OSError:
+                    pass
+
+        base_options = youtube_download_options(os.path.join(cache_dir, "original_input.%(ext)s"))
+        formats = (
+            "bv*[height<=1080]+ba/b[height<=1080]/b",
+            "b/bv*+ba",
+        )
+        title = "Vídeo do YouTube"
+        last_error = None
+
+        for attempt, media_format in enumerate(formats, start=1):
+            options = {
+                **base_options,
+                "format": media_format,
+                "merge_output_format": "mp4",
+                "remux_video": "mp4",
+            }
             try:
-                os.remove(os.path.join(cache_dir, f))
-            except Exception:
-                pass
+                logger.info("Download do YouTube: tentativa %s de %s.", attempt, len(formats))
+                with yt_dlp.YoutubeDL(options) as ydl:
+                    info = ydl.extract_info(url, download=True)
+                title = str((info or {}).get("title") or title)
+                return find_downloaded_file(cache_dir, "original_input"), title
+            except Exception as exc:
+                last_error = exc
+                logger.warning("Tentativa %s do download do YouTube falhou: %s", attempt, exc)
 
-    ydl_opts_primary = {
-        'format': 'bestvideo[height<=1080]+bestaudio/best[height<=1080]/best',
-        'outtmpl': os.path.join(cache_dir, 'original_input.%(ext)s'),
-        'merge_output_format': 'mp4',
-        'remux_video': 'mp4',
-        'overwrites': True,
-        'quiet': True,
-        'no_warnings': True,
-    }
-
-    ydl_opts_fallback = {
-        'format': 'best',
-        'outtmpl': os.path.join(cache_dir, 'original_input.%(ext)s'),
-        'merge_output_format': 'mp4',
-        'remux_video': 'mp4',
-        'overwrites': True,
-        'quiet': True,
-        'no_warnings': True,
-    }
-
-    title = "YouTube Video"
-    try:
-        logger.info("Tentando baixar do YouTube com formato primário (<=1080p)...")
-        with yt_dlp.YoutubeDL(ydl_opts_primary) as ydl:
-            info = ydl.extract_info(url, download=True)
-            title = info.get('title', 'YouTube Video')
-    except Exception as e:
-        logger.warning(f"Falha ao baixar no formato primário ({e}). Tentando formato fallback 'best'...")
-        with yt_dlp.YoutubeDL(ydl_opts_fallback) as ydl:
-            info = ydl.extract_info(url, download=True)
-            title = info.get('title', 'YouTube Video')
-
-    # O arquivo final será .mp4 devido ao merge e remux
-    file_path = os.path.join(cache_dir, 'original_input.mp4')
-    if not os.path.exists(file_path):
-        for f in os.listdir(cache_dir):
-            if f.startswith("original_input."):
-                file_path = os.path.join(cache_dir, f)
-                break
-    return file_path, title
+        raise RuntimeError(f"Não foi possível baixar o vídeo do YouTube: {last_error}")
 
 def get_current_user(
     x_session_token: str = Header(None),
@@ -281,6 +344,168 @@ def require_task_control(user: dict):
 # Locks para controle thread-safe e prevenção de processamentos concorrentes
 state_lock = threading.Lock()
 processing_lock = threading.Lock()
+yt_dlp_update_lock = threading.Lock()
+yt_dlp_update_state = {
+    "status": "idle",
+    "message": "Nenhuma atualização executada nesta sessão.",
+    "error": None,
+    "version": None,
+}
+
+
+def deno_runtime_version() -> str | None:
+    executable = shutil.which("deno")
+    if not executable:
+        return None
+    try:
+        result = subprocess.run(
+            [executable, "--version"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+            check=True,
+        )
+        first_line = (result.stdout or "").splitlines()[0].strip()
+        return first_line or None
+    except (OSError, subprocess.SubprocessError, IndexError):
+        return None
+
+
+def run_yt_dlp_update():
+    with yt_dlp_update_lock:
+        yt_dlp_update_state.update({
+            "status": "updating",
+            "message": "Baixando a versão mais recente do mecanismo do YouTube...",
+            "error": None,
+        })
+
+    try:
+        if os.path.isdir(YT_DLP_STAGING_DIR):
+            shutil.rmtree(YT_DLP_STAGING_DIR)
+        os.makedirs(YT_DLP_STAGING_DIR, exist_ok=True)
+        command = [
+            sys.executable,
+            "-m",
+            "pip",
+            "install",
+            "--disable-pip-version-check",
+            "--no-cache-dir",
+            "--upgrade",
+            "--upgrade-strategy",
+            "eager",
+            "--pre",
+            "--target",
+            YT_DLP_STAGING_DIR,
+            "yt-dlp[default]",
+        ]
+        with yt_dlp_operation_lock:
+            result = subprocess.run(
+                command,
+                capture_output=True,
+                text=True,
+                timeout=900,
+                check=False,
+            )
+            if result.returncode != 0:
+                details = (result.stderr or result.stdout or "Falha não especificada.").strip()
+                raise RuntimeError(details[-3000:])
+
+            validation = subprocess.run(
+                [
+                    sys.executable,
+                    "-c",
+                    (
+                        "import sys; "
+                        f"sys.path.insert(0, {YT_DLP_STAGING_DIR!r}); "
+                        "from yt_dlp.version import __version__; print(__version__)"
+                    ),
+                ],
+                capture_output=True,
+                text=True,
+                timeout=30,
+                check=False,
+            )
+            if validation.returncode != 0 or not (validation.stdout or "").strip():
+                raise RuntimeError((validation.stderr or "O pacote baixado não pôde ser validado.")[-3000:])
+
+            if os.path.isdir(YT_DLP_BACKUP_DIR):
+                shutil.rmtree(YT_DLP_BACKUP_DIR)
+            had_previous_runtime = os.path.isdir(YT_DLP_RUNTIME_DIR)
+            if had_previous_runtime:
+                os.replace(YT_DLP_RUNTIME_DIR, YT_DLP_BACKUP_DIR)
+            os.replace(YT_DLP_STAGING_DIR, YT_DLP_RUNTIME_DIR)
+
+            try:
+                load_yt_dlp(force_reload=True)
+                installed_version = yt_dlp_version()
+            except Exception:
+                if os.path.isdir(YT_DLP_RUNTIME_DIR):
+                    shutil.rmtree(YT_DLP_RUNTIME_DIR)
+                if had_previous_runtime and os.path.isdir(YT_DLP_BACKUP_DIR):
+                    os.replace(YT_DLP_BACKUP_DIR, YT_DLP_RUNTIME_DIR)
+                load_yt_dlp(force_reload=True)
+                raise
+
+            if os.path.isdir(YT_DLP_BACKUP_DIR):
+                shutil.rmtree(YT_DLP_BACKUP_DIR)
+
+        with yt_dlp_update_lock:
+            yt_dlp_update_state.update({
+                "status": "done",
+                "message": "Mecanismo do YouTube atualizado e pronto para uso.",
+                "error": None,
+                "version": installed_version,
+            })
+        logger.info("yt-dlp atualizado em armazenamento persistente para %s.", installed_version)
+    except Exception as exc:
+        if os.path.isdir(YT_DLP_STAGING_DIR):
+            shutil.rmtree(YT_DLP_STAGING_DIR, ignore_errors=True)
+        logger.error("Falha ao atualizar yt-dlp: %s", exc)
+        with yt_dlp_update_lock:
+            yt_dlp_update_state.update({
+                "status": "error",
+                "message": "A atualização não foi concluída.",
+                "error": str(exc),
+            })
+
+
+@app.get("/api/youtube-tools/status")
+def get_youtube_tools_status(current_user: dict = Depends(get_current_user)):
+    require_admin(current_user)
+    try:
+        installed_version = yt_dlp_version()
+    except Exception as exc:
+        installed_version = None
+        logger.warning("Não foi possível consultar a versão do yt-dlp: %s", exc)
+
+    with yt_dlp_update_lock:
+        update_snapshot = dict(yt_dlp_update_state)
+
+    return {
+        "yt_dlp_version": installed_version,
+        "source": "persistent" if os.path.isfile(os.path.join(YT_DLP_RUNTIME_DIR, "yt_dlp", "__init__.py")) else "image",
+        "deno_version": deno_runtime_version(),
+        "update": update_snapshot,
+    }
+
+
+@app.post("/api/youtube-tools/update")
+def update_youtube_tools(current_user: dict = Depends(get_current_user)):
+    require_admin(current_user)
+    if processing_lock.locked():
+        raise HTTPException(status_code=409, detail="Aguarde o processamento atual terminar antes de atualizar.")
+
+    with yt_dlp_update_lock:
+        if yt_dlp_update_state.get("status") == "updating":
+            return {"status": "updating"}
+        yt_dlp_update_state.update({
+            "status": "updating",
+            "message": "Preparando a atualização...",
+            "error": None,
+        })
+
+    threading.Thread(target=run_yt_dlp_update, daemon=True).start()
+    return {"status": "started"}
 
 # Proteção contra brute-force no login
 _login_attempts: dict = {}  # {ip_or_user: {"count": int, "locked_until": float}}
@@ -302,9 +527,241 @@ state = {
     "owner_username": None,
     "owner_role": None,
     "history_filename": None,
+    "subtitle_filename": None,
+    "subtitle_language": None,
     "public_download_token": None,
     "process_summary": {}
 }
+
+PROCESSING_QUEUE_FILE = "/data/output/processing_queue.json"
+PROCESSING_QUEUE_ROOT = "/data/output/queue_jobs"
+processing_queue_lock = threading.Lock()
+processing_queue_event = threading.Event()
+processing_queue = []
+processing_queue_worker_started = False
+
+
+def save_processing_queue_unlocked():
+    os.makedirs(os.path.dirname(PROCESSING_QUEUE_FILE), exist_ok=True)
+    with open(PROCESSING_QUEUE_FILE, "w", encoding="utf-8") as queue_file:
+        json.dump(processing_queue[-200:], queue_file, ensure_ascii=False, indent=2)
+
+
+def load_processing_queue():
+    global processing_queue
+    if not os.path.isfile(PROCESSING_QUEUE_FILE):
+        processing_queue = []
+        return
+    try:
+        with open(PROCESSING_QUEUE_FILE, "r", encoding="utf-8") as queue_file:
+            loaded = json.load(queue_file)
+        processing_queue = loaded if isinstance(loaded, list) else []
+        for job in processing_queue:
+            if job.get("status") == "processing":
+                job["status"] = "queued"
+                job["message"] = "Recuperado após reinício do servidor."
+        save_processing_queue_unlocked()
+    except Exception as exc:
+        logger.error("Não foi possível carregar a fila persistente: %s", exc)
+        processing_queue = []
+
+
+def public_queue_job(job: dict, waiting_position: int | None = None) -> dict:
+    result = {
+        "id": job.get("id"),
+        "title": job.get("title"),
+        "owner_username": job.get("owner_username"),
+        "owner_role": job.get("owner_role"),
+        "status": job.get("status"),
+        "message": job.get("message", ""),
+        "created_at": job.get("created_at"),
+        "started_at": job.get("started_at"),
+        "finished_at": job.get("finished_at"),
+        "history_filename": job.get("history_filename"),
+        "subtitle_filename": job.get("subtitle_filename"),
+    }
+    if waiting_position is not None:
+        result["position"] = waiting_position
+    return result
+
+
+def enqueue_processing_job(job: dict) -> int:
+    with processing_queue_lock:
+        active_for_user = sum(
+            1 for queued_job in processing_queue
+            if queued_job.get("owner_username") == job.get("owner_username")
+            and queued_job.get("status") in {"queued", "processing"}
+        )
+        if active_for_user >= 25:
+            raise HTTPException(status_code=429, detail="Sua fila atingiu o limite de 25 vídeos pendentes.")
+        processing_queue.append(job)
+        position = sum(1 for queued_job in processing_queue if queued_job.get("status") == "queued")
+        save_processing_queue_unlocked()
+    processing_queue_event.set()
+    return position
+
+
+def ensure_processing_queue_capacity(username: str):
+    with processing_queue_lock:
+        active_for_user = sum(
+            1 for queued_job in processing_queue
+            if queued_job.get("owner_username") == username
+            and queued_job.get("status") in {"queued", "processing"}
+        )
+    if active_for_user >= 25:
+        raise HTTPException(status_code=429, detail="Sua fila atingiu o limite de 25 vídeos pendentes.")
+
+
+def active_queue_pipeline_for_user(current_user: dict) -> dict:
+    """Retorna os parâmetros do trabalho ativo visível ao usuário, quando existir."""
+    with processing_queue_lock:
+        active_job = next(
+            (
+                job for job in processing_queue
+                if job.get("status") == "processing"
+                and (
+                    is_admin(current_user)
+                    or job.get("owner_username") == current_user.get("username")
+                )
+            ),
+            None,
+        )
+    return dict((active_job or {}).get("pipeline") or {})
+
+
+def queue_cache_dir_for_user(current_user: dict) -> str | None:
+    pipeline = active_queue_pipeline_for_user(current_user)
+    cache_dir = pipeline.get("cache_dir")
+    return cache_dir if cache_dir and os.path.isdir(cache_dir) else None
+
+
+def remove_finished_queue_cache(cache_dir: str | None):
+    if not cache_dir:
+        return
+    queue_root = os.path.abspath(PROCESSING_QUEUE_ROOT)
+    job_root = os.path.abspath(os.path.dirname(cache_dir))
+    if os.path.commonpath([queue_root, job_root]) != queue_root or job_root == queue_root:
+        logger.warning("Cache da fila fora da raiz permitida; limpeza ignorada: %s", job_root)
+        return
+    shutil.rmtree(job_root, ignore_errors=True)
+
+
+def processing_queue_worker():
+    while True:
+        processing_queue_event.wait(timeout=2)
+        processing_queue_event.clear()
+
+        while True:
+            with processing_queue_lock:
+                job = next((item for item in processing_queue if item.get("status") == "queued"), None)
+                if not job:
+                    break
+                job["status"] = "processing"
+                job["started_at"] = time.time()
+                job["message"] = "Processando no servidor."
+                save_processing_queue_unlocked()
+
+            pipeline = dict(job.get("pipeline") or {})
+            owner = dict(pipeline.get("owner_user") or {})
+            summary = dict(job.get("process_summary") or {})
+            try:
+                update_state(
+                    "processing",
+                    "Preparing queued job",
+                    1,
+                    original_filename=job.get("title") or "Vídeo",
+                    owner_username=owner.get("username"),
+                    owner_role=owner.get("role"),
+                    process_summary=summary,
+                )
+                run_pipeline(**pipeline)
+                with state_lock:
+                    final_status = state.get("status")
+                    final_error = state.get("error_message", "")
+                    final_history_filename = state.get("history_filename")
+                    final_subtitle_filename = state.get("subtitle_filename")
+                if final_status == "done":
+                    queue_status = "done"
+                    queue_message = "Vídeo concluído e salvo no histórico."
+                    job_cache = pipeline.get("cache_dir")
+                    legacy_cache = get_user_paths(owner)["cache"]
+                    if job_cache and os.path.isdir(job_cache):
+                        os.makedirs(legacy_cache, exist_ok=True)
+                        for cached_name in os.listdir(legacy_cache):
+                            cached_path = os.path.join(legacy_cache, cached_name)
+                            try:
+                                if os.path.isdir(cached_path):
+                                    shutil.rmtree(cached_path)
+                                else:
+                                    os.remove(cached_path)
+                            except OSError as exc:
+                                logger.warning("Não foi possível atualizar o cache reutilizável: %s", exc)
+                        shutil.copytree(job_cache, legacy_cache, dirs_exist_ok=True)
+                elif final_status == "idle" and "cancel" in final_error.casefold():
+                    queue_status = "cancelled"
+                    queue_message = "Processamento cancelado."
+                else:
+                    queue_status = "error"
+                    queue_message = final_error or "O processamento não foi concluído."
+            except Exception as exc:
+                logger.exception("Falha inesperada no trabalhador da fila.")
+                queue_status = "error"
+                queue_message = str(exc)
+
+            with processing_queue_lock:
+                job["status"] = queue_status
+                job["message"] = queue_message
+                job["finished_at"] = time.time()
+                if queue_status == "done":
+                    job["history_filename"] = final_history_filename
+                    job["subtitle_filename"] = final_subtitle_filename
+                save_processing_queue_unlocked()
+            if queue_status in {"done", "cancelled"}:
+                remove_finished_queue_cache(pipeline.get("cache_dir"))
+
+
+def start_processing_queue_worker():
+    global processing_queue_worker_started
+    if processing_queue_worker_started:
+        return
+    processing_queue_worker_started = True
+    threading.Thread(target=processing_queue_worker, daemon=True, name="karaoke-processing-queue").start()
+    processing_queue_event.set()
+
+
+@app.get("/api/queue")
+def get_processing_queue(current_user: dict = Depends(get_current_user)):
+    with processing_queue_lock:
+        waiting = 0
+        visible = []
+        for job in processing_queue:
+            position = None
+            if job.get("status") == "queued":
+                waiting += 1
+                position = waiting
+            if is_admin(current_user) or job.get("owner_username") == current_user.get("username"):
+                visible.append(public_queue_job(job, position))
+    return {"jobs": list(reversed(visible[-100:]))}
+
+
+@app.delete("/api/queue/{job_id}")
+def remove_queued_job(job_id: str, current_user: dict = Depends(get_current_user)):
+    cache_dir = None
+    with processing_queue_lock:
+        job = next((item for item in processing_queue if item.get("id") == job_id), None)
+        if not job:
+            raise HTTPException(status_code=404, detail="Item da fila não encontrado.")
+        if not (is_admin(current_user) or job.get("owner_username") == current_user.get("username")):
+            raise HTTPException(status_code=403, detail="Este item pertence a outro usuário.")
+        if job.get("status") != "queued":
+            raise HTTPException(status_code=409, detail="Somente itens que ainda aguardam podem ser removidos.")
+        job["status"] = "cancelled"
+        job["message"] = "Removido da fila antes do processamento."
+        job["finished_at"] = time.time()
+        cache_dir = (job.get("pipeline") or {}).get("cache_dir")
+        save_processing_queue_unlocked()
+    remove_finished_queue_cache(cache_dir)
+    return {"status": "cancelled"}
 
 # Evento global para pausar e continuar o processamento (revisão de legenda)
 correction_event = threading.Event()
@@ -432,6 +889,8 @@ def update_state(
     owner_username: str = None,
     owner_role: str = None,
     history_filename: str = None,
+    subtitle_filename: str = None,
+    subtitle_language: str = None,
     public_download_token: str = None,
     stage_progress: int | None = None,
     stage_detail: str = "",
@@ -451,11 +910,17 @@ def update_state(
         if owner_username is not None:
             state["owner_username"] = owner_username
             state["history_filename"] = None
+            state["subtitle_filename"] = None
+            state["subtitle_language"] = None
             state["public_download_token"] = None
         if owner_role is not None:
             state["owner_role"] = owner_role
         if history_filename is not None:
             state["history_filename"] = history_filename
+        if subtitle_filename is not None:
+            state["subtitle_filename"] = subtitle_filename
+        if subtitle_language is not None:
+            state["subtitle_language"] = subtitle_language
         if public_download_token is not None:
             state["public_download_token"] = public_download_token
         if process_summary is not None:
@@ -521,6 +986,9 @@ def startup_event():
                     state.update(saved_state)
         except Exception as e:
             logger.error(f"Erro ao carregar estado inicial no startup: {e}")
+    with processing_queue_lock:
+        load_processing_queue()
+    start_processing_queue_worker()
 
 
 def karaoke_download_filename(original_name: str) -> str:
@@ -562,12 +1030,54 @@ def save_video_to_history(video_path: str, orig_name: str, library_dir: str) -> 
         return None
 
 
-def save_result_metadata(output_dir: str, original_filename: str, history_filename: str):
+def subtitle_video_download_filename(original_name: str) -> str:
+    base_name = os.path.splitext(karaoke_download_filename(original_name))[0]
+    base_name = re.sub(r" - Karaok[eê]$", "", base_name, flags=re.IGNORECASE)
+    return f"{base_name} - Legendado.mp4"
+
+
+def save_subtitled_video_to_history(video_path: str, orig_name: str, library_dir: str) -> str:
+    if not video_path or not os.path.exists(video_path):
+        return None
+    lib_history_dir = os.path.join(library_dir, "history")
+    os.makedirs(lib_history_dir, exist_ok=True)
+    dest_filename = subtitle_video_download_filename(orig_name)
+    safe_name = os.path.splitext(dest_filename)[0]
+    dest_path = os.path.join(lib_history_dir, dest_filename)
+    counter = 1
+    while os.path.exists(dest_path):
+        dest_filename = f"{safe_name} ({counter}).mp4"
+        dest_path = os.path.join(lib_history_dir, dest_filename)
+        counter += 1
+    shutil.copy2(video_path, dest_path)
+    return dest_filename
+
+
+def save_subtitle_to_history(srt_path: str, history_filename: str, library_dir: str) -> str:
+    if not srt_path or not os.path.exists(srt_path) or not history_filename:
+        return None
+    lib_history_dir = os.path.join(library_dir, "history")
+    os.makedirs(lib_history_dir, exist_ok=True)
+    subtitle_filename = f"{os.path.splitext(history_filename)[0]}.srt"
+    destination = os.path.join(lib_history_dir, subtitle_filename)
+    shutil.copy2(srt_path, destination)
+    return subtitle_filename
+
+
+def save_result_metadata(
+    output_dir: str,
+    original_filename: str,
+    history_filename: str,
+    subtitle_filename: str = None,
+    subtitle_language: str = None,
+):
     try:
         with open(os.path.join(output_dir, "result_meta.json"), "w", encoding="utf-8") as file:
             json.dump({
                 "original_filename": original_filename,
                 "history_filename": history_filename,
+                "subtitle_filename": subtitle_filename,
+                "subtitle_language": subtitle_language,
                 "completed_at": time.time()
             }, file, ensure_ascii=False, indent=2)
     except Exception as exc:
@@ -973,16 +1483,15 @@ def get_youtube_metadata(
         raise HTTPException(status_code=400, detail="Informe uma URL válida do YouTube.")
 
     try:
-        import yt_dlp
-        options = {
-            "quiet": True,
-            "no_warnings": True,
-            "skip_download": True,
-            "noplaylist": True,
-            "socket_timeout": 10,
-        }
-        with yt_dlp.YoutubeDL(options) as ydl:
-            info = ydl.extract_info(url, download=False)
+        with yt_dlp_operation_lock:
+            yt_dlp = load_yt_dlp()
+            options = {
+                **youtube_download_options(),
+                "skip_download": True,
+                "socket_timeout": 20,
+            }
+            with yt_dlp.YoutubeDL(options) as ydl:
+                info = ydl.extract_info(url, download=False)
         title = str((info or {}).get("title") or "").strip()
         if not title:
             raise HTTPException(status_code=404, detail="Não foi possível identificar o título desse vídeo.")
@@ -1227,55 +1736,46 @@ def run_youtube_download_bg(url: str, owner: dict):
 
 def download_bg_youtube(url: str, cache_dir: str) -> tuple[str, str]:
     """Baixa apenas o fluxo de vídeo do YouTube (sem áudio) para uso como fundo com expurgo e overwrites: True."""
-    import yt_dlp
+    with yt_dlp_operation_lock:
+        yt_dlp = load_yt_dlp()
 
-    # Expurgo prévio obrigatorio de qualquer bg_yt_raw.* no cache
-    for f in os.listdir(cache_dir):
-        if f.startswith("bg_yt_raw.") or f.startswith("bg_yt_no_audio."):
+        # Expurgo prévio obrigatório de downloads completos ou parciais anteriores.
+        for filename in os.listdir(cache_dir):
+            if filename.startswith("bg_yt_raw.") or filename.startswith("bg_yt_no_audio."):
+                try:
+                    os.remove(os.path.join(cache_dir, filename))
+                except OSError:
+                    pass
+
+        base_options = youtube_download_options(os.path.join(cache_dir, "bg_yt_raw.%(ext)s"))
+        formats = (
+            "bv*[height<=1080]/b[height<=1080]/bv*/b",
+            "b/bv*+ba",
+        )
+        title = "Fundo do YouTube"
+        last_error = None
+        raw_file = None
+
+        for attempt, media_format in enumerate(formats, start=1):
+            options = {
+                **base_options,
+                "format": media_format,
+                "merge_output_format": "mp4",
+                "remux_video": "mp4",
+            }
             try:
-                os.remove(os.path.join(cache_dir, f))
-            except Exception:
-                pass
-
-    ydl_opts_primary = {
-        'format': 'bestvideo[height<=1080]/bestvideo/best',
-        'outtmpl': os.path.join(cache_dir, 'bg_yt_raw.%(ext)s'),
-        'merge_output_format': 'mp4',
-        'remux_video': 'mp4',
-        'overwrites': True,
-        'quiet': True,
-        'no_warnings': True,
-    }
-    ydl_opts_fallback = {
-        'format': 'best',
-        'outtmpl': os.path.join(cache_dir, 'bg_yt_raw.%(ext)s'),
-        'merge_output_format': 'mp4',
-        'remux_video': 'mp4',
-        'overwrites': True,
-        'quiet': True,
-        'no_warnings': True,
-    }
-
-    title = "Fundo YouTube"
-    try:
-        with yt_dlp.YoutubeDL(ydl_opts_primary) as ydl:
-            info = ydl.extract_info(url, download=True)
-            title = info.get('title', 'Fundo YouTube')
-    except Exception as e:
-        logger.warning(f"Falha no formato primário do fundo YouTube ({e}). Tentando fallback...")
-        try:
-            with yt_dlp.YoutubeDL(ydl_opts_fallback) as ydl:
-                info = ydl.extract_info(url, download=True)
-                title = info.get('title', 'Fundo YouTube')
-        except Exception as err:
-            logger.error(f"Erro fatal no download de fundo YouTube: {err}")
-
-    raw_file = os.path.join(cache_dir, 'bg_yt_raw.mp4')
-    if not os.path.exists(raw_file):
-        for f in os.listdir(cache_dir):
-            if f.startswith("bg_yt_raw."):
-                raw_file = os.path.join(cache_dir, f)
+                logger.info("Download do fundo do YouTube: tentativa %s de %s.", attempt, len(formats))
+                with yt_dlp.YoutubeDL(options) as ydl:
+                    info = ydl.extract_info(url, download=True)
+                title = str((info or {}).get("title") or title)
+                raw_file = find_downloaded_file(cache_dir, "bg_yt_raw")
                 break
+            except Exception as exc:
+                last_error = exc
+                logger.warning("Tentativa %s do fundo do YouTube falhou: %s", attempt, exc)
+
+        if not raw_file:
+            raise RuntimeError(f"Não foi possível baixar o fundo do YouTube: {last_error}")
 
     # Remover o áudio usando ffmpeg (-an) para garantir 100% sem som
     no_audio_file = os.path.join(cache_dir, 'bg_yt_no_audio.mp4')
@@ -1378,7 +1878,7 @@ def download_bg_youtube_preset(
 
 
 LRCLIB_API_URL = "https://lrclib.net/api"
-LRCLIB_USER_AGENT = "Sal0-Karaoke/7.0.0 (+https://github.com/Sal0-Apps/Sal0-Karaoke)"
+LRCLIB_USER_AGENT = "Sal0-Karaoke/8.0.0 (+https://github.com/Sal0-Apps/Sal0-Karaoke)"
 LYRICS_OVH_API_URL = "https://api.lyrics.ovh/v1"
 LYRICS_PROVIDER_TIMEOUT = (3.05, 6)
 MUSIXMATCH_API_URL = "https://apic-desktop.musixmatch.com/ws/1.1"
@@ -1806,7 +2306,7 @@ def delete_lyrics_server(current_user: dict = Depends(get_current_user)):
 
 
 
-# Sistema de Logs de Diagnóstico v7.0.0
+# Sistema de Logs de Diagnóstico v8.0.0
 DIAGNOSTIC_LOG_FILE = "/data/output/app_diagnostic.log"
 
 def log_diagnostic(message: str, level: str = "INFO"):
@@ -1842,7 +2342,7 @@ def download_diagnostic_logs(current_user: dict = Depends(get_current_user)):
     with state_lock:
         current_state = dict(state)
     report = "\n".join([
-"Sal0 Karaokê v7.0.0 — diagnóstico ao vivo",
+"Sal0 Karaokê v8.0.0 — diagnóstico ao vivo",
         f"Gerado em: {time.strftime('%Y-%m-%d %H:%M:%S')}",
         "",
         "=== ESTADO ATUAL ===",
@@ -2344,6 +2844,66 @@ def get_library_files(current_user: dict = Depends(get_current_user)):
         result[section] = sorted(names)
     return result
 
+
+def admin_result_owner(owner_key: str, current_user: dict) -> dict:
+    require_admin(current_user)
+    if owner_key == "__admin__":
+        return {"username": current_user.get("username", "admin"), "role": "admin"}
+    owner = user_from_username(owner_key)
+    if not owner or is_admin(owner):
+        raise HTTPException(status_code=404, detail="Perfil não encontrado.")
+    return owner
+
+
+@app.get("/api/admin/results")
+def get_admin_results(current_user: dict = Depends(get_current_user)):
+    """Lista os vídeos finalizados de todos os perfis com autoria explícita."""
+    require_admin(current_user)
+    owners = [("__admin__", "Administrador", {"username": current_user.get("username"), "role": "admin"})]
+    for username, record in sorted(load_users().items()):
+        if record.get("role") != "admin":
+            owners.append((username, username, {"username": username, "role": record.get("role", "user")}))
+
+    results = []
+    for owner_key, owner_label, owner in owners:
+        history_dir = os.path.join(get_user_paths(owner)["library"], "history")
+        if not os.path.isdir(history_dir):
+            continue
+        for filename in os.listdir(history_dir):
+            file_path = os.path.join(history_dir, filename)
+            if not os.path.isfile(file_path) or filename.startswith("."):
+                continue
+            stat = os.stat(file_path)
+            results.append({
+                "owner_key": owner_key,
+                "owner": owner_label,
+                "filename": filename,
+                "kind": "subtitle" if filename.lower().endswith(".srt") else "video",
+                "size": stat.st_size,
+                "modified_at": stat.st_mtime,
+            })
+    results.sort(key=lambda item: item["modified_at"], reverse=True)
+    return {"results": results}
+
+
+@app.get("/api/admin/results/{owner_key}/{filename}")
+def get_admin_result_file(
+    owner_key: str,
+    filename: str,
+    request: Request,
+    inline: bool = Query(False),
+    current_user: dict = Depends(get_current_user),
+):
+    owner = admin_result_owner(owner_key, current_user)
+    safe_filename = os.path.basename(filename)
+    file_path = os.path.join(get_user_paths(owner)["library"], "history", safe_filename)
+    if not os.path.isfile(file_path):
+        raise HTTPException(status_code=404, detail="Vídeo finalizado não encontrado.")
+    if inline:
+        media_type = mimetypes.guess_type(file_path)[0] or "video/mp4"
+        return inline_file_response(file_path, media_type, request)
+    return FileResponse(file_path, filename=safe_filename)
+
 @app.post("/api/library/upload")
 def upload_to_library(
     section: str = Form(...),
@@ -2662,7 +3222,7 @@ class ContinueProcessModel(BaseModel):
 
 @app.get("/api/cache_info")
 def get_cache_info(current_user: dict = Depends(get_current_user)):
-    cache_dir = get_user_paths(current_user)["cache"]
+    cache_dir = queue_cache_dir_for_user(current_user) or get_user_paths(current_user)["cache"]
     cache_meta_file = os.path.join(cache_dir, "cache_meta.json")
     if os.path.exists(cache_meta_file):
         try:
@@ -2695,7 +3255,7 @@ def get_cache_info(current_user: dict = Depends(get_current_user)):
 @app.get("/api/cache/background")
 def get_cached_background(current_user: dict = Depends(get_current_user)):
     """Serve o arquivo de background em cache (imagem ou vídeo) ou uma paisagem padrão como fallback."""
-    cache_dir = get_user_paths(current_user)["cache"]
+    cache_dir = queue_cache_dir_for_user(current_user) or get_user_paths(current_user)["cache"]
     cache_meta_file = os.path.join(cache_dir, "cache_meta.json")
     if os.path.exists(cache_meta_file):
         try:
@@ -2715,6 +3275,12 @@ def get_cached_background(current_user: dict = Depends(get_current_user)):
                     return FileResponse(bg_path, media_type=media_type)
         except Exception:
             pass
+
+    active_pipeline = active_queue_pipeline_for_user(current_user)
+    original_video = active_pipeline.get("input_audio_path")
+    if active_pipeline.get("subtitle_only") and original_video and check_has_video(original_video):
+        media_type = mimetypes.guess_type(original_video)[0] or "video/mp4"
+        return FileResponse(original_video, media_type=media_type)
 
     # Fallback para paisagem aleatória
     default_bg = get_random_default_background()
@@ -2886,7 +3452,6 @@ def purge_audio_cache_directory(cache_dir: str):
 
 @app.post("/api/process")
 def process_karaoke(
-    background_tasks: BackgroundTasks,
     current_user: dict = Depends(get_current_user),
     audio_file: UploadFile = File(None),
     bg_file: UploadFile = File(None),
@@ -2916,11 +3481,17 @@ def process_karaoke(
     only_remove_vocals: bool = Form(False),
     app_base_url: str = Form(""),
     easy_mode: bool = Form(False),
-    easy_background_choice: str = Form("default")
+    easy_background_choice: str = Form("default"),
+    subtitle_only: bool = Form(False),
+    translation_language: str = Form("pt")
 ):
     """
     Recebe os arquivos enviados, valida a concorrência e inicia o pipeline em segundo plano.
     """
+    ensure_processing_queue_capacity(current_user.get("username"))
+    translation_language = (translation_language or "pt").strip().lower()
+    if translation_language not in SUPPORTED_TARGET_LANGUAGES:
+        raise HTTPException(status_code=400, detail="Idioma de tradução inválido.")
     quick_random_background_requested = False
     quick_background_title = ""
     if easy_mode:
@@ -2966,29 +3537,34 @@ def process_karaoke(
         save_to_library = easy_config["save_to_library"]
         only_remove_vocals = easy_config["only_remove_vocals"]
 
+    if subtitle_only:
+        background_mode = "original"
+        transcribe_source = "original"
+        show_instrumental = False
+        show_next_line_preview = False
+        lyrics_mode = "manual"
+        lyrics_text = ""
+        only_remove_vocals = False
+
     if transcription_preset not in {"karaoke", "continuous", "difficult", "fast"}:
         raise HTTPException(status_code=400, detail="Perfil de leitura da voz inválido.")
 
-    # 1. Verificar se o servidor já está processando alguma música
-    if processing_lock.locked():
-        with state_lock:
-            if state.get("status") in ["idle", "error", "done"]:
-                try:
-                    processing_lock.release()
-                    logger.info("Failsafe: lock de concorrência obsoleto liberado com sucesso.")
-                except Exception:
-                    pass
-            else:
-                raise HTTPException(
-                    status_code=429,
-                    detail="O servidor está ocupado processando outro vídeo. Por favor, aguarde alguns minutos."
-                )
-
     user_paths = get_user_paths(current_user)
-    cache_dir = user_paths["cache"]
+    job_id = uuid.uuid4().hex
+    cache_dir = os.path.join(PROCESSING_QUEUE_ROOT, job_id, "cache")
     library_dir = user_paths["library"]
     os.makedirs(cache_dir, exist_ok=True)
     cache_meta_file = os.path.join(cache_dir, "cache_meta.json")
+
+    has_new_source = bool(
+        (youtube_url and youtube_url.strip())
+        or (library_audio and library_audio.strip())
+        or (audio_file and audio_file.filename and audio_file.filename.strip())
+    )
+    if not has_new_source:
+        legacy_cache_dir = user_paths["cache"]
+        if os.path.isdir(legacy_cache_dir):
+            shutil.copytree(legacy_cache_dir, cache_dir, dirs_exist_ok=True)
 
     if quick_random_background_requested:
         library_bg, quick_background_title = stage_quick_random_background(easy_config, current_user)
@@ -3111,7 +3687,7 @@ def process_karaoke(
         lib_video_dir = os.path.join(library_dir, "videos")
         lib_audio_path = os.path.join(lib_video_dir, library_audio)
 
-        if not os.path.exists(lib_audio_path) and is_admin(owner_user):
+        if not os.path.exists(lib_audio_path) and is_admin(current_user):
             for username, record in load_users().items():
                 candidate_dir = os.path.join(get_user_paths({"username": username, "role": record.get("role", "user")})["library"], "videos")
                 candidate = os.path.join(candidate_dir, library_audio)
@@ -3356,54 +3932,65 @@ def process_karaoke(
 
     process_summary = {
         "title": orig_name,
-        "lyrics": lyrics_summary,
+        "lyrics": (
+            f"SRT · {translation_language.upper() if translation_language != 'original' else 'idioma original'}"
+            if subtitle_only else lyrics_summary
+        ),
         "model": model_labels.get(whisper_model, whisper_model),
-        "mode": "Modo Rápido" if easy_mode else "Modo Detalhado",
-        "background": background_summary,
+        "mode": "Legendar vídeo" if subtitle_only else ("Modo Rápido" if easy_mode else "Modo Detalhado"),
+        "background": "Vídeo original · áudio preservado" if subtitle_only else background_summary,
     }
 
-    update_state(
-        "processing",
-        "Uploading",
-        5,
-        original_filename=orig_name,
-        owner_username=current_user.get("username"),
-        owner_role=current_user.get("role"),
-        process_summary=process_summary
-    )
-
-    background_tasks.add_task(
-        run_pipeline,
-        input_audio_path=input_audio_path,
-        input_bg_path=input_bg_path,
-        whisper_model=whisper_model,
-        font_size=font_size,
-        text_color=text_color,
-        text_position=text_position,
-        subtitle_mode=subtitle_mode,
-        words_per_line=words_per_line,
-        max_chars_line=max_chars_line,
-        break_on_punctuation=break_on_punctuation,
-        enable_vad=enable_vad,
-        transcription_preset=transcription_preset,
-        background_mode=background_mode,
-        show_instrumental=show_instrumental,
-        transcribe_source=transcribe_source,
-        show_next_line_preview=show_next_line_preview,
-        lyrics_text=lyrics_text,
-        lyrics_mode=lyrics_mode,
-        enable_correction=enable_correction,
-        keep_first_line_visible=keep_first_line_visible,
-        youtube_url=youtube_url,
-        only_remove_vocals=only_remove_vocals,
-        owner_user=dict(current_user),
-        cache_dir=cache_dir,
-        output_dir=user_paths["output"],
-        library_dir=library_dir,
-        app_base_url=(app_base_url or "").strip()
-    )
-
-    return {"status": "processing"}
+    pipeline = {
+        "input_audio_path": input_audio_path,
+        "input_bg_path": input_bg_path,
+        "whisper_model": whisper_model,
+        "font_size": font_size,
+        "text_color": text_color,
+        "text_position": text_position,
+        "subtitle_mode": subtitle_mode,
+        "words_per_line": words_per_line,
+        "max_chars_line": max_chars_line,
+        "break_on_punctuation": break_on_punctuation,
+        "enable_vad": enable_vad,
+        "transcription_preset": transcription_preset,
+        "background_mode": background_mode,
+        "show_instrumental": show_instrumental,
+        "transcribe_source": transcribe_source,
+        "show_next_line_preview": show_next_line_preview,
+        "lyrics_text": lyrics_text,
+        "lyrics_mode": lyrics_mode,
+        "enable_correction": enable_correction,
+        "keep_first_line_visible": keep_first_line_visible,
+        "youtube_url": youtube_url,
+        "only_remove_vocals": only_remove_vocals,
+        "owner_user": dict(current_user),
+        "cache_dir": cache_dir,
+        "output_dir": user_paths["output"],
+        "library_dir": library_dir,
+        "app_base_url": (app_base_url or "").strip(),
+        "subtitle_only": subtitle_only,
+        "translation_language": translation_language,
+    }
+    job = {
+        "id": job_id,
+        "title": orig_name,
+        "owner_username": current_user.get("username"),
+        "owner_role": current_user.get("role"),
+        "status": "queued",
+        "message": "Aguardando processamento.",
+        "created_at": time.time(),
+        "started_at": None,
+        "finished_at": None,
+        "process_summary": process_summary,
+        "pipeline": pipeline,
+    }
+    try:
+        position = enqueue_processing_job(job)
+    except Exception:
+        remove_finished_queue_cache(cache_dir)
+        raise
+    return {"status": "queued", "job_id": job_id, "position": position, "title": orig_name}
 
 def send_telegram_video_flow(
     token: str,
@@ -3497,6 +4084,207 @@ def send_video_to_targets(
             daemon=True
         ).start()
 
+
+def run_subtitle_video_pipeline(
+    input_video_path: str,
+    orig_name: str,
+    whisper_model: str,
+    font_size: int,
+    text_color: str,
+    text_position: str,
+    subtitle_mode: str,
+    words_per_line: int,
+    max_chars_line: int,
+    break_on_punctuation: bool,
+    enable_vad: bool,
+    transcription_preset: str,
+    enable_correction: bool,
+    keep_first_line_visible: bool,
+    translation_language: str,
+    owner_user: dict,
+    cache_dir: str,
+    output_dir: str,
+    library_dir: str,
+    telegram_targets: list[dict],
+    telegram_base_url: str,
+    telegram_external_url: str,
+):
+    """Gera vídeo legendado e SRT sem Demucs, preservando o áudio original."""
+    import process_manager as pm
+
+    if not check_has_video(input_video_path):
+        raise ValueError("O modo Legendar vídeo aceita somente arquivos que contenham uma faixa de vídeo.")
+
+    os.makedirs(output_dir, exist_ok=True)
+    converted_wav = os.path.join(cache_dir, "subtitle_original_audio.wav")
+    segments_cache_file = os.path.join(cache_dir, f"subtitle_segments_{translation_language}.json")
+    info_cache_file = os.path.join(cache_dir, f"subtitle_info_{translation_language}.json")
+    final_video_path = os.path.join(output_dir, "final_karaoke.mp4")
+    final_ass_path = os.path.join(output_dir, "karaoke.ass")
+    final_srt_path = os.path.join(output_dir, "final_subtitles.srt")
+    cache_signature = {
+        "whisper_model": whisper_model,
+        "enable_vad": bool(enable_vad),
+        "transcription_preset": transcription_preset,
+        "translation_language": translation_language,
+    }
+
+    pm.check_cancelled()
+    if not os.path.exists(converted_wav):
+        update_state("processing", "Extracting original audio", 15)
+        extract_audio(input_video_path, converted_wav)
+    else:
+        update_state("processing", "Extracting original audio (cached)", 15)
+
+    segments = None
+    transcription_info = {}
+    if os.path.isfile(segments_cache_file) and os.path.isfile(info_cache_file):
+        try:
+            with open(segments_cache_file, "r", encoding="utf-8") as segment_file:
+                segments = json.load(segment_file)
+            with open(info_cache_file, "r", encoding="utf-8") as info_file:
+                transcription_info = json.load(info_file)
+            if transcription_info.get("cache_signature") != cache_signature:
+                segments = None
+            else:
+                update_state("processing", "Transcribing speech (cached)", 65)
+        except (OSError, ValueError):
+            segments = None
+
+    if segments is None:
+        pm.check_cancelled()
+        whisper_task = "translate" if translation_language == "en" else "transcribe"
+        update_state("processing", "Transcribing original speech", 45)
+        notify_targets(
+            telegram_targets,
+            f"✍️ <b>Sal0 Karaokê</b>: Transcrevendo o áudio original de <b>{orig_name}</b>.",
+        )
+        segments, transcription_info = transcribe_vocals(
+            converted_wav,
+            model_size=whisper_model,
+            quality_mode="max_quality" if whisper_model == "large-v3" else "standard",
+            enable_vad=enable_vad,
+            transcription_preset=transcription_preset,
+            task=whisper_task,
+            return_info=True,
+        )
+        source_language = transcription_info.get("language", "")
+        if translation_language in {"pt", "es"} and source_language != translation_language:
+            update_state(
+                "processing",
+                "Translating subtitles locally",
+                70,
+                stage_progress=0,
+                stage_detail="O modelo de tradução é baixado apenas no primeiro uso",
+            )
+
+            def translation_progress(completed: int, total: int):
+                percent = round((completed / max(total, 1)) * 100)
+                update_state(
+                    "processing",
+                    "Translating subtitles locally",
+                    70 + round(percent * 0.08),
+                    stage_progress=percent,
+                    stage_detail=f"{completed} de {total} trechos traduzidos",
+                )
+
+            segments = translate_subtitle_segments(
+                segments,
+                source_language=source_language,
+                target_language=translation_language,
+                progress_callback=translation_progress,
+            )
+        if segments:
+            transcription_info["cache_signature"] = cache_signature
+            with open(segments_cache_file, "w", encoding="utf-8") as segment_file:
+                json.dump(segments, segment_file, ensure_ascii=False, indent=2)
+            with open(info_cache_file, "w", encoding="utf-8") as info_file:
+                json.dump(transcription_info, info_file, ensure_ascii=False, indent=2)
+
+    if not segments:
+        raise ValueError("Nenhuma fala foi detectada no vídeo.")
+
+    pm.check_cancelled()
+    if enable_correction:
+        global segments_to_edit, correction_event
+        segments_to_edit = segments
+        correction_event.clear()
+        update_state("waiting_for_user_correction", "Correction", 79)
+        while not correction_event.is_set():
+            pm.check_cancelled()
+            correction_event.wait(timeout=1.0)
+        segments = segments_to_edit
+        with open(segments_cache_file, "w", encoding="utf-8") as segment_file:
+            json.dump(segments, segment_file, ensure_ascii=False, indent=2)
+
+    with tempfile.TemporaryDirectory() as subtitle_tmpdir:
+        pm.check_cancelled()
+        update_state("processing", "Generating translated SRT", 82)
+        temporary_srt = os.path.join(subtitle_tmpdir, "translated_subtitles.srt")
+        temporary_ass = os.path.join(subtitle_tmpdir, "translated_subtitles.ass")
+        write_srt(segments, temporary_srt)
+        generate_ass_karaoke(
+            segments=segments,
+            output_ass_path=temporary_ass,
+            font_size=font_size,
+            text_color_hex=text_color,
+            text_position=text_position,
+            subtitle_mode=subtitle_mode,
+            words_per_line=words_per_line,
+            max_chars_line=max_chars_line,
+            break_on_punctuation=break_on_punctuation,
+            show_instrumental=False,
+            show_next_line_preview=False,
+            keep_first_line_visible=keep_first_line_visible,
+        )
+        shutil.copy2(temporary_srt, final_srt_path)
+        shutil.copy2(temporary_ass, final_ass_path)
+
+        pm.check_cancelled()
+        update_state("processing", "Rendering subtitled video with original audio", 92)
+        render_karaoke_video(
+            instrumental_path=converted_wav,
+            ass_path=temporary_ass,
+            output_mp4_path=final_video_path,
+            original_video_path=input_video_path,
+            background_mode="original_video",
+        )
+
+    pm.check_cancelled()
+    history_filename = save_subtitled_video_to_history(final_video_path, orig_name, library_dir)
+    subtitle_filename = save_subtitle_to_history(final_srt_path, history_filename, library_dir)
+    public_token = create_public_download(owner_user, history_filename)
+    save_result_metadata(
+        output_dir,
+        orig_name,
+        history_filename,
+        subtitle_filename=subtitle_filename,
+        subtitle_language=translation_language,
+    )
+    update_state(
+        "done",
+        "Done",
+        100,
+        result_file=final_video_path,
+        history_filename=history_filename,
+        subtitle_filename=subtitle_filename,
+        subtitle_language=translation_language,
+        public_download_token=public_token,
+    )
+    notify_targets(
+        telegram_targets,
+        f"✅ <b>Sal0 Karaokê</b>: vídeo legendado e SRT de <b>{orig_name}</b> concluídos.",
+    )
+    send_video_to_targets(
+        telegram_targets,
+        final_video_path,
+        orig_name,
+        history_filename,
+        public_token,
+        telegram_base_url,
+        telegram_external_url,
+    )
+
 def run_pipeline(
     input_audio_path: str,
     input_bg_path: str = None,
@@ -3524,7 +4312,9 @@ def run_pipeline(
     cache_dir: str = None,
     output_dir: str = None,
     library_dir: str = None,
-    app_base_url: str = ""
+    app_base_url: str = "",
+    subtitle_only: bool = False,
+    translation_language: str = "pt",
 ):
     """Pipeline principal de processamento sequencial."""
     # Obter o lock de processamento exclusivo (segurança de job único)
@@ -3561,12 +4351,15 @@ def run_pipeline(
 
         final_mp4_path = os.path.join(output_dir, "final_karaoke.mp4")
         final_ass_path = os.path.join(output_dir, "karaoke.ass")
+        final_srt_path = os.path.join(output_dir, "final_subtitles.srt")
 
         # Limpar outputs anteriores se existirem
         if os.path.exists(final_mp4_path):
             os.remove(final_mp4_path)
         if os.path.exists(final_ass_path):
             os.remove(final_ass_path)
+        if os.path.exists(final_srt_path):
+            os.remove(final_srt_path)
 
         # Configurar diretório de cache persistente
         os.makedirs(cache_dir, exist_ok=True)
@@ -3642,6 +4435,33 @@ def run_pipeline(
             with open(cache_meta_file, "w", encoding="utf-8") as f:
                 import json
                 json.dump(cached_meta, f, indent=4)
+
+        if subtitle_only:
+            run_subtitle_video_pipeline(
+                input_video_path=input_audio_path,
+                orig_name=orig_name,
+                whisper_model=whisper_model,
+                font_size=font_size,
+                text_color=text_color,
+                text_position=text_position,
+                subtitle_mode=subtitle_mode,
+                words_per_line=words_per_line,
+                max_chars_line=max_chars_line,
+                break_on_punctuation=break_on_punctuation,
+                enable_vad=enable_vad,
+                transcription_preset=transcription_preset,
+                enable_correction=enable_correction,
+                keep_first_line_visible=keep_first_line_visible,
+                translation_language=translation_language,
+                owner_user=owner_user,
+                cache_dir=cache_dir,
+                output_dir=output_dir,
+                library_dir=library_dir,
+                telegram_targets=telegram_targets,
+                telegram_base_url=telegram_base_url,
+                telegram_external_url=telegram_external_url,
+            )
+            return
 
         # Busca automática de letra: sempre usa a identidade da mídia atual.
         # O texto anterior é descartado para nunca orientar outra música.
@@ -4003,14 +4823,18 @@ def download_file(
             detail="Arquivo de vídeo não encontrado. Por favor, processe um áudio primeiro."
         )
     orig_name = "final"
+    result_meta = {}
     meta_file = os.path.join(output_dir, "result_meta.json")
     if os.path.exists(meta_file):
         try:
             with open(meta_file, "r", encoding="utf-8") as file:
-                orig_name = json.load(file).get("original_filename", "final")
+                result_meta = json.load(file)
+                orig_name = result_meta.get("original_filename", "final")
         except Exception:
             pass
     download_name = karaoke_download_filename(orig_name)
+    if result_meta.get("history_filename"):
+        download_name = os.path.basename(result_meta["history_filename"])
     if inline:
         return inline_file_response(file_path, "video/mp4", request)
     return FileResponse(
@@ -4018,3 +4842,21 @@ def download_file(
         media_type="video/mp4",
         filename=download_name
     )
+
+
+@app.get("/api/download-subtitles")
+def download_subtitles(current_user: dict = Depends(get_current_user)):
+    output_dir = get_user_paths(current_user)["output"]
+    meta_file = os.path.join(output_dir, "result_meta.json")
+    if not os.path.isfile(meta_file):
+        raise HTTPException(status_code=404, detail="Nenhuma legenda SRT foi gerada nesta conta.")
+    try:
+        with open(meta_file, "r", encoding="utf-8") as result_file:
+            result_meta = json.load(result_file)
+    except (OSError, ValueError):
+        raise HTTPException(status_code=404, detail="Os metadados da legenda não estão disponíveis.")
+    subtitle_filename = os.path.basename(result_meta.get("subtitle_filename") or "")
+    subtitle_path = os.path.join(get_user_paths(current_user)["library"], "history", subtitle_filename)
+    if not subtitle_filename or not os.path.isfile(subtitle_path):
+        raise HTTPException(status_code=404, detail="Nenhuma legenda SRT foi gerada nesta conta.")
+    return FileResponse(subtitle_path, media_type="application/x-subrip", filename=subtitle_filename)

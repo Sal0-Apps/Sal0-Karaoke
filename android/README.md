@@ -40,7 +40,7 @@ $env:ANDROID_KEYSTORE_PATH = 'C:\caminho\sal0-karaoke-release.p12'
 $env:ANDROID_KEYSTORE_PASSWORD = 'senha-do-keystore'
 $env:ANDROID_KEY_ALIAS = 'sal0-karaoke'
 $env:ANDROID_KEY_PASSWORD = 'senha-da-chave'
-.\build-release.ps1 -VersionName 5.6.0 -VersionCode 50600
+.\build-release.ps1 -VersionName 8.0.0 -VersionCode 80000
 ```
 
 O script executa os testes, o lint, gera o APK assinado e atualiza `android/Sal0-Karaoke-Android.apk` apenas na cópia local. As chaves e senhas nunca devem ser commitadas.
