@@ -11,6 +11,29 @@ TRANSLATION_MODEL_DIR = "/data/output/models/translation"
 SUPPORTED_TARGET_LANGUAGES = {"original", "pt", "en", "es"}
 
 
+def cover_full_media_timeline(segments: list[dict], duration: float) -> list[dict]:
+    """Ajusta os intervalos para o SRT cobrir a mídia inteira, sem lacunas."""
+    normalized = [dict(segment) for segment in segments if str(segment.get("text") or "").strip()]
+    normalized.sort(key=lambda segment: float(segment.get("start", 0.0)))
+    if not normalized:
+        return []
+
+    media_end = max(float(duration or 0.0), float(normalized[-1].get("end", 0.0)))
+    normalized[0]["start"] = 0.0
+    for index in range(len(normalized) - 1):
+        current = normalized[index]
+        following = normalized[index + 1]
+        current_start = float(current.get("start", 0.0))
+        current_end = max(current_start, float(current.get("end", current_start)))
+        following_start = max(current_start, float(following.get("start", current_end)))
+        boundary = max(current_start, min(media_end, (current_end + following_start) / 2.0))
+        current["end"] = boundary
+        following["start"] = boundary
+
+    normalized[-1]["end"] = max(float(normalized[-1].get("start", 0.0)), media_end)
+    return normalized
+
+
 def rebuild_segment_words(text: str, start: float, end: float) -> list[dict]:
     words = [word for word in (text or "").split() if word]
     if not words:
@@ -72,7 +95,10 @@ def translate_subtitle_segments(
         revision=TRANSLATION_MODEL_REVISION,
         cache_dir=TRANSLATION_MODEL_DIR,
         use_safetensors=True,
+        low_cpu_mem_usage=False,
+        device_map=None,
     )
+    model.to(torch.device("cpu"))
     model.eval()
     translated_segments = []
     batch_size = 8
@@ -87,6 +113,7 @@ def translate_subtitle_segments(
                 truncation=True,
                 max_length=512,
             )
+            encoded = {name: tensor.to("cpu") for name, tensor in encoded.items()}
             with torch.inference_mode():
                 generated = model.generate(
                     **encoded,

@@ -1463,8 +1463,8 @@
                 <button type="button" id="btnCreatorAdvanced" class="creator-mode-btn" role="tab" aria-selected="false" title="Controle completo da transcrição, legenda e visual">
                     <span class="creator-mode-icon">🎛️</span><span class="creator-mode-title">Detalhado</span><span class="creator-mode-hint">Todas as opções</span>
                 </button>
-                <button type="button" id="btnCreatorSubtitle" class="creator-mode-btn" role="tab" aria-selected="false" title="Preserva o áudio e gera vídeo legendado com arquivo SRT">
-                    <span class="creator-mode-icon">▤</span><span class="creator-mode-title">Legendar vídeo</span><span class="creator-mode-hint">Vídeo + SRT traduzido</span>
+                <button type="button" id="btnCreatorSubtitle" class="creator-mode-btn" role="tab" aria-selected="false" title="Transcreve mídias e gera somente arquivos SRT">
+                    <span class="creator-mode-icon">▤</span><span class="creator-mode-title">Gerar SRT</span><span class="creator-mode-hint">Original + tradução opcional</span>
                 </button>
             </div>
 
@@ -1551,20 +1551,20 @@
                     <div class="easy-hero-head">
                         <div class="easy-hero-icon"><img src="/favicon.png" alt=""></div>
                         <div>
-                            <span class="easy-kicker">Legendar vídeo</span>
-                            <span class="card-title">Preserve a fala e gere SRT traduzido</span>
-                            <p class="easy-intro">Sem limite definido de duração, sem separação vocal e sem escolha de fundo. O áudio original permanece no vídeo final e o SRT pode ser baixado separadamente.</p>
+                            <span class="easy-kicker">Gerar SRT</span>
+                            <span class="card-title">Transcreva a mídia inteira e baixe as legendas</span>
+                            <p class="easy-intro">Aceita áudio ou vídeo em formatos compatíveis com FFmpeg. A mídia é normalizada para MP3 e o único resultado é o SRT original, acompanhado de uma tradução opcional quando ela for concluída.</p>
                         </div>
                     </div>
 
                     <div class="card" style="margin: 1rem 0; box-shadow: none;">
-                        <div class="card-header"><span class="card-title"><span class="line-glyph">1</span> Vídeo de origem</span></div>
+                        <div class="card-header"><span class="card-title"><span class="line-glyph">1</span> Mídia de origem</span></div>
                         <div class="form-grid">
                             <label class="upload-area" id="subtitleUploadArea" for="subtitleVideoFile" style="min-height: 112px; display:flex; flex-direction:column; align-items:center; justify-content:center; cursor:pointer; border:2px dashed var(--glass-border-light); border-radius:14px; background:var(--input-bg);" data-drop-zone>
                                 <span class="line-glyph" style="font-size:1.5rem;">＋</span>
-                                <strong id="subtitleVideoFileText">Escolher um ou mais vídeos</strong>
-                                <span class="compact-note">MP4, MKV, AVI, MOV ou WEBM</span>
-                                <input type="file" id="subtitleVideoFile" accept="video/*,.mkv,.avi" multiple style="display:none;">
+                                <strong id="subtitleVideoFileText">Escolher um ou mais arquivos</strong>
+                                <span class="compact-note">Áudio ou vídeo compatível; o servidor usará MP3</span>
+                                <input type="file" id="subtitleVideoFile" accept="audio/*,video/*,.mkv,.avi,.mov,.webm,.m4v,.flac,.m4a,.aac,.ogg,.opus,.wav,.mp3" multiple style="display:none;">
                             </label>
                             <div style="display:flex; flex-direction:column; gap:0.65rem;">
                                 <div class="form-group">
@@ -1573,7 +1573,7 @@
                                     <div id="subtitleYoutubeTitleBadge" class="youtube-identification" aria-live="polite"><span>▶</span><span id="subtitleYoutubeTitleText"></span></div>
                                 </div>
                                 <div class="form-group">
-                                    <span class="label">Vídeo da Biblioteca</span>
+                                    <span class="label">Mídia da Biblioteca</span>
                                     <select id="subtitleLibraryVideo" class="select-input"><option value="">Ou escolha na Biblioteca...</option></select>
                                 </div>
                             </div>
@@ -1581,26 +1581,18 @@
                     </div>
 
                     <div class="card" style="margin: 0 0 1rem; box-shadow: none;">
-                        <div class="card-header"><span class="card-title"><span class="line-glyph">2</span> Transcrição, tradução e estilo</span></div>
+                        <div class="card-header"><span class="card-title"><span class="line-glyph">2</span> Transcrição e tradução opcional</span></div>
                         <div class="form-grid">
-                            <div class="form-group"><span class="label">Idioma do SRT</span><select id="subtitleTranslationLanguage" class="select-input"><option value="pt" selected>Português</option><option value="en">Inglês</option><option value="es">Espanhol</option><option value="original">Idioma original (sem tradução)</option></select></div>
+                            <div class="form-group"><span class="label">Segundo SRT traduzido</span><select id="subtitleTranslationLanguage" class="select-input"><option value="pt" selected>Português</option><option value="en">Inglês</option><option value="es">Espanhol</option><option value="original">Não traduzir</option></select></div>
                             <div class="form-group"><span class="label">Modelo Whisper</span><select id="subtitleWhisperModel" class="select-input"><option value="large-v3-turbo">Large V3 Turbo</option><option value="large-v3">Large V3 (máxima)</option><option value="medium">Medium</option><option value="small">Small</option><option value="tiny">Tiny</option></select></div>
                             <div class="form-group"><span class="label">Leitura da fala</span><select id="subtitleTranscriptionPreset" class="select-input"><option value="difficult">Voz difícil</option><option value="karaoke">Equilibrada</option><option value="continuous">Fala contínua</option><option value="fast">Rápida</option></select></div>
                             <div class="form-group"><span class="label">Filtro de fala (VAD)</span><select id="subtitleEnableVad" class="select-input"><option value="true">Ligado (recomendado para fala)</option><option value="false">Desligado</option></select></div>
-                            <div class="form-group"><span class="label">Modo visual da legenda</span><select id="subtitleVisualMode" class="select-input"><option value="line">Linha completa</option><option value="word">Palavra por palavra</option><option value="syllable">Varredura</option></select></div>
-                            <div class="form-group"><span class="label">Revisar antes de renderizar</span><select id="subtitleEnableCorrection" class="select-input"><option value="false">Não</option><option value="true">Sim</option></select></div>
-                            <div class="form-group"><span class="label">Posição</span><select id="subtitleTextPosition" class="select-input"><option value="bottom">Inferior</option><option value="middle">Central</option><option value="top">Superior</option></select></div>
-                            <div class="form-group"><span class="label">Cor</span><input type="color" id="subtitleTextColor" value="#00FFFF" class="input-text" style="height:38px; padding:0.25rem;"></div>
-                            <div class="form-group"><span class="label">Tamanho da fonte</span><input type="number" id="subtitleFontSize" min="20" max="96" value="50" class="input-text"></div>
-                            <div class="form-group"><span class="label">Palavras por linha (0 = auto)</span><input type="number" id="subtitleWordsPerLine" min="0" max="30" value="0" class="input-text"></div>
-                            <div class="form-group"><span class="label">Caracteres por linha (0 = auto)</span><input type="number" id="subtitleMaxCharsLine" min="0" max="100" value="0" class="input-text"></div>
-                            <div class="form-group"><span class="label">Quebrar por pontuação</span><select id="subtitleBreakPunctuation" class="select-input"><option value="true">Sim</option><option value="false">Não</option></select></div>
-                            <div class="form-group"><span class="label">Legenda desde o início</span><select id="subtitleFirstLine" class="select-input"><option value="false">Não</option><option value="true">Sim</option></select></div>
+                            <div class="form-group"><span class="label">Revisar o SRT original</span><select id="subtitleEnableCorrection" class="select-input"><option value="false">Não</option><option value="true">Sim</option></select></div>
                             <div class="form-group"><span class="label">Salvar original na Biblioteca</span><select id="subtitleSaveLibrary" class="select-input"><option value="true">Sim</option><option value="false">Não</option></select></div>
                         </div>
-                        <p class="compact-note" style="margin-top:0.8rem;">A tradução é processada localmente. No primeiro uso de tradução para português ou espanhol, o modelo multilíngue é baixado para o volume persistente do servidor.</p>
+                        <p class="compact-note" style="margin-top:0.8rem;">O SRT original é salvo primeiro. A tradução é independente: se ela falhar, o arquivo original continua disponível para download.</p>
                     </div>
-                    <button type="submit" id="subtitleSubmitBtn" class="btn-primary easy-submit">▤ Gerar vídeo legendado + SRT</button>
+                    <button type="submit" id="subtitleSubmitBtn" class="btn-primary easy-submit">▤ Gerar arquivos SRT</button>
                 </div>
             </form>
 
@@ -1959,7 +1951,7 @@
                     <div class="timeline-step" id="step-Separating"><div class="step-dot"></div><span>Separando vocais do instrumental</span></div>
                     <div class="timeline-step" id="step-Transcribing"><div class="step-dot"></div><span>Transcrevendo voz com Whisper</span></div>
                     <div class="timeline-step" id="step-Subtitles"><div class="step-dot"></div><span>Gerando legenda sincronizada</span></div>
-                    <div class="timeline-step" id="step-Rendering"><div class="step-dot"></div><span>Renderizando vídeo final</span></div>
+                    <div class="timeline-step" id="step-Rendering"><div class="step-dot"></div><span>Gerando resultado final</span></div>
                     <div class="timeline-step" id="step-Cleaning"><div class="step-dot"></div><span>Limpando arquivos temporários</span></div>
                     <div class="timeline-step" id="step-Done"><div class="step-dot"></div><span>Concluído</span></div>
                 </div>
@@ -2010,19 +2002,22 @@
 
             <div style="display: flex; justify-content: space-between; align-items: center; pt: 1rem; border-top: 1px solid var(--glass-border);">
                 <button type="button" class="btn-cancel-task btn-secondary" style="background: rgba(239,68,68,0.15); color: #fca5a5; border-color: rgba(239,68,68,0.3);">🛑 Cancelar Processamento</button>
-                <button type="button" id="btnSkipEdit" class="btn-secondary">⏩ Renderizar sem editar</button>
+                <button type="button" id="btnSkipEdit" class="btn-secondary">⏩ Continuar sem editar</button>
             </div>
         </div>
 
             <!-- CARD DE DOWNLOAD DO VÍDEO CONCLUÍDO -->
             <div class="card" id="downloadBox" style="display: none; text-align: center; border-color: rgba(16, 185, 129, 0.4);">
                 <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">🎉</div>
-                <h3 style="font-size: 1.08rem; color: var(--text-main); margin-bottom: 0.25rem;">Vídeo pronto!</h3>
-                <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.6rem;">Assista aqui ou abra sua cópia permanente na Biblioteca.</p>
+                <h3 id="downloadResultTitle" style="font-size: 1.08rem; color: var(--text-main); margin-bottom: 0.25rem;">Vídeo pronto!</h3>
+                <p id="downloadResultDescription" style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.6rem;">Assista aqui ou abra sua cópia permanente na Biblioteca.</p>
                 <video id="resultVideoPreview" class="media-preview" controls preload="metadata"></video>
+                <p id="translationResultWarning" class="compact-note" style="display:none; margin:0 0 0.7rem; color:#fbbf24;"></p>
                 <div style="display: flex; justify-content: center; gap: 0.55rem; flex-wrap: wrap;">
                     <button type="button" id="btnDownloadResult" class="btn-primary" style="background: linear-gradient(135deg, #10b981, #059669); width: auto;">⬇️ Baixar MP4</button>
                     <button type="button" id="btnDownloadSubtitles" class="btn-primary" style="display:none; width:auto;">▤ Baixar SRT</button>
+                    <button type="button" id="btnDownloadOriginalSubtitles" class="btn-primary" style="display:none; width:auto;">▤ Baixar SRT original</button>
+                    <button type="button" id="btnDownloadTranslatedSubtitles" class="btn-primary" style="display:none; width:auto;">▤ Baixar SRT traduzido</button>
                     <button type="button" id="btnOpenResultLibrary" class="btn-secondary">📚 Abrir Biblioteca</button>
                 </div>
             </div>
@@ -2544,15 +2539,7 @@
             const values = {
                 subtitleWhisperModel: config.whisper_model || 'large-v3-turbo',
                 subtitleTranscriptionPreset: config.transcription_preset || 'difficult',
-                subtitleVisualMode: config.subtitle_mode === 'phrase' ? 'line' : (config.subtitle_mode || 'line'),
                 subtitleEnableCorrection: Boolean(config.enable_correction),
-                subtitleTextPosition: config.text_position || 'bottom',
-                subtitleTextColor: config.text_color || '#00FFFF',
-                subtitleFontSize: config.font_size || 50,
-                subtitleWordsPerLine: config.words_per_line || 0,
-                subtitleMaxCharsLine: config.max_chars_line || 0,
-                subtitleBreakPunctuation: Boolean(config.break_on_punctuation),
-                subtitleFirstLine: Boolean(config.keep_first_line_visible),
                 subtitleSaveLibrary: Boolean(config.save_to_library),
             };
             Object.entries(values).forEach(([id, value]) => {
@@ -3536,8 +3523,10 @@
                 fillLibrarySelect(document.getElementById('libraryBgSelect'), data.photos, 'Selecione um fundo da biblioteca...');
                 fillLibrarySelect(document.getElementById('easyLibraryAudio'), data.videos, 'Escolha na biblioteca...');
                 fillLibrarySelect(document.getElementById('easyLibraryBg'), data.photos, 'Escolha um fundo...');
-                const libraryVideos = (data.videos || []).filter(file => ['mp4', 'mkv', 'avi', 'mov', 'webm', 'm4v'].includes((file.split('.').pop() || '').toLowerCase()));
-                fillLibrarySelect(document.getElementById('subtitleLibraryVideo'), libraryVideos, 'Ou escolha na Biblioteca...');
+                const subtitleMedia = (data.videos || []).filter(file => [
+                    'mp4', 'mkv', 'avi', 'mov', 'webm', 'm4v', 'mp3', 'wav', 'flac', 'm4a', 'aac', 'ogg', 'opus'
+                ].includes((file.split('.').pop() || '').toLowerCase()));
+                fillLibrarySelect(document.getElementById('subtitleLibraryVideo'), subtitleMedia, 'Ou escolha na Biblioteca...');
                 latestLibraryPhotos = data.photos || [];
                 easyRandomBackgroundSelection = new Set(
                     [...easyRandomBackgroundSelection].filter(filename => latestLibraryPhotos.includes(filename))
@@ -3736,7 +3725,7 @@
             document.getElementById('subtitleVideoFile')?.addEventListener('change', event => {
                 const files = Array.from(event.target.files || []);
                 const label = document.getElementById('subtitleVideoFileText');
-                if (label) label.textContent = files.length > 1 ? `${files.length} vídeos selecionados` : (files[0]?.name || 'Escolher um ou mais vídeos');
+                if (label) label.textContent = files.length > 1 ? `${files.length} arquivos selecionados` : (files[0]?.name || 'Escolher um ou mais arquivos');
             });
 
             document.getElementById('btnResetEasyModeDefaults')?.addEventListener('click', () => {
@@ -3893,15 +3882,7 @@
                 formData.set('whisper_model', document.getElementById('subtitleWhisperModel')?.value || 'large-v3-turbo');
                 formData.set('transcription_preset', document.getElementById('subtitleTranscriptionPreset')?.value || 'difficult');
                 formData.set('enable_vad', document.getElementById('subtitleEnableVad')?.value || 'true');
-                formData.set('subtitle_mode', document.getElementById('subtitleVisualMode')?.value || 'line');
                 formData.set('enable_correction', document.getElementById('subtitleEnableCorrection')?.value || 'false');
-                formData.set('text_position', document.getElementById('subtitleTextPosition')?.value || 'bottom');
-                formData.set('text_color', document.getElementById('subtitleTextColor')?.value || '#00FFFF');
-                formData.set('font_size', document.getElementById('subtitleFontSize')?.value || '50');
-                formData.set('words_per_line', document.getElementById('subtitleWordsPerLine')?.value || '0');
-                formData.set('max_chars_line', document.getElementById('subtitleMaxCharsLine')?.value || '0');
-                formData.set('break_on_punctuation', document.getElementById('subtitleBreakPunctuation')?.value || 'true');
-                formData.set('keep_first_line_visible', document.getElementById('subtitleFirstLine')?.value || 'false');
                 formData.set('save_to_library', document.getElementById('subtitleSaveLibrary')?.value || 'true');
                 formData.set('background_mode', 'original');
                 formData.set('transcribe_source', 'original');
@@ -3918,12 +3899,12 @@
                 setCreationUiLocked(true);
                 if (button) { button.disabled = true; button.textContent = 'Adicionando à fila...'; }
                 if (processCard) processCard.style.display = 'block';
-                if (status) status.textContent = 'Preparando o vídeo para transcrição...';
+                if (status) status.textContent = 'Preparando a mídia e convertendo para MP3...';
                 renderProcessSummary({
                     title: audioFiles.length > 1 ? `${audioFiles.length} vídeos` : (audioFiles[0]?.name || youtubeUrl || libraryVideo),
                     lyrics: `SRT · ${(document.getElementById('subtitleTranslationLanguage')?.selectedOptions?.[0]?.textContent || 'Português')}`,
                     model: document.getElementById('subtitleWhisperModel')?.selectedOptions?.[0]?.textContent || 'Large V3 Turbo',
-                    background: 'Vídeo original · áudio preservado',
+                    background: 'Somente arquivos SRT',
                 });
                 updateTimelineUI('Uploading');
                 try {
@@ -3939,7 +3920,7 @@
                 } catch (error) {
                     clientPreparationInProgress = false;
                     setCreationUiLocked(false);
-                    if (button) { button.disabled = false; button.textContent = '▤ Gerar vídeo legendado + SRT'; }
+                    if (button) { button.disabled = false; button.textContent = '▤ Gerar arquivos SRT'; }
                     if (processCard) processCard.style.display = 'none';
                     alert('Erro ao legendar vídeo: ' + error.message);
                 }
@@ -4408,6 +4389,16 @@
                     link.remove();
                 };
             }
+            const downloadSubtitleKind = kind => {
+                const link = document.createElement('a');
+                link.href = `/api/download-subtitles?kind=${encodeURIComponent(kind)}&token=${encodeURIComponent(authToken)}&t=${Date.now()}`;
+                link.rel = 'noopener';
+                document.body.appendChild(link);
+                link.click();
+                link.remove();
+            };
+            document.getElementById('btnDownloadOriginalSubtitles')?.addEventListener('click', () => downloadSubtitleKind('original'));
+            document.getElementById('btnDownloadTranslatedSubtitles')?.addEventListener('click', () => downloadSubtitleKind('translated'));
 
             // Download Logs
             const btnDownloadLogs = document.getElementById('btnDownloadLogs');
@@ -5715,7 +5706,13 @@
                 const subtitleSubmitBtn = document.getElementById('subtitleSubmitBtn');
                 const downloadBox = document.getElementById('downloadBox');
                 const resultVideoPreview = document.getElementById('resultVideoPreview');
+                const btnDownloadResult = document.getElementById('btnDownloadResult');
                 const btnDownloadSubtitles = document.getElementById('btnDownloadSubtitles');
+                const btnDownloadOriginalSubtitles = document.getElementById('btnDownloadOriginalSubtitles');
+                const btnDownloadTranslatedSubtitles = document.getElementById('btnDownloadTranslatedSubtitles');
+                const downloadResultTitle = document.getElementById('downloadResultTitle');
+                const downloadResultDescription = document.getElementById('downloadResultDescription');
+                const translationResultWarning = document.getElementById('translationResultWarning');
                 document.querySelectorAll('.btn-cancel-task').forEach(button => {
                     button.style.display = data.can_cancel ? '' : 'none';
                 });
@@ -5789,18 +5786,47 @@
 
                     if (data.status === "done" && data.result_available_to_current_user && data.original_filename && !data.original_filename.includes("Baixando")) {
                         if (downloadBox) downloadBox.style.display = "block";
-                        if (resultVideoPreview && (statusChanged || !resultVideoPreview.getAttribute('src'))) {
-                            resultVideoPreview.src = `/api/download?inline=true&token=${encodeURIComponent(authToken)}&t=${Date.now()}`;
-                            resultVideoPreview.load();
+                        const subtitleResult = data.result_kind === 'subtitles';
+                        if (subtitleResult) {
+                            if (downloadResultTitle) downloadResultTitle.textContent = 'Legendas prontas!';
+                            if (downloadResultDescription) downloadResultDescription.textContent = 'Baixe o SRT original e, quando disponível, a tradução opcional.';
+                            if (resultVideoPreview) {
+                                resultVideoPreview.pause();
+                                resultVideoPreview.removeAttribute('src');
+                                resultVideoPreview.load();
+                                resultVideoPreview.style.display = 'none';
+                            }
+                            if (btnDownloadResult) btnDownloadResult.style.display = 'none';
+                            if (btnDownloadSubtitles) btnDownloadSubtitles.style.display = 'none';
+                            if (btnDownloadOriginalSubtitles) btnDownloadOriginalSubtitles.style.display = data.original_subtitle_filename ? '' : 'none';
+                            if (btnDownloadTranslatedSubtitles) btnDownloadTranslatedSubtitles.style.display = data.translated_subtitle_filename ? '' : 'none';
+                            if (translationResultWarning) {
+                                translationResultWarning.textContent = data.translation_error ? `A tradução opcional falhou: ${data.translation_error}` : '';
+                                translationResultWarning.style.display = data.translation_error ? '' : 'none';
+                            }
+                        } else {
+                            if (downloadResultTitle) downloadResultTitle.textContent = 'Vídeo pronto!';
+                            if (downloadResultDescription) downloadResultDescription.textContent = 'Assista aqui ou abra sua cópia permanente na Biblioteca.';
+                            if (resultVideoPreview) resultVideoPreview.style.display = '';
+                            if (resultVideoPreview && (statusChanged || !resultVideoPreview.getAttribute('src'))) {
+                                resultVideoPreview.src = `/api/download?inline=true&token=${encodeURIComponent(authToken)}&t=${Date.now()}`;
+                                resultVideoPreview.load();
+                            }
+                            if (btnDownloadResult) btnDownloadResult.style.display = '';
+                            if (btnDownloadSubtitles) btnDownloadSubtitles.style.display = data.subtitle_filename ? '' : 'none';
+                            if (btnDownloadOriginalSubtitles) btnDownloadOriginalSubtitles.style.display = 'none';
+                            if (btnDownloadTranslatedSubtitles) btnDownloadTranslatedSubtitles.style.display = 'none';
+                            if (translationResultWarning) translationResultWarning.style.display = 'none';
                         }
-                        if (btnDownloadSubtitles) btnDownloadSubtitles.style.display = data.subtitle_filename ? '' : 'none';
                     } else if (downloadBox) {
                         downloadBox.style.display = 'none';
                         if (btnDownloadSubtitles) btnDownloadSubtitles.style.display = 'none';
+                        if (btnDownloadOriginalSubtitles) btnDownloadOriginalSubtitles.style.display = 'none';
+                        if (btnDownloadTranslatedSubtitles) btnDownloadTranslatedSubtitles.style.display = 'none';
                     }
                     if (btnSubmit) { btnSubmit.disabled = false; btnSubmit.innerHTML = '🎬 Criar Karaokê'; }
                     if (easySubmitBtn) { easySubmitBtn.disabled = false; easySubmitBtn.innerHTML = '⚡ Criar meu karaokê'; }
-                    if (subtitleSubmitBtn) { subtitleSubmitBtn.disabled = false; subtitleSubmitBtn.innerHTML = '▤ Gerar vídeo legendado + SRT'; }
+                    if (subtitleSubmitBtn) { subtitleSubmitBtn.disabled = false; subtitleSubmitBtn.innerHTML = '▤ Gerar arquivos SRT'; }
                     isShowingCorrection = false;
                     if (statusChanged && previousStatus !== 'unknown') {
                         await Promise.allSettled([fetchCacheInfo(), loadLibrary()]);
@@ -5811,7 +5837,7 @@
                     setCreationUiLocked(false);
                     if (btnSubmit) { btnSubmit.disabled = false; btnSubmit.innerHTML = '🎬 Criar Karaokê'; }
                     if (easySubmitBtn) { easySubmitBtn.disabled = false; easySubmitBtn.innerHTML = '⚡ Criar meu karaokê'; }
-                    if (subtitleSubmitBtn) { subtitleSubmitBtn.disabled = false; subtitleSubmitBtn.innerHTML = '▤ Gerar vídeo legendado + SRT'; }
+                    if (subtitleSubmitBtn) { subtitleSubmitBtn.disabled = false; subtitleSubmitBtn.innerHTML = '▤ Gerar arquivos SRT'; }
                     isShowingCorrection = false;
                 }
             } catch (error) {

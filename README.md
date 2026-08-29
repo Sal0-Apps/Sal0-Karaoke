@@ -21,7 +21,7 @@ O sistema inclui contas locais, isolamento de dados entre usuários, permissões
 ## Recursos
 
 - modo rápido e modo detalhado para criação de karaokê;
-- modo dedicado para legendar vídeos longos, preservar a fala original e entregar MP4 + SRT em português, inglês, espanhol ou no idioma detectado;
+- modo dedicado para transcrever mídias longas, normalizar o áudio para MP3 e entregar somente o SRT original, com um segundo SRT opcional em português, inglês ou espanhol;
 - upload múltiplo de áudio e vídeo com processamento sequencial em fila;
 - upload de áudio, vídeo e imagens;
 - importação opcional de conteúdo do YouTube por `yt-dlp`, com atualização administrativa persistente do mecanismo;
@@ -47,7 +47,7 @@ O container utiliza `/data` como volume persistente:
 ```text
 /data/library/videos/    mídias de entrada
 /data/library/photos/    imagens e vídeos de fundo
-/data/library/history/   vídeos finais e legendas SRT correspondentes
+/data/library/history/   vídeos finais e arquivos SRT independentes
 /data/output/models/     modelos Whisper e modelo opcional de tradução
 /data/output/            configurações, estado e logs
 /data/output/queue_jobs/ entradas isoladas dos trabalhos ativos da fila de processamento

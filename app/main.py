@@ -28,9 +28,14 @@ from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field
 
 # Módulos do pipeline local
-from audio_processor import extract_audio, separate_vocals
+from audio_processor import extract_audio, extract_audio_mp3, get_file_duration, separate_vocals
 from transcriber import transcribe_vocals
-from subtitle_translator import translate_subtitle_segments, write_srt, SUPPORTED_TARGET_LANGUAGES
+from subtitle_translator import (
+    SUPPORTED_TARGET_LANGUAGES,
+    cover_full_media_timeline,
+    translate_subtitle_segments,
+    write_srt,
+)
 from karaoke_generator import generate_ass_karaoke
 from video_renderer import render_karaoke_video, check_has_video
 
@@ -528,7 +533,11 @@ state = {
     "owner_role": None,
     "history_filename": None,
     "subtitle_filename": None,
+    "original_subtitle_filename": None,
+    "translated_subtitle_filename": None,
     "subtitle_language": None,
+    "translation_error": "",
+    "result_kind": None,
     "public_download_token": None,
     "process_summary": {}
 }
@@ -897,7 +906,11 @@ def update_state(
     owner_role: str = None,
     history_filename: str = None,
     subtitle_filename: str = None,
+    original_subtitle_filename: str = None,
+    translated_subtitle_filename: str = None,
     subtitle_language: str = None,
+    translation_error: str = None,
+    result_kind: str = None,
     public_download_token: str = None,
     stage_progress: int | None = None,
     stage_detail: str = "",
@@ -918,7 +931,11 @@ def update_state(
             state["owner_username"] = owner_username
             state["history_filename"] = None
             state["subtitle_filename"] = None
+            state["original_subtitle_filename"] = None
+            state["translated_subtitle_filename"] = None
             state["subtitle_language"] = None
+            state["translation_error"] = ""
+            state["result_kind"] = None
             state["public_download_token"] = None
         if owner_role is not None:
             state["owner_role"] = owner_role
@@ -926,8 +943,16 @@ def update_state(
             state["history_filename"] = history_filename
         if subtitle_filename is not None:
             state["subtitle_filename"] = subtitle_filename
+        if original_subtitle_filename is not None:
+            state["original_subtitle_filename"] = original_subtitle_filename
+        if translated_subtitle_filename is not None:
+            state["translated_subtitle_filename"] = translated_subtitle_filename
         if subtitle_language is not None:
             state["subtitle_language"] = subtitle_language
+        if translation_error is not None:
+            state["translation_error"] = translation_error
+        if result_kind is not None:
+            state["result_kind"] = result_kind
         if public_download_token is not None:
             state["public_download_token"] = public_download_token
         if process_summary is not None:
@@ -1037,38 +1062,25 @@ def save_video_to_history(video_path: str, orig_name: str, library_dir: str) -> 
         return None
 
 
-def subtitle_video_download_filename(original_name: str) -> str:
-    base_name = os.path.splitext(karaoke_download_filename(original_name))[0]
+def save_srt_result(srt_path: str, orig_name: str, library_dir: str, language_label: str) -> str:
+    """Salva um SRT como resultado independente, sem criar um vídeo associado."""
+    if not srt_path or not os.path.isfile(srt_path):
+        return None
+    base_name = os.path.splitext(karaoke_download_filename(orig_name))[0]
     base_name = re.sub(r" - Karaok[eê]$", "", base_name, flags=re.IGNORECASE)
-    return f"{base_name} - Legendado.mp4"
-
-
-def save_subtitled_video_to_history(video_path: str, orig_name: str, library_dir: str) -> str:
-    if not video_path or not os.path.exists(video_path):
-        return None
-    lib_history_dir = os.path.join(library_dir, "history")
-    os.makedirs(lib_history_dir, exist_ok=True)
-    dest_filename = subtitle_video_download_filename(orig_name)
-    safe_name = os.path.splitext(dest_filename)[0]
-    dest_path = os.path.join(lib_history_dir, dest_filename)
+    safe_language = re.sub(r"[^a-zA-Z0-9_-]", "", language_label or "original") or "original"
+    filename_root = f"{base_name} - Legenda {safe_language}"
+    history_dir = os.path.join(library_dir, "history")
+    os.makedirs(history_dir, exist_ok=True)
+    filename = f"{filename_root}.srt"
+    destination = os.path.join(history_dir, filename)
     counter = 1
-    while os.path.exists(dest_path):
-        dest_filename = f"{safe_name} ({counter}).mp4"
-        dest_path = os.path.join(lib_history_dir, dest_filename)
+    while os.path.exists(destination):
+        filename = f"{filename_root} ({counter}).srt"
+        destination = os.path.join(history_dir, filename)
         counter += 1
-    shutil.copy2(video_path, dest_path)
-    return dest_filename
-
-
-def save_subtitle_to_history(srt_path: str, history_filename: str, library_dir: str) -> str:
-    if not srt_path or not os.path.exists(srt_path) or not history_filename:
-        return None
-    lib_history_dir = os.path.join(library_dir, "history")
-    os.makedirs(lib_history_dir, exist_ok=True)
-    subtitle_filename = f"{os.path.splitext(history_filename)[0]}.srt"
-    destination = os.path.join(lib_history_dir, subtitle_filename)
     shutil.copy2(srt_path, destination)
-    return subtitle_filename
+    return filename
 
 
 def save_result_metadata(
@@ -1077,6 +1089,10 @@ def save_result_metadata(
     history_filename: str,
     subtitle_filename: str = None,
     subtitle_language: str = None,
+    original_subtitle_filename: str = None,
+    translated_subtitle_filename: str = None,
+    translation_error: str = "",
+    result_kind: str = None,
 ):
     try:
         with open(os.path.join(output_dir, "result_meta.json"), "w", encoding="utf-8") as file:
@@ -1085,6 +1101,10 @@ def save_result_metadata(
                 "history_filename": history_filename,
                 "subtitle_filename": subtitle_filename,
                 "subtitle_language": subtitle_language,
+                "original_subtitle_filename": original_subtitle_filename,
+                "translated_subtitle_filename": translated_subtitle_filename,
+                "translation_error": translation_error,
+                "result_kind": result_kind,
                 "completed_at": time.time()
             }, file, ensure_ascii=False, indent=2)
     except Exception as exc:
@@ -3962,8 +3982,8 @@ def process_karaoke(
             if subtitle_only else lyrics_summary
         ),
         "model": model_labels.get(whisper_model, whisper_model),
-        "mode": "Legendar vídeo" if subtitle_only else ("Modo Rápido" if easy_mode else "Modo Detalhado"),
-        "background": "Vídeo original · áudio preservado" if subtitle_only else background_summary,
+        "mode": "Gerar SRT" if subtitle_only else ("Modo Rápido" if easy_mode else "Modo Detalhado"),
+        "background": "Somente arquivos SRT" if subtitle_only else background_summary,
     }
 
     pipeline = {
@@ -4110,204 +4130,186 @@ def send_video_to_targets(
         ).start()
 
 
-def run_subtitle_video_pipeline(
-    input_video_path: str,
+def run_subtitle_srt_pipeline(
+    input_media_path: str,
     orig_name: str,
     whisper_model: str,
-    font_size: int,
-    text_color: str,
-    text_position: str,
-    subtitle_mode: str,
-    words_per_line: int,
-    max_chars_line: int,
-    break_on_punctuation: bool,
     enable_vad: bool,
     transcription_preset: str,
     enable_correction: bool,
-    keep_first_line_visible: bool,
     translation_language: str,
     owner_user: dict,
     cache_dir: str,
     output_dir: str,
     library_dir: str,
     telegram_targets: list[dict],
-    telegram_base_url: str,
-    telegram_external_url: str,
 ):
-    """Gera vídeo legendado e SRT sem Demucs, preservando o áudio original."""
+    """Transcreve qualquer mídia por MP3 e retorna somente SRT original/traduzido."""
     import process_manager as pm
 
-    if not check_has_video(input_video_path):
-        raise ValueError("O modo Legendar vídeo aceita somente arquivos que contenham uma faixa de vídeo.")
-
     os.makedirs(output_dir, exist_ok=True)
-    converted_wav = os.path.join(cache_dir, "subtitle_original_audio.wav")
-    segments_cache_file = os.path.join(cache_dir, f"subtitle_segments_{translation_language}.json")
-    info_cache_file = os.path.join(cache_dir, f"subtitle_info_{translation_language}.json")
-    final_video_path = os.path.join(output_dir, "final_karaoke.mp4")
-    final_ass_path = os.path.join(output_dir, "karaoke.ass")
-    final_srt_path = os.path.join(output_dir, "final_subtitles.srt")
+    normalized_mp3 = os.path.join(cache_dir, "subtitle_source.mp3")
+    segments_cache_file = os.path.join(cache_dir, "subtitle_segments_original.json")
+    info_cache_file = os.path.join(cache_dir, "subtitle_info_original.json")
+    final_original_srt = os.path.join(output_dir, "final_subtitles_original.srt")
+    final_translated_srt = os.path.join(output_dir, "final_subtitles_translated.srt")
     cache_signature = {
         "whisper_model": whisper_model,
         "enable_vad": bool(enable_vad),
         "transcription_preset": transcription_preset,
-        "translation_language": translation_language,
     }
 
     pm.check_cancelled()
-    if not os.path.exists(converted_wav):
-        update_state("processing", "Extracting original audio", 15)
-        extract_audio(input_video_path, converted_wav)
+    if not os.path.isfile(normalized_mp3):
+        update_state("processing", "Converting media to MP3", 15)
+        extract_audio_mp3(input_media_path, normalized_mp3)
     else:
-        update_state("processing", "Extracting original audio (cached)", 15)
+        update_state("processing", "Using normalized MP3", 15)
+    media_duration = get_file_duration(normalized_mp3)
+    if media_duration <= 0:
+        raise ValueError("Não foi possível determinar a duração do áudio normalizado.")
 
-    segments = None
+    original_segments = None
     transcription_info = {}
     if os.path.isfile(segments_cache_file) and os.path.isfile(info_cache_file):
         try:
             with open(segments_cache_file, "r", encoding="utf-8") as segment_file:
-                segments = json.load(segment_file)
+                original_segments = json.load(segment_file)
             with open(info_cache_file, "r", encoding="utf-8") as info_file:
                 transcription_info = json.load(info_file)
             if transcription_info.get("cache_signature") != cache_signature:
-                segments = None
+                original_segments = None
             else:
-                update_state("processing", "Transcribing speech (cached)", 65)
+                update_state("processing", "Using cached transcription", 65)
         except (OSError, ValueError):
-            segments = None
+            original_segments = None
 
-    if segments is None:
+    if original_segments is None:
         pm.check_cancelled()
-        whisper_task = "translate" if translation_language == "en" else "transcribe"
-        update_state("processing", "Transcribing original speech", 45)
+        update_state("processing", "Transcribing complete MP3", 45)
         notify_targets(
             telegram_targets,
-            f"✍️ <b>Sal0 Karaokê</b>: Transcrevendo o áudio original de <b>{orig_name}</b>.",
+            f"✍️ <b>Sal0 Karaokê</b>: Transcrevendo o áudio completo de <b>{orig_name}</b>.",
         )
-        segments, transcription_info = transcribe_vocals(
-            converted_wav,
+        original_segments, transcription_info = transcribe_vocals(
+            normalized_mp3,
             model_size=whisper_model,
             quality_mode="max_quality" if whisper_model == "large-v3" else "standard",
             enable_vad=enable_vad,
             transcription_preset=transcription_preset,
-            task=whisper_task,
+            task="transcribe",
             return_info=True,
         )
-        source_language = transcription_info.get("language", "")
-        if translation_language in {"pt", "es"} and source_language != translation_language:
+        if original_segments:
+            transcription_info["cache_signature"] = cache_signature
+            with open(segments_cache_file, "w", encoding="utf-8") as segment_file:
+                json.dump(original_segments, segment_file, ensure_ascii=False, indent=2)
+            with open(info_cache_file, "w", encoding="utf-8") as info_file:
+                json.dump(transcription_info, info_file, ensure_ascii=False, indent=2)
+
+    if not original_segments:
+        raise ValueError("Nenhuma fala foi detectada na mídia enviada.")
+
+    pm.check_cancelled()
+    if enable_correction:
+        global segments_to_edit, correction_event
+        segments_to_edit = original_segments
+        correction_event.clear()
+        update_state("waiting_for_user_correction", "Correction", 68)
+        while not correction_event.is_set():
+            pm.check_cancelled()
+            correction_event.wait(timeout=1.0)
+        original_segments = segments_to_edit
+
+    original_segments = cover_full_media_timeline(original_segments, media_duration)
+    update_state("processing", "Generating original SRT", 72)
+    write_srt(original_segments, final_original_srt)
+    original_filename = save_srt_result(
+        final_original_srt,
+        orig_name,
+        library_dir,
+        transcription_info.get("language") or "original",
+    )
+    if not original_filename:
+        raise RuntimeError("Não foi possível salvar o SRT original na Biblioteca.")
+
+    translated_filename = None
+    translation_error = ""
+    source_language = str(transcription_info.get("language") or "").split("-")[0].lower()
+    if translation_language != "original":
+        try:
             update_state(
                 "processing",
-                "Translating subtitles locally",
-                70,
+                "Translating optional SRT",
+                80,
                 stage_progress=0,
-                stage_detail="O modelo de tradução é baixado apenas no primeiro uso",
+                stage_detail="O SRT original já está seguro na Biblioteca",
             )
 
             def translation_progress(completed: int, total: int):
                 percent = round((completed / max(total, 1)) * 100)
                 update_state(
                     "processing",
-                    "Translating subtitles locally",
-                    70 + round(percent * 0.08),
+                    "Translating optional SRT",
+                    80 + round(percent * 0.15),
                     stage_progress=percent,
                     stage_detail=f"{completed} de {total} trechos traduzidos",
                 )
 
-            segments = translate_subtitle_segments(
-                segments,
+            translated_segments = translate_subtitle_segments(
+                original_segments,
                 source_language=source_language,
                 target_language=translation_language,
                 progress_callback=translation_progress,
             )
-        if segments:
-            transcription_info["cache_signature"] = cache_signature
-            with open(segments_cache_file, "w", encoding="utf-8") as segment_file:
-                json.dump(segments, segment_file, ensure_ascii=False, indent=2)
-            with open(info_cache_file, "w", encoding="utf-8") as info_file:
-                json.dump(transcription_info, info_file, ensure_ascii=False, indent=2)
+            translated_segments = cover_full_media_timeline(translated_segments, media_duration)
+            write_srt(translated_segments, final_translated_srt)
+            translated_filename = save_srt_result(
+                final_translated_srt,
+                orig_name,
+                library_dir,
+                translation_language,
+            )
+        except Exception as exc:
+            translation_error = str(exc)
+            logger.exception("A tradução opcional falhou; o SRT original foi preservado.")
+            notify_targets(
+                telegram_targets,
+                f"⚠️ <b>Sal0 Karaokê</b>: o SRT original de <b>{orig_name}</b> ficou pronto, "
+                "mas a tradução opcional falhou.",
+            )
 
-    if not segments:
-        raise ValueError("Nenhuma fala foi detectada no vídeo.")
-
-    pm.check_cancelled()
-    if enable_correction:
-        global segments_to_edit, correction_event
-        segments_to_edit = segments
-        correction_event.clear()
-        update_state("waiting_for_user_correction", "Correction", 79)
-        while not correction_event.is_set():
-            pm.check_cancelled()
-            correction_event.wait(timeout=1.0)
-        segments = segments_to_edit
-        with open(segments_cache_file, "w", encoding="utf-8") as segment_file:
-            json.dump(segments, segment_file, ensure_ascii=False, indent=2)
-
-    with tempfile.TemporaryDirectory() as subtitle_tmpdir:
-        pm.check_cancelled()
-        update_state("processing", "Generating translated SRT", 82)
-        temporary_srt = os.path.join(subtitle_tmpdir, "translated_subtitles.srt")
-        temporary_ass = os.path.join(subtitle_tmpdir, "translated_subtitles.ass")
-        write_srt(segments, temporary_srt)
-        generate_ass_karaoke(
-            segments=segments,
-            output_ass_path=temporary_ass,
-            font_size=font_size,
-            text_color_hex=text_color,
-            text_position=text_position,
-            subtitle_mode=subtitle_mode,
-            words_per_line=words_per_line,
-            max_chars_line=max_chars_line,
-            break_on_punctuation=break_on_punctuation,
-            show_instrumental=False,
-            show_next_line_preview=False,
-            keep_first_line_visible=keep_first_line_visible,
-        )
-        shutil.copy2(temporary_srt, final_srt_path)
-        shutil.copy2(temporary_ass, final_ass_path)
-
-        pm.check_cancelled()
-        update_state("processing", "Rendering subtitled video with original audio", 92)
-        render_karaoke_video(
-            instrumental_path=converted_wav,
-            ass_path=temporary_ass,
-            output_mp4_path=final_video_path,
-            original_video_path=input_video_path,
-            background_mode="original_video",
-        )
-
-    pm.check_cancelled()
-    history_filename = save_subtitled_video_to_history(final_video_path, orig_name, library_dir)
-    subtitle_filename = save_subtitle_to_history(final_srt_path, history_filename, library_dir)
-    public_token = create_public_download(owner_user, history_filename)
+    primary_subtitle = translated_filename or original_filename
+    public_token = create_public_download(owner_user, original_filename)
     save_result_metadata(
         output_dir,
         orig_name,
-        history_filename,
-        subtitle_filename=subtitle_filename,
+        original_filename,
+        subtitle_filename=primary_subtitle,
         subtitle_language=translation_language,
+        original_subtitle_filename=original_filename,
+        translated_subtitle_filename=translated_filename,
+        translation_error=translation_error,
+        result_kind="subtitles",
     )
     update_state(
         "done",
-        "Done",
+        "SRT ready",
         100,
-        result_file=final_video_path,
-        history_filename=history_filename,
-        subtitle_filename=subtitle_filename,
+        result_file=final_original_srt,
+        history_filename=original_filename,
+        subtitle_filename=primary_subtitle,
+        original_subtitle_filename=original_filename,
+        translated_subtitle_filename=translated_filename or "",
         subtitle_language=translation_language,
+        translation_error=translation_error,
+        result_kind="subtitles",
         public_download_token=public_token,
     )
+    completion = "SRT original e traduzido" if translated_filename else "SRT original"
     notify_targets(
         telegram_targets,
-        f"✅ <b>Sal0 Karaokê</b>: vídeo legendado e SRT de <b>{orig_name}</b> concluídos.",
-    )
-    send_video_to_targets(
-        telegram_targets,
-        final_video_path,
-        orig_name,
-        history_filename,
-        public_token,
-        telegram_base_url,
-        telegram_external_url,
+        f"✅ <b>Sal0 Karaokê</b>: {completion} de <b>{orig_name}</b> concluído(s).",
     )
 
 def run_pipeline(
@@ -4377,6 +4379,8 @@ def run_pipeline(
         final_mp4_path = os.path.join(output_dir, "final_karaoke.mp4")
         final_ass_path = os.path.join(output_dir, "karaoke.ass")
         final_srt_path = os.path.join(output_dir, "final_subtitles.srt")
+        final_original_srt_path = os.path.join(output_dir, "final_subtitles_original.srt")
+        final_translated_srt_path = os.path.join(output_dir, "final_subtitles_translated.srt")
 
         # Limpar outputs anteriores se existirem
         if os.path.exists(final_mp4_path):
@@ -4385,6 +4389,10 @@ def run_pipeline(
             os.remove(final_ass_path)
         if os.path.exists(final_srt_path):
             os.remove(final_srt_path)
+        if os.path.exists(final_original_srt_path):
+            os.remove(final_original_srt_path)
+        if os.path.exists(final_translated_srt_path):
+            os.remove(final_translated_srt_path)
 
         # Configurar diretório de cache persistente
         os.makedirs(cache_dir, exist_ok=True)
@@ -4462,29 +4470,19 @@ def run_pipeline(
                 json.dump(cached_meta, f, indent=4)
 
         if subtitle_only:
-            run_subtitle_video_pipeline(
-                input_video_path=input_audio_path,
+            run_subtitle_srt_pipeline(
+                input_media_path=input_audio_path,
                 orig_name=orig_name,
                 whisper_model=whisper_model,
-                font_size=font_size,
-                text_color=text_color,
-                text_position=text_position,
-                subtitle_mode=subtitle_mode,
-                words_per_line=words_per_line,
-                max_chars_line=max_chars_line,
-                break_on_punctuation=break_on_punctuation,
                 enable_vad=enable_vad,
                 transcription_preset=transcription_preset,
                 enable_correction=enable_correction,
-                keep_first_line_visible=keep_first_line_visible,
                 translation_language=translation_language,
                 owner_user=owner_user,
                 cache_dir=cache_dir,
                 output_dir=output_dir,
                 library_dir=library_dir,
                 telegram_targets=telegram_targets,
-                telegram_base_url=telegram_base_url,
-                telegram_external_url=telegram_external_url,
             )
             return
 
@@ -4870,7 +4868,10 @@ def download_file(
 
 
 @app.get("/api/download-subtitles")
-def download_subtitles(current_user: dict = Depends(get_current_user)):
+def download_subtitles(
+    kind: str = Query("primary"),
+    current_user: dict = Depends(get_current_user),
+):
     output_dir = get_user_paths(current_user)["output"]
     meta_file = os.path.join(output_dir, "result_meta.json")
     if not os.path.isfile(meta_file):
@@ -4880,8 +4881,20 @@ def download_subtitles(current_user: dict = Depends(get_current_user)):
             result_meta = json.load(result_file)
     except (OSError, ValueError):
         raise HTTPException(status_code=404, detail="Os metadados da legenda não estão disponíveis.")
-    subtitle_filename = os.path.basename(result_meta.get("subtitle_filename") or "")
+    subtitle_fields = {
+        "primary": "subtitle_filename",
+        "original": "original_subtitle_filename",
+        "translated": "translated_subtitle_filename",
+    }
+    if kind not in subtitle_fields:
+        raise HTTPException(status_code=400, detail="Tipo de SRT inválido.")
+    subtitle_filename = os.path.basename(result_meta.get(subtitle_fields[kind]) or "")
     subtitle_path = os.path.join(get_user_paths(current_user)["library"], "history", subtitle_filename)
     if not subtitle_filename or not os.path.isfile(subtitle_path):
-        raise HTTPException(status_code=404, detail="Nenhuma legenda SRT foi gerada nesta conta.")
+        if kind == "translated" and result_meta.get("translation_error"):
+            raise HTTPException(
+                status_code=404,
+                detail=f"O SRT original está disponível, mas a tradução falhou: {result_meta['translation_error']}",
+            )
+        raise HTTPException(status_code=404, detail="A legenda SRT solicitada não foi gerada nesta conta.")
     return FileResponse(subtitle_path, media_type="application/x-subrip", filename=subtitle_filename)

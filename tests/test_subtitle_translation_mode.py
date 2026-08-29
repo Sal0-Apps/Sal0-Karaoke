@@ -10,10 +10,11 @@ HTML = (ROOT / "app" / "templates" / "index.html").read_text(encoding="utf-8")
 TRANSCRIBER = (ROOT / "app" / "transcriber.py").read_text(encoding="utf-8")
 TRANSLATOR = (ROOT / "app" / "subtitle_translator.py").read_text(encoding="utf-8")
 REQUIREMENTS = (ROOT / "app" / "requirements.txt").read_text(encoding="utf-8")
+AUDIO_PROCESSOR = (ROOT / "app" / "audio_processor.py").read_text(encoding="utf-8")
 
 
 class SubtitleTranslationModeTests(unittest.TestCase):
-    def test_third_creator_mode_has_no_background_controls(self):
+    def test_third_creator_mode_accepts_audio_or_video_and_has_no_visual_controls(self):
         self.assertIn('id="btnCreatorSubtitle"', HTML)
         self.assertIn('id="subtitleModeForm"', HTML)
         start = HTML.index('id="subtitleModeForm"')
@@ -23,18 +24,41 @@ class SubtitleTranslationModeTests(unittest.TestCase):
         self.assertNotIn('backgroundMode', subtitle_form)
         self.assertIn('id="subtitleTranslationLanguage"', subtitle_form)
         self.assertIn('id="subtitleVideoFile"', subtitle_form)
+        self.assertIn('accept="audio/*,video/*', subtitle_form)
+        self.assertNotIn('id="subtitleVisualMode"', subtitle_form)
+        self.assertNotIn('id="subtitleTextPosition"', subtitle_form)
+        self.assertIn('Gerar arquivos SRT', subtitle_form)
 
-    def test_subtitle_pipeline_skips_demucs_and_preserves_original_audio(self):
+    def test_subtitle_pipeline_returns_only_srt_and_normalizes_media_to_mp3(self):
         tree = ast.parse(MAIN)
         function = next(
             node for node in tree.body
-            if isinstance(node, ast.FunctionDef) and node.name == "run_subtitle_video_pipeline"
+            if isinstance(node, ast.FunctionDef) and node.name == "run_subtitle_srt_pipeline"
         )
         source = ast.get_source_segment(MAIN, function)
         self.assertNotIn("separate_vocals", source)
-        self.assertIn('background_mode="original_video"', source)
-        self.assertIn("instrumental_path=converted_wav", source)
-        self.assertIn("write_srt(segments", source)
+        self.assertNotIn("render_karaoke_video", source)
+        self.assertNotIn("generate_ass_karaoke", source)
+        self.assertNotIn("final_karaoke.mp4", source)
+        self.assertIn("extract_audio_mp3(input_media_path, normalized_mp3)", source)
+        self.assertIn("final_subtitles_original.srt", source)
+        self.assertIn("final_subtitles_translated.srt", source)
+        self.assertIn('result_kind="subtitles"', source)
+        self.assertIn("def extract_audio_mp3", AUDIO_PROCESSOR)
+        self.assertIn('"-map", "0:a:0"', AUDIO_PROCESSOR)
+        self.assertIn('"-codec:a", "libmp3lame"', AUDIO_PROCESSOR)
+
+    def test_original_srt_survives_optional_translation_failure(self):
+        original_save = MAIN.index("original_filename = save_srt_result(")
+        translation_try = MAIN.index("if translation_language != \"original\":", original_save)
+        self.assertLess(original_save, translation_try)
+        self.assertIn("except Exception as exc:", MAIN[translation_try:])
+        self.assertIn("A tradução opcional falhou; o SRT original foi preservado.", MAIN)
+        self.assertIn('"original": "original_subtitle_filename"', MAIN)
+        self.assertIn('"translated": "translated_subtitle_filename"', MAIN)
+        self.assertIn('id="btnDownloadOriginalSubtitles"', HTML)
+        self.assertIn('id="btnDownloadTranslatedSubtitles"', HTML)
+        self.assertIn("data.translation_error", HTML)
 
     def test_backend_enforces_subtitle_mode_invariants(self):
         self.assertIn('subtitle_only: bool = Form(False)', MAIN)
@@ -42,6 +66,7 @@ class SubtitleTranslationModeTests(unittest.TestCase):
         self.assertIn('transcribe_source = "original"', MAIN)
         self.assertIn('show_instrumental = False', MAIN)
         self.assertIn('@app.get("/api/download-subtitles")', MAIN)
+        self.assertIn('task="transcribe"', MAIN)
 
     def test_whisper_supports_native_translation_and_language_metadata(self):
         ast.parse(TRANSCRIBER)
@@ -54,6 +79,8 @@ class SubtitleTranslationModeTests(unittest.TestCase):
         self.assertIn('TRANSLATION_MODEL_REVISION = "791dc1c6d300846c9a747d4bd11fcc7f369b750e"', TRANSLATOR)
         self.assertIn('TRANSLATION_MODEL_DIR = "/data/output/models/translation"', TRANSLATOR)
         self.assertIn("use_safetensors=True", TRANSLATOR)
+        self.assertIn("low_cpu_mem_usage=False", TRANSLATOR)
+        self.assertIn('model.to(torch.device("cpu"))', TRANSLATOR)
         self.assertIn("torch==2.10.0", REQUIREMENTS)
         self.assertIn("torchaudio==2.10.0", REQUIREMENTS)
         self.assertIn("safetensors>=0.4.3,<1", REQUIREMENTS)
@@ -77,6 +104,25 @@ class SubtitleTranslationModeTests(unittest.TestCase):
             content = destination.read_text(encoding="utf-8-sig")
         self.assertIn("00:00:01,250 --> 00:01:05,750", content)
         self.assertIn("Olá, mundo!", content)
+
+    def test_srt_timeline_covers_media_from_start_to_finish_without_gaps(self):
+        namespace = {}
+        tree = ast.parse(TRANSLATOR)
+        selected = next(
+            node for node in tree.body
+            if isinstance(node, ast.FunctionDef) and node.name == "cover_full_media_timeline"
+        )
+        exec(compile(ast.Module(body=[selected], type_ignores=[]), "subtitle_translator.py", "exec"), namespace)
+        covered = namespace["cover_full_media_timeline"](
+            [
+                {"start": 3.0, "end": 5.0, "text": "Primeira"},
+                {"start": 8.0, "end": 10.0, "text": "Segunda"},
+            ],
+            20.0,
+        )
+        self.assertEqual(covered[0]["start"], 0.0)
+        self.assertEqual(covered[0]["end"], covered[1]["start"])
+        self.assertEqual(covered[-1]["end"], 20.0)
 
 
 if __name__ == "__main__":

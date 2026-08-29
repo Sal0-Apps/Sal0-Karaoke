@@ -56,6 +56,40 @@ def extract_audio(input_path: str, output_wav_path: str) -> str:
         logger.error(f"Erro no FFmpeg ao extrair áudio: {e}")
         raise
 
+
+def extract_audio_mp3(input_path: str, output_mp3_path: str) -> str:
+    """Normaliza a primeira faixa de áudio de qualquer mídia compatível para MP3."""
+    logger.info("Normalizando mídia para MP3: %s", input_path)
+    cmd = [
+        "ffmpeg",
+        "-y",
+        "-i", input_path,
+        "-map", "0:a:0",
+        "-vn",
+        "-codec:a", "libmp3lame",
+        "-q:a", "2",
+        "-ar", "44100",
+        "-ac", "2",
+        output_mp3_path,
+    ]
+
+    import process_manager as pm
+    pm.check_cancelled()
+    try:
+        process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        pm.set_active_process(process)
+        _, stderr = process.communicate()
+        pm.clear_active_process()
+        pm.check_cancelled()
+        if process.returncode != 0:
+            raise RuntimeError(f"FFmpeg não encontrou uma faixa de áudio utilizável: {stderr}")
+        logger.info("Mídia normalizada para MP3 com sucesso: %s", output_mp3_path)
+        return output_mp3_path
+    except Exception:
+        pm.clear_active_process()
+        logger.exception("Falha ao normalizar mídia para MP3.")
+        raise
+
 def separate_vocals(audio_path: str, temp_output_dir: str, update_callback=None) -> tuple[str, str]:
     """Usa Demucs em modo CPU para separar o áudio em vocais e instrumental (no_vocals)."""
     logger.info(f"Iniciando a separação de vocais com Demucs para: {audio_path}")
