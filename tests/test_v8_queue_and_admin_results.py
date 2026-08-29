@@ -31,6 +31,15 @@ class VersionEightQueueTests(unittest.TestCase):
         self.assertIn("ensure_processing_queue_capacity", MAIN)
         self.assertIn("remove_finished_queue_cache", MAIN)
 
+    def test_queue_contains_only_active_jobs_and_is_hidden_for_one_video(self):
+        self.assertIn('ACTIVE_QUEUE_STATUSES = {"queued", "processing"}', MAIN)
+        self.assertIn('processing_queue.remove(job)', MAIN)
+        self.assertIn('job.get("status") in ACTIVE_QUEUE_STATUSES', MAIN)
+        self.assertIn('id="queueCard" style="display: none;"', HTML)
+        self.assertIn("card.style.display = activeJobs.length > 1 ? '' : 'none';", HTML)
+        self.assertIn("if (activeJobs.length <= 1)", HTML)
+        self.assertNotIn("queueResultUrl", HTML)
+
     def test_admin_has_explicit_cross_profile_results(self):
         self.assertIn('@app.get("/api/admin/results")', MAIN)
         self.assertIn('@app.get("/api/admin/results/{owner_key}/{filename}")', MAIN)

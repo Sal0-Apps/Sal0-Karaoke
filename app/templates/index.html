@@ -57,6 +57,34 @@
             font-variant-emoji: text;
         }
 
+        html,
+        body {
+            width: 100%;
+            max-width: 100%;
+            overflow-x: clip;
+        }
+
+        @supports not (overflow: clip) {
+            html,
+            body { overflow-x: hidden; }
+        }
+
+        img,
+        video,
+        canvas,
+        svg,
+        iframe {
+            max-width: 100%;
+        }
+
+        button,
+        input,
+        select,
+        textarea {
+            min-width: 0;
+            max-width: 100%;
+        }
+
         body {
             background:
                 radial-gradient(circle at 50% -20%, rgba(73, 174, 239, 0.18), transparent 42%),
@@ -73,6 +101,48 @@
         .container {
             width: 100%;
             max-width: 1100px;
+            min-width: 0;
+        }
+
+        .container > *,
+        #createTabContent,
+        #settingsTabContent,
+        #libraryTabContent,
+        form,
+        section,
+        .card,
+        .card > *,
+        .form-grid > *,
+        .settings-grid > * {
+            min-width: 0;
+            max-width: 100%;
+        }
+
+        .card-title,
+        .compact-note,
+        .label,
+        p,
+        h1,
+        h2,
+        h3,
+        h4 {
+            overflow-wrap: anywhere;
+        }
+
+        #helpModal,
+        #setupModal,
+        #loginModal,
+        #mediaPreviewModal {
+            width: 100% !important;
+            max-width: 100% !important;
+        }
+
+        #helpModal > div,
+        #setupModal > div,
+        #loginModal > div,
+        #mediaPreviewModal > div {
+            min-width: 0;
+            max-width: min(100%, calc(100vw - 2rem)) !important;
         }
 
         /* HEADER */
@@ -165,10 +235,13 @@
             border-radius: var(--radius-md);
             border: 1px solid var(--glass-border);
             box-shadow: var(--shadow);
+            min-width: 0;
+            max-width: 100%;
         }
 
         .tab-btn {
             flex: 1;
+            min-width: 0;
             padding: 0.65rem 1rem;
             background: transparent;
             border: none;
@@ -182,6 +255,7 @@
             align-items: center;
             justify-content: center;
             gap: 0.4rem;
+            overflow-wrap: anywhere;
         }
 
         .tab-btn:hover {
@@ -242,6 +316,7 @@
             display: flex;
             flex-direction: column;
             gap: 0.4rem;
+            min-width: 0;
         }
 
         .label {
@@ -520,6 +595,8 @@
             align-items: center;
             gap: 0.75rem;
             overflow: hidden;
+            min-width: 0;
+            flex: 1 1 auto;
         }
 
         .library-item .icon {
@@ -546,6 +623,8 @@
             display: flex;
             gap: 0.4rem;
             flex-shrink: 0;
+            min-width: 0;
+            max-width: 100%;
         }
 
         .library-item .actions button, .library-item .actions a {
@@ -654,6 +733,15 @@
                 padding-left: 0.75rem;
                 padding-right: 0.75rem;
             }
+            .container,
+            #createTabContent,
+            #settingsTabContent,
+            #libraryTabContent {
+                width: 100%;
+                min-width: 0;
+                max-width: 100%;
+                overflow-x: clip;
+            }
             header {
                 padding: 0.85rem 1rem;
                 align-items: flex-start;
@@ -686,6 +774,9 @@
             .card {
                 padding: 1rem;
                 margin-bottom: 1rem;
+                min-width: 0;
+                max-width: 100%;
+                overflow-x: clip;
             }
             .nav-tabs {
                 flex-wrap: wrap;
@@ -699,7 +790,13 @@
             }
             .card-title {
                 font-size: 0.95rem;
+                white-space: normal;
             }
+            .card-header { align-items: flex-start; }
+            .card-header > * { min-width: 0; max-width: 100%; }
+            .label { flex-wrap: wrap; overflow-wrap: anywhere; }
+            .easy-hero-head { align-items: flex-start; }
+            .easy-summary > * { min-width: 0; max-width: 100%; overflow-wrap: anywhere; }
             .card-header > .btn-secondary {
                 padding: 0.45rem 0.6rem;
                 font-size: 0.74rem;
@@ -744,7 +841,21 @@
             .library-item .actions a {
                 padding: 0.4rem 0.6rem;
                 font-size: 0.75rem;
+                min-width: 0;
+                max-width: 100%;
+                white-space: normal;
+                overflow-wrap: anywhere;
             }
+            #libAudioUploadForm,
+            #libBgUploadForm {
+                align-items: stretch !important;
+                flex-direction: column;
+            }
+            #libAudioUploadForm > *,
+            #libBgUploadForm > * { width: 100% !important; min-width: 0; }
+            .timeline-step,
+            .progress-copy,
+            .process-summary-item { min-width: 0; max-width: 100%; overflow-wrap: anywhere; }
         }
         @media (max-width: 420px) {
             .header-btn {
@@ -1003,7 +1114,7 @@
         .compact-note { font-size: 0.76rem; color: var(--text-muted); line-height: 1.45; }
         .creator-mode-switch {
             display: grid;
-            grid-template-columns: repeat(3, 1fr);
+            grid-template-columns: repeat(3, minmax(0, 1fr));
             gap: 0.45rem;
             padding: 0.42rem;
             margin-bottom: 1.15rem;
@@ -1016,6 +1127,9 @@
             background: color-mix(in srgb, var(--bg-card) 92%, transparent);
             backdrop-filter: blur(14px);
             box-shadow: 0 8px 24px rgba(0, 0, 0, 0.14);
+            width: 100%;
+            min-width: 0;
+            max-width: 100%;
         }
         .creator-mode-switch.is-locked { opacity: 0.62; }
         .creator-mode-btn {
@@ -1033,9 +1147,12 @@
             text-align: left;
             cursor: pointer;
             transition: all 0.2s ease;
+            width: 100%;
+            min-width: 0;
+            overflow: hidden;
         }
         .creator-mode-icon { grid-area: icon; font-size: 1.05rem; }
-        .creator-mode-title { grid-area: title; color: inherit; font-size: 0.8rem; }
+        .creator-mode-title { grid-area: title; min-width: 0; color: inherit; font-size: 0.8rem; overflow-wrap: anywhere; }
         .creator-mode-hint { grid-area: hint; color: inherit; opacity: 0.72; font-size: 0.64rem; font-weight: 550; }
         .creator-mode-btn:disabled { cursor: not-allowed; }
         .creator-mode-btn:hover {
@@ -1056,7 +1173,8 @@
                 var(--bg-card);
             border-color: rgba(139, 92, 246, 0.38);
         }
-        .easy-hero-head { display: flex; align-items: center; gap: 0.9rem; margin-bottom: 1.2rem; }
+        .easy-hero-head { display: flex; align-items: center; gap: 0.9rem; margin-bottom: 1.2rem; min-width: 0; }
+        .easy-hero-head > * { min-width: 0; }
         .easy-hero-icon {
             width: 52px;
             height: 52px;
@@ -1074,7 +1192,7 @@
         .easy-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
         .easy-step { min-width: 0; padding: 1rem; border: 1px solid var(--glass-border); border-radius: var(--radius-md); background: rgba(0, 0, 0, 0.12); transition: border-color 0.2s ease, transform 0.2s ease; }
         .easy-step:hover { border-color: var(--glass-border-light); transform: translateY(-1px); }
-        .easy-step-title { display: flex; align-items: center; gap: 0.45rem; margin-bottom: 0.75rem; font-weight: 700; font-size: 0.88rem; }
+        .easy-step-title { display: flex; align-items: center; gap: 0.45rem; margin-bottom: 0.75rem; min-width: 0; flex-wrap: wrap; font-weight: 700; font-size: 0.88rem; overflow-wrap: anywhere; }
         .easy-step-number { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 7px; color: #fff; background: linear-gradient(135deg, var(--accent), var(--pink-accent)); font-size: 0.68rem; }
         .quick-choice-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.55rem; align-items: stretch; }
         .quick-source-grid { grid-auto-rows: minmax(78px, auto); }
@@ -1253,11 +1371,25 @@
             border: 1px solid rgba(73, 174, 239, 0.18);
             border-radius: 12px;
             background: rgba(3, 14, 24, 0.65);
+            min-width: 0;
+            max-width: 100%;
         }
+        .queue-item > *,
+        .admin-result-item > * { min-width: 0; max-width: 100%; }
         .queue-title,
         .admin-result-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700; }
         .queue-meta,
-        .admin-result-meta { color: var(--text-muted); font-size: 0.72rem; margin-top: 0.22rem; }
+        .admin-result-meta { color: var(--text-muted); font-size: 0.72rem; margin-top: 0.22rem; overflow-wrap: anywhere; }
+        .queue-actions,
+        .admin-result-actions {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 0.45rem;
+            flex-wrap: wrap;
+            min-width: 0;
+            max-width: 100%;
+        }
         .queue-status {
             display: inline-flex;
             padding: 0.22rem 0.5rem;
@@ -1281,6 +1413,19 @@
         @media (max-width: 640px) {
             .queue-item,
             .admin-result-item { grid-template-columns: 1fr; }
+            .queue-title,
+            .admin-result-title {
+                white-space: normal;
+                overflow-wrap: anywhere;
+            }
+            .queue-actions,
+            .admin-result-actions { justify-content: flex-start; }
+            .creator-mode-btn {
+                grid-template-columns: 1fr;
+                grid-template-areas: "icon" "title";
+                justify-items: center;
+                text-align: center;
+            }
         }
 </style>
 </head>
@@ -1770,7 +1915,7 @@
                 </div>
             </form>
 
-            <div class="card" id="queueCard">
+            <div class="card" id="queueCard" style="display: none;">
                 <div class="card-header">
                     <span class="card-title"><span class="line-glyph">≡</span> Fila de processamento</span>
                     <span id="queueCountBadge" class="queue-status">0 aguardando</span>
@@ -1832,7 +1977,7 @@
             </div>
 
             <!-- Grid de Duas Colunas: Live Preview e Lista de Estrofes -->
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.5rem; margin-bottom: 1.5rem;">
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr)); gap: 1.5rem; margin-bottom: 1.5rem;">
 
                 <!-- Coluna A: Mockup Live Preview -->
                 <div style="display: flex; flex-direction: column; gap: 0.8rem;">
@@ -3077,42 +3222,31 @@
         function queueStatusLabel(job) {
             if (job.status === 'queued') return `Aguardando · posição ${job.position || '—'}`;
             if (job.status === 'processing') return 'Processando agora';
-            if (job.status === 'done') return 'Concluído';
-            if (job.status === 'cancelled') return 'Cancelado';
-            if (job.status === 'error') return 'Falhou';
             return job.status || 'Desconhecido';
         }
 
-        function queueResultUrl(job, filename) {
-            const encodedFilename = encodeURIComponent(filename || '');
-            if (currentUser?.role === 'admin') {
-                const ownerKey = job.owner_role === 'admin' ? '__admin__' : job.owner_username;
-                return `/api/admin/results/${encodeURIComponent(ownerKey)}/${encodedFilename}?token=${encodeURIComponent(authToken)}`;
-            }
-            return `/api/library/download/history/${encodedFilename}?token=${encodeURIComponent(authToken)}`;
-        }
-
         function renderProcessingQueue(jobs) {
+            const card = document.getElementById('queueCard');
             const container = document.getElementById('processingQueueList');
             const badge = document.getElementById('queueCountBadge');
-            if (!container || !badge) return;
-            const pending = jobs.filter(job => ['queued', 'processing'].includes(job.status));
-            badge.textContent = `${pending.filter(job => job.status === 'queued').length} aguardando`;
-            if (!jobs.length) {
-                container.innerHTML = '<span class="compact-note">A fila está vazia.</span>';
+            if (!card || !container || !badge) return;
+            const activeJobs = jobs.filter(job => ['queued', 'processing'].includes(job.status));
+            const queuedCount = activeJobs.filter(job => job.status === 'queued').length;
+            card.style.display = activeJobs.length > 1 ? '' : 'none';
+            badge.textContent = `${queuedCount} aguardando`;
+            if (activeJobs.length <= 1) {
+                container.replaceChildren();
                 return;
             }
-            container.innerHTML = jobs.slice(0, 20).map(job => `
+            container.innerHTML = activeJobs.slice(0, 20).map(job => `
                 <div class="queue-item">
                     <div>
                         <div class="queue-title">${escapeHtml(job.title || 'Vídeo')}</div>
                         <div class="queue-meta">${currentUser?.role === 'admin' ? `${escapeHtml(job.owner_username || 'perfil')} · ` : ''}${escapeHtml(job.message || '')}</div>
                     </div>
-                    <div style="display:flex; align-items:center; gap:0.45rem; flex-wrap:wrap; justify-content:flex-end;">
+                    <div class="queue-actions">
                         <span class="queue-status">${escapeHtml(queueStatusLabel(job))}</span>
                         ${job.status === 'queued' ? `<button type="button" class="btn-secondary" onclick="removeQueuedJob('${encodeURIComponent(job.id)}')">Remover</button>` : ''}
-                        ${job.status === 'done' && job.history_filename ? `<a class="btn-secondary" style="text-decoration:none;" href="${queueResultUrl(job, job.history_filename)}">MP4</a>` : ''}
-                        ${job.status === 'done' && job.subtitle_filename ? `<a class="btn-secondary" style="text-decoration:none;" href="${queueResultUrl(job, job.subtitle_filename)}">SRT</a>` : ''}
                     </div>
                 </div>
             `).join('');
@@ -3203,7 +3337,7 @@
                                 <div class="admin-result-title">${escapeHtml(item.filename)}</div>
                                 <div class="admin-result-meta">Perfil: ${escapeHtml(item.owner)} · ${formatFileSize(item.size)}</div>
                             </div>
-                            <div style="display:flex; gap:0.45rem; flex-wrap:wrap; justify-content:flex-end;">
+                            <div class="admin-result-actions">
                                 ${item.kind === 'subtitle' ? '' : `<button type="button" class="btn-secondary" onclick="previewAdminResult('${owner}', '${filename}')">▷ Visualizar</button>`}
                                 <button type="button" class="btn-secondary" onclick="downloadAdminResult('${owner}', '${filename}')">↓ Baixar</button>
                             </div>
@@ -4239,6 +4373,7 @@
                         if (res.ok) {
                             clientPreparationInProgress = false;
                             await fetchStatus();
+                            await fetchProcessingQueue();
                             startPolling(false);
                             alert("Processamento cancelado.");
                             await loadLibrary();
@@ -5544,6 +5679,7 @@
                             setCreationUiLocked(false);
                             isShowingCorrection = false;
                             await fetchStatus();
+                            await fetchProcessingQueue();
                             startPolling(false);
                         }
                     } catch (e) {

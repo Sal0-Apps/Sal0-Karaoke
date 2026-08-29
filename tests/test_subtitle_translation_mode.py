@@ -51,7 +51,12 @@ class SubtitleTranslationModeTests(unittest.TestCase):
     def test_local_translation_model_is_open_and_persistent(self):
         ast.parse(TRANSLATOR)
         self.assertIn('TRANSLATION_MODEL = "facebook/m2m100_418M"', TRANSLATOR)
+        self.assertIn('TRANSLATION_MODEL_REVISION = "791dc1c6d300846c9a747d4bd11fcc7f369b750e"', TRANSLATOR)
         self.assertIn('TRANSLATION_MODEL_DIR = "/data/output/models/translation"', TRANSLATOR)
+        self.assertIn("use_safetensors=True", TRANSLATOR)
+        self.assertIn("torch==2.10.0", REQUIREMENTS)
+        self.assertIn("torchaudio==2.10.0", REQUIREMENTS)
+        self.assertIn("safetensors>=0.4.3,<1", REQUIREMENTS)
         self.assertIn("transformers>=4.45,<5", REQUIREMENTS)
         self.assertIn("sentencepiece>=0.2,<1", REQUIREMENTS)
 

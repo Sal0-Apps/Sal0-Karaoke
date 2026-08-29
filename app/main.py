@@ -539,12 +539,17 @@ processing_queue_lock = threading.Lock()
 processing_queue_event = threading.Event()
 processing_queue = []
 processing_queue_worker_started = False
+ACTIVE_QUEUE_STATUSES = {"queued", "processing"}
 
 
 def save_processing_queue_unlocked():
+    processing_queue[:] = [
+        job for job in processing_queue
+        if job.get("status") in ACTIVE_QUEUE_STATUSES
+    ]
     os.makedirs(os.path.dirname(PROCESSING_QUEUE_FILE), exist_ok=True)
     with open(PROCESSING_QUEUE_FILE, "w", encoding="utf-8") as queue_file:
-        json.dump(processing_queue[-200:], queue_file, ensure_ascii=False, indent=2)
+        json.dump(processing_queue, queue_file, ensure_ascii=False, indent=2)
 
 
 def load_processing_queue():
@@ -555,7 +560,10 @@ def load_processing_queue():
     try:
         with open(PROCESSING_QUEUE_FILE, "r", encoding="utf-8") as queue_file:
             loaded = json.load(queue_file)
-        processing_queue = loaded if isinstance(loaded, list) else []
+        processing_queue = [
+            job for job in (loaded if isinstance(loaded, list) else [])
+            if isinstance(job, dict) and job.get("status") in ACTIVE_QUEUE_STATUSES
+        ]
         for job in processing_queue:
             if job.get("status") == "processing":
                 job["status"] = "queued"
@@ -716,8 +724,7 @@ def processing_queue_worker():
                     job["history_filename"] = final_history_filename
                     job["subtitle_filename"] = final_subtitle_filename
                 save_processing_queue_unlocked()
-            if queue_status in {"done", "cancelled"}:
-                remove_finished_queue_cache(pipeline.get("cache_dir"))
+            remove_finished_queue_cache(pipeline.get("cache_dir"))
 
 
 def start_processing_queue_worker():
@@ -735,13 +742,15 @@ def get_processing_queue(current_user: dict = Depends(get_current_user)):
         waiting = 0
         visible = []
         for job in processing_queue:
+            if job.get("status") not in ACTIVE_QUEUE_STATUSES:
+                continue
             position = None
             if job.get("status") == "queued":
                 waiting += 1
                 position = waiting
             if is_admin(current_user) or job.get("owner_username") == current_user.get("username"):
                 visible.append(public_queue_job(job, position))
-    return {"jobs": list(reversed(visible[-100:]))}
+    return {"jobs": visible[-100:]}
 
 
 @app.delete("/api/queue/{job_id}")
@@ -755,10 +764,8 @@ def remove_queued_job(job_id: str, current_user: dict = Depends(get_current_user
             raise HTTPException(status_code=403, detail="Este item pertence a outro usuário.")
         if job.get("status") != "queued":
             raise HTTPException(status_code=409, detail="Somente itens que ainda aguardam podem ser removidos.")
-        job["status"] = "cancelled"
-        job["message"] = "Removido da fila antes do processamento."
-        job["finished_at"] = time.time()
         cache_dir = (job.get("pipeline") or {}).get("cache_dir")
+        processing_queue.remove(job)
         save_processing_queue_unlocked()
     remove_finished_queue_cache(cache_dir)
     return {"status": "cancelled"}
@@ -3368,6 +3375,24 @@ def cancel_process(current_user: dict = Depends(get_current_user)):
     import process_manager as pm
     require_task_control(current_user)
     logger.info("Solicitação de cancelamento recebida de %s.", current_user.get("username"))
+
+    # O item cancelado deixa de existir na fila imediatamente. O worker mantém
+    # apenas sua referência privada enquanto encerra o subprocesso e limpa o cache.
+    with processing_queue_lock:
+        active_job = next(
+            (
+                job for job in processing_queue
+                if job.get("status") == "processing"
+                and (
+                    is_admin(current_user)
+                    or job.get("owner_username") == current_user.get("username")
+                )
+            ),
+            None,
+        )
+        if active_job:
+            processing_queue.remove(active_job)
+            save_processing_queue_unlocked()
 
     # 1. Definir o flag de cancelamento
     pm.cancel_event.set()

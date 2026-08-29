@@ -16,7 +16,7 @@ O fluxo de criação é composto por cinco fases:
 4. transcrição local da voz e geração de legendas sincronizadas;
 5. composição e renderização do vídeo final com fundo, estilo e histórico.
 
-O sistema inclui contas locais, isolamento de dados entre usuários, permissões administrativas, fila persistente de renderização, Biblioteca de mídias, perfis de renderização, revisão opcional de legendas, notificações por Telegram e uma rota Android para conexão ao servidor.
+O sistema inclui contas locais, isolamento de dados entre usuários, permissões administrativas, fila persistente apenas para trabalhos ativos, Biblioteca de mídias, perfis de renderização, revisão opcional de legendas, notificações por Telegram e uma rota Android para conexão ao servidor. Trabalhos concluídos aparecem na Biblioteca, não como histórico da fila.
 
 ## Recursos
 
@@ -50,7 +50,7 @@ O container utiliza `/data` como volume persistente:
 /data/library/history/   vídeos finais e legendas SRT correspondentes
 /data/output/models/     modelos Whisper e modelo opcional de tradução
 /data/output/            configurações, estado e logs
-/data/output/queue_jobs/ entradas isoladas da fila de processamento
+/data/output/queue_jobs/ entradas isoladas dos trabalhos ativos da fila de processamento
 /data/cache/             arquivos temporários do pipeline
 /data/users.json         usuários locais
 /data/sessions.json      sessões locais

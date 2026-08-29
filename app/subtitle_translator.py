@@ -6,6 +6,7 @@ import os
 logger = logging.getLogger("karaoke")
 
 TRANSLATION_MODEL = "facebook/m2m100_418M"
+TRANSLATION_MODEL_REVISION = "791dc1c6d300846c9a747d4bd11fcc7f369b750e"
 TRANSLATION_MODEL_DIR = "/data/output/models/translation"
 SUPPORTED_TARGET_LANGUAGES = {"original", "pt", "en", "es"}
 
@@ -57,6 +58,7 @@ def translate_subtitle_segments(
     )
     tokenizer = M2M100Tokenizer.from_pretrained(
         TRANSLATION_MODEL,
+        revision=TRANSLATION_MODEL_REVISION,
         cache_dir=TRANSLATION_MODEL_DIR,
     )
     if source_language not in tokenizer.lang_code_to_id:
@@ -67,7 +69,9 @@ def translate_subtitle_segments(
 
     model = M2M100ForConditionalGeneration.from_pretrained(
         TRANSLATION_MODEL,
+        revision=TRANSLATION_MODEL_REVISION,
         cache_dir=TRANSLATION_MODEL_DIR,
+        use_safetensors=True,
     )
     model.eval()
     translated_segments = []

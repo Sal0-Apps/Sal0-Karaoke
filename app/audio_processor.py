@@ -85,6 +85,10 @@ def separate_vocals(audio_path: str, temp_output_dir: str, update_callback=None)
         env = os.environ.copy()
         env["TORCH_HOME"] = "/data/output/models/torch"
         env["HF_HOME"] = "/data/output/models/huggingface"
+        # Os checkpoints oficiais legados do Demucs usam o formato pickle.
+        # Esta exceção fica restrita ao subprocesso que baixa modelos da Meta;
+        # uploads do usuário nunca são tratados como checkpoints PyTorch.
+        env["TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD"] = "1"
         
         # Executar o Demucs com streaming de logs em tempo real
         logger.info(f"Executando Demucs: {' '.join(cmd)}")
