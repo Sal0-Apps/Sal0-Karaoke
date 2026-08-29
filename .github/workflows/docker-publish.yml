@@ -73,7 +73,10 @@ jobs:
       - name: Build Android APK
         if: startsWith(github.ref, 'refs/tags/v')
         working-directory: android
-        run: gradle --no-daemon :app:assembleRelease -PVERSION_NAME=${{ env.VERSION_TAG }} -PVERSION_CODE=80000
+        run: |
+          gradle --no-daemon :app:assembleRelease -PVERSION_NAME=${{ env.VERSION_TAG }} -PVERSION_CODE=80000
+          test -f app/build/outputs/apk/release/app-release.apk
+          mv app/build/outputs/apk/release/app-release.apk app/build/outputs/apk/release/Sal0-Karaoke-v${{ env.VERSION_TAG }}.apk
 
       - name: Create GitHub Release
         if: startsWith(github.ref, 'refs/tags/v')
@@ -83,6 +86,7 @@ jobs:
           generate_release_notes: true
           draft: false
           prerelease: false
-          files: android/app/build/outputs/apk/release/app-release.apk
+          fail_on_unmatched_files: true
+          files: android/app/build/outputs/apk/release/Sal0-Karaoke-v${{ env.VERSION_TAG }}.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -49,6 +49,10 @@ android {
             )
             if (hasReleaseSigning) {
                 signingConfig = signingConfigs.getByName("release")
+            } else {
+                // Mantém o APK público instalável quando nenhuma chave privada
+                // de lançamento estiver configurada no ambiente de CI.
+                signingConfig = signingConfigs.getByName("debug")
             }
         }
     }
