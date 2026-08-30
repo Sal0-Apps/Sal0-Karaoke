@@ -1945,7 +1945,7 @@ def download_bg_youtube_preset(
 
 
 LRCLIB_API_URL = "https://lrclib.net/api"
-LRCLIB_USER_AGENT = "Sal0-Karaoke/8.0.0 (+https://github.com/Sal0-Apps/Sal0-Karaoke)"
+LRCLIB_USER_AGENT = "Sal0-Karaoke/8.5.0 (+https://github.com/Sal0-Apps/Sal0-Karaoke)"
 LYRICS_OVH_API_URL = "https://api.lyrics.ovh/v1"
 LYRICS_PROVIDER_TIMEOUT = (3.05, 6)
 MUSIXMATCH_API_URL = "https://apic-desktop.musixmatch.com/ws/1.1"
@@ -2373,7 +2373,7 @@ def delete_lyrics_server(current_user: dict = Depends(get_current_user)):
 
 
 
-# Sistema de Logs de Diagnóstico v8.0.0
+# Sistema de Logs de Diagnóstico v8.5.0
 DIAGNOSTIC_LOG_FILE = "/data/output/app_diagnostic.log"
 
 def log_diagnostic(message: str, level: str = "INFO"):
@@ -2409,7 +2409,7 @@ def download_diagnostic_logs(current_user: dict = Depends(get_current_user)):
     with state_lock:
         current_state = dict(state)
     report = "\n".join([
-"Sal0 Karaokê v8.0.0 — diagnóstico ao vivo",
+"Sal0 Karaokê v8.5.0 — diagnóstico ao vivo",
         f"Gerado em: {time.strftime('%Y-%m-%d %H:%M:%S')}",
         "",
         "=== ESTADO ATUAL ===",
@@ -4829,6 +4829,15 @@ def run_pipeline(
 
             pm.check_cancelled()
 
+            def publish_render_progress(percent: int):
+                update_state(
+                    "processing",
+                    "Rendering final video",
+                    min(98, 95 + round(percent * 0.03)),
+                    stage_progress=percent,
+                    stage_detail="Codificando o vídeo final",
+                )
+
             # Se only_remove_vocals estiver ativo, pulamos transcrição e legenda, indo direto para renderização
             if only_remove_vocals:
                 pm.check_cancelled()
@@ -4842,7 +4851,8 @@ def run_pipeline(
                     output_mp4_path=final_mp4_path,
                     background_image_path=None,
                     original_video_path=input_audio_path,
-                    background_mode="original_video"
+                    background_mode="original_video",
+                    progress_callback=publish_render_progress,
                 )
 
                 pm.check_cancelled()
@@ -5020,7 +5030,8 @@ def run_pipeline(
                 output_mp4_path=final_mp4_path,
                 background_image_path=input_bg_path,
                 original_video_path=input_audio_path,
-                background_mode=bg_mode_param
+                background_mode=bg_mode_param,
+                progress_callback=publish_render_progress,
             )
 
             pm.check_cancelled()

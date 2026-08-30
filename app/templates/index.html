@@ -657,7 +657,7 @@
             background: rgba(239, 68, 68, 0.3);
         }
 
-        /* PROGRESSO E TIMELINE */
+        /* PROGRESSO TOTAL E INDICADOR COMPACTO DA ETAPA ATUAL */
         .progress-bar-bg {
             width: 100%;
             background: var(--input-bg);
@@ -672,51 +672,6 @@
             width: 0%;
             background: linear-gradient(90deg, var(--accent), var(--pink-accent));
             transition: width 0.3s ease;
-        }
-
-        .timeline {
-            display: flex;
-            flex-direction: column;
-            gap: 0.5rem;
-            margin-top: 1rem;
-        }
-
-        .timeline-step {
-            display: flex;
-            align-items: center;
-            gap: 0.6rem;
-            font-size: 0.82rem;
-            color: var(--text-muted);
-        }
-
-        .timeline-step.active {
-            color: var(--accent) !important;
-            font-weight: 700 !important;
-        }
-        .timeline-step.active .step-dot {
-            background: var(--accent) !important;
-            box-shadow: 0 0 12px var(--accent) !important;
-            animation: pulseDot 1.2s infinite ease-in-out !important;
-        }
-        @keyframes pulseDot {
-            0% { transform: scale(1); opacity: 1; }
-            50% { transform: scale(1.4); opacity: 0.6; }
-            100% { transform: scale(1); opacity: 1; }
-        }
-        .timeline-step.completed {
-            color: #34d399 !important;
-            font-weight: 600 !important;
-        }
-        .timeline-step.completed .step-dot {
-            background: #10b981 !important;
-            box-shadow: 0 0 6px #10b981 !important;
-        }
-
-        .step-dot {
-            width: 10px;
-            height: 10px;
-            border-radius: 50%;
-            background: var(--text-muted);
         }
 
         footer {
@@ -962,23 +917,19 @@
         .settings-grid.user-settings #telegramSection { grid-column: 1 / -1; }
 
         .progress-copy {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-            gap: 1rem;
+            display: grid;
+            gap: 0.25rem;
             margin-bottom: 0.8rem;
         }
         .progress-copy #statusMessage { margin: 0; }
         .stage-progress-text {
-            flex: 0 0 auto;
-            max-width: 48%;
+            max-width: 100%;
             color: var(--text-muted);
             font-size: 0.76rem;
             line-height: 1.35;
-            text-align: right;
+            text-align: left;
         }
         #createTabContent.has-active-process {
-            display: flex !important;
             flex-direction: column;
         }
         #createTabContent.has-active-process #processCard { order: 1; }
@@ -990,21 +941,6 @@
         #createTabContent.has-active-process #subtitleModeForm,
         #createTabContent.has-active-process #karaokêForm { order: 5; }
         #createTabContent.has-active-process #downloadBox { order: 6; }
-        .stage-progress-box {
-            margin-top: 0.9rem;
-            padding: 0.8rem;
-            border: 1px solid var(--glass-border);
-            border-radius: 12px;
-            background: var(--input-bg);
-        }
-        .stage-progress-head {
-            display: flex;
-            justify-content: space-between;
-            gap: 0.75rem;
-            margin-bottom: 0.55rem;
-            color: var(--text-muted);
-            font-size: 0.78rem;
-        }
         .youtube-identification {
             display: none;
             align-items: center;
@@ -1361,7 +1297,8 @@
             .quick-background-presets { grid-template-columns: 1fr; }
             .quick-source-grid #easyAudioYoutubeBox,
             .quick-background-grid .quick-youtube-background { grid-column: auto; }
-            .process-summary { grid-template-columns: 1fr; }
+            .process-summary { grid-template-columns: 1fr 1fr; }
+            .process-summary-item:first-child { grid-column: 1 / -1; }
             .library-youtube-row { align-items: stretch; flex-direction: column; }
             .library-youtube-row .btn-primary { width: 100%; }
         }
@@ -1963,18 +1900,8 @@
                     <div class="process-summary-item"><span>🖼️</span><span id="processSummaryBackground"></span></div>
                 </div>
 
-                <div class="progress-bar-bg" role="progressbar" aria-label="Progresso geral" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+                <div class="progress-bar-bg" role="progressbar" aria-label="Progresso total do processo" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
                     <div class="progress-bar-fill" id="progressBarFill"></div>
-                </div>
-
-                <div id="stageProgressBox" class="stage-progress-box" style="display:none;">
-                    <div class="stage-progress-head">
-                        <span id="stageProgressLabel">Progresso da etapa atual</span>
-                        <strong id="stageProgressPercent">0%</strong>
-                    </div>
-                    <div class="progress-bar-bg" role="progressbar" aria-label="Progresso da etapa atual" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
-                        <div class="progress-bar-fill" id="stageProgressBarFill"></div>
-                    </div>
                 </div>
 
                 <!-- Botão Cancelar -->
@@ -1982,17 +1909,6 @@
                     <button type="button" class="btn-cancel-task btn-secondary" style="background: rgba(239,68,68,0.15); color: #fca5a5; border-color: rgba(239,68,68,0.3);">🛑 Cancelar Processamento</button>
                 </div>
 
-                <!-- Timeline de Etapas -->
-                <div class="timeline" id="timeline" style="margin-top: 1rem;">
-                    <div class="timeline-step" id="step-Uploading"><div class="step-dot"></div><span>Carregando arquivo</span></div>
-                    <div class="timeline-step" id="step-Extracting"><div class="step-dot"></div><span>Extraindo áudio</span></div>
-                    <div class="timeline-step" id="step-Separating"><div class="step-dot"></div><span>Separando vocais do instrumental</span></div>
-                    <div class="timeline-step" id="step-Transcribing"><div class="step-dot"></div><span>Transcrevendo voz com Whisper</span></div>
-                    <div class="timeline-step" id="step-Subtitles"><div class="step-dot"></div><span>Gerando legenda sincronizada</span></div>
-                    <div class="timeline-step" id="step-Rendering"><div class="step-dot"></div><span>Gerando resultado final</span></div>
-                    <div class="timeline-step" id="step-Cleaning"><div class="step-dot"></div><span>Limpando arquivos temporários</span></div>
-                    <div class="timeline-step" id="step-Done"><div class="step-dot"></div><span>Concluído</span></div>
-                </div>
             </div>
 
             <!-- CARD DE REVISÃO E EDIÇÃO DE LEGENDAS (PAUSA INTERMEDIÁRIA) -->
@@ -2332,7 +2248,7 @@
 
         <!-- RODAPÉ DISCRETO DA PÁGINA -->
         <footer>
-                     Sal0 Karaokê v8.0.0
+                     Sal0 Karaokê v8.5.0
         </footer>
 
     </div> <!-- Container End -->
@@ -2501,6 +2417,7 @@
             const advancedButton = document.getElementById('btnCreatorAdvanced');
             const subtitleButton = document.getElementById('btnCreatorSubtitle');
             switcher?.classList.toggle('is-locked', creationUiLocked);
+            if (switcher) switcher.style.display = creationUiLocked ? 'none' : 'grid';
             if (easyButton) easyButton.disabled = creationUiLocked;
             if (advancedButton) advancedButton.disabled = creationUiLocked;
             if (subtitleButton) subtitleButton.disabled = creationUiLocked;
@@ -2516,6 +2433,42 @@
             }
             setCreationUiLocked(!queueCreationExpanded);
             if (queueCreationExpanded) setCreatorMode(currentCreatorMode);
+        }
+
+        function friendlyStageName(step) {
+            const value = String(step || '').toLowerCase();
+            const stages = [
+                [['downloading youtube'], 'Baixando mídia'],
+                [['converting media to mp3', 'extracting audio', 'extraindo áudio', 'using normalized mp3'], 'Preparando áudio'],
+                [['searching lyrics'], 'Buscando letra'],
+                [['separating', 'demucs', 'vocais'], 'Separando vocais do instrumental'],
+                [['transcribing', 'whisper'], 'Transcrevendo áudio com Whisper'],
+                [['translating', 'traduz'], 'Traduzindo o SRT'],
+                [['generating original srt'], 'Gerando o SRT original'],
+                [['generating subtitles', 'subtitles'], 'Gerando legenda sincronizada'],
+                [['rendering'], 'Gerando o vídeo final'],
+                [['cleaning'], 'Finalizando o processo'],
+            ];
+            return stages.find(([keys]) => keys.some(key => value.includes(key)))?.[1] || step || 'Processando';
+        }
+
+        function cleanStageDetail(detail) {
+            return String(detail || '')
+                .replace(/\bWhisper\s+\d+(?:[.,]\d+)?%/gi, 'Whisper')
+                .replace(/\s*[·-]\s*\d+(?:[.,]\d+)?%\s*(?:desta\s+(?:análise|etapa))?/gi, '')
+                .replace(/\b\d+(?:[.,]\d+)?%\s*(?:desta\s+(?:análise|etapa))?/gi, '')
+                .replace(/\s*·\s*·\s*/g, ' · ')
+                .replace(/^\s*·\s*|\s*·\s*$/g, '')
+                .trim();
+        }
+
+        function setActiveProcessLayout(active) {
+            const content = document.getElementById('createTabContent');
+            if (!content) return;
+            content.classList.toggle('has-active-process', Boolean(active));
+            if (document.getElementById('tabBtnCreate')?.classList.contains('active')) {
+                content.style.display = active ? 'flex' : 'block';
+            }
         }
 
         function refreshEasySummary(config) {
@@ -2598,7 +2551,7 @@
                 easyModeConfig = await response.json();
                 applyEasyModeConfigToControls(easyModeConfig);
                 const switcher = document.getElementById('creatorModeSwitch');
-                if (switcher) switcher.style.display = 'grid';
+                if (switcher) switcher.style.display = creationUiLocked ? 'none' : 'grid';
                 setCreatorMode(easyModeConfig.enabled ? 'easy' : 'advanced');
             } catch (error) {
                 console.warn('Não foi possível carregar o Modo Rápido.', error);
@@ -2987,7 +2940,9 @@
 
             if (tab === 'create') {
                 if (tabBtnCreate) tabBtnCreate.classList.add('active');
-                if (createTabContent) createTabContent.style.display = 'block';
+                if (createTabContent) {
+                    createTabContent.style.display = createTabContent.classList.contains('has-active-process') ? 'flex' : 'block';
+                }
             } else if (tab === 'settings') {
                 if (tabBtnSettings) tabBtnSettings.classList.add('active');
                 if (settingsTabContent) settingsTabContent.style.display = 'block';
@@ -5686,17 +5641,12 @@
                 const progressBarFill = document.getElementById('progressBarFill');
                 const statusMessage = document.getElementById('statusMessage');
                 const stageProgressText = document.getElementById('stageProgressText');
-                const stageProgressBox = document.getElementById('stageProgressBox');
-                const stageProgressLabel = document.getElementById('stageProgressLabel');
-                const stageProgressPercent = document.getElementById('stageProgressPercent');
-                const stageProgressBarFill = document.getElementById('stageProgressBarFill');
                 const btnSubmit = document.getElementById('btnSubmit');
                 const easyForm = document.getElementById('easyModeForm');
                 const easySubmitBtn = document.getElementById('easySubmitBtn');
                 const subtitleForm = document.getElementById('subtitleModeForm');
                 const subtitleSubmitBtn = document.getElementById('subtitleSubmitBtn');
                 const queueAddProcessCard = document.getElementById('queueAddProcessCard');
-                const createContent = document.getElementById('createTabContent');
                 const downloadBox = document.getElementById('downloadBox');
                 const resultVideoPreview = document.getElementById('resultVideoPreview');
                 const btnDownloadResult = document.getElementById('btnDownloadResult');
@@ -5717,14 +5667,13 @@
                     renderProcessSummary({});
                     queueCreationExpanded = false;
                     setCreationUiLocked(true);
-                    createContent?.classList.add('has-active-process');
+                    setActiveProcessLayout(true);
                     if (correctionCard) correctionCard.style.display = 'none';
                     if (processCard) processCard.style.display = 'block';
                     if (statusMessage) statusMessage.innerText = 'O servidor está ocupado com outra criação. Os detalhes ficam privados.';
                     if (progressPercent) progressPercent.innerText = '—';
                     if (progressBarFill) progressBarFill.style.width = '0%';
                     if (stageProgressText) stageProgressText.textContent = '';
-                    if (stageProgressBox) stageProgressBox.style.display = 'none';
                     if (btnSubmit) { btnSubmit.disabled = true; btnSubmit.innerHTML = '⏳ Servidor ocupado'; }
                     if (easySubmitBtn) { easySubmitBtn.disabled = true; easySubmitBtn.innerHTML = '⏳ Servidor ocupado'; }
                     if (subtitleSubmitBtn) { subtitleSubmitBtn.disabled = true; subtitleSubmitBtn.innerHTML = '⏳ Servidor ocupado'; }
@@ -5735,39 +5684,33 @@
                     const canAddToQueue = Boolean(data.owned_by_current_user || currentUser?.role === 'admin');
                     if (!canAddToQueue) queueCreationExpanded = false;
                     setCreationUiLocked(!(canAddToQueue && queueCreationExpanded));
-                    createContent?.classList.add('has-active-process');
+                    setActiveProcessLayout(true);
                     if (queueAddProcessCard) queueAddProcessCard.style.display = canAddToQueue ? 'block' : 'none';
                     if (correctionCard) correctionCard.style.display = "none";
                     if (processCard) processCard.style.display = "block";
 
-                    const overallProgress = Math.max(0, Math.min(100, Number(data.progress) || 0));
-                    if (statusMessage) statusMessage.innerText = data.step || 'Processando...';
+                    const hasStageProgress = data.stage_progress !== null
+                        && data.stage_progress !== undefined
+                        && Number.isFinite(Number(data.stage_progress));
+                    const overallProgress = Math.max(0, Math.min(100, Math.round(Number(data.progress) || 0)));
+                    const currentStageProgress = hasStageProgress
+                        ? Math.max(0, Math.min(100, Math.round(Number(data.stage_progress))))
+                        : null;
+                    if (statusMessage) statusMessage.innerText = friendlyStageName(data.step);
                     if (progressPercent) progressPercent.innerText = `${overallProgress}%`;
                     if (progressBarFill) {
                         progressBarFill.style.width = `${overallProgress}%`;
                         progressBarFill.parentElement?.setAttribute('aria-valuenow', String(overallProgress));
-                    }
-                    if (stageProgressText) {
-                        stageProgressText.textContent = data.stage_detail || (
-                            data.stage_progress !== null
-                            && data.stage_progress !== undefined
-                            && Number.isFinite(Number(data.stage_progress))
-                                ? `${Number(data.stage_progress)}% desta etapa`
-                                : ''
+                        progressBarFill.parentElement?.setAttribute(
+                            'aria-valuetext',
+                            `${overallProgress}% do processo completo`
                         );
                     }
-                    const hasStageProgress = data.stage_progress !== null
-                        && data.stage_progress !== undefined
-                        && Number.isFinite(Number(data.stage_progress));
-                    if (stageProgressBox) stageProgressBox.style.display = hasStageProgress ? 'block' : 'none';
-                    if (hasStageProgress) {
-                        const currentStageProgress = Math.max(0, Math.min(100, Number(data.stage_progress)));
-                        if (stageProgressLabel) stageProgressLabel.textContent = data.stage_detail || 'Progresso da etapa atual';
-                        if (stageProgressPercent) stageProgressPercent.textContent = `${currentStageProgress}%`;
-                        if (stageProgressBarFill) {
-                            stageProgressBarFill.style.width = `${currentStageProgress}%`;
-                            stageProgressBarFill.parentElement?.setAttribute('aria-valuenow', String(currentStageProgress));
-                        }
+                    if (stageProgressText) {
+                        const detail = cleanStageDetail(data.stage_detail);
+                        stageProgressText.textContent = currentStageProgress === null
+                            ? (detail || 'Etapa atual sem estimativa percentual')
+                            : `${detail ? `${detail} · ` : ''}${currentStageProgress}% da etapa atual`;
                     }
                     if (btnSubmit) btnSubmit.disabled = !queueCreationExpanded;
                     if (easySubmitBtn) easySubmitBtn.disabled = !queueCreationExpanded;
@@ -5780,7 +5723,7 @@
                     const canAddToQueue = Boolean(data.owned_by_current_user || currentUser?.role === 'admin');
                     if (!canAddToQueue) queueCreationExpanded = false;
                     setCreationUiLocked(!(canAddToQueue && queueCreationExpanded));
-                    createContent?.classList.add('has-active-process');
+                    setActiveProcessLayout(true);
                     if (queueAddProcessCard) queueAddProcessCard.style.display = canAddToQueue ? 'block' : 'none';
                     if (processCard) processCard.style.display = "none";
                     if (correctionCard) correctionCard.style.display = "block";
@@ -5790,12 +5733,11 @@
                         loadCorrectionPanel();
                     }
                 } else if (data.status === "done" || data.status === "idle") {
-                    createContent?.classList.remove('has-active-process');
+                    setActiveProcessLayout(false);
                     setQueueCreationExpanded(false);
                     if (processCard) processCard.style.display = "none";
                     if (correctionCard) correctionCard.style.display = "none";
                     if (queueAddProcessCard) queueAddProcessCard.style.display = 'none';
-                    if (stageProgressBox) stageProgressBox.style.display = 'none';
                     setCreationUiLocked(false);
 
                     if (data.status === "done" && data.result_available_to_current_user && data.original_filename && !data.original_filename.includes("Baixando")) {
@@ -5846,12 +5788,11 @@
                         await Promise.allSettled([fetchCacheInfo(), loadLibrary()]);
                     }
                 } else if (data.status === "error") {
-                    createContent?.classList.remove('has-active-process');
+                    setActiveProcessLayout(false);
                     setQueueCreationExpanded(false);
                     if (processCard) processCard.style.display = "none";
                     if (correctionCard) correctionCard.style.display = "none";
                     if (queueAddProcessCard) queueAddProcessCard.style.display = 'none';
-                    if (stageProgressBox) stageProgressBox.style.display = 'none';
                     setCreationUiLocked(false);
                     if (btnSubmit) { btnSubmit.disabled = false; btnSubmit.innerHTML = '🎬 Criar Karaokê'; }
                     if (easySubmitBtn) { easySubmitBtn.disabled = false; easySubmitBtn.innerHTML = '⚡ Criar meu karaokê'; }

@@ -57,7 +57,14 @@ class VersionEightQueueTests(unittest.TestCase):
         self.assertIn('id="queueAddProcessCard"', HTML)
         self.assertIn('id="btnToggleQueueCreation"', HTML)
         self.assertIn("setCreatorMode(currentCreatorMode)", HTML)
+        self.assertIn("switcher.style.display = creationUiLocked ? 'none' : 'grid';", HTML)
         self.assertIn("arquivos, links, Biblioteca e qualquer um dos três modos", HTML)
+
+    def test_active_progress_stays_exclusively_in_create_tab(self):
+        self.assertNotIn("display: flex !important", HTML)
+        self.assertIn("setActiveProcessLayout(true)", HTML)
+        self.assertIn("setActiveProcessLayout(false)", HTML)
+        self.assertIn("createTabContent.classList.contains('has-active-process') ? 'flex' : 'block'", HTML)
 
     def test_finished_jobs_do_not_block_the_next_queue_item(self):
         self.assertIn("promote_queue_cache_in_background", MAIN)
@@ -79,13 +86,13 @@ class VersionEightQueueTests(unittest.TestCase):
         self.assertIn('class="btn-primary"', form)
         self.assertNotIn('#ec4899', form)
 
-    def test_version_is_8_for_web_android_and_release_build(self):
-        self.assertIn("Sal0 Karaokê v8.0.0", HTML)
+    def test_web_and_docker_are_8_5_while_android_source_remains_unchanged(self):
+        self.assertIn("Sal0 Karaokê v8.5.0", HTML)
         self.assertIn('.orElse("8.0.0")', ANDROID_BUILD)
         self.assertIn('.orElse("80000")', ANDROID_BUILD)
         self.assertIn("-PVERSION_CODE=80000", WORKFLOW)
-        self.assertIn("sal0-karaoke:8.0.0", COMPOSE)
-        self.assertIn('org.opencontainers.image.version="8.0.0"', DOCKERFILE)
+        self.assertIn("sal0-karaoke:8.5.0", COMPOSE)
+        self.assertIn('org.opencontainers.image.version="8.5.0"', DOCKERFILE)
 
     def test_generated_icon_is_committed_for_web_and_android(self):
         self.assertTrue((ROOT / "app" / "templates" / "app-icon-v8.png").is_file())

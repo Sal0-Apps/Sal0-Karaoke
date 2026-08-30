@@ -39,20 +39,31 @@ def get_random_default_background() -> str:
             logger.error(f"Erro ao selecionar imagem de fundo aleatória: {e}")
     return None
 
-def run_ffmpeg_with_logging(cmd: list[str], env: dict = None) -> bool:
+def run_ffmpeg_with_logging(
+    cmd: list[str],
+    env: dict = None,
+    progress_callback=None,
+    total_duration: float | None = None,
+) -> bool:
     """Executa o FFmpeg transmitindo a saída em tempo real para os logs do container."""
     import process_manager as pm
     pm.check_cancelled()
     try:
         logger.info(f"Executando FFmpeg: {' '.join(cmd)}")
+        ffmpeg_cmd = cmd
+        if progress_callback and total_duration and total_duration > 0:
+            ffmpeg_cmd = [cmd[0], "-progress", "pipe:1", "-nostats", *cmd[1:]]
         process = subprocess.Popen(
-            cmd,
+            ffmpeg_cmd,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True,
             env=env
         )
         pm.set_active_process(process)
+        last_progress = -1
+        if progress_callback:
+            progress_callback(0)
         
         # Ler a saída linha a linha
         for line in process.stdout:
@@ -60,6 +71,15 @@ def run_ffmpeg_with_logging(cmd: list[str], env: dict = None) -> bool:
                 process.terminate()
                 break
             line_str = line.strip()
+            if line_str.startswith("out_time_ms=") and progress_callback and total_duration:
+                try:
+                    elapsed = int(line_str.split("=", 1)[1]) / 1_000_000
+                    percent = max(0, min(99, round((elapsed / total_duration) * 100)))
+                    if percent != last_progress:
+                        progress_callback(percent)
+                        last_progress = percent
+                except (TypeError, ValueError, ZeroDivisionError):
+                    pass
             # Filtrar logs repetitivos de frame para evitar inundação de logs, mantendo alertas de erro
             if "frame=" in line_str or "size=" in line_str or "time=" in line_str or "speed=" in line_str or "Error" in line_str:
                 logger.info(f"[FFmpeg] {line_str}")
@@ -70,6 +90,8 @@ def run_ffmpeg_with_logging(cmd: list[str], env: dict = None) -> bool:
         
         if process.returncode != 0:
             raise RuntimeError(f"FFmpeg falhou com código de retorno {process.returncode}")
+        if progress_callback:
+            progress_callback(100)
         return True
     except Exception as e:
         pm.clear_active_process()
@@ -82,7 +104,8 @@ def render_karaoke_video(
     output_mp4_path: str,
     background_image_path: str = None,
     original_video_path: str = None,
-    background_mode: str = "image"
+    background_mode: str = "image",
+    progress_callback=None,
 ) -> str:
     """
     Renderiza o vídeo final de Karaokê em formato MP4.
@@ -221,7 +244,7 @@ def render_karaoke_video(
         ])
         
     try:
-        run_ffmpeg_with_logging(cmd)
+        run_ffmpeg_with_logging(cmd, progress_callback=progress_callback, total_duration=duration)
         logger.info("Renderização do vídeo concluída com sucesso.")
         return output_mp4_path
     except Exception as e:
