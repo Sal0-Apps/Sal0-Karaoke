@@ -26,6 +26,7 @@ import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
 import android.webkit.CookieManager;
+import android.webkit.MimeTypeMap;
 import android.webkit.SslErrorHandler;
 import android.webkit.URLUtil;
 import android.webkit.ValueCallback;
@@ -48,14 +49,19 @@ import android.widget.Toast;
 import androidx.activity.ComponentActivity;
 import androidx.activity.OnBackPressedCallback;
 
+import java.io.File;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class MainActivity extends ComponentActivity {
     private static final int COLOR_BACKGROUND = Color.rgb(5, 11, 18);
@@ -830,17 +836,15 @@ public class MainActivity extends ComponentActivity {
 
     private void enqueueWebDownload(PendingWebDownload download) {
         try {
-            String fileName = URLUtil.guessFileName(
-                download.url,
-                download.contentDisposition,
-                download.mimeType
-            ).replaceAll("[\\\\/:*?\"<>|]", "_");
+            String fileName = uniqueDownloadFileName(resolveDownloadFileName(download));
             DownloadManager.Request request = new DownloadManager.Request(Uri.parse(download.url))
                 .setTitle(fileName)
                 .setDescription("Baixando do Sal0 Karaokê")
                 .setNotificationVisibility(
                     DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED
                 )
+                .setAllowedOverMetered(true)
+                .setAllowedOverRoaming(true)
                 .setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, fileName);
             if (download.mimeType != null && !download.mimeType.isEmpty()) {
                 request.setMimeType(download.mimeType);
@@ -864,6 +868,53 @@ public class MainActivity extends ComponentActivity {
         } catch (Exception error) {
             Toast.makeText(this, "Não foi possível iniciar o download.", Toast.LENGTH_LONG).show();
         }
+    }
+
+    private String resolveDownloadFileName(PendingWebDownload download) {
+        String candidate = null;
+        String disposition = download.contentDisposition == null ? "" : download.contentDisposition;
+        Matcher utf8Name = Pattern.compile("(?i)filename\\*\\s*=\\s*(?:UTF-8'')?([^;]+)").matcher(disposition);
+        if (utf8Name.find()) {
+            candidate = utf8Name.group(1).trim().replaceAll("^\"|\"$", "");
+            try {
+                candidate = URLDecoder.decode(candidate, StandardCharsets.UTF_8.name());
+            } catch (Exception ignored) {
+                candidate = Uri.decode(candidate);
+            }
+        }
+        if (candidate == null || candidate.trim().isEmpty()) {
+            Matcher regularName = Pattern.compile("(?i)filename\\s*=\\s*(?:\"([^\"]+)\"|([^;]+))").matcher(disposition);
+            if (regularName.find()) {
+                candidate = regularName.group(1) != null ? regularName.group(1) : regularName.group(2);
+            }
+        }
+        if (candidate == null || candidate.trim().isEmpty()) {
+            candidate = URLUtil.guessFileName(download.url, disposition, download.mimeType);
+        }
+        candidate = candidate.trim().replaceAll("[\\\\/:*?\"<>|\\p{Cntrl}]", "_");
+        if (candidate.isEmpty() || candidate.equals(".") || candidate.equals("..")) {
+            candidate = "sal0_karaoke_download";
+        }
+        if (!candidate.contains(".") && download.mimeType != null) {
+            String extension = MimeTypeMap.getSingleton().getExtensionFromMimeType(
+                download.mimeType.split(";", 2)[0].trim()
+            );
+            if (extension != null && !extension.isEmpty()) candidate += "." + extension;
+        }
+        return candidate;
+    }
+
+    private String uniqueDownloadFileName(String fileName) {
+        File downloads = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
+        if (!new File(downloads, fileName).exists()) return fileName;
+        int dot = fileName.lastIndexOf('.');
+        String stem = dot > 0 ? fileName.substring(0, dot) : fileName;
+        String extension = dot > 0 ? fileName.substring(dot) : "";
+        for (int suffix = 2; suffix < 10000; suffix++) {
+            String uniqueName = stem + " (" + suffix + ")" + extension;
+            if (!new File(downloads, uniqueName).exists()) return uniqueName;
+        }
+        return stem + " (" + System.currentTimeMillis() + ")" + extension;
     }
 
     private void showCustomVideo(View view, WebChromeClient.CustomViewCallback callback) {

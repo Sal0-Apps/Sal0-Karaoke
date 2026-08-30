@@ -231,7 +231,8 @@ class EasyModeConfigTests(unittest.TestCase):
             html.index("await fetchStatus();", html.index("const isAuthenticated")),
             html.index("await fetchEasyModeConfig();", html.index("const isAuthenticated")),
         )
-        self.assertGreaterEqual(html.count("setCreationUiLocked(true);"), 5)
+        self.assertGreaterEqual(html.count("setCreationUiLocked(true);"), 4)
+        self.assertIn("setCreationUiLocked(!(canAddToQueue && queueCreationExpanded));", html)
         self.assertIn('response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"', source)
 
 

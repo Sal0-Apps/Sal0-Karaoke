@@ -14,6 +14,13 @@ AUDIO_PROCESSOR = (ROOT / "app" / "audio_processor.py").read_text(encoding="utf-
 
 
 class SubtitleTranslationModeTests(unittest.TestCase):
+    def test_srt_results_are_sent_as_telegram_documents_with_download_links(self):
+        self.assertIn("def send_telegram_document_flow", MAIN)
+        self.assertIn("/sendDocument", MAIN)
+        self.assertIn("send_documents_to_targets(", MAIN)
+        self.assertIn("translated_public_token", MAIN)
+        self.assertIn("/api/public/download/", MAIN)
+
     def test_third_creator_mode_accepts_audio_or_video_and_has_no_visual_controls(self):
         self.assertIn('id="btnCreatorSubtitle"', HTML)
         self.assertIn('id="subtitleModeForm"', HTML)

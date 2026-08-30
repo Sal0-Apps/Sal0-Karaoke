@@ -549,6 +549,7 @@ processing_queue_event = threading.Event()
 processing_queue = []
 processing_queue_worker_started = False
 ACTIVE_QUEUE_STATUSES = {"queued", "processing"}
+legacy_cache_promotion_lock = threading.Lock()
 
 
 def save_processing_queue_unlocked():
@@ -631,11 +632,8 @@ def ensure_processing_queue_capacity(username: str):
 
 def ensure_processing_queue_access(
     current_user: dict,
-    youtube_url: str = None,
-    audio_filename: str = None,
-    library_audio: str = None,
 ):
-    """Durante um trabalho ativo, permite somente novos links ao dono ou administrador."""
+    """Durante um trabalho ativo, permite novos itens ao dono ou administrador."""
     with processing_queue_lock:
         active_job = next(
             (job for job in processing_queue if job.get("status") == "processing"),
@@ -647,11 +645,6 @@ def ensure_processing_queue_access(
         raise HTTPException(
             status_code=409,
             detail="Aguarde: o servidor está processando um trabalho de outro perfil.",
-        )
-    if not (youtube_url or "").strip() or (audio_filename or "").strip() or (library_audio or "").strip():
-        raise HTTPException(
-            status_code=409,
-            detail="Durante o processamento, somente novos links do YouTube podem ser adicionados à fila.",
         )
 
 
@@ -689,6 +682,30 @@ def remove_finished_queue_cache(cache_dir: str | None):
     shutil.rmtree(job_root, ignore_errors=True)
 
 
+def promote_queue_cache_in_background(job_cache: str, owner: dict):
+    """Atualiza o cache reutilizável sem impedir que o worker inicie o próximo trabalho."""
+    try:
+        with legacy_cache_promotion_lock:
+            if not job_cache or not os.path.isdir(job_cache):
+                return
+            legacy_cache = get_user_paths(owner)["cache"]
+            os.makedirs(legacy_cache, exist_ok=True)
+            for cached_name in os.listdir(legacy_cache):
+                cached_path = os.path.join(legacy_cache, cached_name)
+                try:
+                    if os.path.isdir(cached_path):
+                        shutil.rmtree(cached_path)
+                    else:
+                        os.remove(cached_path)
+                except OSError as exc:
+                    logger.warning("Não foi possível atualizar o cache reutilizável: %s", exc)
+            shutil.copytree(job_cache, legacy_cache, dirs_exist_ok=True)
+    except Exception:
+        logger.exception("Não foi possível promover o cache concluído em segundo plano.")
+    finally:
+        remove_finished_queue_cache(job_cache)
+
+
 def processing_queue_worker():
     while True:
         processing_queue_event.wait(timeout=2)
@@ -707,6 +724,7 @@ def processing_queue_worker():
             pipeline = dict(job.get("pipeline") or {})
             owner = dict(pipeline.get("owner_user") or {})
             summary = dict(job.get("process_summary") or {})
+            deferred_cache_cleanup = False
             try:
                 update_state(
                     "processing",
@@ -725,21 +743,16 @@ def processing_queue_worker():
                     final_subtitle_filename = state.get("subtitle_filename")
                 if final_status == "done":
                     queue_status = "done"
-                    queue_message = "Vídeo concluído e salvo no histórico."
+                    queue_message = "Resultado concluído e salvo na Biblioteca."
                     job_cache = pipeline.get("cache_dir")
-                    legacy_cache = get_user_paths(owner)["cache"]
-                    if job_cache and os.path.isdir(job_cache):
-                        os.makedirs(legacy_cache, exist_ok=True)
-                        for cached_name in os.listdir(legacy_cache):
-                            cached_path = os.path.join(legacy_cache, cached_name)
-                            try:
-                                if os.path.isdir(cached_path):
-                                    shutil.rmtree(cached_path)
-                                else:
-                                    os.remove(cached_path)
-                            except OSError as exc:
-                                logger.warning("Não foi possível atualizar o cache reutilizável: %s", exc)
-                        shutil.copytree(job_cache, legacy_cache, dirs_exist_ok=True)
+                    if job_cache and os.path.isdir(job_cache) and not pipeline.get("subtitle_only"):
+                        deferred_cache_cleanup = True
+                        threading.Thread(
+                            target=promote_queue_cache_in_background,
+                            args=(job_cache, owner),
+                            daemon=True,
+                            name=f"cache-promotion-{job.get('id', 'job')}",
+                        ).start()
                 elif final_status == "idle" and "cancel" in final_error.casefold():
                     queue_status = "cancelled"
                     queue_message = "Processamento cancelado."
@@ -759,7 +772,8 @@ def processing_queue_worker():
                     job["history_filename"] = final_history_filename
                     job["subtitle_filename"] = final_subtitle_filename
                 save_processing_queue_unlocked()
-            remove_finished_queue_cache(pipeline.get("cache_dir"))
+            if not deferred_cache_cleanup:
+                remove_finished_queue_cache(pipeline.get("cache_dir"))
 
 
 def start_processing_queue_worker():
@@ -2908,6 +2922,23 @@ def admin_result_owner(owner_key: str, current_user: dict) -> dict:
     return owner
 
 
+def attachment_file_response(file_path: str, filename: str, media_type: str = None):
+    """Entrega downloads com nome UTF-8 e fallback ASCII consistente para Android."""
+    safe_name = os.path.basename(str(filename or "download"))
+    ascii_name = unicodedata.normalize("NFKD", safe_name).encode("ascii", "ignore").decode("ascii")
+    ascii_name = re.sub(r'[\x00-\x1f\\/:*?"<>|]', "_", ascii_name).strip(" .") or "download"
+    encoded_name = quote(safe_name, safe="")
+    headers = {
+        "Content-Disposition": (
+            f'attachment; filename="{ascii_name}"; filename*=UTF-8\'\'{encoded_name}'
+        ),
+        "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+        "X-Content-Type-Options": "nosniff",
+    }
+    resolved_media_type = media_type or mimetypes.guess_type(safe_name)[0] or "application/octet-stream"
+    return FileResponse(file_path, media_type=resolved_media_type, headers=headers)
+
+
 @app.get("/api/admin/results")
 def get_admin_results(current_user: dict = Depends(get_current_user)):
     """Lista os vídeos finalizados de todos os perfis com autoria explícita."""
@@ -2955,7 +2986,7 @@ def get_admin_result_file(
     if inline:
         media_type = mimetypes.guess_type(file_path)[0] or "video/mp4"
         return inline_file_response(file_path, media_type, request)
-    return FileResponse(file_path, filename=safe_filename)
+    return attachment_file_response(file_path, safe_filename)
 
 @app.post("/api/library/upload")
 def upload_to_library(
@@ -3109,7 +3140,7 @@ def download_from_library(section: str, filename: str, current_user: dict = Depe
     file_path = resolved[0] if resolved else os.path.join(get_user_paths(current_user)["library"], section, safe_filename)
 
     if os.path.exists(file_path):
-        return FileResponse(file_path, filename=safe_filename)
+        return attachment_file_response(file_path, safe_filename)
 
     raise HTTPException(status_code=404, detail="Arquivo não encontrado na biblioteca.")
 
@@ -3253,11 +3284,8 @@ def public_download(download_token: str):
     allowed_root = os.path.abspath("/data") + os.sep
     if not file_path.startswith(allowed_root) or not os.path.isfile(file_path):
         raise HTTPException(status_code=404, detail="Vídeo removido ou indisponível.")
-    return FileResponse(
-        file_path,
-        media_type="video/mp4",
-        filename=os.path.basename(record.get("filename") or "sal0_karaoke.mp4")
-    )
+    download_name = os.path.basename(record.get("filename") or "sal0_karaoke.mp4")
+    return attachment_file_response(file_path, download_name)
 
 class EditWordModel(BaseModel):
     word: str
@@ -3559,12 +3587,7 @@ def process_karaoke(
     """
     Recebe os arquivos enviados, valida a concorrência e inicia o pipeline em segundo plano.
     """
-    ensure_processing_queue_access(
-        current_user,
-        youtube_url=youtube_url,
-        audio_filename=audio_file.filename if audio_file else None,
-        library_audio=library_audio,
-    )
+    ensure_processing_queue_access(current_user)
     ensure_processing_queue_capacity(current_user.get("username"))
     translation_language = (translation_language or "pt").strip().lower()
     if translation_language not in SUPPORTED_TARGET_LANGUAGES:
@@ -4069,6 +4092,67 @@ def process_karaoke(
         raise
     return {"status": "queued", "job_id": job_id, "position": position, "title": orig_name}
 
+def compress_video_for_telegram(source_path: str, destination_path: str, target_bytes: int) -> bool:
+    """Cria uma prévia completa sob o limite do bot sem alterar o resultado original."""
+    duration = get_file_duration(source_path)
+    if duration <= 0:
+        return False
+    total_kbps = max(32, int((target_bytes * 8 * 0.92) / duration / 1000))
+    audio_kbps = 48 if total_kbps >= 120 else 24
+    video_kbps = max(12, total_kbps - audio_kbps)
+    height = 720 if video_kbps >= 700 else (480 if video_kbps >= 300 else 360)
+
+    with tempfile.TemporaryDirectory(prefix="sal0-telegram-") as pass_dir:
+        pass_log = os.path.join(pass_dir, "encode")
+        for attempt in range(3):
+            attempt_video_kbps = max(10, int(video_kbps * (0.82 ** attempt)))
+            common_video = [
+                "-vf", f"scale=-2:'min({height},ih)'",
+                "-c:v", "libx264",
+                "-preset", "veryfast",
+                "-b:v", f"{attempt_video_kbps}k",
+                "-maxrate", f"{attempt_video_kbps}k",
+                "-bufsize", f"{max(20, attempt_video_kbps * 2)}k",
+                "-pix_fmt", "yuv420p",
+            ]
+            first_pass = subprocess.run(
+                [
+                    "ffmpeg", "-y", "-i", source_path,
+                    *common_video,
+                    "-pass", "1", "-passlogfile", pass_log,
+                    "-an", "-f", "null", os.devnull,
+                ],
+                capture_output=True,
+                text=True,
+                timeout=21600,
+                check=False,
+            )
+            if first_pass.returncode != 0:
+                logger.error("Primeira passagem da prévia Telegram falhou: %s", first_pass.stderr[-1000:])
+                return False
+            second_pass = subprocess.run(
+                [
+                    "ffmpeg", "-y", "-i", source_path,
+                    *common_video,
+                    "-pass", "2", "-passlogfile", pass_log,
+                    "-c:a", "aac", "-b:a", f"{audio_kbps}k",
+                    "-movflags", "+faststart", destination_path,
+                ],
+                capture_output=True,
+                text=True,
+                timeout=21600,
+                check=False,
+            )
+            if second_pass.returncode == 0 and os.path.isfile(destination_path):
+                if 0 < os.path.getsize(destination_path) <= target_bytes:
+                    return True
+                logger.warning("Prévia Telegram ainda excedeu o limite; reduzindo a taxa de bits.")
+            else:
+                logger.error("Segunda passagem da prévia Telegram falhou: %s", second_pass.stderr[-1000:])
+                return False
+    return False
+
+
 def send_telegram_video_flow(
     token: str,
     chat_id: str,
@@ -4084,6 +4168,7 @@ def send_telegram_video_flow(
         return
 
     limit_50mb = 50 * 1024 * 1024
+    compressed_target = 46 * 1024 * 1024
 
     def build_download_links() -> str:
         if not public_download_token:
@@ -4099,38 +4184,51 @@ def send_telegram_video_flow(
     try:
         file_size = os.path.getsize(video_path)
         download_block = build_download_links()
-        if file_size > limit_50mb:
-            file_size_mb = file_size / (1024 * 1024)
-            send_telegram_notification(
-                token,
-                chat_id,
-                f"🎬 <b>Sal0 Karaokê</b>: <b>{orig_name}</b> ficou pronto!\n\n"
-                f"O arquivo tem <b>{file_size_mb:.1f} MB</b> e está na Biblioteca como <b>{history_filename}</b>."
-                f"{download_block}"
-            )
-            return
-
         success = False
-        with open(video_path, "rb") as video_file:
-            response = requests.post(
-                f"https://api.telegram.org/bot{token}/sendVideo",
-                data={
-                    "chat_id": chat_id,
-                    "caption": f"🎥 <b>Sal0 Karaokê</b>: aqui está <b>{orig_name}</b>!",
-                    "parse_mode": "HTML"
-                },
-                files={"video": video_file},
-                timeout=90
-            )
-            success = response.status_code == 200
-            if not success:
-                logger.error("Telegram recusou o vídeo com HTTP %s.", response.status_code)
+        sent_compressed_preview = False
+        with tempfile.TemporaryDirectory(prefix="sal0-telegram-preview-") as preview_dir:
+            upload_path = video_path
+            if file_size > limit_50mb:
+                upload_path = os.path.join(preview_dir, "preview_telegram.mp4")
+                sent_compressed_preview = compress_video_for_telegram(
+                    video_path,
+                    upload_path,
+                    compressed_target,
+                )
+                if not sent_compressed_preview:
+                    upload_path = ""
 
-        status_text = "Vídeo enviado e salvo na sua Biblioteca." if success else "O envio do arquivo falhou, mas ele está salvo na sua Biblioteca."
+            if upload_path:
+                with open(upload_path, "rb") as video_file:
+                    response = requests.post(
+                        f"https://api.telegram.org/bot{token}/sendVideo",
+                        data={
+                            "chat_id": chat_id,
+                            "caption": (
+                                f"🎥 <b>Sal0 Karaokê</b>: prévia compactada de <b>{orig_name}</b>"
+                                if sent_compressed_preview
+                                else f"🎥 <b>Sal0 Karaokê</b>: aqui está <b>{orig_name}</b>!"
+                            ),
+                            "parse_mode": "HTML",
+                        },
+                        files={"video": (os.path.basename(upload_path), video_file, "video/mp4")},
+                        timeout=300,
+                    )
+                    success = response.status_code == 200
+                    if not success:
+                        logger.error("Telegram recusou o vídeo com HTTP %s.", response.status_code)
+
+        if success and sent_compressed_preview:
+            status_text = "Prévia compactada enviada; o original permanece intacto na Biblioteca."
+        elif success:
+            status_text = "Vídeo original enviado e salvo na sua Biblioteca."
+        else:
+            status_text = "Não foi possível anexar a prévia, mas o original está salvo na sua Biblioteca."
         send_telegram_notification(
             token,
             chat_id,
-            f"✅ <b>Sal0 Karaokê</b>: <b>{orig_name}</b> concluído. {status_text}{download_block}"
+            f"✅ <b>Sal0 Karaokê</b>: <b>{orig_name}</b> concluído. {status_text}\n"
+            f"Use os links abaixo para baixar o arquivo original sem compressão.{download_block}"
         )
     except Exception as exc:
         logger.error("Erro no envio em segundo plano para o Telegram: %s", exc)
@@ -4162,6 +4260,76 @@ def send_video_to_targets(
         ).start()
 
 
+def send_telegram_document_flow(
+    token: str,
+    chat_id: str,
+    document_path: str,
+    display_name: str,
+    public_download_token: str,
+    base_url: str = "",
+    external_url: str = "",
+):
+    """Envia um resultado leve como documento e sempre publica os links disponíveis."""
+    if not token or not chat_id or not os.path.isfile(document_path):
+        return
+    route = f"/api/public/download/{public_download_token}" if public_download_token else ""
+    links = []
+    if route and base_url.strip():
+        links.append(f'🏠 <a href="{base_url.rstrip("/")}{route}">Baixar na rede local</a>')
+    if route and external_url.strip():
+        links.append(f'🌐 <a href="{external_url.rstrip("/")}{route}">Baixar pelo acesso externo</a>')
+
+    success = False
+    try:
+        with open(document_path, "rb") as document_file:
+            response = requests.post(
+                f"https://api.telegram.org/bot{token}/sendDocument",
+                data={
+                    "chat_id": chat_id,
+                    "caption": f"📄 <b>Sal0 Karaokê</b>: {display_name}",
+                    "parse_mode": "HTML",
+                },
+                files={"document": (os.path.basename(document_path), document_file, "application/x-subrip")},
+                timeout=90,
+            )
+            success = response.ok
+            if not success:
+                logger.error("Telegram recusou o documento com HTTP %s.", response.status_code)
+    except Exception as exc:
+        logger.error("Falha ao enviar documento ao Telegram: %s", exc)
+
+    delivery = "Arquivo SRT enviado diretamente." if success else "O envio direto falhou; use um dos links abaixo."
+    link_block = "\n" + "\n".join(links) if links else ""
+    send_telegram_notification(
+        token,
+        chat_id,
+        f"✅ <b>Sal0 Karaokê</b>: {display_name}. {delivery}{link_block}",
+    )
+
+
+def send_documents_to_targets(
+    targets: list[dict],
+    documents: list[dict],
+    base_url: str,
+    external_url: str,
+):
+    for target in targets:
+        for document in documents:
+            threading.Thread(
+                target=send_telegram_document_flow,
+                kwargs={
+                    "token": target["telegram_token"],
+                    "chat_id": target["telegram_chat_id"],
+                    "document_path": document["path"],
+                    "display_name": document["label"],
+                    "public_download_token": document.get("public_download_token"),
+                    "base_url": base_url,
+                    "external_url": external_url,
+                },
+                daemon=True,
+            ).start()
+
+
 def run_subtitle_srt_pipeline(
     input_media_path: str,
     orig_name: str,
@@ -4175,6 +4343,8 @@ def run_subtitle_srt_pipeline(
     output_dir: str,
     library_dir: str,
     telegram_targets: list[dict],
+    telegram_base_url: str = "",
+    telegram_external_url: str = "",
 ):
     """Transcreve qualquer mídia por MP3 e retorna somente SRT original/traduzido."""
     import process_manager as pm
@@ -4223,6 +4393,21 @@ def run_subtitle_srt_pipeline(
             telegram_targets,
             f"✍️ <b>Sal0 Karaokê</b>: Transcrevendo o áudio completo de <b>{orig_name}</b>.",
         )
+        def publish_subtitle_whisper_progress(percent: int, elapsed: float, total: float):
+            remaining = max(0.0, total - elapsed)
+            detail = f"Whisper {percent}%"
+            if total > 0:
+                detail += f" · {int(elapsed // 60):02d}:{int(elapsed % 60):02d} de {int(total // 60):02d}:{int(total % 60):02d}"
+                if remaining > 0:
+                    detail += f" · faltam {int(remaining // 60):02d}:{int(remaining % 60):02d} de áudio"
+            update_state(
+                "processing",
+                "Transcribing complete MP3",
+                min(69, 45 + round(percent * 0.24)),
+                stage_progress=percent,
+                stage_detail=detail,
+            )
+
         original_segments, transcription_info = transcribe_vocals(
             normalized_mp3,
             model_size=whisper_model,
@@ -4231,6 +4416,7 @@ def run_subtitle_srt_pipeline(
             transcription_preset=transcription_preset,
             task="transcribe",
             return_info=True,
+            progress_callback=publish_subtitle_whisper_progress,
         )
         if original_segments:
             transcription_info["cache_signature"] = cache_signature
@@ -4313,6 +4499,7 @@ def run_subtitle_srt_pipeline(
 
     primary_subtitle = translated_filename or original_filename
     public_token = create_public_download(owner_user, original_filename)
+    translated_public_token = create_public_download(owner_user, translated_filename) if translated_filename else None
     save_result_metadata(
         output_dir,
         orig_name,
@@ -4339,10 +4526,24 @@ def run_subtitle_srt_pipeline(
         public_download_token=public_token,
     )
     completion = "SRT original e traduzido" if translated_filename else "SRT original"
-    notify_targets(
+    telegram_documents = [{
+        "path": os.path.join(library_dir, "history", original_filename),
+        "label": f"SRT original de {orig_name}",
+        "public_download_token": public_token,
+    }]
+    if translated_filename:
+        telegram_documents.append({
+            "path": os.path.join(library_dir, "history", translated_filename),
+            "label": f"SRT traduzido de {orig_name}",
+            "public_download_token": translated_public_token,
+        })
+    send_documents_to_targets(
         telegram_targets,
-        f"✅ <b>Sal0 Karaokê</b>: {completion} de <b>{orig_name}</b> concluído(s).",
+        telegram_documents,
+        telegram_base_url,
+        telegram_external_url,
     )
+    logger.info("%s concluído(s) e encaminhado(s) ao Telegram.", completion)
 
 def run_pipeline(
     input_audio_path: str,
@@ -4379,7 +4580,7 @@ def run_pipeline(
     # Obter o lock de processamento exclusivo (segurança de job único)
     if not processing_lock.acquire(blocking=False):
         logger.warning("Bloqueio de concorrência ativado: Processamento já em andamento.")
-        return
+        raise RuntimeError("O processador não foi liberado pelo trabalho anterior.")
 
     owner_user = owner_user or {"username": state.get("owner_username"), "role": state.get("owner_role", "user")}
     owner_paths = get_user_paths(owner_user)
@@ -4515,6 +4716,8 @@ def run_pipeline(
                 output_dir=output_dir,
                 library_dir=library_dir,
                 telegram_targets=telegram_targets,
+                telegram_base_url=telegram_base_url,
+                telegram_external_url=telegram_external_url,
             )
             return
 
@@ -4705,6 +4908,21 @@ def run_pipeline(
                     update_state("processing", f"Baixando Modelo de IA Whisper {whisper_model} no servidor...", 65)
 
                 quality_preset = "max_quality" if whisper_model == "large-v3" else "standard"
+                def publish_whisper_progress(percent: int, elapsed: float, total: float):
+                    remaining = max(0.0, total - elapsed)
+                    detail = f"Whisper {percent}%"
+                    if total > 0:
+                        detail += f" · {int(elapsed // 60):02d}:{int(elapsed % 60):02d} de {int(total // 60):02d}:{int(total % 60):02d}"
+                        if remaining > 0:
+                            detail += f" · faltam {int(remaining // 60):02d}:{int(remaining % 60):02d} de áudio"
+                    update_state(
+                        "processing",
+                        "Transcribing vocals",
+                        min(74, 65 + round(percent * 0.09)),
+                        stage_progress=percent,
+                        stage_detail=detail,
+                    )
+
                 segments = transcribe_vocals(
                     transcribe_audio,
                     model_size=whisper_model,
@@ -4712,6 +4930,7 @@ def run_pipeline(
                     quality_mode=quality_preset,
                     enable_vad=enable_vad,
                     transcription_preset=transcription_preset,
+                    progress_callback=publish_whisper_progress,
                 )
 
                 if segments:
@@ -4892,11 +5111,7 @@ def download_file(
         download_name = os.path.basename(result_meta["history_filename"])
     if inline:
         return inline_file_response(file_path, "video/mp4", request)
-    return FileResponse(
-        file_path,
-        media_type="video/mp4",
-        filename=download_name
-    )
+    return attachment_file_response(file_path, download_name, "video/mp4")
 
 
 @app.get("/api/download-subtitles")
@@ -4929,4 +5144,4 @@ def download_subtitles(
                 detail=f"O SRT original está disponível, mas a tradução falhou: {result_meta['translation_error']}",
             )
         raise HTTPException(status_code=404, detail="A legenda SRT solicitada não foi gerada nesta conta.")
-    return FileResponse(subtitle_path, media_type="application/x-subrip", filename=subtitle_filename)
+    return attachment_file_response(subtitle_path, subtitle_filename, "application/x-subrip")

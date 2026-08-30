@@ -155,6 +155,7 @@ def transcribe_vocals(
     transcription_preset: str = "karaoke",
     task: str = "transcribe",
     return_info: bool = False,
+    progress_callback=None,
 ) -> list[dict] | tuple[list[dict], dict]:
     """
     Transcrição local de vocais com Faster-Whisper e ajustes próprios para canto.
@@ -253,9 +254,34 @@ def transcribe_vocals(
             "vad_parameters": dict(preset["vad_parameters"]),
         })
 
+    def consume_segments(segment_iterator, transcription_info):
+        collected = []
+        total_duration = float(
+            getattr(transcription_info, "duration", 0.0)
+            or getattr(transcription_info, "duration_after_vad", 0.0)
+            or 0.0
+        )
+        last_percent = -1
+        for segment in segment_iterator:
+            collected.append(segment)
+            segment_end = float(getattr(segment, "end", 0.0) or 0.0)
+            percent = min(99, max(0, int((segment_end / total_duration) * 100))) if total_duration else 0
+            if progress_callback and percent != last_percent:
+                try:
+                    progress_callback(percent, segment_end, total_duration)
+                except Exception as callback_error:
+                    logger.debug("Falha ao publicar progresso do Whisper: %s", callback_error)
+            last_percent = percent
+        if progress_callback:
+            try:
+                progress_callback(100, total_duration, total_duration)
+            except Exception as callback_error:
+                logger.debug("Falha ao publicar conclusão do Whisper: %s", callback_error)
+        return collected
+
     try:
         segments, info = model.transcribe(vocals_path, **transcribe_options)
-        segments = list(segments)
+        segments = consume_segments(segments, info)
     except Exception as e_vad:
         if not enable_vad:
             raise
@@ -263,7 +289,7 @@ def transcribe_vocals(
         transcribe_options.pop("vad_filter", None)
         transcribe_options.pop("vad_parameters", None)
         segments, info = model.transcribe(vocals_path, **transcribe_options)
-        segments = list(segments)
+        segments = consume_segments(segments, info)
 
     logger.info(f"Idioma detectado: {info.language} ({info.language_probability:.2%})")
 

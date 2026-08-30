@@ -977,6 +977,34 @@
             line-height: 1.35;
             text-align: right;
         }
+        #createTabContent.has-active-process {
+            display: flex !important;
+            flex-direction: column;
+        }
+        #createTabContent.has-active-process #processCard { order: 1; }
+        #createTabContent.has-active-process #correctionCard { order: 1; }
+        #createTabContent.has-active-process #queueCard { order: 2; }
+        #createTabContent.has-active-process #queueAddProcessCard { order: 3; }
+        #createTabContent.has-active-process #creatorModeSwitch { order: 4; }
+        #createTabContent.has-active-process #easyModeForm,
+        #createTabContent.has-active-process #subtitleModeForm,
+        #createTabContent.has-active-process #karaokêForm { order: 5; }
+        #createTabContent.has-active-process #downloadBox { order: 6; }
+        .stage-progress-box {
+            margin-top: 0.9rem;
+            padding: 0.8rem;
+            border: 1px solid var(--glass-border);
+            border-radius: 12px;
+            background: var(--input-bg);
+        }
+        .stage-progress-head {
+            display: flex;
+            justify-content: space-between;
+            gap: 0.75rem;
+            margin-bottom: 0.55rem;
+            color: var(--text-muted);
+            font-size: 0.78rem;
+        }
         .youtube-identification {
             display: none;
             align-items: center;
@@ -1483,7 +1511,7 @@
                                     <span class="quick-choice-icon">🎵</span>
                                     <span class="quick-choice-label" id="easyAudioFileText">Escolher arquivo</span>
                                     <span class="quick-choice-hint">Clique ou arraste música/vídeo</span>
-                                    <input type="file" id="easyAudioFile" accept=".mp3,.wav,.flac,.m4a,.mp4,.mkv,.avi" multiple style="display: none;">
+                                    <input type="file" id="easyAudioFile" accept=".mp3,.wav,.flac,.m4a,.aac,.ogg,.opus,.mp4,.mkv,.avi,.mov,.webm,.m4v" multiple style="display: none;">
                                 </label>
                                 <div id="easyAudioLibraryBox" class="quick-choice-card">
                                     <span class="quick-choice-label">📚 Minha Biblioteca</span>
@@ -1612,7 +1640,7 @@
                             <span style="font-size: 1.6rem; margin-bottom: 0.2rem;">🎵</span>
                             <p id="audioTextName" style="font-size: 0.85rem; margin: 0; font-weight: 500;">Arraste a música/vídeo aqui ou clique para buscar</p>
                             <p style="font-size: 0.68rem; color: var(--text-muted); margin: 0;">MP3, WAV, FLAC, M4A, MP4, MKV...</p>
-                            <input type="file" id="audioFile" name="audio_file" accept=".mp3,.wav,.flac,.m4a,.mp4,.mkv,.avi" multiple style="display: none;">
+                            <input type="file" id="audioFile" name="audio_file" accept=".mp3,.wav,.flac,.m4a,.aac,.ogg,.opus,.mp4,.mkv,.avi,.mov,.webm,.m4v" multiple style="display: none;">
                             <div id="audioBadge" style="display: none; background: var(--accent); color: white; padding: 0.2rem 0.6rem; border-radius: 20px; font-size: 0.72rem; margin-top: 0.3rem;"></div>
                         </div>
                     </div>
@@ -1907,17 +1935,13 @@
                 <div id="processingQueueList" class="queue-list"><span class="compact-note">A fila está vazia.</span></div>
             </div>
 
-            <div class="card" id="queueLinkCard" style="display: none;">
+            <div class="card" id="queueAddProcessCard" style="display: none;">
                 <div class="card-header">
-                    <span class="card-title"><span class="line-glyph">＋</span> Adicionar link à fila</span>
-                    <span id="queueLinkModeBadge" class="queue-status">Modo Rápido</span>
+                    <span class="card-title"><span class="line-glyph">＋</span> Novo processo na fila</span>
+                    <span class="queue-status">Até 25 pendentes</span>
                 </div>
-                <p class="compact-note" style="margin-bottom:0.7rem;">Durante o processamento, somente novos links podem ser acrescentados. Os formulários permanecem fechados.</p>
-                <div class="library-youtube-row">
-                    <input type="url" id="queueYoutubeUrl" class="input-text" placeholder="Cole um novo link do YouTube">
-                    <button type="button" id="btnQueueYoutubeLink" class="btn-primary" style="width:auto;">Adicionar</button>
-                </div>
-                <p id="queueLinkStatus" class="compact-note" style="margin-top:0.55rem;"></p>
+                <p class="compact-note" style="margin-bottom:0.7rem;">O processo atual continua em destaque. Abra as opções somente quando quiser preparar outro item, escolhendo arquivos, links, Biblioteca e qualquer um dos três modos.</p>
+                <button type="button" id="btnToggleQueueCreation" class="btn-primary" aria-expanded="false">＋ Adicionar novo processo</button>
             </div>
 
             <!-- CARD DE PROGRESSO DE PRODUÇÃO -->
@@ -1941,6 +1965,16 @@
 
                 <div class="progress-bar-bg" role="progressbar" aria-label="Progresso geral" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
                     <div class="progress-bar-fill" id="progressBarFill"></div>
+                </div>
+
+                <div id="stageProgressBox" class="stage-progress-box" style="display:none;">
+                    <div class="stage-progress-head">
+                        <span id="stageProgressLabel">Progresso da etapa atual</span>
+                        <strong id="stageProgressPercent">0%</strong>
+                    </div>
+                    <div class="progress-bar-bg" role="progressbar" aria-label="Progresso da etapa atual" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+                        <div class="progress-bar-fill" id="stageProgressBarFill"></div>
+                    </div>
                 </div>
 
                 <!-- Botão Cancelar -->
@@ -2400,7 +2434,7 @@
         let clientPreparationInProgress = false;
         let creationUiLocked = false;
         let lastKnownServerStatus = 'unknown';
-        let activeQueueLinkMode = 'easy';
+        let queueCreationExpanded = false;
         let youtubeToolsPollTimer = null;
         let processingQueuePollTimer = null;
 
@@ -2471,6 +2505,17 @@
             if (advancedButton) advancedButton.disabled = creationUiLocked;
             if (subtitleButton) subtitleButton.disabled = creationUiLocked;
             setCreatorMode(currentCreatorMode);
+        }
+
+        function setQueueCreationExpanded(expanded) {
+            queueCreationExpanded = Boolean(expanded);
+            const button = document.getElementById('btnToggleQueueCreation');
+            if (button) {
+                button.setAttribute('aria-expanded', String(queueCreationExpanded));
+                button.textContent = queueCreationExpanded ? 'Fechar opções' : '＋ Adicionar novo processo';
+            }
+            setCreationUiLocked(!queueCreationExpanded);
+            if (queueCreationExpanded) setCreatorMode(currentCreatorMode);
         }
 
         function refreshEasySummary(config) {
@@ -3780,7 +3825,7 @@
 
                     const results = await submitProcessBatch(formData, audioFiles);
                     clientPreparationInProgress = false;
-                    setCreationUiLocked(false);
+                    setQueueCreationExpanded(false);
                     if (button) {
                         button.disabled = false;
                         button.textContent = results.length > 1 ? `${results.length} vídeos adicionados à fila` : 'Adicionar outro vídeo';
@@ -3848,7 +3893,7 @@
                 try {
                     const results = await submitProcessBatch(formData, audioFiles);
                     clientPreparationInProgress = false;
-                    setCreationUiLocked(false);
+                    setQueueCreationExpanded(false);
                     if (button) {
                         button.disabled = false;
                         button.textContent = results.length > 1 ? `${results.length} vídeos adicionados à fila` : 'Adicionar outro vídeo';
@@ -3864,46 +3909,8 @@
                 }
             });
 
-            document.getElementById('btnQueueYoutubeLink')?.addEventListener('click', async () => {
-                const input = document.getElementById('queueYoutubeUrl');
-                const button = document.getElementById('btnQueueYoutubeLink');
-                const status = document.getElementById('queueLinkStatus');
-                const url = input?.value.trim() || '';
-                if (!url) {
-                    if (status) status.textContent = 'Cole um link antes de adicionar.';
-                    return;
-                }
-
-                const formData = new FormData();
-                formData.set('youtube_url', url);
-                formData.set('app_base_url', window.location.origin);
-                formData.set('save_to_library', 'true');
-                if (activeQueueLinkMode === 'subtitle') {
-                    formData.set('subtitle_only', 'true');
-                    formData.set('translation_language', document.getElementById('subtitleTranslationLanguage')?.value || 'pt');
-                    formData.set('whisper_model', document.getElementById('subtitleWhisperModel')?.value || 'large-v3-turbo');
-                    formData.set('transcription_preset', document.getElementById('subtitleTranscriptionPreset')?.value || 'difficult');
-                    formData.set('enable_vad', document.getElementById('subtitleEnableVad')?.value || 'true');
-                    formData.set('enable_correction', 'false');
-                } else {
-                    formData.set('easy_mode', 'true');
-                    formData.set('easy_background_choice', 'default');
-                }
-
-                if (button) button.disabled = true;
-                if (status) status.textContent = 'Preparando o link para a fila...';
-                try {
-                    const response = await authFetch('/api/process', { method: 'POST', body: formData });
-                    const result = await response.json().catch(() => ({}));
-                    if (!response.ok) throw new Error(result.detail || 'Não foi possível adicionar o link.');
-                    if (input) input.value = '';
-                    if (status) status.textContent = `${result.title || 'Link'} adicionado à fila.`;
-                    await fetchProcessingQueue();
-                } catch (error) {
-                    if (status) status.textContent = `Erro: ${error.message}`;
-                } finally {
-                    if (button) button.disabled = false;
-                }
+            document.getElementById('btnToggleQueueCreation')?.addEventListener('click', () => {
+                setQueueCreationExpanded(!queueCreationExpanded);
             });
 
             // Alternadores de Tema
@@ -5178,7 +5185,7 @@
                     if (initialStatus) initialStatus.textContent = 'Preparando a criação...';
                     const results = await submitProcessBatch(formData, audioFiles);
                     clientPreparationInProgress = false;
-                    setCreationUiLocked(false);
+                    setQueueCreationExpanded(false);
                     btnSubmit.disabled = false;
                     btnSubmit.textContent = results.length > 1 ? `${results.length} vídeos adicionados à fila` : 'Adicionar outro vídeo';
                     await fetchProcessingQueue();
@@ -5679,13 +5686,17 @@
                 const progressBarFill = document.getElementById('progressBarFill');
                 const statusMessage = document.getElementById('statusMessage');
                 const stageProgressText = document.getElementById('stageProgressText');
+                const stageProgressBox = document.getElementById('stageProgressBox');
+                const stageProgressLabel = document.getElementById('stageProgressLabel');
+                const stageProgressPercent = document.getElementById('stageProgressPercent');
+                const stageProgressBarFill = document.getElementById('stageProgressBarFill');
                 const btnSubmit = document.getElementById('btnSubmit');
                 const easyForm = document.getElementById('easyModeForm');
                 const easySubmitBtn = document.getElementById('easySubmitBtn');
                 const subtitleForm = document.getElementById('subtitleModeForm');
                 const subtitleSubmitBtn = document.getElementById('subtitleSubmitBtn');
-                const queueLinkCard = document.getElementById('queueLinkCard');
-                const queueLinkModeBadge = document.getElementById('queueLinkModeBadge');
+                const queueAddProcessCard = document.getElementById('queueAddProcessCard');
+                const createContent = document.getElementById('createTabContent');
                 const downloadBox = document.getElementById('downloadBox');
                 const resultVideoPreview = document.getElementById('resultVideoPreview');
                 const btnDownloadResult = document.getElementById('btnDownloadResult');
@@ -5704,28 +5715,28 @@
                 if (data.status === "busy") {
                     clientPreparationInProgress = false;
                     renderProcessSummary({});
+                    queueCreationExpanded = false;
                     setCreationUiLocked(true);
+                    createContent?.classList.add('has-active-process');
                     if (correctionCard) correctionCard.style.display = 'none';
                     if (processCard) processCard.style.display = 'block';
                     if (statusMessage) statusMessage.innerText = 'O servidor está ocupado com outra criação. Os detalhes ficam privados.';
                     if (progressPercent) progressPercent.innerText = '—';
                     if (progressBarFill) progressBarFill.style.width = '0%';
                     if (stageProgressText) stageProgressText.textContent = '';
+                    if (stageProgressBox) stageProgressBox.style.display = 'none';
                     if (btnSubmit) { btnSubmit.disabled = true; btnSubmit.innerHTML = '⏳ Servidor ocupado'; }
                     if (easySubmitBtn) { easySubmitBtn.disabled = true; easySubmitBtn.innerHTML = '⏳ Servidor ocupado'; }
                     if (subtitleSubmitBtn) { subtitleSubmitBtn.disabled = true; subtitleSubmitBtn.innerHTML = '⏳ Servidor ocupado'; }
-                    if (queueLinkCard) queueLinkCard.style.display = 'none';
+                    if (queueAddProcessCard) queueAddProcessCard.style.display = 'none';
                     if (downloadBox) downloadBox.style.display = 'none';
                 } else if (data.status === "processing" || data.status === "downloading") {
                     clientPreparationInProgress = false;
                     const canAddToQueue = Boolean(data.owned_by_current_user || currentUser?.role === 'admin');
-                    setCreationUiLocked(true);
-                    if (formCard) formCard.style.display = "none";
-                    if (easyForm) easyForm.style.display = "none";
-                    if (subtitleForm) subtitleForm.style.display = "none";
-                    activeQueueLinkMode = data.process_summary?.mode === 'Gerar SRT' ? 'subtitle' : 'easy';
-                    if (queueLinkModeBadge) queueLinkModeBadge.textContent = activeQueueLinkMode === 'subtitle' ? 'Gerar SRT' : 'Modo Rápido';
-                    if (queueLinkCard) queueLinkCard.style.display = canAddToQueue ? 'block' : 'none';
+                    if (!canAddToQueue) queueCreationExpanded = false;
+                    setCreationUiLocked(!(canAddToQueue && queueCreationExpanded));
+                    createContent?.classList.add('has-active-process');
+                    if (queueAddProcessCard) queueAddProcessCard.style.display = canAddToQueue ? 'block' : 'none';
                     if (correctionCard) correctionCard.style.display = "none";
                     if (processCard) processCard.style.display = "block";
 
@@ -5745,22 +5756,32 @@
                                 : ''
                         );
                     }
-                    if (btnSubmit) btnSubmit.disabled = true;
-                    if (easySubmitBtn) easySubmitBtn.disabled = true;
-                    if (subtitleSubmitBtn) subtitleSubmitBtn.disabled = true;
+                    const hasStageProgress = data.stage_progress !== null
+                        && data.stage_progress !== undefined
+                        && Number.isFinite(Number(data.stage_progress));
+                    if (stageProgressBox) stageProgressBox.style.display = hasStageProgress ? 'block' : 'none';
+                    if (hasStageProgress) {
+                        const currentStageProgress = Math.max(0, Math.min(100, Number(data.stage_progress)));
+                        if (stageProgressLabel) stageProgressLabel.textContent = data.stage_detail || 'Progresso da etapa atual';
+                        if (stageProgressPercent) stageProgressPercent.textContent = `${currentStageProgress}%`;
+                        if (stageProgressBarFill) {
+                            stageProgressBarFill.style.width = `${currentStageProgress}%`;
+                            stageProgressBarFill.parentElement?.setAttribute('aria-valuenow', String(currentStageProgress));
+                        }
+                    }
+                    if (btnSubmit) btnSubmit.disabled = !queueCreationExpanded;
+                    if (easySubmitBtn) easySubmitBtn.disabled = !queueCreationExpanded;
+                    if (subtitleSubmitBtn) subtitleSubmitBtn.disabled = !queueCreationExpanded;
 
                     renderProcessSummary(data.process_summary || {});
 
                     updateTimelineUI(data.step || "");
                 } else if (data.status === "waiting_for_user_correction" || data.status === "awaiting_review") {
                     const canAddToQueue = Boolean(data.owned_by_current_user || currentUser?.role === 'admin');
-                    setCreationUiLocked(true);
-                    if (formCard) formCard.style.display = "none";
-                    if (easyForm) easyForm.style.display = "none";
-                    if (subtitleForm) subtitleForm.style.display = "none";
-                    activeQueueLinkMode = data.process_summary?.mode === 'Gerar SRT' ? 'subtitle' : 'easy';
-                    if (queueLinkModeBadge) queueLinkModeBadge.textContent = activeQueueLinkMode === 'subtitle' ? 'Gerar SRT' : 'Modo Rápido';
-                    if (queueLinkCard) queueLinkCard.style.display = canAddToQueue ? 'block' : 'none';
+                    if (!canAddToQueue) queueCreationExpanded = false;
+                    setCreationUiLocked(!(canAddToQueue && queueCreationExpanded));
+                    createContent?.classList.add('has-active-process');
+                    if (queueAddProcessCard) queueAddProcessCard.style.display = canAddToQueue ? 'block' : 'none';
                     if (processCard) processCard.style.display = "none";
                     if (correctionCard) correctionCard.style.display = "block";
 
@@ -5769,9 +5790,12 @@
                         loadCorrectionPanel();
                     }
                 } else if (data.status === "done" || data.status === "idle") {
+                    createContent?.classList.remove('has-active-process');
+                    setQueueCreationExpanded(false);
                     if (processCard) processCard.style.display = "none";
                     if (correctionCard) correctionCard.style.display = "none";
-                    if (queueLinkCard) queueLinkCard.style.display = 'none';
+                    if (queueAddProcessCard) queueAddProcessCard.style.display = 'none';
+                    if (stageProgressBox) stageProgressBox.style.display = 'none';
                     setCreationUiLocked(false);
 
                     if (data.status === "done" && data.result_available_to_current_user && data.original_filename && !data.original_filename.includes("Baixando")) {
@@ -5822,9 +5846,12 @@
                         await Promise.allSettled([fetchCacheInfo(), loadLibrary()]);
                     }
                 } else if (data.status === "error") {
+                    createContent?.classList.remove('has-active-process');
+                    setQueueCreationExpanded(false);
                     if (processCard) processCard.style.display = "none";
                     if (correctionCard) correctionCard.style.display = "none";
-                    if (queueLinkCard) queueLinkCard.style.display = 'none';
+                    if (queueAddProcessCard) queueAddProcessCard.style.display = 'none';
+                    if (stageProgressBox) stageProgressBox.style.display = 'none';
                     setCreationUiLocked(false);
                     if (btnSubmit) { btnSubmit.disabled = false; btnSubmit.innerHTML = '🎬 Criar Karaokê'; }
                     if (easySubmitBtn) { easySubmitBtn.disabled = false; easySubmitBtn.innerHTML = '⚡ Criar meu karaokê'; }

@@ -19,8 +19,9 @@ class VersionEightQueueTests(unittest.TestCase):
         self.assertIn("submitProcessBatch(formData, audioFiles)", HTML)
 
     def test_upload_inputs_accept_multiple_files(self):
-        self.assertIn('id="easyAudioFile" accept=".mp3,.wav,.flac,.m4a,.mp4,.mkv,.avi" multiple', HTML)
-        self.assertIn('id="audioFile" name="audio_file" accept=".mp3,.wav,.flac,.m4a,.mp4,.mkv,.avi" multiple', HTML)
+        formats = ".mp3,.wav,.flac,.m4a,.aac,.ogg,.opus,.mp4,.mkv,.avi,.mov,.webm,.m4v"
+        self.assertIn(f'id="easyAudioFile" accept="{formats}" multiple', HTML)
+        self.assertIn(f'id="audioFile" name="audio_file" accept="{formats}" multiple', HTML)
 
     def test_queue_is_persistent_and_uses_isolated_job_directories(self):
         self.assertIn('PROCESSING_QUEUE_FILE = "/data/output/processing_queue.json"', MAIN)
@@ -50,14 +51,19 @@ class VersionEightQueueTests(unittest.TestCase):
         self.assertIn("is_admin(current_user)", source)
         self.assertIn('active_job.get("owner_username") != current_user.get("username")', source)
         self.assertIn("status_code=409", source)
-        self.assertIn('not (youtube_url or "").strip()', source)
-        self.assertIn("somente novos links do YouTube", source)
+        self.assertNotIn("youtube_url", source)
         self.assertIn("ensure_processing_queue_access(", MAIN)
         self.assertIn("data.owned_by_current_user || currentUser?.role === 'admin'", HTML)
-        self.assertIn('id="queueLinkCard"', HTML)
-        self.assertIn('id="queueYoutubeUrl"', HTML)
-        self.assertIn("Os formulários permanecem fechados.", HTML)
-        self.assertIn('formData.set(\'youtube_url\', url)', HTML)
+        self.assertIn('id="queueAddProcessCard"', HTML)
+        self.assertIn('id="btnToggleQueueCreation"', HTML)
+        self.assertIn("setCreatorMode(currentCreatorMode)", HTML)
+        self.assertIn("arquivos, links, Biblioteca e qualquer um dos três modos", HTML)
+
+    def test_finished_jobs_do_not_block_the_next_queue_item(self):
+        self.assertIn("promote_queue_cache_in_background", MAIN)
+        self.assertIn("daemon=True", MAIN)
+        self.assertIn('if job_cache and os.path.isdir(job_cache) and not pipeline.get("subtitle_only")', MAIN)
+        self.assertIn('raise RuntimeError("O processador não foi liberado pelo trabalho anterior.")', MAIN)
 
     def test_duplicate_admin_results_panel_is_not_rendered(self):
         self.assertIn('@app.get("/api/admin/results")', MAIN)
