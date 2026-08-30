@@ -96,16 +96,13 @@ def separate_vocals(audio_path: str, temp_output_dir: str, update_callback=None)
     # Nome base do arquivo de áudio para localizar o diretório de saída do Demucs
     audio_stem = Path(audio_path).stem
     
-    # Demucs salva em: <temp_output_dir>/<model_name>/<audio_stem>/
-    # O modelo padrão que usamos é o "htdemucs"
-    model_name = "htdemucs_ft"
+    # Usando o modelo "htdemucs" rápido de passagem única
+    model_name = "htdemucs"
     
-    # Montar comando do Demucs
-    # Usando o modelo padrão htdemucs, rodando apenas na CPU, e separando apenas vocals + instrumental
     cmd = [
         "demucs",
         "-d", "cpu",
-        "-n", "htdemucs_ft",
+        "-n", "htdemucs",
         "--two-stems", "vocals",
         "-o", temp_output_dir,
         audio_path
@@ -118,6 +115,7 @@ def separate_vocals(audio_path: str, temp_output_dir: str, update_callback=None)
         env = os.environ.copy()
         env["TORCH_HOME"] = "/data/output/models/torch"
         env["HF_HOME"] = "/data/output/models/huggingface"
+        env["TORCHAUDIO_BACKEND"] = "soundfile"
         
         # Executar o Demucs com streaming de logs em tempo real
         logger.info(f"Executando Demucs: {' '.join(cmd)}")
@@ -130,12 +128,6 @@ def separate_vocals(audio_path: str, temp_output_dir: str, update_callback=None)
         )
         pm.set_active_process(process)
 
-        # O htdemucs_ft é um conjunto de quatro análises. Cada uma informa
-        # 0–100%, portanto o valor bruto reinicia várias vezes. Agregamos os
-        # ciclos para que o progresso geral nunca volte para trás.
-        total_passes = 4
-        current_pass = 0
-        last_raw_pct = None
         best_stage_pct = 0
 
         import re
@@ -157,18 +149,7 @@ def separate_vocals(audio_path: str, temp_output_dir: str, update_callback=None)
                     percentages = re.findall(r'(?<!\d)(100|[1-9]?\d)%', line_str)
                     if percentages:
                         raw_pct = int(percentages[-1])
-                        if (
-                            last_raw_pct is not None
-                            and last_raw_pct >= 90
-                            and raw_pct <= 15
-                            and current_pass < total_passes - 1
-                        ):
-                            current_pass += 1
-
-                        aggregate_pct = round(
-                            ((current_pass + (raw_pct / 100)) / total_passes) * 100
-                        )
-                        aggregate_pct = max(best_stage_pct, min(99, aggregate_pct))
+                        aggregate_pct = max(best_stage_pct, min(99, raw_pct))
                         best_stage_pct = aggregate_pct
                         overall_pct = 20 + round(aggregate_pct * 0.35)
                         update_callback(
@@ -176,12 +157,8 @@ def separate_vocals(audio_path: str, temp_output_dir: str, update_callback=None)
                             "Separando vocais do áudio",
                             overall_pct,
                             stage_progress=aggregate_pct,
-                            stage_detail=(
-                                f"Análise {current_pass + 1} de {total_passes} · "
-                                f"{raw_pct}% desta análise"
-                            )
+                            stage_detail=f"Separação de vocais: {raw_pct}%"
                         )
-                        last_raw_pct = raw_pct
                 
         process.wait()
         pm.clear_active_process()
@@ -196,7 +173,7 @@ def separate_vocals(audio_path: str, temp_output_dir: str, update_callback=None)
                 "Vocais separados com sucesso",
                 55,
                 stage_progress=100,
-                stage_detail=f"{total_passes} análises locais concluídas"
+                stage_detail="Análise local do Demucs concluída"
             )
 
         logger.info("Separação do Demucs concluída com sucesso.")
