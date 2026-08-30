@@ -47,11 +47,11 @@ class DemucsFallbackAndQueueTests(unittest.TestCase):
 
             def fake_popen(command, **kwargs):
                 commands.append(command)
-                output = Path(temporary_dir) / "htdemucs" / source.stem
+                output = Path(temporary_dir) / "htdemucs_ft" / source.stem
                 output.mkdir(parents=True, exist_ok=True)
                 (output / "vocals.wav").touch()
                 (output / "no_vocals.wav").touch()
-                return FakeProcess(0, ["Selected model: htdemucs\n", "100%\n"])
+                return FakeProcess(0, ["Selected model: htdemucs_ft\n", "100%\n"])
 
             updates = []
             with patch.dict(sys.modules, {"process_manager": fake_manager}), patch.object(
@@ -69,7 +69,7 @@ class DemucsFallbackAndQueueTests(unittest.TestCase):
         self.assertIn("-d", cmd)
         self.assertIn("cpu", cmd)
         self.assertIn("-n", cmd)
-        self.assertIn("htdemucs", cmd)
+        self.assertIn("htdemucs_ft", cmd)
         self.assertIn("--two-stems", cmd)
         self.assertIn("vocals", cmd)
         self.assertTrue(vocals.endswith("vocals.wav"))
