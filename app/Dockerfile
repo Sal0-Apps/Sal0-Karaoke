@@ -2,7 +2,7 @@ FROM python:3.12-slim
 
 LABEL org.opencontainers.image.title="Sal0 Karaokê" \
       org.opencontainers.image.description="Servidor auto-hospedado para criação local de karaokê e legendas" \
-      org.opencontainers.image.version="9.0.1" \
+      org.opencontainers.image.version="9.0.2" \
       org.opencontainers.image.source="https://github.com/Sal0-Apps/Sal0-Karaoke" \
       org.opencontainers.image.licenses="MIT"
 

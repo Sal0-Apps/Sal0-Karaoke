@@ -16,6 +16,7 @@ import audio_processor
 
 MAIN = (APP / "main.py").read_text(encoding="utf-8")
 HTML = (APP / "templates" / "index.html").read_text(encoding="utf-8")
+DEMUCS_RUNNER = (APP / "demucs_runner.py").read_text(encoding="utf-8")
 
 
 class FakeProcess:
@@ -82,6 +83,13 @@ class DemucsFallbackAndQueueTests(unittest.TestCase):
         self.assertTrue(vocals.endswith("vocals.wav"))
         self.assertTrue(instrumental.endswith("no_vocals.wav"))
         self.assertTrue(any("blocos menores" in update[1].get("stage_detail", "") for update in updates))
+
+    def test_demucs_streams_long_audio_in_contextual_windows(self):
+        self.assertIn("def separate_target_stem_streaming", DEMUCS_RUNNER)
+        self.assertIn("core_seconds: float = 30.0", DEMUCS_RUNNER)
+        self.assertIn("context_seconds: float = 8.0", DEMUCS_RUNNER)
+        self.assertIn("source.read(", DEMUCS_RUNNER)
+        self.assertIn("gc.collect()", DEMUCS_RUNNER)
 
     def test_queue_removal_wakes_worker_and_cleanup_is_non_blocking(self):
         self.assertIn('target=cleanup_queue_cache_in_background', MAIN)

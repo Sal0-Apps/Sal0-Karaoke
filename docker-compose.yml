@@ -1,6 +1,6 @@
 services:
   karaoke-app:
-    image: ghcr.io/sal0-apps/sal0-karaoke:9.0.1
+    image: ghcr.io/sal0-apps/sal0-karaoke:9.0.2
     container_name: karaoke-app
     ports:
       - "7885:7860"

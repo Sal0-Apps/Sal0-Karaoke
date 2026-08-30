@@ -86,13 +86,13 @@ class VersionEightQueueTests(unittest.TestCase):
         self.assertIn('class="btn-primary"', form)
         self.assertNotIn('#ec4899', form)
 
-    def test_release_metadata_is_9_0_1(self):
-        self.assertIn("Sal0 Karaokê v9.0.1", HTML)
-        self.assertIn('.orElse("9.0.1")', ANDROID_BUILD)
-        self.assertIn('.orElse("90001")', ANDROID_BUILD)
-        self.assertIn("-PVERSION_CODE=90001", WORKFLOW)
-        self.assertIn("sal0-karaoke:9.0.1", COMPOSE)
-        self.assertIn('org.opencontainers.image.version="9.0.1"', DOCKERFILE)
+    def test_release_metadata_is_9_0_2(self):
+        self.assertIn("Sal0 Karaokê v9.0.2", HTML)
+        self.assertIn('.orElse("9.0.2")', ANDROID_BUILD)
+        self.assertIn('.orElse("90002")', ANDROID_BUILD)
+        self.assertIn("-PVERSION_CODE=90002", WORKFLOW)
+        self.assertIn("sal0-karaoke:9.0.2", COMPOSE)
+        self.assertIn('org.opencontainers.image.version="9.0.2"', DOCKERFILE)
 
     def test_generated_icon_is_committed_for_web_and_android(self):
         self.assertTrue((ROOT / "app" / "templates" / "app-icon-v8.png").is_file())
