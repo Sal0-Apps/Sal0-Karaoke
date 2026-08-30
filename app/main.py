@@ -543,13 +543,34 @@ state = {
 }
 
 PROCESSING_QUEUE_FILE = "/data/output/processing_queue.json"
+PROCESSING_QUEUE_CONTROL_FILE = "/data/output/processing_queue_control.json"
 PROCESSING_QUEUE_ROOT = "/data/output/queue_jobs"
 processing_queue_lock = threading.Lock()
 processing_queue_event = threading.Event()
 processing_queue = []
+processing_queue_paused = False
 processing_queue_worker_started = False
 ACTIVE_QUEUE_STATUSES = {"queued", "processing"}
 legacy_cache_promotion_lock = threading.Lock()
+
+
+def save_processing_queue_control_unlocked():
+    os.makedirs(os.path.dirname(PROCESSING_QUEUE_CONTROL_FILE), exist_ok=True)
+    with open(PROCESSING_QUEUE_CONTROL_FILE, "w", encoding="utf-8") as control_file:
+        json.dump({"paused": processing_queue_paused}, control_file, ensure_ascii=False, indent=2)
+
+
+def load_processing_queue_control():
+    global processing_queue_paused
+    processing_queue_paused = False
+    if not os.path.isfile(PROCESSING_QUEUE_CONTROL_FILE):
+        return
+    try:
+        with open(PROCESSING_QUEUE_CONTROL_FILE, "r", encoding="utf-8") as control_file:
+            control = json.load(control_file)
+        processing_queue_paused = bool(control.get("paused")) if isinstance(control, dict) else False
+    except Exception as exc:
+        logger.error("Não foi possível carregar o controle persistente da fila: %s", exc)
 
 
 def save_processing_queue_unlocked():
@@ -718,6 +739,8 @@ def processing_queue_worker():
 
         while True:
             with processing_queue_lock:
+                if processing_queue_paused:
+                    break
                 job = next((item for item in processing_queue if item.get("status") == "queued"), None)
                 if not job:
                     break
@@ -810,7 +833,42 @@ def get_processing_queue(current_user: dict = Depends(get_current_user)):
                 position = waiting
             if is_admin(current_user) or job.get("owner_username") == current_user.get("username"):
                 visible.append(public_queue_job(job, position))
-    return {"jobs": visible[-100:]}
+        active_job = next((job for job in processing_queue if job.get("status") == "processing"), None)
+        paused = processing_queue_paused
+    return {
+        "jobs": visible[-100:],
+        "paused": paused,
+        "pause_pending": bool(paused and active_job),
+    }
+
+
+@app.post("/api/queue/pause")
+def pause_processing_queue(current_user: dict = Depends(get_current_user)):
+    require_admin(current_user)
+    global processing_queue_paused
+    with processing_queue_lock:
+        processing_queue_paused = True
+        active_job = next((job for job in processing_queue if job.get("status") == "processing"), None)
+        save_processing_queue_control_unlocked()
+    return {
+        "status": "pause_pending" if active_job else "paused",
+        "message": (
+            "A fila será pausada quando o processo atual terminar."
+            if active_job else
+            "A fila está pausada e permanecerá assim após reiniciar o servidor."
+        ),
+    }
+
+
+@app.post("/api/queue/resume")
+def resume_processing_queue(current_user: dict = Depends(get_current_user)):
+    require_admin(current_user)
+    global processing_queue_paused
+    with processing_queue_lock:
+        processing_queue_paused = False
+        save_processing_queue_control_unlocked()
+    processing_queue_event.set()
+    return {"status": "resumed", "message": "A fila foi retomada."}
 
 
 @app.delete("/api/queue/{job_id}")
@@ -1123,6 +1181,7 @@ def startup_event():
         except Exception as e:
             logger.error(f"Erro ao carregar estado inicial no startup: {e}")
     with processing_queue_lock:
+        load_processing_queue_control()
         load_processing_queue()
     start_processing_queue_worker()
 
@@ -2009,7 +2068,7 @@ def download_bg_youtube_preset(
 
 
 LRCLIB_API_URL = "https://lrclib.net/api"
-LRCLIB_USER_AGENT = "Sal0-Karaoke/8.5.1 (+https://github.com/Sal0-Apps/Sal0-Karaoke)"
+LRCLIB_USER_AGENT = "Sal0-Karaoke/8.5.2 (+https://github.com/Sal0-Apps/Sal0-Karaoke)"
 LYRICS_OVH_API_URL = "https://api.lyrics.ovh/v1"
 LYRICS_PROVIDER_TIMEOUT = (3.05, 6)
 MUSIXMATCH_API_URL = "https://apic-desktop.musixmatch.com/ws/1.1"
@@ -2437,7 +2496,7 @@ def delete_lyrics_server(current_user: dict = Depends(get_current_user)):
 
 
 
-# Sistema de Logs de Diagnóstico v8.5.1
+# Sistema de Logs de Diagnóstico v8.5.2
 DIAGNOSTIC_LOG_FILE = "/data/output/app_diagnostic.log"
 
 def log_diagnostic(message: str, level: str = "INFO"):
@@ -2473,7 +2532,7 @@ def download_diagnostic_logs(current_user: dict = Depends(get_current_user)):
     with state_lock:
         current_state = dict(state)
     report = "\n".join([
-"Sal0 Karaokê v8.5.1 — diagnóstico ao vivo",
+"Sal0 Karaokê v8.5.2 — diagnóstico ao vivo",
         f"Gerado em: {time.strftime('%Y-%m-%d %H:%M:%S')}",
         "",
         "=== ESTADO ATUAL ===",
@@ -4810,6 +4869,10 @@ def run_pipeline(
             if auto_lyrics:
                 lyrics_text = auto_lyrics
                 update_process_summary(lyrics="Letra-guia + Whisper")
+                notify_targets(
+                    telegram_targets,
+                    f"📖 <b>Sal0 Karaokê</b>: letra-guia encontrada para <b>{orig_name}</b>.",
+                )
                 cached_meta["lyrics_text"] = auto_lyrics
                 try:
                     with open(cache_meta_file, "w", encoding="utf-8") as f:
@@ -4825,7 +4888,22 @@ def run_pipeline(
                     logger.warning("A letra automática foi encontrada, mas não pôde ser salva: %s", save_error)
             else:
                 update_process_summary(lyrics="Somente Whisper")
+                notify_targets(
+                    telegram_targets,
+                    f"📖 <b>Sal0 Karaokê</b>: nenhuma letra-guia foi encontrada para <b>{orig_name}</b>; "
+                    "o processamento seguirá somente com o Whisper.",
+                )
                 logger.info("Seguindo sem letra guia automática para '%s'.", orig_name)
+        elif lyrics_text:
+            notify_targets(
+                telegram_targets,
+                f"📖 <b>Sal0 Karaokê</b>: letra-guia manual recebida para <b>{orig_name}</b>.",
+            )
+        else:
+            notify_targets(
+                telegram_targets,
+                f"📖 <b>Sal0 Karaokê</b>: <b>{orig_name}</b> será processado sem letra-guia.",
+            )
 
         # Invalidação Inteligente de Cache: comparar o hash/tamanho do arquivo de entrada atual com o cache
         new_audio_hash = None

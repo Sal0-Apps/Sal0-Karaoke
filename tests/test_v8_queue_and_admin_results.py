@@ -37,8 +37,8 @@ class VersionEightQueueTests(unittest.TestCase):
         self.assertIn('processing_queue.remove(job)', MAIN)
         self.assertIn('job.get("status") in ACTIVE_QUEUE_STATUSES', MAIN)
         self.assertIn('id="queueCard" style="display: none;"', HTML)
-        self.assertIn("card.style.display = activeJobs.length > 1 ? '' : 'none';", HTML)
-        self.assertIn("if (activeJobs.length <= 1)", HTML)
+        self.assertIn("activeJobs.length > 1 || (adminCanControl && processingQueuePaused)", HTML)
+        self.assertIn("if (activeJobs.length <= 1 && !processingQueuePaused)", HTML)
         self.assertNotIn("queueResultUrl", HTML)
 
     def test_queue_accepts_owner_and_admin_but_blocks_other_profiles(self):
@@ -86,13 +86,13 @@ class VersionEightQueueTests(unittest.TestCase):
         self.assertIn('class="btn-primary"', form)
         self.assertNotIn('#ec4899', form)
 
-    def test_web_and_docker_are_8_5_while_android_source_remains_unchanged(self):
-        self.assertIn("Sal0 Karaokê v8.5.1", HTML)
-        self.assertIn('.orElse("8.5.1")', ANDROID_BUILD)
-        self.assertIn('.orElse("80501")', ANDROID_BUILD)
-        self.assertIn("-PVERSION_CODE=80501", WORKFLOW)
-        self.assertIn("sal0-karaoke:8.5.1", COMPOSE)
-        self.assertIn('org.opencontainers.image.version="8.5.1"', DOCKERFILE)
+    def test_release_metadata_is_8_5_2(self):
+        self.assertIn("Sal0 Karaokê v8.5.2", HTML)
+        self.assertIn('.orElse("8.5.2")', ANDROID_BUILD)
+        self.assertIn('.orElse("80502")', ANDROID_BUILD)
+        self.assertIn("-PVERSION_CODE=80502", WORKFLOW)
+        self.assertIn("sal0-karaoke:8.5.2", COMPOSE)
+        self.assertIn('org.opencontainers.image.version="8.5.2"', DOCKERFILE)
 
     def test_generated_icon_is_committed_for_web_and_android(self):
         self.assertTrue((ROOT / "app" / "templates" / "app-icon-v8.png").is_file())

@@ -88,6 +88,23 @@ class DemucsFallbackAndQueueTests(unittest.TestCase):
         self.assertIn("Mover para cima", HTML)
         self.assertIn("Mover para baixo", HTML)
 
+    def test_queue_pause_is_persistent_and_admin_controlled(self):
+        self.assertIn('PROCESSING_QUEUE_CONTROL_FILE = "/data/output/processing_queue_control.json"', MAIN)
+        self.assertIn('@app.post("/api/queue/pause")', MAIN)
+        self.assertIn('@app.post("/api/queue/resume")', MAIN)
+        self.assertIn("require_admin(current_user)", MAIN)
+        self.assertIn("if processing_queue_paused:", MAIN)
+        self.assertIn("load_processing_queue_control()", MAIN)
+        self.assertIn("async function toggleProcessingQueuePause", HTML)
+        self.assertIn("Pausar para atualização", HTML)
+
+    def test_telegram_reports_automatic_lyrics_result(self):
+        self.assertIn("letra-guia encontrada para", MAIN)
+        self.assertIn("nenhuma letra-guia foi encontrada para", MAIN)
+        self.assertIn("o processamento seguirá somente com o Whisper", MAIN)
+        self.assertIn("letra-guia manual recebida para", MAIN)
+        self.assertIn("será processado sem letra-guia", MAIN)
+
     def test_mobile_process_summary_wraps_complete_values(self):
         self.assertIn(".process-summary { grid-template-columns: 1fr; }", HTML)
         self.assertIn("white-space: normal;", HTML)

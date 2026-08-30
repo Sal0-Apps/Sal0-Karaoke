@@ -1374,6 +1374,20 @@
             opacity: 0.35;
             cursor: not-allowed;
         }
+        .queue-maintenance-control {
+            display: none;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.7rem;
+            flex-wrap: wrap;
+            margin-top: 0.9rem;
+            padding: 0.75rem;
+            border: 1px solid rgba(73, 174, 239, 0.24);
+            border-radius: 12px;
+            background: rgba(73, 174, 239, 0.07);
+        }
+        .queue-maintenance-control .compact-note { flex: 1 1 220px; margin: 0; }
+        .btn-queue-pause { width: auto; }
         .line-glyph { color: var(--accent); text-shadow: 0 0 12px var(--accent-glow); }
         .quick-choice-icon,
         .creator-mode-icon,
@@ -1884,6 +1898,10 @@
                     <span id="queueCountBadge" class="queue-status">0 aguardando</span>
                 </div>
                 <p class="compact-note" style="margin-bottom: 0.8rem;">Selecione vários arquivos de uma vez. O servidor prepara um vídeo por vez, sem sobrescrever os demais.</p>
+                <div class="queue-maintenance-control">
+                    <span class="compact-note queue-pause-status">A fila está ativa.</span>
+                    <button type="button" class="btn-secondary btn-queue-pause">⏸ Pausar para atualização</button>
+                </div>
                 <div id="processingQueueList" class="queue-list"><span class="compact-note">A fila está vazia.</span></div>
             </div>
 
@@ -1917,6 +1935,11 @@
 
                 <div class="progress-bar-bg" role="progressbar" aria-label="Progresso total do processo" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
                     <div class="progress-bar-fill" id="progressBarFill"></div>
+                </div>
+
+                <div class="queue-maintenance-control">
+                    <span class="compact-note queue-pause-status">A fila está ativa.</span>
+                    <button type="button" class="btn-secondary btn-queue-pause">⏸ Pausar para atualização</button>
                 </div>
 
                 <!-- Botão Cancelar -->
@@ -2263,7 +2286,7 @@
 
         <!-- RODAPÉ DISCRETO DA PÁGINA -->
         <footer>
-                     Sal0 Karaokê v8.5.1
+                     Sal0 Karaokê v8.5.2
         </footer>
 
     </div> <!-- Container End -->
@@ -2368,6 +2391,8 @@
         let queueCreationExpanded = false;
         let youtubeToolsPollTimer = null;
         let processingQueuePollTimer = null;
+        let processingQueuePaused = false;
+        let processingQueuePausePending = false;
 
         function escapeHtml(value) {
             return String(value ?? '').replace(/[&<>'"]/g, char => ({
@@ -3223,16 +3248,33 @@
             return job.status || 'Desconhecido';
         }
 
-        function renderProcessingQueue(jobs) {
+        function renderProcessingQueue(jobs, queueState = {}) {
             const card = document.getElementById('queueCard');
             const container = document.getElementById('processingQueueList');
             const badge = document.getElementById('queueCountBadge');
             if (!card || !container || !badge) return;
             const activeJobs = jobs.filter(job => ['queued', 'processing'].includes(job.status));
             const queuedCount = activeJobs.filter(job => job.status === 'queued').length;
-            card.style.display = activeJobs.length > 1 ? '' : 'none';
-            badge.textContent = `${queuedCount} aguardando`;
-            if (activeJobs.length <= 1) {
+            processingQueuePaused = Boolean(queueState.paused);
+            processingQueuePausePending = Boolean(queueState.pause_pending);
+            const adminCanControl = currentUser?.role === 'admin';
+            document.querySelectorAll('.queue-maintenance-control').forEach(control => {
+                control.style.display = adminCanControl ? 'flex' : 'none';
+            });
+            document.querySelectorAll('.queue-pause-status').forEach(status => {
+                status.textContent = processingQueuePaused
+                    ? (processingQueuePausePending
+                        ? 'Pausa programada: o processo atual terminará, mas o próximo não começará.'
+                        : 'Fila pausada e protegida para reinício ou atualização do servidor.')
+                    : 'Fila ativa: novos itens começam automaticamente.';
+            });
+            document.querySelectorAll('.btn-queue-pause').forEach(button => {
+                button.textContent = processingQueuePaused ? '▶ Retomar fila' : '⏸ Pausar para atualização';
+                button.onclick = toggleProcessingQueuePause;
+            });
+            card.style.display = activeJobs.length > 1 || (adminCanControl && processingQueuePaused) ? '' : 'none';
+            badge.textContent = processingQueuePaused ? `${queuedCount} pausados` : `${queuedCount} aguardando`;
+            if (activeJobs.length <= 1 && !processingQueuePaused) {
                 container.replaceChildren();
                 return;
             }
@@ -3262,13 +3304,29 @@
                 if (!response.ok) return;
                 const data = await response.json();
                 const jobs = data.jobs || [];
-                renderProcessingQueue(jobs);
+                renderProcessingQueue(jobs, data);
                 clearTimeout(processingQueuePollTimer);
-                if (jobs.some(job => ['queued', 'processing'].includes(job.status))) {
+                if (data.paused || jobs.some(job => ['queued', 'processing'].includes(job.status))) {
                     processingQueuePollTimer = setTimeout(fetchProcessingQueue, 3000);
                 }
             } catch (error) {
                 console.error('Erro ao consultar a fila:', error);
+            }
+        }
+
+        async function toggleProcessingQueuePause() {
+            const action = processingQueuePaused ? 'resume' : 'pause';
+            document.querySelectorAll('.btn-queue-pause').forEach(button => { button.disabled = true; });
+            try {
+                const response = await authFetch(`/api/queue/${action}`, { method: 'POST' });
+                const data = await response.json().catch(() => ({}));
+                if (!response.ok) throw new Error(data.detail || 'Não foi possível alterar o estado da fila.');
+                await fetchProcessingQueue();
+                alert(data.message || (action === 'pause' ? 'Pausa programada.' : 'Fila retomada.'));
+            } catch (error) {
+                alert(`Erro ao controlar a fila: ${error.message}`);
+            } finally {
+                document.querySelectorAll('.btn-queue-pause').forEach(button => { button.disabled = false; });
             }
         }
 
