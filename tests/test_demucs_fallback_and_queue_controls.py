@@ -32,7 +32,7 @@ class FakeProcess:
 
 
 class DemucsFallbackAndQueueTests(unittest.TestCase):
-    def test_demucs_retries_with_lower_memory_model_and_preserves_diagnostics(self):
+    def test_demucs_runs_fine_tuned_models_sequentially_and_preserves_diagnostics(self):
         commands = []
         fake_manager = types.SimpleNamespace(
             cancel_event=threading.Event(),
@@ -48,18 +48,22 @@ class DemucsFallbackAndQueueTests(unittest.TestCase):
             def fake_popen(command, **kwargs):
                 commands.append(command)
                 model = command[command.index("--model") + 1]
-                if "--segment" not in command:
+                target = command[command.index("--target-stem") + 1]
+                if model == "d12395a8" and "--segment" not in command:
                     return FakeProcess(1, ["RuntimeError: insufficient resources\n"])
                 output = Path(command[command.index("--output") + 1]) / model / source.stem
                 output.mkdir(parents=True)
-                (output / "vocals.wav").touch()
-                (output / "no_vocals.wav").touch()
-                return FakeProcess(0, ["100%\n"])
+                (output / f"{target}.wav").touch()
+                return FakeProcess(0, ["DEMUCS_PROGRESS 100%\n"])
+
+            def fake_combine(input_paths, output_path):
+                output_path.parent.mkdir(parents=True, exist_ok=True)
+                output_path.touch()
 
             updates = []
             with patch.dict(sys.modules, {"process_manager": fake_manager}), patch.object(
                 audio_processor.subprocess, "Popen", side_effect=fake_popen
-            ):
+            ), patch.object(audio_processor, "combine_demucs_stems", side_effect=fake_combine):
                 vocals, instrumental = audio_processor.separate_vocals(
                     str(source),
                     temporary_dir,
@@ -68,12 +72,16 @@ class DemucsFallbackAndQueueTests(unittest.TestCase):
 
         self.assertEqual(
             [command[command.index("--model") + 1] for command in commands],
-            ["htdemucs_ft", "htdemucs_ft"],
+            ["f7e0c4bc", "d12395a8", "d12395a8", "92cfc3b6", "04573f0d"],
         )
-        self.assertIn("--segment", commands[1])
+        self.assertEqual(
+            [command[command.index("--target-stem") + 1] for command in commands],
+            ["drums", "bass", "bass", "other", "vocals"],
+        )
+        self.assertIn("--segment", commands[2])
         self.assertTrue(vocals.endswith("vocals.wav"))
         self.assertTrue(instrumental.endswith("no_vocals.wav"))
-        self.assertTrue(any("mesmo modelo de alta precisão" in update[1].get("stage_detail", "") for update in updates))
+        self.assertTrue(any("blocos menores" in update[1].get("stage_detail", "") for update in updates))
 
     def test_queue_removal_wakes_worker_and_cleanup_is_non_blocking(self):
         self.assertIn('target=cleanup_queue_cache_in_background', MAIN)

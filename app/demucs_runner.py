@@ -9,11 +9,19 @@ from demucs.api import Separator
 from demucs.audio import prevent_clip
 
 
-def save_wav(path: Path, waveform: torch.Tensor, sample_rate: int) -> None:
-    waveform = prevent_clip(waveform.detach().cpu(), mode="rescale")
+def save_wav(
+    path: Path,
+    waveform: torch.Tensor,
+    sample_rate: int,
+    *,
+    preserve_float: bool = False,
+) -> None:
+    waveform = waveform.detach().cpu()
+    if not preserve_float:
+        waveform = prevent_clip(waveform, mode="rescale")
     samples = waveform.transpose(0, 1).numpy()
     path.parent.mkdir(parents=True, exist_ok=True)
-    sf.write(path, samples, sample_rate, subtype="PCM_16")
+    sf.write(path, samples, sample_rate, subtype="FLOAT" if preserve_float else "PCM_16")
 
 
 def main() -> None:
@@ -22,6 +30,7 @@ def main() -> None:
     parser.add_argument("--output", required=True)
     parser.add_argument("--model", default="htdemucs_ft")
     parser.add_argument("--segment", type=int)
+    parser.add_argument("--target-stem", choices=("drums", "bass", "other", "vocals"))
     args = parser.parse_args()
 
     last_percent = -1
@@ -52,6 +61,19 @@ def main() -> None:
         callback=report_progress,
     )
     original, separated = separator.separate_audio_file(Path(args.input))
+    output_folder = Path(args.output) / args.model / Path(args.input).stem
+    if args.target_stem:
+        if args.target_stem not in separated:
+            raise RuntimeError(f"Stem ausente no resultado do Demucs: {args.target_stem}")
+        save_wav(
+            output_folder / f"{args.target_stem}.wav",
+            separated[args.target_stem],
+            separator.samplerate,
+            preserve_float=True,
+        )
+        print("DEMUCS_PROGRESS 100%", flush=True)
+        return
+
     vocals = separated["vocals"]
     accompaniment = torch.zeros_like(vocals)
     for name, stem in separated.items():
@@ -60,7 +82,6 @@ def main() -> None:
     if not any(name != "vocals" for name in separated):
         accompaniment = original - vocals
 
-    output_folder = Path(args.output) / args.model / Path(args.input).stem
     save_wav(output_folder / "vocals.wav", vocals, separator.samplerate)
     save_wav(output_folder / "no_vocals.wav", accompaniment, separator.samplerate)
     print("DEMUCS_PROGRESS 100%", flush=True)
