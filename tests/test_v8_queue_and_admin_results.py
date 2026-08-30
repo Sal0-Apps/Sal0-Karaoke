@@ -87,12 +87,12 @@ class VersionEightQueueTests(unittest.TestCase):
         self.assertNotIn('#ec4899', form)
 
     def test_web_and_docker_are_8_5_while_android_source_remains_unchanged(self):
-        self.assertIn("Sal0 Karaokê v8.5.0", HTML)
-        self.assertIn('.orElse("8.0.0")', ANDROID_BUILD)
-        self.assertIn('.orElse("80000")', ANDROID_BUILD)
-        self.assertIn("-PVERSION_CODE=80000", WORKFLOW)
-        self.assertIn("sal0-karaoke:8.5.0", COMPOSE)
-        self.assertIn('org.opencontainers.image.version="8.5.0"', DOCKERFILE)
+        self.assertIn("Sal0 Karaokê v8.5.1", HTML)
+        self.assertIn('.orElse("8.5.1")', ANDROID_BUILD)
+        self.assertIn('.orElse("80501")', ANDROID_BUILD)
+        self.assertIn("-PVERSION_CODE=80501", WORKFLOW)
+        self.assertIn("sal0-karaoke:8.5.1", COMPOSE)
+        self.assertIn('org.opencontainers.image.version="8.5.1"', DOCKERFILE)
 
     def test_generated_icon_is_committed_for_web_and_android(self):
         self.assertTrue((ROOT / "app" / "templates" / "app-icon-v8.png").is_file())

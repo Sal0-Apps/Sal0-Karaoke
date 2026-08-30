@@ -706,6 +706,11 @@ def promote_queue_cache_in_background(job_cache: str, owner: dict):
         remove_finished_queue_cache(job_cache)
 
 
+def cleanup_queue_cache_in_background(job_cache: str | None):
+    """Remove o cache isolado sem impedir que o próximo trabalho seja iniciado."""
+    remove_finished_queue_cache(job_cache)
+
+
 def processing_queue_worker():
     while True:
         processing_queue_event.wait(timeout=2)
@@ -773,7 +778,13 @@ def processing_queue_worker():
                     job["subtitle_filename"] = final_subtitle_filename
                 save_processing_queue_unlocked()
             if not deferred_cache_cleanup:
-                remove_finished_queue_cache(pipeline.get("cache_dir"))
+                threading.Thread(
+                    target=cleanup_queue_cache_in_background,
+                    args=(pipeline.get("cache_dir"),),
+                    daemon=True,
+                    name=f"cache-cleanup-{job.get('id', 'job')}",
+                ).start()
+            processing_queue_event.set()
 
 
 def start_processing_queue_worker():
@@ -816,8 +827,61 @@ def remove_queued_job(job_id: str, current_user: dict = Depends(get_current_user
         cache_dir = (job.get("pipeline") or {}).get("cache_dir")
         processing_queue.remove(job)
         save_processing_queue_unlocked()
-    remove_finished_queue_cache(cache_dir)
+    threading.Thread(
+        target=cleanup_queue_cache_in_background,
+        args=(cache_dir,),
+        daemon=True,
+        name=f"queue-remove-{job_id}",
+    ).start()
+    processing_queue_event.set()
     return {"status": "cancelled"}
+
+
+class QueueMoveRequest(BaseModel):
+    direction: str
+
+
+@app.patch("/api/queue/{job_id}/position")
+def move_queued_job(
+    job_id: str,
+    payload: QueueMoveRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    direction = payload.direction.strip().lower()
+    if direction not in {"up", "down"}:
+        raise HTTPException(status_code=422, detail="Direção inválida para a fila.")
+
+    with processing_queue_lock:
+        job = next((item for item in processing_queue if item.get("id") == job_id), None)
+        if not job:
+            raise HTTPException(status_code=404, detail="Item da fila não encontrado.")
+        if job.get("status") != "queued":
+            raise HTTPException(status_code=409, detail="Somente itens aguardando podem mudar de posição.")
+        if not (is_admin(current_user) or job.get("owner_username") == current_user.get("username")):
+            raise HTTPException(status_code=403, detail="Este item pertence a outro usuário.")
+
+        eligible_indexes = [
+            index for index, queued_job in enumerate(processing_queue)
+            if queued_job.get("status") == "queued"
+            and (
+                is_admin(current_user)
+                or queued_job.get("owner_username") == current_user.get("username")
+            )
+        ]
+        current_index = processing_queue.index(job)
+        current_position = eligible_indexes.index(current_index)
+        target_position = current_position + (-1 if direction == "up" else 1)
+        if target_position < 0 or target_position >= len(eligible_indexes):
+            raise HTTPException(status_code=409, detail="O item já está no limite permitido da fila.")
+        target_index = eligible_indexes[target_position]
+        processing_queue[current_index], processing_queue[target_index] = (
+            processing_queue[target_index],
+            processing_queue[current_index],
+        )
+        save_processing_queue_unlocked()
+
+    processing_queue_event.set()
+    return {"status": "moved", "direction": direction}
 
 # Evento global para pausar e continuar o processamento (revisão de legenda)
 correction_event = threading.Event()
@@ -1945,7 +2009,7 @@ def download_bg_youtube_preset(
 
 
 LRCLIB_API_URL = "https://lrclib.net/api"
-LRCLIB_USER_AGENT = "Sal0-Karaoke/8.5.0 (+https://github.com/Sal0-Apps/Sal0-Karaoke)"
+LRCLIB_USER_AGENT = "Sal0-Karaoke/8.5.1 (+https://github.com/Sal0-Apps/Sal0-Karaoke)"
 LYRICS_OVH_API_URL = "https://api.lyrics.ovh/v1"
 LYRICS_PROVIDER_TIMEOUT = (3.05, 6)
 MUSIXMATCH_API_URL = "https://apic-desktop.musixmatch.com/ws/1.1"
@@ -2373,7 +2437,7 @@ def delete_lyrics_server(current_user: dict = Depends(get_current_user)):
 
 
 
-# Sistema de Logs de Diagnóstico v8.5.0
+# Sistema de Logs de Diagnóstico v8.5.1
 DIAGNOSTIC_LOG_FILE = "/data/output/app_diagnostic.log"
 
 def log_diagnostic(message: str, level: str = "INFO"):
@@ -2409,7 +2473,7 @@ def download_diagnostic_logs(current_user: dict = Depends(get_current_user)):
     with state_lock:
         current_state = dict(state)
     report = "\n".join([
-"Sal0 Karaokê v8.5.0 — diagnóstico ao vivo",
+"Sal0 Karaokê v8.5.1 — diagnóstico ao vivo",
         f"Gerado em: {time.strftime('%Y-%m-%d %H:%M:%S')}",
         "",
         "=== ESTADO ATUAL ===",
@@ -3492,6 +3556,7 @@ def cancel_process(current_user: dict = Depends(get_current_user)):
 
     # 4. Atualizar o estado do servidor para idle
     update_state("idle", "Idle", 0, error_message="Cancelado pelo usuário.")
+    processing_queue_event.set()
 
     # O worker libera o lock no bloco finally, depois de realmente encerrar.
     return {"status": "success", "message": "Processamento cancelado com sucesso."}
@@ -4388,7 +4453,13 @@ def run_subtitle_srt_pipeline(
 
     if original_segments is None:
         pm.check_cancelled()
-        update_state("processing", "Transcribing complete MP3", 45)
+        update_state(
+            "processing",
+            "Transcribing complete MP3",
+            45,
+            stage_progress=0,
+            stage_detail="Carregando o modelo Whisper e preparando o áudio",
+        )
         notify_targets(
             telegram_targets,
             f"✍️ <b>Sal0 Karaokê</b>: Transcrevendo o áudio completo de <b>{orig_name}</b>.",
@@ -4819,7 +4890,7 @@ def run_pipeline(
                     "Separando vocais do áudio",
                     20,
                     stage_progress=0,
-                    stage_detail="Preparando 4 análises locais"
+                    stage_detail="Preparando quatro análises locais de alta precisão"
                 )
                 notify_targets(telegram_targets, "✂️ <b>Sal0 Karaokê</b>: Iniciando a separação local de vocais")
                 with tempfile.TemporaryDirectory() as demucs_tmp:
@@ -4899,13 +4970,25 @@ def run_pipeline(
                         import json
                         segments = json.load(f)
                     logger.info("Aproveitando transcrição do Whisper do cache.")
-                    update_state("processing", "Transcribing vocals (cached)", 70)
+                    update_state(
+                        "processing",
+                        "Transcribing vocals (cached)",
+                        70,
+                        stage_progress=100,
+                        stage_detail="Transcrição recuperada do cache",
+                    )
                 except Exception as e:
                     logger.error(f"Erro ao ler cache de segmentos transcritos: {e}")
 
             if segments is None:
                 pm.check_cancelled()
-                update_state("processing", "Transcribing vocals", 70)
+                update_state(
+                    "processing",
+                    "Transcribing vocals",
+                    65,
+                    stage_progress=0,
+                    stage_detail="Carregando o modelo Whisper e preparando o áudio",
+                )
                 notify_targets(telegram_targets, f"✍️ <b>Sal0 Karaokê</b>: Transcrevendo voz ({whisper_model}) (70%)")
 
                 transcribe_audio = vocals_wav if transcribe_source == "vocals" else converted_wav
@@ -4913,9 +4996,21 @@ def run_pipeline(
 
                 # Verificar status do modelo Whisper com is_model_downloaded() para exibir a mensagem correta na UI
                 if is_model_downloaded(whisper_model):
-                    update_state("processing", f"Carregando Modelo Whisper {whisper_model} do disco e transcrevendo voz...", 65)
+                    update_state(
+                        "processing",
+                        f"Carregando Modelo Whisper {whisper_model} do disco e transcrevendo voz...",
+                        65,
+                        stage_progress=0,
+                        stage_detail="Carregando o modelo Whisper do armazenamento local",
+                    )
                 else:
-                    update_state("processing", f"Baixando Modelo de IA Whisper {whisper_model} no servidor...", 65)
+                    update_state(
+                        "processing",
+                        f"Baixando Modelo de IA Whisper {whisper_model} no servidor...",
+                        65,
+                        stage_progress=0,
+                        stage_detail="Baixando o modelo Whisper antes da transcrição",
+                    )
 
                 quality_preset = "max_quality" if whisper_model == "large-v3" else "standard"
                 def publish_whisper_progress(percent: int, elapsed: float, total: float):

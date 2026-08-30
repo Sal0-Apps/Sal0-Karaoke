@@ -1297,8 +1297,14 @@
             .quick-background-presets { grid-template-columns: 1fr; }
             .quick-source-grid #easyAudioYoutubeBox,
             .quick-background-grid .quick-youtube-background { grid-column: auto; }
-            .process-summary { grid-template-columns: 1fr 1fr; }
-            .process-summary-item:first-child { grid-column: 1 / -1; }
+            .process-summary { grid-template-columns: 1fr; }
+            .process-summary-item:first-child { grid-column: auto; }
+            .process-summary-item span:last-child {
+                overflow: visible;
+                text-overflow: clip;
+                white-space: normal;
+                overflow-wrap: anywhere;
+            }
             .library-youtube-row { align-items: stretch; flex-direction: column; }
             .library-youtube-row .btn-primary { width: 100%; }
         }
@@ -1358,6 +1364,15 @@
             background: rgba(73, 174, 239, 0.1);
             font-size: 0.68rem;
             font-weight: 800;
+        }
+        .queue-move-btn {
+            min-width: 2.35rem;
+            padding: 0.42rem 0.58rem;
+            font-size: 0.82rem;
+        }
+        .queue-move-btn:disabled {
+            opacity: 0.35;
+            cursor: not-allowed;
         }
         .line-glyph { color: var(--accent); text-shadow: 0 0 12px var(--accent-glow); }
         .quick-choice-icon,
@@ -2248,7 +2263,7 @@
 
         <!-- RODAPÉ DISCRETO DA PÁGINA -->
         <footer>
-                     Sal0 Karaokê v8.5.0
+                     Sal0 Karaokê v8.5.1
         </footer>
 
     </div> <!-- Container End -->
@@ -3221,6 +3236,8 @@
                 container.replaceChildren();
                 return;
             }
+            const queuedJobs = activeJobs.filter(job => job.status === 'queued');
+            const queuedOrder = new Map(queuedJobs.map((job, index) => [job.id, index]));
             container.innerHTML = activeJobs.slice(0, 20).map(job => `
                 <div class="queue-item">
                     <div>
@@ -3229,7 +3246,11 @@
                     </div>
                     <div class="queue-actions">
                         <span class="queue-status">${escapeHtml(queueStatusLabel(job))}</span>
-                        ${job.status === 'queued' ? `<button type="button" class="btn-secondary" onclick="removeQueuedJob('${encodeURIComponent(job.id)}')">Remover</button>` : ''}
+                        ${job.status === 'queued' ? `
+                            <button type="button" class="btn-secondary queue-move-btn" title="Mover para cima" aria-label="Mover ${escapeHtml(job.title || 'item')} para cima" ${queuedOrder.get(job.id) === 0 ? 'disabled' : ''} onclick="moveQueuedJob('${encodeURIComponent(job.id)}', 'up')">↑</button>
+                            <button type="button" class="btn-secondary queue-move-btn" title="Mover para baixo" aria-label="Mover ${escapeHtml(job.title || 'item')} para baixo" ${queuedOrder.get(job.id) === queuedJobs.length - 1 ? 'disabled' : ''} onclick="moveQueuedJob('${encodeURIComponent(job.id)}', 'down')">↓</button>
+                            <button type="button" class="btn-secondary" onclick="removeQueuedJob('${encodeURIComponent(job.id)}')">Remover</button>
+                        ` : ''}
                     </div>
                 </div>
             `).join('');
@@ -3256,6 +3277,20 @@
             const data = await response.json().catch(() => ({}));
             if (!response.ok) {
                 alert(data.detail || 'Não foi possível remover o item da fila.');
+                return;
+            }
+            await fetchProcessingQueue();
+        }
+
+        async function moveQueuedJob(jobId, direction) {
+            const response = await authFetch(`/api/queue/${jobId}/position`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ direction }),
+            });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                alert(data.detail || 'Não foi possível alterar a ordem da fila.');
                 return;
             }
             await fetchProcessingQueue();

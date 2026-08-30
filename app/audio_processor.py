@@ -1,6 +1,9 @@
 import os
 import subprocess
 import logging
+import re
+import sys
+from collections import deque
 from pathlib import Path
 
 logger = logging.getLogger("karaoke")
@@ -91,133 +94,136 @@ def extract_audio_mp3(input_path: str, output_mp3_path: str) -> str:
         raise
 
 def separate_vocals(audio_path: str, temp_output_dir: str, update_callback=None) -> tuple[str, str]:
-    """Usa Demucs em modo CPU para separar o áudio em vocais e instrumental (no_vocals)."""
-    logger.info(f"Iniciando a separação de vocais com Demucs para: {audio_path}")
-    
-    # Nome base do arquivo de áudio para localizar o diretório de saída do Demucs
+    """Separa vocais com o htdemucs_ft e repete em blocos menores se necessário."""
+    logger.info("Iniciando a separação de vocais com Demucs para: %s", audio_path)
     audio_stem = Path(audio_path).stem
-    
-    # Demucs salva em: <temp_output_dir>/<model_name>/<audio_stem>/
-    # O modelo padrão que usamos é o "htdemucs"
-    model_name = "htdemucs_ft"
-    
-    # Montar comando do Demucs
-    # Usando o modelo padrão htdemucs, rodando apenas na CPU, e separando apenas vocals + instrumental
-    cmd = [
-        "demucs",
-        "-d", "cpu",
-        "-n", "htdemucs_ft",
-        "--two-stems", "vocals",
-        "-o", temp_output_dir,
-        audio_path
-    ]
-    
     import process_manager as pm
     pm.check_cancelled()
+
+    env = os.environ.copy()
+    env["TORCH_HOME"] = "/data/output/models/torch"
+    env["HF_HOME"] = "/data/output/models/huggingface"
+    env["TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD"] = "1"
+    attempts = [
+        {"model": "htdemucs_ft", "segment": None},
+        {"model": "htdemucs_ft", "segment": "5"},
+    ]
+    failure_summaries = []
+
     try:
-        # Configurar variáveis de ambiente para salvar modelos do PyTorch/Demucs no disco persistente
-        env = os.environ.copy()
-        env["TORCH_HOME"] = "/data/output/models/torch"
-        env["HF_HOME"] = "/data/output/models/huggingface"
-        # Os checkpoints oficiais legados do Demucs usam o formato pickle.
-        # Esta exceção fica restrita ao subprocesso que baixa modelos da Meta;
-        # uploads do usuário nunca são tratados como checkpoints PyTorch.
-        env["TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD"] = "1"
-        
-        # Executar o Demucs com streaming de logs em tempo real
-        logger.info(f"Executando Demucs: {' '.join(cmd)}")
-        process = subprocess.Popen(
-            cmd,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
-            env=env
-        )
-        pm.set_active_process(process)
+        for attempt_index, attempt in enumerate(attempts):
+            model_name = attempt["model"]
+            total_passes = 1
+            runner_path = Path(__file__).with_name("demucs_runner.py")
+            cmd = [
+                sys.executable,
+                str(runner_path),
+                audio_path,
+                "--output", temp_output_dir,
+                "--model", model_name,
+            ]
+            if attempt["segment"]:
+                cmd.extend(["--segment", attempt["segment"]])
 
-        # O htdemucs_ft é um conjunto de quatro análises. Cada uma informa
-        # 0–100%, portanto o valor bruto reinicia várias vezes. Agregamos os
-        # ciclos para que o progresso geral nunca volte para trás.
-        total_passes = 4
-        current_pass = 0
-        last_raw_pct = None
-        best_stage_pct = 0
+            if attempt_index and update_callback:
+                update_callback(
+                    "processing",
+                    "Repetindo separação de vocais",
+                    20,
+                    stage_progress=0,
+                    stage_detail="Repetindo o mesmo modelo de alta precisão em blocos menores",
+                )
 
-        import re
-        for line in process.stdout:
-            if pm.cancel_event.is_set():
-                process.terminate()
-                break
-            line_str = line.strip()
-            if line_str:
-                logger.info(f"[Demucs] {line_str}")
+            logger.info("Executando Demucs (%s): %s", model_name, " ".join(cmd))
+            process = subprocess.Popen(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                env=env,
+            )
+            pm.set_active_process(process)
+            recent_output = deque(maxlen=18)
+            current_pass = 0
+            last_raw_pct = None
+            best_stage_pct = 0
+
+            for line in process.stdout:
+                if pm.cancel_event.is_set():
+                    process.terminate()
+                    break
+                line_str = re.sub(r"\x1b\[[0-9;?]*[ -/]*[@-~]", "", line.strip())
+                if not line_str:
+                    continue
+                recent_output.append(line_str)
+                logger.info("[Demucs:%s] %s", model_name, line_str)
+                if not update_callback:
+                    continue
+                if "downloading" in line_str.lower() or "download" in line_str.lower():
+                    update_callback(
+                        "processing",
+                        "Preparando separador de vocais",
+                        20,
+                        stage_progress=0,
+                        stage_detail="Baixando o modelo local do Demucs (somente na primeira vez)",
+                    )
+                percentages = re.findall(r"(?<!\d)(100|[1-9]?\d)%", line_str)
+                if not percentages:
+                    continue
+                raw_pct = int(percentages[-1])
+                if (
+                    last_raw_pct is not None
+                    and last_raw_pct >= 90
+                    and raw_pct <= 15
+                    and current_pass < total_passes - 1
+                ):
+                    current_pass += 1
+                aggregate_pct = round(((current_pass + (raw_pct / 100)) / total_passes) * 100)
+                aggregate_pct = max(best_stage_pct, min(99, aggregate_pct))
+                best_stage_pct = aggregate_pct
+                update_callback(
+                    "processing",
+                    "Separando vocais do áudio",
+                    20 + round(aggregate_pct * 0.35),
+                    stage_progress=aggregate_pct,
+                    stage_detail=(
+                        f"Modelo de alta precisão · {raw_pct}% da separação"
+                    ),
+                )
+                last_raw_pct = raw_pct
+
+            process.wait()
+            pm.clear_active_process()
+            pm.check_cancelled()
+
+            output_folder = Path(temp_output_dir) / model_name / audio_stem
+            vocals_path = output_folder / "vocals.wav"
+            instrumental_path = output_folder / "no_vocals.wav"
+            if process.returncode == 0 and vocals_path.exists() and instrumental_path.exists():
                 if update_callback:
-                    if "downloading" in line_str.lower() or "download" in line_str.lower():
-                        update_callback(
-                            "processing",
-                            "Preparando separador de vocais",
-                            20,
-                            stage_detail="Baixando o modelo local do Demucs (somente na primeira vez)"
-                        )
-                    percentages = re.findall(r'(?<!\d)(100|[1-9]?\d)%', line_str)
-                    if percentages:
-                        raw_pct = int(percentages[-1])
-                        if (
-                            last_raw_pct is not None
-                            and last_raw_pct >= 90
-                            and raw_pct <= 15
-                            and current_pass < total_passes - 1
-                        ):
-                            current_pass += 1
+                    update_callback(
+                        "processing",
+                        "Vocais separados com sucesso",
+                        55,
+                        stage_progress=100,
+                        stage_detail=f"Separação concluída com {model_name}",
+                    )
+                logger.info("Separação do Demucs concluída com sucesso usando %s.", model_name)
+                return str(vocals_path), str(instrumental_path)
 
-                        aggregate_pct = round(
-                            ((current_pass + (raw_pct / 100)) / total_passes) * 100
-                        )
-                        aggregate_pct = max(best_stage_pct, min(99, aggregate_pct))
-                        best_stage_pct = aggregate_pct
-                        overall_pct = 20 + round(aggregate_pct * 0.35)
-                        update_callback(
-                            "processing",
-                            "Separando vocais do áudio",
-                            overall_pct,
-                            stage_progress=aggregate_pct,
-                            stage_detail=(
-                                f"Análise {current_pass + 1} de {total_passes} · "
-                                f"{raw_pct}% desta análise"
-                            )
-                        )
-                        last_raw_pct = raw_pct
-                
-        process.wait()
+            detail = " | ".join(recent_output) or "nenhuma saída de diagnóstico"
+            detail = detail[-1200:]
+            failure_summaries.append(f"{model_name} (código {process.returncode}): {detail}")
+            logger.warning("Demucs %s falhou; preparando tentativa alternativa. %s", model_name, detail)
+
+        raise RuntimeError(
+            "A separação de vocais falhou nos dois modelos. "
+            + " || ".join(failure_summaries)
+        )
+    except InterruptedError:
         pm.clear_active_process()
-        pm.check_cancelled()
-        
-        if process.returncode != 0:
-            raise RuntimeError(f"Demucs falhou com código de retorno {process.returncode}")
-
-        if update_callback:
-            update_callback(
-                "processing",
-                "Vocais separados com sucesso",
-                55,
-                stage_progress=100,
-                stage_detail=f"{total_passes} análises locais concluídas"
-            )
-
-        logger.info("Separação do Demucs concluída com sucesso.")
-        
-        # Caminhos dos arquivos de saída gerados pelo Demucs
-        output_folder = Path(temp_output_dir) / model_name / audio_stem
-        vocals_path = output_folder / "vocals.wav"
-        instrumental_path = output_folder / "no_vocals.wav"
-        
-        if not vocals_path.exists() or not instrumental_path.exists():
-            raise FileNotFoundError(
-                f"Arquivos gerados pelo Demucs não foram encontrados. Esperado em: {output_folder}"
-            )
-            
-        return str(vocals_path), str(instrumental_path)
-        
+        raise
     except Exception as e:
-        logger.error(f"Erro ao executar o Demucs: {e}")
-        raise RuntimeError(f"Demucs falhou: {e}")
+        pm.clear_active_process()
+        logger.exception("Erro ao executar o Demucs.")
+        raise RuntimeError(f"Demucs falhou: {e}") from e

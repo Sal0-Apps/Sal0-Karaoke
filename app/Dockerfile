@@ -2,7 +2,7 @@ FROM python:3.12-slim
 
 LABEL org.opencontainers.image.title="Sal0 Karaokê" \
       org.opencontainers.image.description="Servidor auto-hospedado para criação local de karaokê e legendas" \
-      org.opencontainers.image.version="8.5.0" \
+      org.opencontainers.image.version="8.5.1" \
       org.opencontainers.image.source="https://github.com/Sal0-Apps/Sal0-Karaoke" \
       org.opencontainers.image.licenses="MIT"
 
@@ -39,8 +39,9 @@ RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt && \
     pip install --no-cache-dir --upgrade --pre "yt-dlp[default]"
 
-# Copiar script auxiliar e pré-baixar os modelos (Whisper Medium e Demucs htdemucs)
+# Copiar scripts auxiliares e pré-baixar os modelos (Whisper Medium e Demucs htdemucs_ft)
 COPY download_models.py .
+COPY demucs_runner.py .
 RUN python download_models.py && rm download_models.py
 
 # Copiar código-fonte da aplicação
