@@ -1900,7 +1900,7 @@
                 <p class="compact-note" style="margin-bottom: 0.8rem;">Selecione vários arquivos de uma vez. O servidor prepara um vídeo por vez, sem sobrescrever os demais.</p>
                 <div class="queue-maintenance-control">
                     <span class="compact-note queue-pause-status">A fila está ativa.</span>
-                    <button type="button" class="btn-secondary btn-queue-pause">⏸ Pausar para atualização</button>
+                    <button type="button" class="btn-secondary btn-queue-pause">⏸ Pausar ao concluir etapa</button>
                 </div>
                 <div id="processingQueueList" class="queue-list"><span class="compact-note">A fila está vazia.</span></div>
             </div>
@@ -1939,7 +1939,7 @@
 
                 <div class="queue-maintenance-control">
                     <span class="compact-note queue-pause-status">A fila está ativa.</span>
-                    <button type="button" class="btn-secondary btn-queue-pause">⏸ Pausar para atualização</button>
+                    <button type="button" class="btn-secondary btn-queue-pause">⏸ Pausar ao concluir etapa</button>
                 </div>
 
                 <!-- Botão Cancelar -->
@@ -2286,7 +2286,7 @@
 
         <!-- RODAPÉ DISCRETO DA PÁGINA -->
         <footer>
-                     Sal0 Karaokê v8.5.2
+                     Sal0 Karaokê v9.0.0
         </footer>
 
     </div> <!-- Container End -->
@@ -3264,12 +3264,12 @@
             document.querySelectorAll('.queue-pause-status').forEach(status => {
                 status.textContent = processingQueuePaused
                     ? (processingQueuePausePending
-                        ? 'Pausa programada: o processo atual terminará, mas o próximo não começará.'
+                        ? 'Pausa solicitada: a etapa atual terminará, o checkpoint será salvo e o próximo estágio não começará.'
                         : 'Fila pausada e protegida para reinício ou atualização do servidor.')
                     : 'Fila ativa: novos itens começam automaticamente.';
             });
             document.querySelectorAll('.btn-queue-pause').forEach(button => {
-                button.textContent = processingQueuePaused ? '▶ Retomar fila' : '⏸ Pausar para atualização';
+                button.textContent = processingQueuePaused ? '▶ Retomar do checkpoint' : '⏸ Pausar ao concluir etapa';
                 button.onclick = toggleProcessingQueuePause;
             });
             card.style.display = activeJobs.length > 1 || (adminCanControl && processingQueuePaused) ? '' : 'none';
@@ -5825,6 +5825,21 @@
                         isShowingCorrection = true;
                         loadCorrectionPanel();
                     }
+                } else if (data.status === "paused") {
+                    setCreationUiLocked(true);
+                    setActiveProcessLayout(true);
+                    if (queueAddProcessCard) queueAddProcessCard.style.display = 'none';
+                    if (correctionCard) correctionCard.style.display = 'none';
+                    if (processCard) processCard.style.display = 'block';
+                    const savedProgress = Math.max(0, Math.min(100, Math.round(Number(data.progress) || 0)));
+                    if (progressPercent) progressPercent.innerText = `${savedProgress}%`;
+                    if (progressBarFill) {
+                        progressBarFill.style.width = `${savedProgress}%`;
+                        progressBarFill.parentElement?.setAttribute('aria-valuenow', String(savedProgress));
+                    }
+                    if (statusMessage) statusMessage.innerText = 'Checkpoint salvo — é seguro reiniciar o servidor';
+                    if (stageProgressText) stageProgressText.textContent = cleanStageDetail(data.stage_detail);
+                    renderProcessSummary(data.process_summary || {});
                 } else if (data.status === "done" || data.status === "idle") {
                     setActiveProcessLayout(false);
                     setQueueCreationExpanded(false);

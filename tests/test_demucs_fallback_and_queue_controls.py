@@ -96,7 +96,19 @@ class DemucsFallbackAndQueueTests(unittest.TestCase):
         self.assertIn("if processing_queue_paused:", MAIN)
         self.assertIn("load_processing_queue_control()", MAIN)
         self.assertIn("async function toggleProcessingQueuePause", HTML)
-        self.assertIn("Pausar para atualização", HTML)
+        self.assertIn("Pausar ao concluir etapa", HTML)
+
+    def test_stage_checkpoints_preserve_expensive_results(self):
+        self.assertIn('class StagePauseRequested(Exception):', MAIN)
+        self.assertIn('"stage_checkpoints.json"', MAIN)
+        self.assertIn('"audio_extracted"', MAIN)
+        self.assertIn('"vocals_separated"', MAIN)
+        self.assertIn('"transcription_ready"', MAIN)
+        self.assertIn('"subtitle_transcription_reviewed"', MAIN)
+        self.assertIn('"subtitles_generated"', MAIN)
+        self.assertIn('"video_rendered"', MAIN)
+        self.assertIn('queue_status = "queued"', MAIN)
+        self.assertIn("Checkpoint salvo — é seguro reiniciar o servidor", HTML)
 
     def test_telegram_reports_automatic_lyrics_result(self):
         self.assertIn("letra-guia encontrada para", MAIN)
@@ -104,6 +116,12 @@ class DemucsFallbackAndQueueTests(unittest.TestCase):
         self.assertIn("o processamento seguirá somente com o Whisper", MAIN)
         self.assertIn("letra-guia manual recebida para", MAIN)
         self.assertIn("será processado sem letra-guia", MAIN)
+
+    def test_telegram_completion_reports_total_processing_time(self):
+        self.assertIn("def format_processing_duration", MAIN)
+        self.assertIn("active_processing_seconds", MAIN)
+        self.assertIn("Tempo total de processamento", MAIN)
+        self.assertIn("processing_seconds", MAIN)
 
     def test_mobile_process_summary_wraps_complete_values(self):
         self.assertIn(".process-summary { grid-template-columns: 1fr; }", HTML)

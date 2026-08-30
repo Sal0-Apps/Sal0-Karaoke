@@ -554,6 +554,96 @@ ACTIVE_QUEUE_STATUSES = {"queued", "processing"}
 legacy_cache_promotion_lock = threading.Lock()
 
 
+class StagePauseRequested(Exception):
+    def __init__(self, stage: str, label: str, progress: int):
+        super().__init__(f"Pausado após a etapa: {label}")
+        self.stage = stage
+        self.label = label
+        self.progress = progress
+
+
+def load_stage_checkpoints(cache_dir: str | None) -> dict:
+    if not cache_dir:
+        return {"completed_stages": {}}
+    checkpoint_file = os.path.join(cache_dir, "stage_checkpoints.json")
+    try:
+        with open(checkpoint_file, "r", encoding="utf-8") as saved_file:
+            saved = json.load(saved_file)
+        if isinstance(saved, dict) and isinstance(saved.get("completed_stages"), dict):
+            return saved
+    except FileNotFoundError:
+        pass
+    except Exception as exc:
+        logger.warning("Não foi possível carregar os checkpoints da etapa: %s", exc)
+    return {"completed_stages": {}}
+
+
+def stage_checkpoint(cache_dir: str | None, stage: str) -> dict:
+    return dict(load_stage_checkpoints(cache_dir).get("completed_stages", {}).get(stage) or {})
+
+
+def persist_active_processing_seconds(cache_dir: str, elapsed_seconds: float) -> float:
+    saved = load_stage_checkpoints(cache_dir)
+    saved["active_processing_seconds"] = max(0.0, float(elapsed_seconds))
+    checkpoint_file = os.path.join(cache_dir, "stage_checkpoints.json")
+    temporary_file = f"{checkpoint_file}.tmp"
+    with open(temporary_file, "w", encoding="utf-8") as output_file:
+        json.dump(saved, output_file, ensure_ascii=False, indent=2)
+    os.replace(temporary_file, checkpoint_file)
+    return saved["active_processing_seconds"]
+
+
+def format_processing_duration(elapsed_seconds: float | int | None) -> str:
+    total = max(0, round(float(elapsed_seconds or 0)))
+    hours, remainder = divmod(total, 3600)
+    minutes, seconds = divmod(remainder, 60)
+    if hours:
+        return f"{hours}h {minutes:02d}min {seconds:02d}s"
+    if minutes:
+        return f"{minutes}min {seconds:02d}s"
+    return f"{seconds}s"
+
+
+def queue_pause_requested() -> bool:
+    with processing_queue_lock:
+        return processing_queue_paused
+
+
+def save_stage_checkpoint(
+    cache_dir: str,
+    stage: str,
+    label: str,
+    progress: int,
+    **details,
+):
+    os.makedirs(cache_dir, exist_ok=True)
+    checkpoint_file = os.path.join(cache_dir, "stage_checkpoints.json")
+    saved = load_stage_checkpoints(cache_dir)
+    completed = saved.setdefault("completed_stages", {})
+    completed[stage] = {
+        "label": label,
+        "progress": max(0, min(100, int(progress))),
+        "saved_at": time.time(),
+        **details,
+    }
+    saved["last_stage"] = stage
+    saved["last_label"] = label
+    temporary_file = f"{checkpoint_file}.tmp"
+    with open(temporary_file, "w", encoding="utf-8") as output_file:
+        json.dump(saved, output_file, ensure_ascii=False, indent=2)
+    os.replace(temporary_file, checkpoint_file)
+
+    if queue_pause_requested():
+        update_state(
+            "paused",
+            "Paused at stage checkpoint",
+            progress,
+            stage_progress=100,
+            stage_detail=f"Checkpoint salvo após: {label}. É seguro reiniciar o servidor.",
+        )
+        raise StagePauseRequested(stage, label, progress)
+
+
 def save_processing_queue_control_unlocked():
     os.makedirs(os.path.dirname(PROCESSING_QUEUE_CONTROL_FILE), exist_ok=True)
     with open(PROCESSING_QUEUE_CONTROL_FILE, "w", encoding="utf-8") as control_file:
@@ -787,6 +877,11 @@ def processing_queue_worker():
                 else:
                     queue_status = "error"
                     queue_message = final_error or "O processamento não foi concluído."
+            except StagePauseRequested as exc:
+                queue_status = "queued"
+                queue_message = f"Pausado com segurança após: {exc.label}."
+                deferred_cache_cleanup = True
+                logger.info("Trabalho devolvido à fila no checkpoint %s.", exc.stage)
             except Exception as exc:
                 logger.exception("Falha inesperada no trabalhador da fila.")
                 queue_status = "error"
@@ -795,7 +890,11 @@ def processing_queue_worker():
             with processing_queue_lock:
                 job["status"] = queue_status
                 job["message"] = queue_message
-                job["finished_at"] = time.time()
+                if queue_status == "queued":
+                    job.pop("started_at", None)
+                    job.pop("finished_at", None)
+                else:
+                    job["finished_at"] = time.time()
                 if queue_status == "done":
                     job["history_filename"] = final_history_filename
                     job["subtitle_filename"] = final_subtitle_filename
@@ -853,7 +952,7 @@ def pause_processing_queue(current_user: dict = Depends(get_current_user)):
     return {
         "status": "pause_pending" if active_job else "paused",
         "message": (
-            "A fila será pausada quando o processo atual terminar."
+            "A etapa atual continuará até o checkpoint e então a fila será pausada com segurança."
             if active_job else
             "A fila está pausada e permanecerá assim após reiniciar o servidor."
         ),
@@ -2068,7 +2167,7 @@ def download_bg_youtube_preset(
 
 
 LRCLIB_API_URL = "https://lrclib.net/api"
-LRCLIB_USER_AGENT = "Sal0-Karaoke/8.5.2 (+https://github.com/Sal0-Apps/Sal0-Karaoke)"
+LRCLIB_USER_AGENT = "Sal0-Karaoke/9.0.0 (+https://github.com/Sal0-Apps/Sal0-Karaoke)"
 LYRICS_OVH_API_URL = "https://api.lyrics.ovh/v1"
 LYRICS_PROVIDER_TIMEOUT = (3.05, 6)
 MUSIXMATCH_API_URL = "https://apic-desktop.musixmatch.com/ws/1.1"
@@ -2496,7 +2595,7 @@ def delete_lyrics_server(current_user: dict = Depends(get_current_user)):
 
 
 
-# Sistema de Logs de Diagnóstico v8.5.2
+# Sistema de Logs de Diagnóstico v9.0.0
 DIAGNOSTIC_LOG_FILE = "/data/output/app_diagnostic.log"
 
 def log_diagnostic(message: str, level: str = "INFO"):
@@ -2532,7 +2631,7 @@ def download_diagnostic_logs(current_user: dict = Depends(get_current_user)):
     with state_lock:
         current_state = dict(state)
     report = "\n".join([
-"Sal0 Karaokê v8.5.2 — diagnóstico ao vivo",
+"Sal0 Karaokê v9.0.0 — diagnóstico ao vivo",
         f"Gerado em: {time.strftime('%Y-%m-%d %H:%M:%S')}",
         "",
         "=== ESTADO ATUAL ===",
@@ -4285,7 +4384,8 @@ def send_telegram_video_flow(
     history_filename: str,
     public_download_token: str,
     base_url: str = "",
-    external_url: str = ""
+    external_url: str = "",
+    processing_seconds: float = 0,
 ):
     """Envia o vídeo e links diretos sem reutilizar a sessão web do usuário."""
     if not token or not chat_id:
@@ -4293,6 +4393,7 @@ def send_telegram_video_flow(
 
     limit_50mb = 50 * 1024 * 1024
     compressed_target = 46 * 1024 * 1024
+    duration_text = format_processing_duration(processing_seconds)
 
     def build_download_links() -> str:
         if not public_download_token:
@@ -4329,9 +4430,11 @@ def send_telegram_video_flow(
                         data={
                             "chat_id": chat_id,
                             "caption": (
-                                f"🎥 <b>Sal0 Karaokê</b>: prévia compactada de <b>{orig_name}</b>"
+                                f"🎥 <b>Sal0 Karaokê</b>: prévia compactada de <b>{orig_name}</b>\n"
+                                f"⏱ Tempo total de processamento: <b>{duration_text}</b>"
                                 if sent_compressed_preview
-                                else f"🎥 <b>Sal0 Karaokê</b>: aqui está <b>{orig_name}</b>!"
+                                else f"🎥 <b>Sal0 Karaokê</b>: aqui está <b>{orig_name}</b>!\n"
+                                f"⏱ Tempo total de processamento: <b>{duration_text}</b>"
                             ),
                             "parse_mode": "HTML",
                         },
@@ -4352,6 +4455,7 @@ def send_telegram_video_flow(
             token,
             chat_id,
             f"✅ <b>Sal0 Karaokê</b>: <b>{orig_name}</b> concluído. {status_text}\n"
+            f"⏱ Tempo total de processamento: <b>{duration_text}</b>.\n"
             f"Use os links abaixo para baixar o arquivo original sem compressão.{download_block}"
         )
     except Exception as exc:
@@ -4365,7 +4469,8 @@ def send_video_to_targets(
     history_filename: str,
     public_download_token: str,
     base_url: str,
-    external_url: str
+    external_url: str,
+    processing_seconds: float = 0,
 ):
     for target in targets:
         threading.Thread(
@@ -4378,7 +4483,8 @@ def send_video_to_targets(
                 "history_filename": history_filename,
                 "public_download_token": public_download_token,
                 "base_url": base_url,
-                "external_url": external_url
+                "external_url": external_url,
+                "processing_seconds": processing_seconds,
             },
             daemon=True
         ).start()
@@ -4392,12 +4498,14 @@ def send_telegram_document_flow(
     public_download_token: str,
     base_url: str = "",
     external_url: str = "",
+    processing_seconds: float = 0,
 ):
     """Envia um resultado leve como documento e sempre publica os links disponíveis."""
     if not token or not chat_id or not os.path.isfile(document_path):
         return
     route = f"/api/public/download/{public_download_token}" if public_download_token else ""
     links = []
+    duration_text = format_processing_duration(processing_seconds)
     if route and base_url.strip():
         links.append(f'🏠 <a href="{base_url.rstrip("/")}{route}">Baixar na rede local</a>')
     if route and external_url.strip():
@@ -4410,7 +4518,10 @@ def send_telegram_document_flow(
                 f"https://api.telegram.org/bot{token}/sendDocument",
                 data={
                     "chat_id": chat_id,
-                    "caption": f"📄 <b>Sal0 Karaokê</b>: {display_name}",
+                    "caption": (
+                        f"📄 <b>Sal0 Karaokê</b>: {display_name}\n"
+                        f"⏱ Tempo total de processamento: <b>{duration_text}</b>"
+                    ),
                     "parse_mode": "HTML",
                 },
                 files={"document": (os.path.basename(document_path), document_file, "application/x-subrip")},
@@ -4427,7 +4538,8 @@ def send_telegram_document_flow(
     send_telegram_notification(
         token,
         chat_id,
-        f"✅ <b>Sal0 Karaokê</b>: {display_name}. {delivery}{link_block}",
+        f"✅ <b>Sal0 Karaokê</b>: {display_name}. {delivery}\n"
+        f"⏱ Tempo total de processamento: <b>{duration_text}</b>.{link_block}",
     )
 
 
@@ -4436,6 +4548,7 @@ def send_documents_to_targets(
     documents: list[dict],
     base_url: str,
     external_url: str,
+    processing_seconds: float = 0,
 ):
     for target in targets:
         for document in documents:
@@ -4449,6 +4562,7 @@ def send_documents_to_targets(
                     "public_download_token": document.get("public_download_token"),
                     "base_url": base_url,
                     "external_url": external_url,
+                    "processing_seconds": processing_seconds,
                 },
                 daemon=True,
             ).start()
@@ -4469,6 +4583,7 @@ def run_subtitle_srt_pipeline(
     telegram_targets: list[dict],
     telegram_base_url: str = "",
     telegram_external_url: str = "",
+    processing_elapsed_callback=None,
 ):
     """Transcreve qualquer mídia por MP3 e retorna somente SRT original/traduzido."""
     import process_manager as pm
@@ -4494,6 +4609,7 @@ def run_subtitle_srt_pipeline(
     media_duration = get_file_duration(normalized_mp3)
     if media_duration <= 0:
         raise ValueError("Não foi possível determinar a duração do áudio normalizado.")
+    save_stage_checkpoint(cache_dir, "subtitle_audio_ready", "áudio normalizado para MP3", 20)
 
     original_segments = None
     transcription_info = {}
@@ -4558,33 +4674,81 @@ def run_subtitle_srt_pipeline(
     if not original_segments:
         raise ValueError("Nenhuma fala foi detectada na mídia enviada.")
 
+    save_stage_checkpoint(cache_dir, "subtitle_transcription_ready", "transcrição do Whisper concluída", 69)
+
     pm.check_cancelled()
-    if enable_correction:
+    review_checkpoint = stage_checkpoint(cache_dir, "subtitle_transcription_reviewed")
+    if enable_correction and not review_checkpoint:
         global segments_to_edit, correction_event
         segments_to_edit = original_segments
         correction_event.clear()
         update_state("waiting_for_user_correction", "Correction", 68)
         while not correction_event.is_set():
             pm.check_cancelled()
+            if queue_pause_requested():
+                save_stage_checkpoint(
+                    cache_dir,
+                    "subtitle_transcription_ready",
+                    "transcrição do Whisper concluída",
+                    69,
+                )
             correction_event.wait(timeout=1.0)
         original_segments = segments_to_edit
+        with open(segments_cache_file, "w", encoding="utf-8") as segment_file:
+            json.dump(original_segments, segment_file, ensure_ascii=False, indent=2)
+        save_stage_checkpoint(
+            cache_dir,
+            "subtitle_transcription_reviewed",
+            "revisão da transcrição concluída",
+            70,
+        )
+    elif review_checkpoint:
+        update_state("processing", "Using reviewed transcription checkpoint", 70)
 
     original_segments = cover_full_media_timeline(original_segments, media_duration)
-    update_state("processing", "Generating original SRT", 72)
-    write_srt(original_segments, final_original_srt)
-    original_filename = save_srt_result(
-        final_original_srt,
-        orig_name,
-        library_dir,
-        transcription_info.get("language") or "original",
-    )
+    original_checkpoint = stage_checkpoint(cache_dir, "subtitle_original_ready")
+    original_filename = str(original_checkpoint.get("filename") or "")
+    original_library_path = os.path.join(library_dir, "history", original_filename) if original_filename else ""
+    if original_filename and os.path.isfile(original_library_path):
+        if not os.path.isfile(final_original_srt):
+            shutil.copy2(original_library_path, final_original_srt)
+        update_state("processing", "Using original SRT checkpoint", 75)
+    else:
+        update_state("processing", "Generating original SRT", 72)
+        write_srt(original_segments, final_original_srt)
+        original_filename = save_srt_result(
+            final_original_srt,
+            orig_name,
+            library_dir,
+            transcription_info.get("language") or "original",
+        )
     if not original_filename:
         raise RuntimeError("Não foi possível salvar o SRT original na Biblioteca.")
+    save_stage_checkpoint(
+        cache_dir,
+        "subtitle_original_ready",
+        "SRT original salvo",
+        75,
+        filename=original_filename,
+    )
 
     translated_filename = None
     translation_error = ""
     source_language = str(transcription_info.get("language") or "").split("-")[0].lower()
-    if translation_language != "original":
+    translation_checkpoint = stage_checkpoint(cache_dir, "subtitle_translation_finished")
+    checkpoint_translation_filename = str(translation_checkpoint.get("filename") or "")
+    checkpoint_translation_path = (
+        os.path.join(library_dir, "history", checkpoint_translation_filename)
+        if checkpoint_translation_filename else ""
+    )
+    if translation_checkpoint:
+        translation_error = str(translation_checkpoint.get("error") or "")
+        if checkpoint_translation_filename and os.path.isfile(checkpoint_translation_path):
+            translated_filename = checkpoint_translation_filename
+            if not os.path.isfile(final_translated_srt):
+                shutil.copy2(checkpoint_translation_path, final_translated_srt)
+        update_state("processing", "Using translation checkpoint", 95)
+    elif translation_language != "original":
         try:
             update_state(
                 "processing",
@@ -4626,6 +4790,14 @@ def run_subtitle_srt_pipeline(
                 f"⚠️ <b>Sal0 Karaokê</b>: o SRT original de <b>{orig_name}</b> ficou pronto, "
                 "mas a tradução opcional falhou.",
             )
+    save_stage_checkpoint(
+        cache_dir,
+        "subtitle_translation_finished",
+        "tradução opcional concluída" if translated_filename else "etapa de tradução encerrada",
+        95,
+        filename=translated_filename or "",
+        error=translation_error,
+    )
 
     primary_subtitle = translated_filename or original_filename
     public_token = create_public_download(owner_user, original_filename)
@@ -4640,6 +4812,9 @@ def run_subtitle_srt_pipeline(
         translated_subtitle_filename=translated_filename,
         translation_error=translation_error,
         result_kind="subtitles",
+    )
+    total_processing_seconds = (
+        processing_elapsed_callback() if processing_elapsed_callback else 0
     )
     update_state(
         "done",
@@ -4672,6 +4847,7 @@ def run_subtitle_srt_pipeline(
         telegram_documents,
         telegram_base_url,
         telegram_external_url,
+        total_processing_seconds,
     )
     logger.info("%s concluído(s) e encaminhado(s) ao Telegram.", completion)
 
@@ -4719,6 +4895,15 @@ def run_pipeline(
     library_dir = library_dir or owner_paths["library"]
     saved_lyrics_file = os.path.join(output_dir, "saved_lyrics.txt")
     telegram_targets = get_notification_targets(owner_user)
+    os.makedirs(cache_dir, exist_ok=True)
+    previous_processing_seconds = float(
+        load_stage_checkpoints(cache_dir).get("active_processing_seconds") or 0
+    )
+    active_run_started = time.monotonic()
+
+    def persist_total_processing_seconds() -> float:
+        elapsed = previous_processing_seconds + (time.monotonic() - active_run_started)
+        return persist_active_processing_seconds(cache_dir, elapsed)
 
     # Carregar URL externa configurada pelo usuário (para links de download no Telegram)
     ext_url_cfg = load_external_url_config()
@@ -4745,20 +4930,22 @@ def run_pipeline(
         final_original_srt_path = os.path.join(output_dir, "final_subtitles_original.srt")
         final_translated_srt_path = os.path.join(output_dir, "final_subtitles_translated.srt")
 
-        # Limpar outputs anteriores se existirem
-        if os.path.exists(final_mp4_path):
+        os.makedirs(cache_dir, exist_ok=True)
+        completed_checkpoints = load_stage_checkpoints(cache_dir).get("completed_stages", {})
+
+        # Preservar resultados de etapas concluídas para permitir retomada após reinício.
+        if "video_rendered" not in completed_checkpoints and os.path.exists(final_mp4_path):
             os.remove(final_mp4_path)
-        if os.path.exists(final_ass_path):
+        if "subtitles_generated" not in completed_checkpoints and os.path.exists(final_ass_path):
             os.remove(final_ass_path)
         if os.path.exists(final_srt_path):
             os.remove(final_srt_path)
-        if os.path.exists(final_original_srt_path):
+        if "subtitle_original_ready" not in completed_checkpoints and os.path.exists(final_original_srt_path):
             os.remove(final_original_srt_path)
-        if os.path.exists(final_translated_srt_path):
+        if "subtitle_translation_finished" not in completed_checkpoints and os.path.exists(final_translated_srt_path):
             os.remove(final_translated_srt_path)
 
         # Configurar diretório de cache persistente
-        os.makedirs(cache_dir, exist_ok=True)
         cache_meta_file = os.path.join(cache_dir, "cache_meta.json")
 
         # Tentar ler metadados do cache anterior
@@ -4848,6 +5035,7 @@ def run_pipeline(
                 telegram_targets=telegram_targets,
                 telegram_base_url=telegram_base_url,
                 telegram_external_url=telegram_external_url,
+                processing_elapsed_callback=persist_total_processing_seconds,
             )
             return
 
@@ -4914,9 +5102,16 @@ def run_pipeline(
             pass
 
         cached_audio_hash = cached_meta.get("audio_hash")
-        if (new_audio_hash and cached_audio_hash != new_audio_hash) or youtube_url:
+        if new_audio_hash and cached_audio_hash != new_audio_hash:
             logger.info(f"Nova mídia detectada para processamento ({orig_name}). Limpando cache de áudio anterior...")
-            for inter_file in ["original_converted.wav", "vocals.wav", "instrumental.wav", "transcribed_segments.json"]:
+            for inter_file in [
+                "original_converted.wav",
+                "vocals.wav",
+                "instrumental.wav",
+                "transcribed_segments.json",
+                "karaoke.ass",
+                "stage_checkpoints.json",
+            ]:
                 inter_path = os.path.join(cache_dir, inter_file)
                 if os.path.exists(inter_path):
                     try:
@@ -4930,6 +5125,8 @@ def run_pipeline(
                 json.dump(cached_meta, cm_f, indent=4)
         else:
             logger.info(f"Reaproveitando cache de áudio válido para '{orig_name}' (audio_hash={new_audio_hash}).")
+
+        save_stage_checkpoint(cache_dir, "input_ready", "entrada preparada", 10)
 
         # Criar diretório temporário para todo o processamento intermediário (Demucs, Whisper, ASS)
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -4947,6 +5144,7 @@ def run_pipeline(
                 extract_audio(input_audio_path, converted_wav)
 
             pm.check_cancelled()
+            save_stage_checkpoint(cache_dir, "audio_extracted", "áudio extraído", 15)
 
             # Passo 2: Separar vocais e instrumental via Demucs
             vocals_wav = os.path.join(cache_dir, "vocals.wav")
@@ -4977,6 +5175,7 @@ def run_pipeline(
                     shutil.move(i_tmp, instrumental_wav)
 
             pm.check_cancelled()
+            save_stage_checkpoint(cache_dir, "vocals_separated", "vocais separados pelo Demucs", 55)
 
             def publish_render_progress(percent: int):
                 update_state(
@@ -4990,24 +5189,30 @@ def run_pipeline(
             # Se only_remove_vocals estiver ativo, pulamos transcrição e legenda, indo direto para renderização
             if only_remove_vocals:
                 pm.check_cancelled()
-                update_state("processing", "Rendering final video", 95)
-                notify_targets(telegram_targets, "🎬 <b>Sal0 Karaokê</b>: Renderizando vídeo sem a voz do cantor (95%)")
+                rendered_checkpoint = stage_checkpoint(cache_dir, "video_rendered")
+                if not rendered_checkpoint or not os.path.isfile(final_mp4_path):
+                    update_state("processing", "Rendering final video", 95)
+                    notify_targets(telegram_targets, "🎬 <b>Sal0 Karaokê</b>: Renderizando vídeo sem a voz do cantor (95%)")
 
-                # Forçar o uso do vídeo original enviado
-                render_karaoke_video(
-                    instrumental_path=instrumental_wav,
-                    ass_path=None,
-                    output_mp4_path=final_mp4_path,
-                    background_image_path=None,
-                    original_video_path=input_audio_path,
-                    background_mode="original_video",
-                    progress_callback=publish_render_progress,
-                )
+                    # Forçar o uso do vídeo original enviado
+                    render_karaoke_video(
+                        instrumental_path=instrumental_wav,
+                        ass_path=None,
+                        output_mp4_path=final_mp4_path,
+                        background_image_path=None,
+                        original_video_path=input_audio_path,
+                        background_mode="original_video",
+                        progress_callback=publish_render_progress,
+                    )
+                else:
+                    update_state("processing", "Using rendered video checkpoint", 98)
 
                 pm.check_cancelled()
+                save_stage_checkpoint(cache_dir, "video_rendered", "vídeo renderizado", 98)
                 history_filename = save_video_to_history(final_mp4_path, orig_name, library_dir)
                 public_token = create_public_download(owner_user, history_filename)
                 save_result_metadata(output_dir, orig_name, history_filename)
+                total_processing_seconds = persist_total_processing_seconds()
                 update_state("processing", "Cleaning temporary files", 98)
                 update_state(
                     "done",
@@ -5028,7 +5233,8 @@ def run_pipeline(
                     history_filename,
                     public_token,
                     telegram_base_url,
-                    telegram_external_url
+                    telegram_external_url,
+                    total_processing_seconds,
                 )
                 return
 
@@ -5134,6 +5340,8 @@ def run_pipeline(
             if not segments:
                 raise ValueError("Nenhum vocal detectado ou transcrição vazia.")
 
+            save_stage_checkpoint(cache_dir, "transcription_ready", "transcrição do Whisper concluída", 74)
+
             # A letra corrige apenas a grafia; os tempos continuam vindo do áudio.
             if lyrics_text and lyrics_text.strip():
                 logger.info("Aplicando letra guia de forma conservadora, sem criar timestamps...")
@@ -5142,7 +5350,8 @@ def run_pipeline(
             pm.check_cancelled()
 
             # --- NOVO: Passo de Pausa e Correção de Legendas (se ativado pelo usuário) ---
-            if enable_correction:
+            review_checkpoint = stage_checkpoint(cache_dir, "transcription_reviewed")
+            if enable_correction and not review_checkpoint:
                 global segments_to_edit, correction_event
                 segments_to_edit = segments
                 correction_event.clear()
@@ -5160,6 +5369,13 @@ def run_pipeline(
                 # Bloqueia a thread até o usuário enviar as correções pelo endpoint /api/continue_process
                 while not correction_event.is_set():
                     pm.check_cancelled()
+                    if queue_pause_requested():
+                        save_stage_checkpoint(
+                            cache_dir,
+                            "transcription_ready",
+                            "transcrição do Whisper concluída",
+                            74,
+                        )
                     correction_event.wait(timeout=1.0)
 
                 logger.info("Retomando o processamento com as legendas corrigidas.")
@@ -5170,52 +5386,65 @@ def run_pipeline(
                     import json
                     json.dump(segments, f, indent=4)
 
+                save_stage_checkpoint(cache_dir, "transcription_reviewed", "revisão das legendas concluída", 78)
+            elif review_checkpoint:
+                update_state("processing", "Using reviewed subtitle checkpoint", 78)
+
             pm.check_cancelled()
 
             # Passo 4: Gerar legendas ASS com efeitos de karaokê
-            update_state("processing", "Generating subtitles", 80)
-            notify_targets(telegram_targets, "📝 <b>Sal0 Karaokê</b>: Gerando legenda (80%)")
-            ass_path = os.path.join(tmpdir, "karaoke.ass")
-            generate_ass_karaoke(
-                segments=segments,
-                output_ass_path=ass_path,
-                font_size=font_size,
-                text_color_hex=text_color,
-                text_position=text_position,
-                subtitle_mode=subtitle_mode,
-                words_per_line=words_per_line,
-                max_chars_line=max_chars_line,
-                break_on_punctuation=break_on_punctuation,
-                show_instrumental=show_instrumental,
-                show_next_line_preview=show_next_line_preview,
-                keep_first_line_visible=keep_first_line_visible
-            )
+            ass_path = os.path.join(cache_dir, "karaoke.ass")
+            subtitles_checkpoint = stage_checkpoint(cache_dir, "subtitles_generated")
+            if not subtitles_checkpoint or not os.path.isfile(ass_path):
+                update_state("processing", "Generating subtitles", 80)
+                notify_targets(telegram_targets, "📝 <b>Sal0 Karaokê</b>: Gerando legenda (80%)")
+                generate_ass_karaoke(
+                    segments=segments,
+                    output_ass_path=ass_path,
+                    font_size=font_size,
+                    text_color_hex=text_color,
+                    text_position=text_position,
+                    subtitle_mode=subtitle_mode,
+                    words_per_line=words_per_line,
+                    max_chars_line=max_chars_line,
+                    break_on_punctuation=break_on_punctuation,
+                    show_instrumental=show_instrumental,
+                    show_next_line_preview=show_next_line_preview,
+                    keep_first_line_visible=keep_first_line_visible
+                )
+            else:
+                update_state("processing", "Using subtitle checkpoint", 80)
 
             pm.check_cancelled()
+            save_stage_checkpoint(cache_dir, "subtitles_generated", "legendas geradas", 80)
 
             # Passo 5: Renderizar o vídeo final
-            update_state("processing", "Rendering final video", 95)
-            notify_targets(telegram_targets, "🎬 <b>Sal0 Karaokê</b>: Renderizando vídeo (95%)")
-            bg_mode_param = "original_video" if (background_mode in ["original", "original_video"]) else background_mode
-            render_karaoke_video(
-                instrumental_path=instrumental_wav,
-                ass_path=ass_path,
-                output_mp4_path=final_mp4_path,
-                background_image_path=input_bg_path,
-                original_video_path=input_audio_path,
-                background_mode=bg_mode_param,
-                progress_callback=publish_render_progress,
-            )
+            rendered_checkpoint = stage_checkpoint(cache_dir, "video_rendered")
+            if not rendered_checkpoint or not os.path.isfile(final_mp4_path):
+                update_state("processing", "Rendering final video", 95)
+                notify_targets(telegram_targets, "🎬 <b>Sal0 Karaokê</b>: Renderizando vídeo (95%)")
+                bg_mode_param = "original_video" if (background_mode in ["original", "original_video"]) else background_mode
+                render_karaoke_video(
+                    instrumental_path=instrumental_wav,
+                    ass_path=ass_path,
+                    output_mp4_path=final_mp4_path,
+                    background_image_path=input_bg_path,
+                    original_video_path=input_audio_path,
+                    background_mode=bg_mode_param,
+                    progress_callback=publish_render_progress,
+                )
+                shutil.copy2(ass_path, final_ass_path)
+            else:
+                update_state("processing", "Using rendered video checkpoint", 98)
 
             pm.check_cancelled()
-
-            # Salvar opcionalmente a legenda ASS final gerada junto com o MP4
-            shutil.copy(ass_path, final_ass_path)
+            save_stage_checkpoint(cache_dir, "video_rendered", "vídeo renderizado", 98)
 
             # Salvar automaticamente no histórico privado do dono da tarefa.
             history_filename = save_video_to_history(final_mp4_path, orig_name, library_dir)
             public_token = create_public_download(owner_user, history_filename)
             save_result_metadata(output_dir, orig_name, history_filename)
+            total_processing_seconds = persist_total_processing_seconds()
 
             # Passo 6: Limpar arquivos temporários (não removemos os uploads do cache)
             update_state("processing", "Cleaning temporary files", 98)
@@ -5243,9 +5472,18 @@ def run_pipeline(
                 history_filename,
                 public_token,
                 telegram_base_url,
-                telegram_external_url
+                telegram_external_url,
+                total_processing_seconds,
             )
 
+    except StagePauseRequested as pause:
+        elapsed_seconds = persist_total_processing_seconds()
+        notify_targets(
+            telegram_targets,
+            f"⏸ <b>Sal0 Karaokê</b>: <b>{orig_name}</b> foi pausado com segurança após "
+            f"<b>{pause.label}</b>. Tempo processado: <b>{format_processing_duration(elapsed_seconds)}</b>.",
+        )
+        raise
     except Exception as e:
         logger.exception("Ocorreu um erro catastrófico durante o processamento do pipeline.")
         # Se foi cancelado cooperativamente, salvar estado correspondente

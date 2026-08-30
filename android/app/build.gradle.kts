@@ -2,8 +2,8 @@ plugins {
     id("com.android.application")
 }
 
-val appVersionName = providers.gradleProperty("VERSION_NAME").orElse("8.5.2")
-val appVersionCode = providers.gradleProperty("VERSION_CODE").orElse("80502")
+val appVersionName = providers.gradleProperty("VERSION_NAME").orElse("9.0.0")
+val appVersionCode = providers.gradleProperty("VERSION_CODE").orElse("90000")
 val signingStore = System.getenv("ANDROID_KEYSTORE_PATH")
 val signingPassword = System.getenv("ANDROID_KEYSTORE_PASSWORD")
 val signingAlias = System.getenv("ANDROID_KEY_ALIAS")
