@@ -16,7 +16,6 @@ import audio_processor
 
 MAIN = (APP / "main.py").read_text(encoding="utf-8")
 HTML = (APP / "templates" / "index.html").read_text(encoding="utf-8")
-DEMUCS_RUNNER = (APP / "demucs_runner.py").read_text(encoding="utf-8")
 
 
 class FakeProcess:
@@ -33,7 +32,7 @@ class FakeProcess:
 
 
 class DemucsFallbackAndQueueTests(unittest.TestCase):
-    def test_demucs_runs_fine_tuned_models_sequentially_and_preserves_diagnostics(self):
+    def test_demucs_executes_standard_cli_and_parses_progress(self):
         commands = []
         fake_manager = types.SimpleNamespace(
             cancel_event=threading.Event(),
@@ -48,48 +47,33 @@ class DemucsFallbackAndQueueTests(unittest.TestCase):
 
             def fake_popen(command, **kwargs):
                 commands.append(command)
-                model = command[command.index("--model") + 1]
-                target = command[command.index("--target-stem") + 1]
-                if model == "d12395a8" and "--segment" not in command:
-                    return FakeProcess(1, ["RuntimeError: insufficient resources\n"])
-                output = Path(command[command.index("--output") + 1]) / model / source.stem
-                output.mkdir(parents=True)
-                (output / f"{target}.wav").touch()
-                return FakeProcess(0, ["DEMUCS_PROGRESS 100%\n"])
-
-            def fake_combine(input_paths, output_path):
-                output_path.parent.mkdir(parents=True, exist_ok=True)
-                output_path.touch()
+                output = Path(temporary_dir) / "htdemucs_ft" / source.stem
+                output.mkdir(parents=True, exist_ok=True)
+                (output / "vocals.wav").touch()
+                (output / "no_vocals.wav").touch()
+                return FakeProcess(0, ["Selected model: htdemucs_ft\n", "100%\n"])
 
             updates = []
             with patch.dict(sys.modules, {"process_manager": fake_manager}), patch.object(
                 audio_processor.subprocess, "Popen", side_effect=fake_popen
-            ), patch.object(audio_processor, "combine_demucs_stems", side_effect=fake_combine):
+            ):
                 vocals, instrumental = audio_processor.separate_vocals(
                     str(source),
                     temporary_dir,
                     update_callback=lambda *args, **kwargs: updates.append((args, kwargs)),
                 )
 
-        self.assertEqual(
-            [command[command.index("--model") + 1] for command in commands],
-            ["f7e0c4bc", "d12395a8", "d12395a8", "92cfc3b6", "04573f0d"],
-        )
-        self.assertEqual(
-            [command[command.index("--target-stem") + 1] for command in commands],
-            ["drums", "bass", "bass", "other", "vocals"],
-        )
-        self.assertIn("--segment", commands[2])
+        self.assertEqual(len(commands), 1)
+        cmd = commands[0]
+        self.assertEqual(cmd[0], "demucs")
+        self.assertIn("-d", cmd)
+        self.assertIn("cpu", cmd)
+        self.assertIn("-n", cmd)
+        self.assertIn("htdemucs_ft", cmd)
+        self.assertIn("--two-stems", cmd)
+        self.assertIn("vocals", cmd)
         self.assertTrue(vocals.endswith("vocals.wav"))
         self.assertTrue(instrumental.endswith("no_vocals.wav"))
-        self.assertTrue(any("blocos menores" in update[1].get("stage_detail", "") for update in updates))
-
-    def test_demucs_streams_long_audio_in_contextual_windows(self):
-        self.assertIn("def separate_target_stem_streaming", DEMUCS_RUNNER)
-        self.assertIn("core_seconds: float = 30.0", DEMUCS_RUNNER)
-        self.assertIn("context_seconds: float = 8.0", DEMUCS_RUNNER)
-        self.assertIn("source.read(", DEMUCS_RUNNER)
-        self.assertIn("gc.collect()", DEMUCS_RUNNER)
 
     def test_queue_removal_wakes_worker_and_cleanup_is_non_blocking(self):
         self.assertIn('target=cleanup_queue_cache_in_background', MAIN)

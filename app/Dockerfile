@@ -39,9 +39,8 @@ RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt && \
     pip install --no-cache-dir --upgrade --pre "yt-dlp[default]"
 
-# Copiar scripts auxiliares e pré-baixar os modelos (Whisper Medium e Demucs htdemucs_ft)
+# Copiar script auxiliar e pré-baixar os modelos (Whisper Medium e Demucs htdemucs_ft)
 COPY download_models.py .
-COPY demucs_runner.py .
 RUN python download_models.py && rm download_models.py
 
 # Copiar código-fonte da aplicação

@@ -3,7 +3,6 @@ import wave
 import math
 import shutil
 import subprocess
-import sys
 from faster_whisper import WhisperModel
 
 print("=== INICIANDO PRÉ-DOWNLOAD DOS MODELOS IA (v4.0.0) ===")
@@ -49,26 +48,18 @@ try:
 except Exception as e:
     print(f"Aviso ao gerar áudio de teste: {e}")
 
-# 3. Executar o mesmo adaptador usado pelo app para baixar e validar o modelo
+# 3. Executar o Demucs via CLI para forçar o download do modelo htdemucs_ft
 print("Testando o modelo Demucs htdemucs_ft...")
 if os.path.exists(dummy_wav):
     try:
         cmd = [
-            sys.executable,
-            "demucs_runner.py",
-            dummy_wav,
-            "--output", "demucs_test_output",
-            "--model", "htdemucs_ft",
+            "demucs",
+            "-d", "cpu",
+            "-n", "htdemucs_ft",
+            "--two-stems", "vocals",
+            dummy_wav
         ]
-        demucs_env = os.environ.copy()
-        demucs_env["TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD"] = "1"
-        result = subprocess.run(
-            cmd,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            env=demucs_env,
-        )
+        result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         if result.returncode == 0:
             print("Demucs htdemucs_ft baixado e testado com sucesso.")
         else:
@@ -81,8 +72,8 @@ print("Limpando arquivos temporários do build...")
 try:
     if os.path.exists(dummy_wav):
         os.remove(dummy_wav)
-    if os.path.exists("demucs_test_output"):
-        shutil.rmtree("demucs_test_output")
+    if os.path.exists("separated"):
+        shutil.rmtree("separated")
 except Exception as e:
     print(f"Aviso ao limpar diretórios de teste: {e}")
 
