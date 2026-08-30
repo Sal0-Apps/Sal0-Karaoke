@@ -104,6 +104,7 @@ def separate_vocals(audio_path: str, temp_output_dir: str, update_callback=None)
         "-d", "cpu",
         "-n", "htdemucs_ft",
         "--two-stems", "vocals",
+        "--jobs", "1",
         "-o", temp_output_dir,
         audio_path
     ]
@@ -116,6 +117,22 @@ def separate_vocals(audio_path: str, temp_output_dir: str, update_callback=None)
         env["TORCH_HOME"] = "/data/output/models/torch"
         env["HF_HOME"] = "/data/output/models/huggingface"
         env["TORCHAUDIO_BACKEND"] = "soundfile"
+        env["TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD"] = "1"
+
+        cpu_count = max(1, os.cpu_count() or 1)
+        configured_jobs = os.environ.get("DEMUCS_CPU_JOBS", "").strip()
+        try:
+            cpu_jobs = int(configured_jobs) if configured_jobs else min(2, max(1, cpu_count // 2))
+        except ValueError:
+            cpu_jobs = min(2, max(1, cpu_count // 2))
+        cpu_jobs = max(1, min(cpu_jobs, cpu_count))
+        threads_per_job = max(1, cpu_count // cpu_jobs)
+        cmd[cmd.index("--jobs") + 1] = str(cpu_jobs)
+        env["OMP_NUM_THREADS"] = str(threads_per_job)
+        env["MKL_NUM_THREADS"] = str(threads_per_job)
+        env["OPENBLAS_NUM_THREADS"] = str(threads_per_job)
+        env["OMP_DYNAMIC"] = "FALSE"
+        env["MKL_DYNAMIC"] = "FALSE"
         
         # Executar o Demucs com streaming de logs em tempo real
         logger.info(f"Executando Demucs: {' '.join(cmd)}")
@@ -124,9 +141,11 @@ def separate_vocals(audio_path: str, temp_output_dir: str, update_callback=None)
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True,
-            env=env
+            env=env,
+            bufsize=1,
         )
         pm.set_active_process(process)
+        cancelled_during_demucs = False
 
         # O htdemucs_ft é um conjunto de quatro análises. Cada uma informa
         # 0–100%, portanto o valor bruto reinicia várias vezes. Agregamos os
@@ -140,6 +159,7 @@ def separate_vocals(audio_path: str, temp_output_dir: str, update_callback=None)
         for line in process.stdout:
             if pm.cancel_event.is_set():
                 process.terminate()
+                cancelled_during_demucs = True
                 break
             line_str = line.strip()
             if line_str:
@@ -183,10 +203,19 @@ def separate_vocals(audio_path: str, temp_output_dir: str, update_callback=None)
                 
         process.wait()
         pm.clear_active_process()
-        pm.check_cancelled()
-        
+
+        if cancelled_during_demucs:
+            pm.check_cancelled()
         if process.returncode != 0:
             raise RuntimeError(f"Demucs falhou com código de retorno {process.returncode}")
+
+        output_folder = Path(temp_output_dir) / model_name / audio_stem
+        vocals_path = output_folder / "vocals.wav"
+        instrumental_path = output_folder / "no_vocals.wav"
+        if not vocals_path.exists() or not instrumental_path.exists():
+            raise FileNotFoundError(
+                f"Arquivos gerados pelo Demucs não foram encontrados. Esperado em: {output_folder}"
+            )
 
         if update_callback:
             update_callback(
@@ -199,16 +228,6 @@ def separate_vocals(audio_path: str, temp_output_dir: str, update_callback=None)
 
         logger.info("Separação do Demucs concluída com sucesso.")
         
-        # Caminhos dos arquivos de saída gerados pelo Demucs
-        output_folder = Path(temp_output_dir) / model_name / audio_stem
-        vocals_path = output_folder / "vocals.wav"
-        instrumental_path = output_folder / "no_vocals.wav"
-        
-        if not vocals_path.exists() or not instrumental_path.exists():
-            raise FileNotFoundError(
-                f"Arquivos gerados pelo Demucs não foram encontrados. Esperado em: {output_folder}"
-            )
-            
         return str(vocals_path), str(instrumental_path)
         
     except Exception as e:

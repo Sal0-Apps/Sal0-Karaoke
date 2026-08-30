@@ -59,7 +59,16 @@ if os.path.exists(dummy_wav):
             "--two-stems", "vocals",
             dummy_wav
         ]
-        result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        demucs_env = os.environ.copy()
+        demucs_env["TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD"] = "1"
+        demucs_env["TORCHAUDIO_BACKEND"] = "soundfile"
+        result = subprocess.run(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            env=demucs_env,
+        )
         if result.returncode == 0:
             print("Demucs htdemucs_ft baixado e testado com sucesso.")
         else:

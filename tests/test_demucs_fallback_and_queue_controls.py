@@ -54,9 +54,11 @@ class DemucsFallbackAndQueueTests(unittest.TestCase):
                 return FakeProcess(0, ["Selected model: htdemucs_ft\n", "100%\n"])
 
             updates = []
-            with patch.dict(sys.modules, {"process_manager": fake_manager}), patch.object(
-                audio_processor.subprocess, "Popen", side_effect=fake_popen
-            ):
+            with patch.dict(sys.modules, {"process_manager": fake_manager}), patch.dict(
+                audio_processor.os.environ, {}, clear=True
+            ), patch.object(
+                audio_processor.os, "cpu_count", return_value=8
+            ), patch.object(audio_processor.subprocess, "Popen", side_effect=fake_popen):
                 vocals, instrumental = audio_processor.separate_vocals(
                     str(source),
                     temporary_dir,
@@ -72,8 +74,19 @@ class DemucsFallbackAndQueueTests(unittest.TestCase):
         self.assertIn("htdemucs_ft", cmd)
         self.assertIn("--two-stems", cmd)
         self.assertIn("vocals", cmd)
+        self.assertIn("--jobs", cmd)
+        self.assertEqual(cmd[cmd.index("--jobs") + 1], "2")
         self.assertTrue(vocals.endswith("vocals.wav"))
         self.assertTrue(instrumental.endswith("no_vocals.wav"))
+
+    def test_subtitle_only_returns_before_demucs(self):
+        pipeline = MAIN[MAIN.index("def run_pipeline("):]
+        subtitle_branch = pipeline.index("if subtitle_only:")
+        subtitle_return = pipeline.index("return", subtitle_branch)
+        demucs_call = pipeline.index("separate_vocals(")
+        self.assertLess(subtitle_branch, demucs_call)
+        self.assertLess(subtitle_return, demucs_call)
+        self.assertIn("Modo Gerar SRT ativo: Demucs desativado", pipeline)
 
     def test_queue_removal_wakes_worker_and_cleanup_is_non_blocking(self):
         self.assertIn('target=cleanup_queue_cache_in_background', MAIN)
