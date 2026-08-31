@@ -921,6 +921,9 @@
             gap: 0.25rem;
             margin-bottom: 0.8rem;
         }
+        .process-overall-progress {
+            margin: -0.15rem 0 0.85rem;
+        }
         .progress-copy #statusMessage { margin: 0; }
         .stage-progress-text {
             max-width: 100%;
@@ -1921,6 +1924,10 @@
                     <span id="progressPercent" style="font-size: 1.2rem; font-weight: 800; color: var(--accent);">0%</span>
                 </div>
 
+                <div class="progress-bar-bg process-overall-progress" role="progressbar" aria-label="Progresso total do processo" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+                    <div class="progress-bar-fill" id="progressBarFill"></div>
+                </div>
+
                 <div class="progress-copy">
                     <p id="statusMessage" style="font-size: 0.9rem; color: var(--text-muted);">Iniciando processamento local...</p>
                     <span id="stageProgressText" class="stage-progress-text"></span>
@@ -1931,15 +1938,6 @@
                     <div class="process-summary-item"><span>📝</span><span id="processSummaryLyrics"></span></div>
                     <div class="process-summary-item"><span>🤖</span><span id="processSummaryModel"></span></div>
                     <div class="process-summary-item"><span>🖼️</span><span id="processSummaryBackground"></span></div>
-                </div>
-
-                <div class="progress-bar-bg" role="progressbar" aria-label="Progresso total do processo" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
-                    <div class="progress-bar-fill" id="progressBarFill"></div>
-                </div>
-
-                <div class="queue-maintenance-control">
-                    <span class="compact-note queue-pause-status">A fila está ativa.</span>
-                    <button type="button" class="btn-secondary btn-queue-pause">⏸ Pausar ao concluir etapa</button>
                 </div>
 
                 <!-- Botão Cancelar -->
@@ -2286,7 +2284,7 @@
 
         <!-- RODAPÉ DISCRETO DA PÁGINA -->
         <footer>
-                     Sal0 Karaokê v9.0.6
+                     Sal0 Karaokê v9.0.7
         </footer>
 
     </div> <!-- Container End -->
@@ -2487,6 +2485,7 @@
                 [['generating original srt'], 'Gerando o SRT original'],
                 [['generating subtitles', 'subtitles'], 'Gerando legenda sincronizada'],
                 [['rendering'], 'Gerando o vídeo final'],
+                [['sending result to telegram', 'sending subtitles to telegram'], 'Enviando resultado ao Telegram'],
                 [['cleaning'], 'Finalizando o processo'],
             ];
             return stages.find(([keys]) => keys.some(key => value.includes(key)))?.[1] || step || 'Processando';

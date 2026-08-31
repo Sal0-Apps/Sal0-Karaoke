@@ -20,6 +20,7 @@ import json
 import hashlib
 import random
 import unicodedata
+import html
 from urllib.parse import quote
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Header, Depends, Query, Request
 from fastapi.responses import HTMLResponse, FileResponse, Response, StreamingResponse
@@ -1372,7 +1373,22 @@ def save_result_metadata(
     except Exception as exc:
         logger.warning("Não foi possível salvar metadados do resultado: %s", exc)
 
-def _send_telegram_notification_worker(token: str, chat_id: str, message: str):
+def telegram_escape(value) -> str:
+    return html.escape(str(value or ""), quote=True)
+
+
+def telegram_notice(icon: str, heading: str, *lines: str) -> str:
+    """Cria uma notificação curta, espaçada e consistente para o Telegram."""
+    details = [str(line or "").strip() for line in lines]
+    while details and not details[0]:
+        details.pop(0)
+    while details and not details[-1]:
+        details.pop()
+    header = f"{icon} <b>{telegram_escape(heading)}</b>"
+    return header if not details else f"{header}\n\n" + "\n".join(details)
+
+
+def _send_telegram_notification_worker(token: str, chat_id: str, message: str) -> bool:
     try:
         url = f"https://api.telegram.org/bot{token}/sendMessage"
         payload = {
@@ -1383,11 +1399,15 @@ def _send_telegram_notification_worker(token: str, chat_id: str, message: str):
         response = requests.post(url, json=payload, timeout=10)
         if not response.ok:
             logger.error("Telegram rejeitou a notificação: HTTP %s (%s)", response.status_code, response.text[:300])
+            return False
+        return True
     except Exception as e:
         logger.error(f"Erro ao enviar notificação para o Telegram: {e}")
+        return False
+
 
 def send_telegram_notification(token: str, chat_id: str, message: str):
-    """Envia uma mensagem de notificação para um chat específico via Bot do Telegram sem bloquear o pipeline ( Thread Assíncrona )."""
+    """Envia uma atualização intermediária sem bloquear o pipeline."""
     if not token or not chat_id:
         return
     threading.Thread(
@@ -2167,7 +2187,7 @@ def download_bg_youtube_preset(
 
 
 LRCLIB_API_URL = "https://lrclib.net/api"
-LRCLIB_USER_AGENT = "Sal0-Karaoke/9.0.6 (+https://github.com/Sal0-Apps/Sal0-Karaoke)"
+LRCLIB_USER_AGENT = "Sal0-Karaoke/9.0.7 (+https://github.com/Sal0-Apps/Sal0-Karaoke)"
 LYRICS_OVH_API_URL = "https://api.lyrics.ovh/v1"
 LYRICS_PROVIDER_TIMEOUT = (3.05, 6)
 MUSIXMATCH_API_URL = "https://apic-desktop.musixmatch.com/ws/1.1"
@@ -2595,7 +2615,7 @@ def delete_lyrics_server(current_user: dict = Depends(get_current_user)):
 
 
 
-# Sistema de Logs de Diagnóstico v9.0.6
+# Sistema de Logs de Diagnóstico v9.0.7
 DIAGNOSTIC_LOG_FILE = "/data/output/app_diagnostic.log"
 
 def log_diagnostic(message: str, level: str = "INFO"):
@@ -2631,7 +2651,7 @@ def download_diagnostic_logs(current_user: dict = Depends(get_current_user)):
     with state_lock:
         current_state = dict(state)
     report = "\n".join([
-"Sal0 Karaokê v9.0.6 — diagnóstico ao vivo",
+"Sal0 Karaokê v9.0.7 — diagnóstico ao vivo",
         f"Gerado em: {time.strftime('%Y-%m-%d %H:%M:%S')}",
         "",
         "=== ESTADO ATUAL ===",
@@ -4387,9 +4407,9 @@ def send_telegram_video_flow(
     external_url: str = "",
     processing_seconds: float = 0,
 ):
-    """Envia o vídeo e links diretos sem reutilizar a sessão web do usuário."""
+    """Envia o vídeo e só retorna quando a entrega final ao Telegram terminar."""
     if not token or not chat_id:
-        return
+        return False
 
     limit_50mb = 50 * 1024 * 1024
     compressed_target = 46 * 1024 * 1024
@@ -4401,10 +4421,12 @@ def send_telegram_video_flow(
         route = f"/api/public/download/{public_download_token}"
         links = []
         if base_url.strip():
-            links.append(f'🏠 <a href="{base_url.rstrip("/")}{route}">Baixar na rede local</a>')
+            local_url = telegram_escape(f'{base_url.rstrip("/")}{route}')
+            links.append(f'🏠 <a href="{local_url}">Rede local</a>')
         if external_url.strip():
-            links.append(f'🌐 <a href="{external_url.rstrip("/")}{route}">Baixar pelo acesso externo</a>')
-        return "\n" + "\n".join(links) if links else ""
+            remote_url = telegram_escape(f'{external_url.rstrip("/")}{route}')
+            links.append(f'🌐 <a href="{remote_url}">Acesso externo</a>')
+        return "\n".join(links)
 
     try:
         file_size = os.path.getsize(video_path)
@@ -4424,18 +4446,29 @@ def send_telegram_video_flow(
                     upload_path = ""
 
             if upload_path:
+                preview_status = (
+                    "🎥 Foi gerada uma prévia compactada para o Telegram; o original permanece intacto."
+                    if sent_compressed_preview else
+                    "🎥 Vídeo original anexado a esta mensagem."
+                )
+                caption_lines = [
+                    f"🎵 <b>{telegram_escape(orig_name)}</b>",
+                    preview_status,
+                    f"⏱ Tempo total de processamento: <b>{telegram_escape(duration_text)}</b>",
+                ]
+                if download_block:
+                    caption_lines.extend(["", "📥 <b>Download do arquivo original sem compressão</b>", download_block])
+                completion_caption = telegram_notice(
+                    "✅",
+                    "Karaokê concluído",
+                    *caption_lines,
+                )
                 with open(upload_path, "rb") as video_file:
                     response = requests.post(
                         f"https://api.telegram.org/bot{token}/sendVideo",
                         data={
                             "chat_id": chat_id,
-                            "caption": (
-                                f"🎥 <b>Sal0 Karaokê</b>: prévia compactada de <b>{orig_name}</b>\n"
-                                f"⏱ Tempo total de processamento: <b>{duration_text}</b>"
-                                if sent_compressed_preview
-                                else f"🎥 <b>Sal0 Karaokê</b>: aqui está <b>{orig_name}</b>!\n"
-                                f"⏱ Tempo total de processamento: <b>{duration_text}</b>"
-                            ),
+                            "caption": completion_caption,
                             "parse_mode": "HTML",
                         },
                         files={"video": (os.path.basename(upload_path), video_file, "video/mp4")},
@@ -4445,21 +4478,33 @@ def send_telegram_video_flow(
                     if not success:
                         logger.error("Telegram recusou o vídeo com HTTP %s.", response.status_code)
 
-        if success and sent_compressed_preview:
-            status_text = "Prévia compactada enviada; o original permanece intacto na Biblioteca."
-        elif success:
-            status_text = "Vídeo original enviado e salvo na sua Biblioteca."
-        else:
-            status_text = "Não foi possível anexar a prévia, mas o original está salvo na sua Biblioteca."
-        send_telegram_notification(
+        if success:
+            return True
+
+        fallback_lines = [
+            f"🎵 <b>{telegram_escape(orig_name)}</b>",
+            "⚠️ Não foi possível anexar a prévia, mas o original está salvo na Biblioteca.",
+            f"⏱ Tempo total de processamento: <b>{telegram_escape(duration_text)}</b>",
+        ]
+        if download_block:
+            fallback_lines.extend(["", "📥 <b>Download do arquivo original sem compressão</b>", download_block])
+        return _send_telegram_notification_worker(
             token,
             chat_id,
-            f"✅ <b>Sal0 Karaokê</b>: <b>{orig_name}</b> concluído. {status_text}\n"
-            f"⏱ Tempo total de processamento: <b>{duration_text}</b>.\n"
-            f"Use os links abaixo para baixar o arquivo original sem compressão.{download_block}"
+            telegram_notice("✅", "Karaokê concluído", *fallback_lines),
         )
     except Exception as exc:
-        logger.error("Erro no envio em segundo plano para o Telegram: %s", exc)
+        logger.error("Erro ao concluir a entrega ao Telegram: %s", exc)
+        return _send_telegram_notification_worker(
+            token,
+            chat_id,
+            telegram_notice(
+                "⚠️",
+                "Resultado salvo; envio pendente",
+                f"🎵 <b>{telegram_escape(orig_name)}</b>",
+                "O resultado permanece disponível na Biblioteca.",
+            ),
+        )
 
 
 def send_video_to_targets(
@@ -4472,22 +4517,19 @@ def send_video_to_targets(
     external_url: str,
     processing_seconds: float = 0,
 ):
+    """Entrega o resultado a todos os bots antes de liberar o próximo item da fila."""
     for target in targets:
-        threading.Thread(
-            target=send_telegram_video_flow,
-            kwargs={
-                "token": target["telegram_token"],
-                "chat_id": target["telegram_chat_id"],
-                "video_path": video_path,
-                "orig_name": orig_name,
-                "history_filename": history_filename,
-                "public_download_token": public_download_token,
-                "base_url": base_url,
-                "external_url": external_url,
-                "processing_seconds": processing_seconds,
-            },
-            daemon=True
-        ).start()
+        send_telegram_video_flow(
+            token=target["telegram_token"],
+            chat_id=target["telegram_chat_id"],
+            video_path=video_path,
+            orig_name=orig_name,
+            history_filename=history_filename,
+            public_download_token=public_download_token,
+            base_url=base_url,
+            external_url=external_url,
+            processing_seconds=processing_seconds,
+        )
 
 
 def send_telegram_document_flow(
@@ -4500,16 +4542,25 @@ def send_telegram_document_flow(
     external_url: str = "",
     processing_seconds: float = 0,
 ):
-    """Envia um resultado leve como documento e sempre publica os links disponíveis."""
+    """Envia um SRT e só retorna quando o Telegram confirmar a entrega."""
     if not token or not chat_id or not os.path.isfile(document_path):
-        return
+        return False
     route = f"/api/public/download/{public_download_token}" if public_download_token else ""
     links = []
     duration_text = format_processing_duration(processing_seconds)
     if route and base_url.strip():
-        links.append(f'🏠 <a href="{base_url.rstrip("/")}{route}">Baixar na rede local</a>')
+        local_url = telegram_escape(f'{base_url.rstrip("/")}{route}')
+        links.append(f'🏠 <a href="{local_url}">Rede local</a>')
     if route and external_url.strip():
-        links.append(f'🌐 <a href="{external_url.rstrip("/")}{route}">Baixar pelo acesso externo</a>')
+        remote_url = telegram_escape(f'{external_url.rstrip("/")}{route}')
+        links.append(f'🌐 <a href="{remote_url}">Acesso externo</a>')
+
+    caption_lines = [
+        f"📄 {telegram_escape(display_name)}",
+        f"⏱ Tempo total de processamento: <b>{telegram_escape(duration_text)}</b>",
+    ]
+    if links:
+        caption_lines.extend(["", "📥 <b>Links de download</b>", *links])
 
     success = False
     try:
@@ -4518,10 +4569,7 @@ def send_telegram_document_flow(
                 f"https://api.telegram.org/bot{token}/sendDocument",
                 data={
                     "chat_id": chat_id,
-                    "caption": (
-                        f"📄 <b>Sal0 Karaokê</b>: {display_name}\n"
-                        f"⏱ Tempo total de processamento: <b>{duration_text}</b>"
-                    ),
+                    "caption": telegram_notice("✅", "Legenda concluída", *caption_lines),
                     "parse_mode": "HTML",
                 },
                 files={"document": (os.path.basename(document_path), document_file, "application/x-subrip")},
@@ -4533,13 +4581,20 @@ def send_telegram_document_flow(
     except Exception as exc:
         logger.error("Falha ao enviar documento ao Telegram: %s", exc)
 
-    delivery = "Arquivo SRT enviado diretamente." if success else "O envio direto falhou; use um dos links abaixo."
-    link_block = "\n" + "\n".join(links) if links else ""
-    send_telegram_notification(
+    if success:
+        return True
+
+    fallback_lines = [
+        f"📄 {telegram_escape(display_name)}",
+        "⚠️ O envio direto falhou; o SRT permanece salvo na Biblioteca.",
+        f"⏱ Tempo total de processamento: <b>{telegram_escape(duration_text)}</b>",
+    ]
+    if links:
+        fallback_lines.extend(["", "📥 <b>Links de download</b>", *links])
+    return _send_telegram_notification_worker(
         token,
         chat_id,
-        f"✅ <b>Sal0 Karaokê</b>: {display_name}. {delivery}\n"
-        f"⏱ Tempo total de processamento: <b>{duration_text}</b>.{link_block}",
+        telegram_notice("✅", "Legenda concluída", *fallback_lines),
     )
 
 
@@ -4550,22 +4605,19 @@ def send_documents_to_targets(
     external_url: str,
     processing_seconds: float = 0,
 ):
+    """Entrega todos os documentos antes de liberar o próximo item da fila."""
     for target in targets:
         for document in documents:
-            threading.Thread(
-                target=send_telegram_document_flow,
-                kwargs={
-                    "token": target["telegram_token"],
-                    "chat_id": target["telegram_chat_id"],
-                    "document_path": document["path"],
-                    "display_name": document["label"],
-                    "public_download_token": document.get("public_download_token"),
-                    "base_url": base_url,
-                    "external_url": external_url,
-                    "processing_seconds": processing_seconds,
-                },
-                daemon=True,
-            ).start()
+            send_telegram_document_flow(
+                token=target["telegram_token"],
+                chat_id=target["telegram_chat_id"],
+                document_path=document["path"],
+                display_name=document["label"],
+                public_download_token=document.get("public_download_token"),
+                base_url=base_url,
+                external_url=external_url,
+                processing_seconds=processing_seconds,
+            )
 
 
 def run_subtitle_srt_pipeline(
@@ -4637,7 +4689,13 @@ def run_subtitle_srt_pipeline(
         )
         notify_targets(
             telegram_targets,
-            f"✍️ <b>Sal0 Karaokê</b>: Transcrevendo o áudio completo de <b>{orig_name}</b>.",
+            telegram_notice(
+                "✍️",
+                "Transcrição com Whisper",
+                f"🎵 <b>{telegram_escape(orig_name)}</b>",
+                "🎧 O áudio completo será usado para gerar o SRT.",
+                "📊 Etapa atual: transcrição",
+            ),
         )
         def publish_subtitle_whisper_progress(percent: int, elapsed: float, total: float):
             remaining = max(0.0, total - elapsed)
@@ -4787,8 +4845,12 @@ def run_subtitle_srt_pipeline(
             logger.exception("A tradução opcional falhou; o SRT original foi preservado.")
             notify_targets(
                 telegram_targets,
-                f"⚠️ <b>Sal0 Karaokê</b>: o SRT original de <b>{orig_name}</b> ficou pronto, "
-                "mas a tradução opcional falhou.",
+                telegram_notice(
+                    "⚠️",
+                    "Tradução opcional não concluída",
+                    f"🎵 <b>{telegram_escape(orig_name)}</b>",
+                    "✅ O SRT original foi preservado e continua disponível.",
+                ),
             )
     save_stage_checkpoint(
         cache_dir,
@@ -4816,6 +4878,31 @@ def run_subtitle_srt_pipeline(
     total_processing_seconds = (
         processing_elapsed_callback() if processing_elapsed_callback else 0
     )
+    completion = "SRT original e traduzido" if translated_filename else "SRT original"
+    telegram_documents = [{
+        "path": os.path.join(library_dir, "history", original_filename),
+        "label": f"SRT original de {orig_name}",
+        "public_download_token": public_token,
+    }]
+    if translated_filename:
+        telegram_documents.append({
+            "path": os.path.join(library_dir, "history", translated_filename),
+            "label": f"SRT traduzido de {orig_name}",
+            "public_download_token": translated_public_token,
+        })
+    update_state(
+        "processing",
+        "Sending subtitles to Telegram",
+        99,
+        stage_detail="Aguardando a confirmação de entrega antes de iniciar o próximo item",
+    )
+    send_documents_to_targets(
+        telegram_targets,
+        telegram_documents,
+        telegram_base_url,
+        telegram_external_url,
+        total_processing_seconds,
+    )
     update_state(
         "done",
         "SRT ready",
@@ -4829,25 +4916,6 @@ def run_subtitle_srt_pipeline(
         translation_error=translation_error,
         result_kind="subtitles",
         public_download_token=public_token,
-    )
-    completion = "SRT original e traduzido" if translated_filename else "SRT original"
-    telegram_documents = [{
-        "path": os.path.join(library_dir, "history", original_filename),
-        "label": f"SRT original de {orig_name}",
-        "public_download_token": public_token,
-    }]
-    if translated_filename:
-        telegram_documents.append({
-            "path": os.path.join(library_dir, "history", translated_filename),
-            "label": f"SRT traduzido de {orig_name}",
-            "public_download_token": translated_public_token,
-        })
-    send_documents_to_targets(
-        telegram_targets,
-        telegram_documents,
-        telegram_base_url,
-        telegram_external_url,
-        total_processing_seconds,
     )
     logger.info("%s concluído(s) e encaminhado(s) ao Telegram.", completion)
 
@@ -4918,8 +4986,15 @@ def run_pipeline(
         pm.cancel_event.clear()
         pm.clear_active_process()
 
-        # Notificação Telegram: Apenas início resumido
-        notify_targets(telegram_targets, f"🎙️ <b>Sal0 Karaokê</b>: Iniciando processamento de <b>{orig_name}</b>...")
+        notify_targets(
+            telegram_targets,
+            telegram_notice(
+                "🎙️",
+                "Novo processamento",
+                f"🎵 <b>{telegram_escape(orig_name)}</b>",
+                "⏳ Preparando a primeira etapa.",
+            ),
+        )
 
         # Pasta de saída mapeada via volume docker-compose
         os.makedirs(output_dir, exist_ok=True)
@@ -4978,7 +5053,15 @@ def run_pipeline(
             if not already_downloaded:
                 pm.check_cancelled()
                 update_state("processing", "Downloading YouTube", 5)
-                notify_targets(telegram_targets, "🌐 <b>Sal0 Karaokê</b>: Iniciando download do YouTube...")
+                notify_targets(
+                    telegram_targets,
+                    telegram_notice(
+                        "🌐",
+                        "Download do YouTube",
+                        "⏳ Iniciando a transferência da mídia.",
+                        "📊 Progresso geral: <b>5%</b>",
+                    ),
+                )
 
                 try:
                     input_audio_path, title = download_youtube(youtube_url, cache_dir)
@@ -4994,7 +5077,15 @@ def run_pipeline(
                         import json
                         json.dump(cached_meta, f, indent=4)
 
-                    notify_targets(telegram_targets, f"📥 <b>Sal0 Karaokê</b>: Download concluído! <b>{orig_name}</b>")
+                    notify_targets(
+                        telegram_targets,
+                        telegram_notice(
+                            "📥",
+                            "Download concluído",
+                            f"🎵 <b>{telegram_escape(orig_name)}</b>",
+                            "➡️ Próxima etapa: preparação do áudio.",
+                        ),
+                    )
                 except Exception as e:
                     logger.error(f"Erro ao baixar do YouTube: {e}")
                     raise RuntimeError(f"Falha ao baixar vídeo do YouTube: {e}")
@@ -5060,7 +5151,12 @@ def run_pipeline(
                 update_process_summary(lyrics="Letra-guia + Whisper")
                 notify_targets(
                     telegram_targets,
-                    f"📖 <b>Sal0 Karaokê</b>: letra-guia encontrada para <b>{orig_name}</b>.",
+                    telegram_notice(
+                        "📖",
+                        "Letra-guia encontrada",
+                        f"🎵 <b>{telegram_escape(orig_name)}</b>",
+                        "✅ A letra será usada para orientar a grafia do Whisper.",
+                    ),
                 )
                 cached_meta["lyrics_text"] = auto_lyrics
                 try:
@@ -5079,19 +5175,33 @@ def run_pipeline(
                 update_process_summary(lyrics="Somente Whisper")
                 notify_targets(
                     telegram_targets,
-                    f"📖 <b>Sal0 Karaokê</b>: nenhuma letra-guia foi encontrada para <b>{orig_name}</b>; "
-                    "o processamento seguirá somente com o Whisper.",
+                    telegram_notice(
+                        "📖",
+                        "Letra-guia não encontrada",
+                        f"🎵 <b>{telegram_escape(orig_name)}</b>",
+                        "➡️ O processamento seguirá normalmente somente com o Whisper.",
+                    ),
                 )
                 logger.info("Seguindo sem letra guia automática para '%s'.", orig_name)
         elif lyrics_text:
             notify_targets(
                 telegram_targets,
-                f"📖 <b>Sal0 Karaokê</b>: letra-guia manual recebida para <b>{orig_name}</b>.",
+                telegram_notice(
+                    "📖",
+                    "Letra-guia manual recebida",
+                    f"🎵 <b>{telegram_escape(orig_name)}</b>",
+                    "✅ O texto será usado para orientar a grafia do Whisper.",
+                ),
             )
         else:
             notify_targets(
                 telegram_targets,
-                f"📖 <b>Sal0 Karaokê</b>: <b>{orig_name}</b> será processado sem letra-guia.",
+                telegram_notice(
+                    "📖",
+                    "Processamento sem letra-guia",
+                    f"🎵 <b>{telegram_escape(orig_name)}</b>",
+                    "➡️ A transcrição será produzida somente pelo Whisper.",
+                ),
             )
 
         # Invalidação Inteligente de Cache: comparar o hash/tamanho do arquivo de entrada atual com o cache
@@ -5141,7 +5251,15 @@ def run_pipeline(
             else:
                 pm.check_cancelled()
                 update_state("processing", "Extracting audio", 15)
-                notify_targets(telegram_targets, "🎵 <b>Sal0 Karaokê</b>: Extraindo áudio (15%)")
+                notify_targets(
+                    telegram_targets,
+                    telegram_notice(
+                        "🎵",
+                        "Extração do áudio",
+                        "🎧 Preparando a faixa para o processamento local.",
+                        "📊 Progresso geral: <b>15%</b>",
+                    ),
+                )
                 extract_audio(input_audio_path, converted_wav)
 
             pm.check_cancelled()
@@ -5169,7 +5287,15 @@ def run_pipeline(
                     stage_progress=0,
                     stage_detail="Preparando quatro análises locais de alta precisão"
                 )
-                notify_targets(telegram_targets, "✂️ <b>Sal0 Karaokê</b>: Iniciando a separação local de vocais")
+                notify_targets(
+                    telegram_targets,
+                    telegram_notice(
+                        "✂️",
+                        "Separação local de vocais",
+                        "⚙️ Iniciando quatro análises de alta precisão com o Demucs.",
+                        "📊 Progresso geral inicial: <b>20%</b>",
+                    ),
+                )
                 with tempfile.TemporaryDirectory() as demucs_tmp:
                     v_tmp, i_tmp = separate_vocals(converted_wav, demucs_tmp, update_callback=update_state)
                     shutil.move(v_tmp, vocals_wav)
@@ -5193,7 +5319,15 @@ def run_pipeline(
                 rendered_checkpoint = stage_checkpoint(cache_dir, "video_rendered")
                 if not rendered_checkpoint or not os.path.isfile(final_mp4_path):
                     update_state("processing", "Rendering final video", 95)
-                    notify_targets(telegram_targets, "🎬 <b>Sal0 Karaokê</b>: Renderizando vídeo sem a voz do cantor (95%)")
+                    notify_targets(
+                        telegram_targets,
+                        telegram_notice(
+                            "🎬",
+                            "Renderização do vídeo",
+                            "🎧 Criando o resultado sem a voz do cantor.",
+                            "📊 Progresso geral: <b>95%</b>",
+                        ),
+                    )
 
                     # Forçar o uso do vídeo original enviado
                     render_karaoke_video(
@@ -5215,18 +5349,13 @@ def run_pipeline(
                 save_result_metadata(output_dir, orig_name, history_filename)
                 total_processing_seconds = persist_total_processing_seconds()
                 update_state("processing", "Cleaning temporary files", 98)
-                update_state(
-                    "done",
-                    "Done",
-                    100,
-                    result_file=final_mp4_path,
-                    history_filename=history_filename,
-                    public_download_token=public_token
-                )
                 logger.info("Pipeline concluído: Vocais removidos do vídeo original com sucesso.")
-
-                processing_lock.release()
-
+                update_state(
+                    "processing",
+                    "Sending result to Telegram",
+                    99,
+                    stage_detail="Aguardando compressão e confirmação de entrega antes da próxima tarefa",
+                )
                 send_video_to_targets(
                     telegram_targets,
                     final_mp4_path,
@@ -5236,6 +5365,14 @@ def run_pipeline(
                     telegram_base_url,
                     telegram_external_url,
                     total_processing_seconds,
+                )
+                update_state(
+                    "done",
+                    "Done",
+                    100,
+                    result_file=final_mp4_path,
+                    history_filename=history_filename,
+                    public_download_token=public_token
                 )
                 return
 
@@ -5274,7 +5411,16 @@ def run_pipeline(
                     stage_progress=0,
                     stage_detail="Carregando o modelo Whisper e preparando o áudio",
                 )
-                notify_targets(telegram_targets, f"✍️ <b>Sal0 Karaokê</b>: Transcrevendo voz ({whisper_model}) (70%)")
+                notify_targets(
+                    telegram_targets,
+                    telegram_notice(
+                        "✍️",
+                        "Transcrição com Whisper",
+                        f"🤖 Modelo: <b>{telegram_escape(whisper_model)}</b>",
+                        "🎤 Convertendo a voz em texto sincronizado.",
+                        "📊 Progresso geral inicial: <b>65%</b>",
+                    ),
+                )
 
                 transcribe_audio = vocals_wav if transcribe_source == "vocals" else converted_wav
                 logger.info(f"Fonte de transcrição escolhida: {transcribe_audio} (Modo: {transcribe_source})")
@@ -5362,8 +5508,13 @@ def run_pipeline(
                 # Notificação Telegram para o usuário entrar no app e editar
                 notify_targets(
                     telegram_targets,
-                    f"⚠️ <b>Sal0 Karaokê</b>: A transcrição de <b>{orig_name}</b> está pronta para correção! "
-                    "Entre no aplicativo web para revisar/corrigir a legenda e continuar a renderização."
+                    telegram_notice(
+                        "⚠️",
+                        "Revisão de legenda necessária",
+                        f"🎵 <b>{telegram_escape(orig_name)}</b>",
+                        "✍️ A transcrição está pronta para correção.",
+                        "➡️ Abra o aplicativo para revisar e continuar a renderização.",
+                    )
                 )
 
                 logger.info("Aguardando o usuário corrigir as legendas na interface web...")
@@ -5398,7 +5549,15 @@ def run_pipeline(
             subtitles_checkpoint = stage_checkpoint(cache_dir, "subtitles_generated")
             if not subtitles_checkpoint or not os.path.isfile(ass_path):
                 update_state("processing", "Generating subtitles", 80)
-                notify_targets(telegram_targets, "📝 <b>Sal0 Karaokê</b>: Gerando legenda (80%)")
+                notify_targets(
+                    telegram_targets,
+                    telegram_notice(
+                        "📝",
+                        "Geração da legenda",
+                        "⏱ Criando e sincronizando o texto do karaokê.",
+                        "📊 Progresso geral: <b>80%</b>",
+                    ),
+                )
                 generate_ass_karaoke(
                     segments=segments,
                     output_ass_path=ass_path,
@@ -5423,7 +5582,15 @@ def run_pipeline(
             rendered_checkpoint = stage_checkpoint(cache_dir, "video_rendered")
             if not rendered_checkpoint or not os.path.isfile(final_mp4_path):
                 update_state("processing", "Rendering final video", 95)
-                notify_targets(telegram_targets, "🎬 <b>Sal0 Karaokê</b>: Renderizando vídeo (95%)")
+                notify_targets(
+                    telegram_targets,
+                    telegram_notice(
+                        "🎬",
+                        "Renderização final",
+                        "🎞 Combinando áudio, fundo e legenda no vídeo.",
+                        "📊 Progresso geral: <b>95%</b>",
+                    ),
+                )
                 bg_mode_param = "original_video" if (background_mode in ["original", "original_video"]) else background_mode
                 render_karaoke_video(
                     instrumental_path=instrumental_wav,
@@ -5451,21 +5618,13 @@ def run_pipeline(
             update_state("processing", "Cleaning temporary files", 98)
             logger.info("Preservando arquivos de entrada no cache para futuros reprocessamentos.")
 
-            # Processamento local CONCLUÍDO na UI!
-            update_state(
-                "done",
-                "Done",
-                100,
-                result_file=final_mp4_path,
-                history_filename=history_filename,
-                public_download_token=public_token
-            )
             logger.info("Pipeline de Karaokê Maker concluído com sucesso!")
-
-            # Liberar o lock de processamento imediatamente para que o usuário possa usar o site
-            processing_lock.release()
-
-            # Disparar envio do vídeo ao Telegram em segundo plano (thread separada)
+            update_state(
+                "processing",
+                "Sending result to Telegram",
+                99,
+                stage_detail="Aguardando compressão e confirmação de entrega antes da próxima tarefa",
+            )
             send_video_to_targets(
                 telegram_targets,
                 final_mp4_path,
@@ -5476,13 +5635,26 @@ def run_pipeline(
                 telegram_external_url,
                 total_processing_seconds,
             )
+            update_state(
+                "done",
+                "Done",
+                100,
+                result_file=final_mp4_path,
+                history_filename=history_filename,
+                public_download_token=public_token
+            )
 
     except StagePauseRequested as pause:
         elapsed_seconds = persist_total_processing_seconds()
         notify_targets(
             telegram_targets,
-            f"⏸ <b>Sal0 Karaokê</b>: <b>{orig_name}</b> foi pausado com segurança após "
-            f"<b>{pause.label}</b>. Tempo processado: <b>{format_processing_duration(elapsed_seconds)}</b>.",
+            telegram_notice(
+                "⏸",
+                "Processamento pausado com segurança",
+                f"🎵 <b>{telegram_escape(orig_name)}</b>",
+                f"💾 Checkpoint salvo após: <b>{telegram_escape(pause.label)}</b>",
+                f"⏱ Tempo processado: <b>{telegram_escape(format_processing_duration(elapsed_seconds))}</b>",
+            ),
         )
         raise
     except Exception as e:
@@ -5492,7 +5664,15 @@ def run_pipeline(
             update_state("idle", "Idle", 0, error_message="Processamento cancelado pelo usuário.")
         else:
             update_state("error", "Error", 0, error_message=str(e))
-            notify_targets(telegram_targets, f"❌ <b>Sal0 Karaokê</b>: Falha ao processar <b>{orig_name}</b>. Erro: {e}")
+            notify_targets(
+                telegram_targets,
+                telegram_notice(
+                    "❌",
+                    "Falha no processamento",
+                    f"🎵 <b>{telegram_escape(orig_name)}</b>",
+                    f"Detalhes: {telegram_escape(e)}",
+                ),
+            )
 
         # Preservamos os arquivos de entrada no cache mesmo após erro
         logger.info("Preservando arquivos de entrada no cache após erro para permitir repetições.")

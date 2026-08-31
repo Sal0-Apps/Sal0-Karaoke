@@ -35,6 +35,8 @@ class WhisperProgressTests(unittest.TestCase):
     def test_interface_has_one_total_bar_and_compact_stage_percentage(self):
         self.assertIn('id="progressBarFill"', HTML)
         self.assertIn('aria-label="Progresso total do processo"', HTML)
+        self.assertIn("process-overall-progress", HTML)
+        self.assertLess(HTML.index('id="progressBarFill"'), HTML.index('id="processSummary"'))
         self.assertNotIn('id="stageProgressBox"', HTML)
         self.assertNotIn('id="stageProgressBarFill"', HTML)
         self.assertNotIn('id="timeline"', HTML)

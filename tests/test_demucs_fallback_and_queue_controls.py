@@ -110,6 +110,7 @@ class DemucsFallbackAndQueueTests(unittest.TestCase):
         self.assertIn("load_processing_queue_control()", MAIN)
         self.assertIn("async function toggleProcessingQueuePause", HTML)
         self.assertIn("Pausar ao concluir etapa", HTML)
+        self.assertEqual(HTML.count('class="btn-secondary btn-queue-pause"'), 1)
 
     def test_stage_checkpoints_preserve_expensive_results(self):
         self.assertIn('class StagePauseRequested(Exception):', MAIN)
@@ -124,17 +125,19 @@ class DemucsFallbackAndQueueTests(unittest.TestCase):
         self.assertIn("Checkpoint salvo — é seguro reiniciar o servidor", HTML)
 
     def test_telegram_reports_automatic_lyrics_result(self):
-        self.assertIn("letra-guia encontrada para", MAIN)
-        self.assertIn("nenhuma letra-guia foi encontrada para", MAIN)
-        self.assertIn("o processamento seguirá somente com o Whisper", MAIN)
-        self.assertIn("letra-guia manual recebida para", MAIN)
-        self.assertIn("será processado sem letra-guia", MAIN)
+        self.assertIn('"Letra-guia encontrada"', MAIN)
+        self.assertIn('"Letra-guia não encontrada"', MAIN)
+        self.assertIn("seguirá normalmente somente com o Whisper", MAIN)
+        self.assertIn('"Letra-guia manual recebida"', MAIN)
+        self.assertIn('"Processamento sem letra-guia"', MAIN)
 
     def test_telegram_completion_reports_total_processing_time(self):
         self.assertIn("def format_processing_duration", MAIN)
         self.assertIn("active_processing_seconds", MAIN)
         self.assertIn("Tempo total de processamento", MAIN)
         self.assertIn("processing_seconds", MAIN)
+        self.assertIn('"Sending result to Telegram"', MAIN)
+        self.assertIn("antes de liberar o próximo item da fila", MAIN)
 
     def test_mobile_process_summary_wraps_complete_values(self):
         self.assertIn(".process-summary { grid-template-columns: 1fr; }", HTML)

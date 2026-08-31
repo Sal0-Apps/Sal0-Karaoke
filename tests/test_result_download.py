@@ -51,6 +51,14 @@ class ResultDownloadTests(unittest.TestCase):
         self.assertIn("uniqueDownloadFileName", ANDROID)
         self.assertIn("setAllowedOverMetered(true)", ANDROID)
 
+    def test_android_webview_does_not_repeat_the_web_header(self):
+        browser_start = ANDROID.index("private void showBrowser()")
+        browser_end = ANDROID.index("private void configureWebView", browser_start)
+        browser_source = ANDROID[browser_start:browser_end]
+        self.assertNotIn('text("Sal0 Karaokê"', browser_source)
+        self.assertNotIn('iconButton("↻"', browser_source)
+        self.assertNotIn('iconButton("⚙"', browser_source)
+
     def test_large_telegram_video_uses_temporary_preview_and_original_link(self):
         self.assertIn("def compress_video_for_telegram", MAIN)
         self.assertIn('compressed_target = 46 * 1024 * 1024', MAIN)

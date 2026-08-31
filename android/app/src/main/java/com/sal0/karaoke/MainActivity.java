@@ -389,38 +389,9 @@ public class MainActivity extends ComponentActivity {
         browserContainer = verticalLayout();
         browserContainer.setBackgroundColor(COLOR_BACKGROUND);
         root.addView(browserContainer, matchMatch());
-
-        LinearLayout toolbar = horizontalLayout();
-        toolbar.setGravity(Gravity.CENTER_VERTICAL);
-        toolbar.setPadding(dp(12), dp(7), dp(8), dp(7));
-        toolbar.setBackgroundColor(COLOR_SURFACE);
-        browserContainer.addView(toolbar, new LinearLayout.LayoutParams(-1, dp(58)));
-
-        ImageView logo = new ImageView(this);
-        logo.setImageResource(com.sal0.karaoke.R.drawable.app_icon_v8);
-        logo.setScaleType(ImageView.ScaleType.CENTER_CROP);
-        toolbar.addView(logo, new LinearLayout.LayoutParams(dp(38), dp(38)));
-
-        TextView name = text("Sal0 Karaokê", 16, COLOR_TEXT, true);
-        LinearLayout.LayoutParams nameParams = new LinearLayout.LayoutParams(0, -2, 1f);
-        nameParams.leftMargin = dp(10);
-        toolbar.addView(name, nameParams);
-
-        routeBadge = text("● Conectando", 12, COLOR_MUTED, true);
-        routeBadge.setGravity(Gravity.CENTER);
-        routeBadge.setPadding(dp(10), dp(6), dp(10), dp(6));
-        routeBadge.setBackground(rounded(COLOR_SURFACE_ALT, COLOR_BORDER, 18));
-        LinearLayout.LayoutParams badgeParams = new LinearLayout.LayoutParams(-2, -2);
-        badgeParams.rightMargin = dp(4);
-        toolbar.addView(routeBadge, badgeParams);
-
-        Button refresh = iconButton("↻", "Atualizar");
-        refresh.setOnClickListener(view -> reevaluateRoute(true));
-        toolbar.addView(refresh, new LinearLayout.LayoutParams(dp(44), dp(44)));
-
-        Button settings = iconButton("⚙", "Configurações");
-        settings.setOnClickListener(view -> showSetup(false));
-        toolbar.addView(settings, new LinearLayout.LayoutParams(dp(44), dp(44)));
+        // A página já possui identidade, estado da conexão, atualização e ajustes.
+        // O APK exibe somente o WebView para não repetir esse cabeçalho no celular.
+        routeBadge = null;
 
         pageProgress = new ProgressBar(
             this,
@@ -734,6 +705,9 @@ public class MainActivity extends ComponentActivity {
     }
 
     private void updateRouteBadge(ConnectionRouter.Route route, String ssid) {
+        if (routeBadge == null) {
+            return;
+        }
         if (route == ConnectionRouter.Route.LOCAL) {
             String label = ConnectionRouter.ssidMatches(ssid, config.wifiSsid)
                 ? "● Local"
