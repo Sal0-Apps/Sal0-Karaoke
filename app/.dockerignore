@@ -31,6 +31,13 @@ __pycache__/
 *.key
 *.pem
 *.p12
+*.pfx
+*.jks
+*.keystore
+.github_token
+*.credentials
+credentials.*
+secrets.*
 
 # Backups e arquivos temporarios
 *.zip
