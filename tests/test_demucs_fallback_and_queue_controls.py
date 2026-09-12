@@ -79,6 +79,11 @@ class DemucsFallbackAndQueueTests(unittest.TestCase):
         self.assertTrue(vocals.endswith("vocals.wav"))
         self.assertTrue(instrumental.endswith("no_vocals.wav"))
 
+    def test_demucs_reserves_one_cpu_thread_for_the_server(self):
+        source = Path(audio_processor.__file__).read_text(encoding="utf-8")
+        self.assertIn("reserved_threads = 1 if cpu_count > 1 else 0", source)
+        self.assertIn("demucs_thread_limit = max(1, cpu_count - reserved_threads)", source)
+
     def test_subtitle_only_returns_before_demucs(self):
         pipeline = MAIN[MAIN.index("def run_pipeline("):]
         subtitle_branch = pipeline.index("if subtitle_only:")

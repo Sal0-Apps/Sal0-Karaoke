@@ -148,12 +148,17 @@ def separate_vocals(audio_path: str, temp_output_dir: str, update_callback=None)
         env["TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD"] = "1"
 
         cpu_count = get_effective_cpu_count()
+        # Reserve um thread para o servidor, Telegram e demais tarefas do
+        # container. Em uma máquina com 4 threads, o Demucs ficará com 3;
+        # em máquinas diferentes a quantidade acompanha o hardware visível.
+        reserved_threads = 1 if cpu_count > 1 else 0
+        demucs_thread_limit = max(1, cpu_count - reserved_threads)
         configured_threads = os.environ.get("DEMUCS_CPU_THREADS", "").strip()
         try:
-            cpu_threads = int(configured_threads) if configured_threads else cpu_count
+            cpu_threads = int(configured_threads) if configured_threads else demucs_thread_limit
         except ValueError:
-            cpu_threads = cpu_count
-        cpu_threads = max(1, min(cpu_threads, cpu_count))
+            cpu_threads = demucs_thread_limit
+        cpu_threads = max(1, min(cpu_threads, demucs_thread_limit))
         # --jobs controla workers internos do Demucs, não a quantidade de
         # threads de CPU. Para uma única entrada, jobs=0 evita o caminho que
         # dividia o trabalho e acabava deixando a CPU quase ociosa.
@@ -165,8 +170,10 @@ def separate_vocals(audio_path: str, temp_output_dir: str, update_callback=None)
         env["OMP_DYNAMIC"] = "FALSE"
         env["MKL_DYNAMIC"] = "FALSE"
         logger.info(
-            "Demucs CPU configurado com %s thread(s) disponível(is); jobs internos: 0",
+            "Demucs CPU configurado com %s thread(s) de %s disponível(is); "
+            "1 thread reservada para o servidor; jobs internos: 0",
             cpu_threads,
+            cpu_count,
         )
         
         # Executar o Demucs com streaming de logs em tempo real
