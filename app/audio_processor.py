@@ -9,9 +9,10 @@ logger = logging.getLogger("karaoke")
 def get_effective_cpu_count() -> int:
     """Retorna a quantidade de CPUs realmente disponível para o processo.
 
-    Em containers, ``os.cpu_count()`` pode informar os CPUs do host mesmo
-    quando o processo recebeu uma cota menor. Consideramos afinidade e cotas
-    do cgroup para evitar tanto subutilização quanto excesso de threads.
+    A afinidade do processo é uma limitação real de execução. Já a cota de
+    CPU do cgroup representa tempo de CPU e não deve ser usada como número de
+    workers: em Docker ela pode valer ``1`` mesmo quando há vários CPUs
+    visíveis para o processo, causando subutilização artificial do PyTorch.
     """
     candidates = []
 
@@ -26,26 +27,6 @@ def get_effective_cpu_count() -> int:
     host_count = os.cpu_count()
     if host_count:
         candidates.append(host_count)
-
-    cgroup_limits = (
-        ("/sys/fs/cgroup/cpu.max", None),
-        ("/sys/fs/cgroup/cpu/cpu.cfs_quota_us", "/sys/fs/cgroup/cpu/cpu.cfs_period_us"),
-    )
-    for quota_path, period_path in cgroup_limits:
-        try:
-            quota_parts = Path(quota_path).read_text(encoding="utf-8").strip().split()
-            if not quota_parts or quota_parts[0] == "max":
-                continue
-            quota = int(quota_parts[0])
-            if period_path:
-                period = int(Path(period_path).read_text(encoding="utf-8").strip())
-            else:
-                period = int(quota_parts[1])
-            if quota > 0 and period > 0:
-                candidates.append((quota + period - 1) // period)
-                break
-        except (OSError, IndexError, ValueError):
-            continue
 
     return max(1, min(candidates)) if candidates else 1
 
