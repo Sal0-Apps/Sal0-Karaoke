@@ -67,7 +67,8 @@ class DemucsFallbackAndQueueTests(unittest.TestCase):
 
         self.assertEqual(len(commands), 1)
         cmd = commands[0]
-        self.assertEqual(cmd[0], "demucs")
+        self.assertEqual(cmd[0], sys.executable)
+        self.assertTrue(cmd[1].endswith("demucs_runner.py"))
         self.assertIn("-d", cmd)
         self.assertIn("cpu", cmd)
         self.assertIn("-n", cmd)

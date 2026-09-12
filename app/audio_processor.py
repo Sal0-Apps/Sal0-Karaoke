@@ -1,6 +1,7 @@
 import os
 import subprocess
 import logging
+import sys
 from pathlib import Path
 
 logger = logging.getLogger("karaoke")
@@ -123,9 +124,11 @@ def separate_vocals(audio_path: str, temp_output_dir: str, update_callback=None)
     
     # Modelo htdemucs_ft de máxima precisão (conjunto de 4 modelos)
     model_name = "htdemucs_ft"
+    runner_path = Path(__file__).with_name("demucs_runner.py")
     
     cmd = [
-        "demucs",
+        sys.executable,
+        str(runner_path),
         "-d", "cpu",
         "-n", "htdemucs_ft",
         "--two-stems", "vocals",
