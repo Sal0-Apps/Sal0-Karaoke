@@ -59,25 +59,6 @@ jobs:
             ${{ env.IMAGE_TAG }}:latest
             ${{ env.IS_TAG == 'true' && format('{0}:{1}', env.IMAGE_TAG, env.VERSION_TAG) || '' }}
 
-      - name: Set up Java for Android build
-        if: startsWith(github.ref, 'refs/tags/v')
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '17'
-
-      - name: Set up Gradle
-        if: startsWith(github.ref, 'refs/tags/v')
-        uses: gradle/actions/setup-gradle@v4
-
-      - name: Build Android APK
-        if: startsWith(github.ref, 'refs/tags/v')
-        working-directory: android
-        run: |
-          gradle --no-daemon :app:assembleRelease -PVERSION_NAME=${{ env.VERSION_TAG }} -PVERSION_CODE=90007
-          test -f app/build/outputs/apk/release/app-release.apk
-          mv app/build/outputs/apk/release/app-release.apk app/build/outputs/apk/release/Sal0-Karaoke-v${{ env.VERSION_TAG }}.apk
-
       - name: Create GitHub Release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
@@ -86,7 +67,5 @@ jobs:
           generate_release_notes: true
           draft: false
           prerelease: false
-          fail_on_unmatched_files: true
-          files: android/app/build/outputs/apk/release/Sal0-Karaoke-v${{ env.VERSION_TAG }}.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

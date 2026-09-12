@@ -1,68 +1,43 @@
-# Sal0 Karaokê 9.0.7
+# 🎤 Sal0 Karaokê
 
-O Sal0 Karaokê é uma aplicação local e auto-hospedada para criar vídeos de karaokê e arquivos de legenda a partir de mídias fornecidas pelo próprio operador. O servidor executa extração de áudio, separação de voz, transcrição, sincronização, tradução opcional e renderização. A interface web é distribuída em uma imagem Docker; o aplicativo Android funciona como cliente do servidor e abre essa mesma interface com roteamento entre endereços local e externo.
+Transforme uma música em um vídeo de karaokê sem mandar seu áudio para uma nuvem de processamento. Escolha a faixa, ajuste o visual e deixe o Sal0 Karaokê separar a voz, transcrever, sincronizar e renderizar tudo no seu próprio computador ou servidor.
 
-Esta é a versão final do projeto. O desenvolvimento ativo foi encerrado e a manutenção é mínima. A publicação do código permite uso, estudo, modificação e criação de forks nos termos da licença MIT, mas não representa promessa de suporte, adequação jurídica para um caso concreto ou compatibilidade futura com serviços externos.
+É um projeto pessoal, feito com carinho para brincar com música — mas organizado o bastante para virar o cantinho de karaokê de uma casa, família ou grupo de amigos. ✨
 
-## Documentação
+## O que ele faz
 
-- [Segurança](SECURITY.md)
-- [Auditoria de segurança](SECURITY_AUDIT.md)
-- [Privacidade](PRIVACY.md)
-- [Status do projeto](PROJECT_STATUS.md)
-- [Uso jurídico e publicação](LEGAL.md)
-- [Componentes e materiais de terceiros](THIRD_PARTY_NOTICES.md)
-- [Licença do código](LICENSE)
-- [Cliente Android](android/README.md)
+| Parte | Possibilidades |
+|---|---|
+| Música | Upload, Biblioteca ou link do YouTube identificado e preparado ao criar |
+| Modo Rápido | Link, arquivo ou Biblioteca, fundo opcional e um botão; o restante segue o padrão do administrador |
+| Voz | Separação de vocal e instrumental com Demucs |
+| Legenda | Transcrição local com Faster-Whisper e modos por sílaba, palavra ou linha |
+| Perfis | Opções prontas para karaokê equilibrado, canto contínuo, voz difícil/mix e criação rápida, além dos perfis pessoais |
+| Letra-guia | Texto manual ou busca opcional em LRCLIB, Lyrics.ovh e Musixmatch |
+| Visual | Vídeo original, cor, imagem, vídeo, Biblioteca ou fundo do YouTube |
+| Revisão | Editor de texto e tempos antes da renderização |
+| Resultado | Preview, download como `Música - Karaokê.mp4` e histórico permanente |
+| Telegram | Bot pessoal por usuário, avisos e vídeo ou link direto |
+| Contas | Espaços separados para Biblioteca, cache, letras, perfis, bot e resultados |
 
-## Funcionalidades
+Todo o processamento de mídia continua local. Quando a busca automática de letra é usada, apenas o nome da música e do artista é consultado na internet; a letra encontrada serve como guia para a transcrição.
 
-- modos Rápido e Detalhado para criação de vídeos de karaokê;
-- modo Gerar SRT para transcrição integral de áudio ou vídeo;
-- SRT no idioma detectado e tradução local opcional;
-- fila persistente para arquivos, links e itens da Biblioteca nos três modos;
-- progresso geral e progresso específico das etapas de processamento;
-- separação de voz e instrumental com Demucs;
-- transcrição local com Faster-Whisper e estabilização de tempos;
-- geração de legendas ASS e renderização com FFmpeg;
-- fundos sólidos, imagens, vídeos, vídeo original e Biblioteca;
-- contas locais com dados separados por usuário;
-- acesso administrativo aos resultados de todas as contas;
-- integração opcional com Telegram para avisos, arquivos SRT, vídeos e links;
-- importação opcional por URL com `yt-dlp`;
-- atualização administrativa do mecanismo `yt-dlp` armazenada em `/data`;
-- cliente Android com seleção de rota, upload, reprodução e downloads.
+Nas telas de criação, basta colar o link: o nome do vídeo aparece na interface e o download necessário acontece ao clicar em criar. Os botões para baixar e guardar uma música ou um fundo antes do processo ficam na **Biblioteca**.
 
-## Fluxo de processamento
+## Contas sem misturar os discos
 
-1. O usuário seleciona arquivo, URL ou item da Biblioteca.
-2. O servidor cria um trabalho isolado e o posiciona na fila.
-3. A mídia é normalizada e, nos modos de karaokê, voz e instrumental são separados.
-4. O Whisper transcreve o áudio e publica o progresso da etapa.
-5. O servidor gera SRT ou compõe as legendas do vídeo.
-6. O resultado final é salvo na Biblioteca da conta responsável.
-7. Se o Telegram estiver configurado, o resultado e os links disponíveis são enviados aos destinatários autorizados.
+- Cada usuário comum vê e controla apenas as próprias criações.
+- Um usuário comum não cria contas nem cancela a tarefa de outra pessoa.
+- Cada conta pode configurar seu próprio bot do Telegram.
+- O administrador gerencia o servidor, pode cancelar qualquer tarefa e recebe também os avisos de todas as contas.
+- A Biblioteca antiga permanece com a conta administradora; novos usuários recebem espaços separados automaticamente.
 
-Trabalhos concluídos ou cancelados não permanecem como histórico da fila. Os resultados permanentes ficam na Biblioteca.
-
-## Requisitos
-
-- Docker Engine;
-- Docker Compose v2;
-- processador compatível com a imagem publicada;
-- espaço suficiente para modelos de IA, arquivos temporários e resultados;
-- memória e tempo de processamento proporcionais à duração e à resolução das mídias.
-
-O primeiro uso pode exigir downloads grandes de modelos. A imagem e as dependências também podem mudar de tamanho conforme os repositórios externos utilizados no build.
-
-## Execução com Docker
-
-Exemplo mínimo:
+## Rodando com Docker
 
 ```yaml
 services:
   karaoke-app:
-    image: ghcr.io/sal0-apps/sal0-karaoke:9.0.7
+    image: ghcr.io/sal0-apps/sal0-karaoke:latest
     container_name: karaoke-app
     ports:
       - "7885:7860"
@@ -71,85 +46,64 @@ services:
     restart: unless-stopped
 ```
 
-Inicialização:
+Depois, execute:
 
 ```bash
-mkdir -p data
-docker compose pull
 docker compose up -d
 ```
 
-Abra `http://localhost:7885` e crie a conta administradora no primeiro acesso. Para atualizar a instalação sem substituir o volume:
+Abra `http://localhost:7885`. No primeiro acesso, o aplicativo pede a criação da conta administradora.
 
-```bash
-docker compose pull
-docker compose up -d --force-recreate
-```
+## Um primeiro karaokê
 
-Persista somente `/data`. Montar um volume sobre `/app` pode ocultar arquivos da imagem e produzir uma instalação inconsistente.
+### Modo Rápido
 
-## Armazenamento
+O **Modo Rápido** é a primeira aba de criação para todas as contas. Link do YouTube, arquivo local e Biblioteca ficam disponíveis ao mesmo tempo: basta interagir com a opção desejada e clicar em criar. Música, vídeo, imagem e fundo também podem ser arrastados diretamente para seus campos.
 
-```text
-/data/library/videos/      mídias originais
-/data/library/photos/      imagens e vídeos de fundo
-/data/library/history/     vídeos finais e arquivos SRT
-/data/output/models/       modelos locais
-/data/output/queue_jobs/   diretórios isolados dos trabalhos ativos
-/data/output/              configurações, estado e logs
-/data/cache/               cache reutilizável do administrador
-/data/user_data/           dados isolados das contas comuns
-/data/users.json           usuários locais
-/data/sessions.json        sessões locais
-```
+O seletor entre **Rápido** e **Detalhado** acompanha a rolagem da tela. Durante uma produção ele fica temporariamente bloqueado e os dois formulários são ocultados, evitando iniciar outra configuração por engano.
 
-O conteúdo de `/data` nunca deve ser adicionado ao Git. O operador é responsável por permissões, backup, retenção e exclusão desses dados.
+Quando nenhum fundo é informado, o app sorteia uma imagem ou vídeo da coleção marcada pelo administrador. Se a coleção estiver vazia, usa o vídeo original. Os arquivos da coleção continuam privados na Biblioteca administrativa: o usuário recebe somente o fundo sorteado durante o processamento.
 
-## Aplicativo Android
+O administrador define o perfil global em **Ajustes → Modo Rápido**. Todas as opções técnicas ficam disponíveis ali — modelo, perfil da voz, fonte da transcrição, VAD, letra, aparência da legenda, coleção de fundos, revisão e salvamento — sem carregar a tela rápida.
 
-O APK é um cliente do servidor, não um processador independente. Ele armazena os endereços configurados no aparelho, escolhe a rota disponível e abre a interface web integrada. O processamento e a Biblioteca permanecem no servidor.
+Os valores iniciais são **Large V3 Turbo**, perfil **Voz difícil**, fonte **50**, vocais separados pelo Demucs, letra automática, texto centralizado, prévia da próxima frase e renderização direta sem revisão.
 
-O workflow de uma tag `v*` compila o APK e o anexa à Release correspondente. Quando o ambiente de CI não recebe uma chave privada de lançamento, o Gradle utiliza a assinatura de depuração para manter o artefato instalável; isso não equivale a uma assinatura oficial permanente. Consulte o [guia Android](android/README.md).
+### Modo Detalhado
 
-## Autenticação e exposição de rede
+1. Em **Criar**, envie uma música, cole um link do YouTube ou escolha um item da Biblioteca.
+2. Escolha um **Perfil da música**. **Karaokê equilibrado** é o ponto de partida recomendado.
+3. Deixe **Letra automática** ativa ou abra o bloco para colar uma letra manualmente.
+4. Escolha o fundo e, se quiser, abra **Mais ajustes** para personalizar legenda e revisão.
+5. Clique em **Criar Karaokê** e acompanhe as etapas com o resumo da música, letra, modelo e fundo em uso.
+6. Quando terminar, assista no próprio app, baixe o MP4 ou abra **Biblioteca → Resultados**.
 
-O backend aceita sessão pelos cabeçalhos `x-session-token` e `Authorization: Bearer`, além do parâmetro de consulta `token` usado por alguns downloads e previews. Parâmetros de consulta podem aparecer em logs de proxy, navegador ou servidor; trate esses registros como confidenciais.
+A página consulta o estado do servidor continuamente, sem reaproveitar respostas antigas do navegador. Ao voltar para a aba ou recuperar a conexão, ela confere o processamento imediatamente.
 
-Para acesso fora de uma rede confiável:
+Para canto, o filtro Silero VAD fica desligado por padrão: ele foi criado para detectar fala e pode cortar notas suaves ou sustentadas. Os perfis de voz difícil também evitam esse filtro; a opção continua disponível em **Mais ajustes** para gravações faladas ou muito ruidosas.
 
-- use HTTPS com um proxy reverso mantido e atualizado;
-- restrinja a porta do container;
-- proteja e faça backup do volume `/data`;
-- revise logs antes de compartilhá-los;
-- não exponha tokens, links públicos ou arquivos de sessão;
-- considere VPN ou rede privada em vez de publicação direta na Internet.
+Em **Mais ajustes**, deixar palavras ou caracteres por verso em zero ativa a divisão inteligente. Quando existe letra-guia, as linhas originais orientam o fim de cada verso; sem ela, o app considera pontuação, pausas e duração. Os cortes internos do Whisper não dividem mais uma frase por conta própria, e a linha atual permanece visível até a próxima começar.
 
-## Serviços externos e dados transmitidos
+O botão de tema claro/escuro fica sempre no topo da tela.
 
-O processamento de mídia ocorre no servidor, mas a instalação não é estritamente offline por padrão:
+## Telegram e links diretos
 
-- o frontend solicita fontes ao Google Fonts quando a página é carregada;
-- o build e a primeira execução podem baixar modelos do Hugging Face e do Demucs;
-- a imagem baixa Deno e imagens de fundo públicas durante o build;
-- YouTube, LRCLIB, Lyrics.ovh e Musixmatch são consultados somente quando os recursos correspondentes são utilizados;
-- Telegram recebe mensagens, arquivos ou links quando configurado pelo usuário.
+Cada conta configura seu bot em **Ajustes → Meu bot do Telegram**. O administrador pode informar uma URL externa do servidor. Ao concluir um vídeo, o app cria um endereço aleatório de download direto para aquele arquivo; assim, o link funciona sem levar uma sessão do navegador para o Telegram.
 
-Leia [PRIVACY.md](PRIVACY.md) antes de expor a aplicação a outras pessoas.
+Quem receber esse endereço consegue baixar o vídeo enquanto ele existir na Biblioteca. Trate a mensagem como um link privado e não a encaminhe para pessoas que não devam acessar o arquivo.
 
-## Uso responsável
+## Dados, privacidade e cuidados
 
-O software é apenas uma ferramenta. O usuário e o operador da instalação são responsáveis por cumprir a legislação, os direitos autorais, os direitos de imagem, as licenças das mídias e os termos dos serviços utilizados.
+Tudo que o app guarda fica no volume `/data`: usuários, sessões, modelos, mídias, fundos, letras, perfis, caches e resultados.
 
-O projeto não inclui nem distribui músicas, vídeos ou letras comerciais no repositório. Ele não concede autorização para baixar, copiar, traduzir, transformar, exibir ou redistribuir conteúdo de terceiros. A presença de suporte técnico a uma URL não significa que o serviço de origem autorize o download. Use apenas material próprio, em domínio público, sob licença compatível ou autorizado pelo titular.
+- Use uma senha que não esteja sendo usada em outro serviço.
+- Publique o app somente em uma rede confiável, VPN ou proxy configurado por você.
+- Faça backup da pasta `/data` para preservar contas e criações.
+- Nunca publique `.env_deploy`, tokens do GitHub, tokens do Telegram ou arquivos de sessão.
+- Os logs podem conter nomes de arquivos e endereços. Revise o texto antes de compartilhá-lo.
+- Fontes de letras e YouTube são serviços externos e podem ficar indisponíveis. O restante do fluxo continua local.
 
-O projeto não incentiva pirataria. Consulte [LEGAL.md](LEGAL.md) para as ressalvas específicas sobre YouTube, letras, codecs, modelos e redistribuição da imagem Docker.
+## Onde pedir ajuda
 
-## Segurança e suporte
+Ao relatar um problema, conte o que estava fazendo, qual etapa apareceu e qual foi a mensagem de erro. O administrador pode gerar um relatório atualizado em **Ajustes → Diagnóstico**. Remova nomes pessoais, endereços e outros dados que não precisem aparecer no relato.
 
-Issues para bugs críticos são bem-vindas quando não contêm segredos ou dados privados. Vulnerabilidades não devem ser publicadas em Issues; siga [SECURITY.md](SECURITY.md).
-
-O projeto está em manutenção mínima. Não há SLA, garantia de resposta rápida, promessa de novas funcionalidades ou garantia de correção de vulnerabilidades futuras. A [auditoria de 31 de agosto de 2026](SECURITY_AUDIT.md) encontrou dependências com vulnerabilidades conhecidas e limitações de reprodutibilidade; leia o relatório antes de expor ou redistribuir a aplicação. Dependências devem ser auditadas novamente antes de cada distribuição, pois advisories e licenças podem mudar.
-
-## Licença
-
-O código original deste repositório é distribuído sob a [MIT License](LICENSE). A licença MIT não substitui as licenças dos componentes, modelos, fontes, imagens, codecs ou serviços externos. Consulte [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) antes de redistribuir o Docker ou o APK.
+Divirta-se — e deixe o microfone longe da caixa de som. 🎶

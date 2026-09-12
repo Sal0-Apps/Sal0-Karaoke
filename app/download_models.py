@@ -48,29 +48,19 @@ try:
 except Exception as e:
     print(f"Aviso ao gerar áudio de teste: {e}")
 
-# 3. Executar o Demucs via CLI para forçar o download do modelo htdemucs_ft
-print("Testando o modelo Demucs htdemucs_ft...")
+# 3. Executar o Demucs via CLI para forçar o download do modelo htdemucs
+print("Testando o modelo Demucs htdemucs...")
 if os.path.exists(dummy_wav):
     try:
         cmd = [
             "demucs",
             "-d", "cpu",
-            "-n", "htdemucs_ft",
             "--two-stems", "vocals",
             dummy_wav
         ]
-        demucs_env = os.environ.copy()
-        demucs_env["TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD"] = "1"
-        demucs_env["TORCHAUDIO_BACKEND"] = "soundfile"
-        result = subprocess.run(
-            cmd,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            env=demucs_env,
-        )
+        result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         if result.returncode == 0:
-            print("Demucs htdemucs_ft baixado e testado com sucesso.")
+            print("Demucs htdemucs baixado e testado com sucesso.")
         else:
             print(f"Demucs baixou o modelo com avisos: {result.stderr}")
     except Exception as e:

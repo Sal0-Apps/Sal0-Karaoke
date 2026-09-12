@@ -15,7 +15,7 @@ def format_time(seconds: float) -> str:
     m = int((seconds % 3600) // 60)
     s = int(seconds % 60)
     cs = int(round((seconds - int(seconds)) * 100))
-    
+
     # Tratar overflow de arredondamento
     if cs == 100:
         s += 1
@@ -26,7 +26,7 @@ def format_time(seconds: float) -> str:
     if m == 60:
         h += 1
         m = 0
-        
+
     return f"{h}:{m:02d}:{s:02d}.{cs:02d}"
 
 def html_color_to_ass(hex_color: str) -> str:
@@ -142,9 +142,9 @@ def insert_instrumental_breaks(segments: list[dict]) -> list[dict]:
     """
     if not segments:
         return []
-        
+
     new_segments = []
-    
+
     # 1. Tratar a introdução da música se ela for longa (>= 3 segundos)
     first_start = segments[0]["start"]
     if first_start >= 3.0:
@@ -173,20 +173,20 @@ def insert_instrumental_breaks(segments: list[dict]) -> list[dict]:
             "text": "Instrumental (1)",
             "words": []
         })
-        
+
     # 2. Tratar os intervalos entre todos os versos
     for idx in range(len(segments)):
         curr_seg = segments[idx]
         new_segments.append(curr_seg)
-        
+
         if idx < len(segments) - 1:
             next_seg = segments[idx + 1]
             gap_duration = next_seg["start"] - curr_seg["end"]
-            
+
             if gap_duration >= 3.0:
                 gap_start = curr_seg["end"]
                 gap_end = next_seg["start"]
-                
+
                 # Inserir o rótulo puramente instrumental se houver espaço
                 if gap_duration > 3.0:
                     new_segments.append({
@@ -195,7 +195,7 @@ def insert_instrumental_breaks(segments: list[dict]) -> list[dict]:
                         "text": "Instrumental",
                         "words": []
                     })
-                    
+
                 # Inserir a contagem regressiva nos últimos 3 segundos antes do próximo verso
                 new_segments.append({
                     "start": gap_end - 3.0,
@@ -215,11 +215,11 @@ def insert_instrumental_breaks(segments: list[dict]) -> list[dict]:
                     "text": "Instrumental (1)",
                     "words": []
                 })
-                
+
     return new_segments
 
 def generate_ass_karaoke(
-    segments: list[dict], 
+    segments: list[dict],
     output_ass_path: str,
     font_size: int = 32,
     text_color_hex: str = "#00FFFF",
@@ -239,7 +239,7 @@ def generate_ass_karaoke(
     - 'phrase': Exibe as frases/linhas inteiras sincronizadas estaticamente.
     """
     logger.info(f"Gerando legenda ASS ({subtitle_mode}): fonte={font_size}, cor={text_color_hex}, pos={text_position}, show_inst={show_instrumental}, preview={show_next_line_preview}")
-    
+
     # 1. Aplicar quebra de frase e limite de palavras
     segments = split_and_wrap_segments(
         segments=segments,
@@ -247,11 +247,11 @@ def generate_ass_karaoke(
         max_chars_line=max_chars_line,
         break_on_punctuation=break_on_punctuation
     )
-    
+
     # 2. Inserir pausas instrumentais se ativado
     if show_instrumental:
         segments = insert_instrumental_breaks(segments)
-    
+
     # 3. Manter o verso atual visível até a entrada do próximo, sem um vazio artificial.
     for idx in range(len(segments) - 1):
         curr = segments[idx]
@@ -260,7 +260,7 @@ def generate_ass_karaoke(
             gap = nxt["start"] - curr["end"]
             if gap > 0:
                 curr["end"] = nxt["start"]
-    
+
     # 4. Determinar o alinhamento ASS (2 = base centro, 5 = meio centro, 8 = topo centro)
     alignment = 2
     if text_position == "middle":
@@ -271,7 +271,7 @@ def generate_ass_karaoke(
     # 5. Configurar cores conforme o modo de legenda
     ass_primary_color = "&H00FFFFFF" # Branco por padrão para karaoke
     ass_secondary_color = html_color_to_ass(text_color_hex) # Cor de destaque para karaoke
-    
+
     if subtitle_mode == "phrase":
         # Em modo frase comum, a cor principal é a cor de destaque selecionada
         ass_primary_color = html_color_to_ass(text_color_hex)
@@ -309,7 +309,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 """
 
     lines = [ass_header]
-    
+
     # Se configurado para manter a primeira linha visível desde o início do vídeo sem coloração (para introdução)
     if keep_first_line_visible and segments:
         first_lyrics_seg = None
@@ -322,7 +322,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
             end_str = format_time(first_lyrics_seg["start"])
             clean_text = first_lyrics_seg["text"]
             lines.append(f"Dialogue: 0,{start_str},{end_str},Default,,0,0,0,,{clean_text}\n")
-            
+
     for idx, seg in enumerate(segments):
         start_time_str = format_time(seg["start"])
         end_time_str = format_time(seg["end"])
@@ -357,7 +357,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                 leading_spaces = len(word_text) - len(word_text.lstrip(' '))
                 trailing_spaces = len(word_text.lstrip(' ')) - len(word_text.strip(' '))
                 clean_text = word_text.strip(' ')
-                
+
                 if clean_text:
                     spaces_before = " " * leading_spaces
                     spaces_after = " " * trailing_spaces
@@ -368,9 +368,9 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                 current_ref_cs = word_end_cs
 
             line = f"Dialogue: 0,{start_time_str},{end_time_str},Default,,0,0,0,,{karaoke_text}\n"
-            
+
         lines.append(line)
-        
+
         # 2. Pré-visualização da próxima linha (NextLine - Ofuscada)
         if show_next_line_preview and idx < len(segments) - 1:
             next_seg = segments[idx + 1]
@@ -378,8 +378,8 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
             if "Instrumental" not in next_seg["text"]:
                 preview_line = f"Dialogue: 0,{start_time_str},{end_time_str},NextLine,,0,0,0,,{next_seg['text']}\n"
                 lines.append(preview_line)
-        
+
     with open(output_ass_path, "w", encoding="utf-8") as f:
         f.writelines(lines)
-        
+
     logger.info("Legenda ASS gerada com sucesso.")

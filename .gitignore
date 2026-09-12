@@ -25,11 +25,8 @@ scratch/
 # === CREDENCIAIS E TOKENS (NUNCA commitar no Git) ===
 .env
 .env.*
+!.env.example
 .env_deploy
-.github_token
-*.credentials
-credentials.*
-secrets.*
 *.token
 *.key
 *.pem
@@ -56,11 +53,12 @@ logs/
 .DS_Store
 Thumbs.db
 
-# === ANDROID ===
-/android/.gradle/
-/android/local.properties
-/android/app/build/
-/android/build/
-/android/*.keystore
-/android/*.jks
-/android/*.apk
+# === AGENT & TEMP DIRECTORIES ===
+.agents/
+.codex-remote-attachments/
+.youtube-fix-publish/
+android-signing/
+*.apk
+AGENTS.md
+
+
