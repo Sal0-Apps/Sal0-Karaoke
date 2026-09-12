@@ -161,7 +161,7 @@ class EasyModeConfigTests(unittest.TestCase):
 
         self.assertIn("let currentCreatorMode = 'easy';", html)
         self.assertIn("let easyAudioMode = 'youtube';", html)
-        self.assertIn("⚡ Modo Rápido", html)
+        self.assertIn('class="easy-kicker">Modo Rápido</span>', html)
         self.assertIn('<span class="creator-mode-title">Detalhado</span>', html)
         self.assertIn('id="easyYoutubeUrl"', html)
         self.assertIn('id="easyAudioFile"', html)

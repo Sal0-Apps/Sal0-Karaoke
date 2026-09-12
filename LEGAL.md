@@ -16,6 +16,8 @@ A publicação sob MIT pressupõe que o titular indicado no arquivo `LICENSE` po
 
 ## Conclusão da auditoria de publicação
 
+A revisão de textos de 12 de setembro de 2026, para a versão 9.5.0, conferiu novamente os 22 commits alcançáveis anteriores à publicação e não encontrou segredos de alta confiança. Ela não encerra as pendências de licenças e dependências registradas abaixo. O título público mantém apenas o nome da aplicação; versões e limitações estão nos documentos de operação e auditoria.
+
 Na auditoria local de 31 de agosto de 2026:
 
 - nenhum segredo de alta confiança foi encontrado nos 21 commits alcançáveis;

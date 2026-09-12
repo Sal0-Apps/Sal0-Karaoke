@@ -1,8 +1,5 @@
 # === DADOS GERADOS PELO APP (não commitar) ===
-/data/cache/*
-/data/output/*
-!/data/cache/.gitkeep
-!/data/output/.gitkeep
+/data/
 
 # === PYTHON ===
 *.pyc
@@ -35,6 +32,12 @@ secrets.*
 *.pem
 *.p12
 *.pfx
+*.jks
+*.keystore
+/android-signing/
+/.codex-remote-attachments/
+/.youtube-fix-publish/
+*.apk
 deploy_credentials.txt
 *_secret.txt
 github_token.txt

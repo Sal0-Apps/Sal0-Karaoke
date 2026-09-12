@@ -36,7 +36,11 @@ Esses serviços aplicam suas próprias políticas, termos, registros e períodos
 
 Alguns downloads e previews aceitam sessão ou link público no endereço. URLs podem ser registradas pelo navegador, proxy reverso, servidor HTTP, roteador ou ferramenta de diagnóstico. Logs devem ser protegidos e revisados antes de compartilhamento.
 
-Os links públicos enviados pelo Telegram possuem tokens aleatórios, mas a versão 9.0.7 não aplica expiração automática a esses registros. Quem receber ou copiar um link poderá usá-lo enquanto o registro e o arquivo permanecerem no servidor. O operador deve remover resultados e registros que não devam mais ser acessíveis e evitar publicar esses endereços em canais abertos.
+Os links públicos enviados pelo Telegram possuem tokens aleatórios, mas a versão 9.5.0 não aplica expiração automática a esses registros. Quem receber ou copiar um link poderá usá-lo enquanto o registro e o arquivo permanecerem no servidor. O operador deve remover resultados e registros que não devam mais ser acessíveis e evitar publicar esses endereços em canais abertos.
+
+## Dados no Android
+
+O aparelho armazena SSID e endereços de conexão nas preferências do aplicativo, além da sessão e preferências da interface na WebView. Arquivos baixados são salvos em Downloads. Abrir as configurações de conexão fecha a página atual, mas não interrompe trabalhos já aceitos pelo servidor. A limpeza dos dados do APK não apaga automaticamente mídias e contas do servidor.
 
 ## Responsabilidades do operador
 

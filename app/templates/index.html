@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sal0 Karaokê - Criador Local de Vídeos de Karaokê</title>
+    <title>Sal0 Karaokê</title>
     <link rel="icon" type="image/png" href="/favicon.png">
 
     <!-- Fontes Google -->
@@ -1415,6 +1415,29 @@
                 text-align: center;
             }
         }
+.help-dialog {
+            background: var(--bg-card);
+            border: 1px solid var(--glass-border);
+            border-radius: 20px;
+            padding: clamp(1rem, 4vw, 1.8rem);
+            max-width: 680px;
+            width: 100%;
+            min-width: 0;
+            max-height: 85dvh;
+            overflow-y: auto;
+            overflow-wrap: anywhere;
+            box-shadow: var(--shadow);
+            font-size: 0.9rem;
+            line-height: 1.6;
+            color: var(--text-muted);
+        }
+        .help-heading { display: flex; flex-wrap: wrap; align-items: center; gap: 0.7rem; justify-content: space-between; margin-bottom: 1rem; }
+        .help-heading h3 { margin: 0; color: var(--text-main); }
+        .help-dialog details { border-top: 1px solid var(--glass-border); padding: 0.85rem 0; }
+        .help-dialog summary { cursor: pointer; color: var(--text-main); font-weight: 700; }
+        .help-dialog ol, .help-dialog ul { padding-left: 1.3rem; margin: 0.6rem 0; }
+        .help-dialog li + li { margin-top: 0.45rem; }
+        .help-dialog strong { color: var(--text-main); }
 </style>
 </head>
 <body>
@@ -1758,7 +1781,7 @@
                                     </select>
                                 </div>
                                 <div>
-                                    <span class="label">✏️ Pausa 75% (Revisão)</span>
+                                    <span class="label">✏️ Revisar antes de finalizar</span>
                                     <select id="enableCorrection" name="enable_correction" class="select-input">
                                         <option value="false" selected>Não (Direta)</option>
                                         <option value="true">Sim (Pausar 75%)</option>
@@ -2284,7 +2307,7 @@
 
         <!-- RODAPÉ DISCRETO DA PÁGINA -->
         <footer>
-                     Sal0 Karaokê v9.0.7
+                     Sal0 Karaokê
         </footer>
 
     </div> <!-- Container End -->
@@ -2307,42 +2330,105 @@
         </div>
     </div>
 
-    <!-- MODAL MANUAL E TUTORIAL PARA INICIANTES -->
-    <div id="helpModal" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.7); backdrop-filter: blur(12px); z-index: 9999; justify-content: center; align-items: center; padding: 1rem;">
-        <div style="background: var(--bg-card); border: 1px solid var(--glass-border); border-radius: 20px; padding: 1.8rem; max-width: 620px; width: 100%; max-height: 85vh; overflow-y: auto; box-shadow: var(--shadow);">
-            <h3 style="color: var(--text-main); margin-bottom: 1rem; font-family: 'Outfit', sans-serif;">📖 Manual do Sal0 Karaokê</h3>
-
-            <div style="display: flex; flex-direction: column; gap: 0.8rem; font-size: 0.85rem; color: var(--text-muted); line-height: 1.5;">
-                <p><strong style="color: var(--text-main);">O que ele faz?</strong><br>
-                O Sal0 Karaokê separa voz e instrumental, transcreve a música, sincroniza as legendas e renderiza o vídeo no seu próprio computador ou servidor. Só a busca opcional de letras e os downloads solicitados usam a internet.</p>
-
-                <p><strong style="color: var(--text-main);">Primeiro karaokê, passo a passo</strong></p>
-                <p><strong style="color: var(--accent);">⚡ Modo Rápido:</strong> é a primeira aba para todas as contas. Cole um link, escolha um arquivo, arraste uma música, vídeo ou foto, ou use a Biblioteca. Se não indicar um fundo, o app sorteia um da coleção preparada pelo administrador.</p>
-                <ol style="margin-left: 1.2rem; display: flex; flex-direction: column; gap: 0.5rem;">
-                    <li><strong style="color: var(--accent);">1. Música:</strong> envie um arquivo, cole um link do YouTube ou escolha algo da sua Biblioteca.</li>
-                    <li><strong style="color: var(--accent);">2. Perfil:</strong> comece com “Karaokê equilibrado”. Use “Canto contínuo” para notas longas, “Voz difícil ou mix” quando a separação estiver ruim e “Criação rápida” para testes.</li>
-                    <li><strong style="color: var(--accent);">3. Letra:</strong> no modo automático, o app procura uma letra-guia e avisa se encontrou. Abra o bloco quando quiser revisar ou colar uma versão manual.</li>
-                    <li><strong style="color: var(--accent);">4. Visual:</strong> use o vídeo original, uma cor, imagem, vídeo ou fundo salvo. Os ajustes extras controlam legenda, linhas, fonte da transcrição e revisão.</li>
-                    <li><strong style="color: var(--accent);">5. Criar:</strong> acompanhe as etapas. Se a revisão estiver ativa, corrija texto e tempos antes da renderização.</li>
-                    <li><strong style="color: var(--accent);">6. Resultado:</strong> assista na própria tela, baixe o MP4 ou abra a cópia salva em “Biblioteca → Resultados”.</li>
-                </ol>
-
-                <p><strong style="color: var(--text-main);">Dica de sincronia</strong><br>
-                O filtro Silero VAD fica desligado nos perfis de canto porque notas suaves e sustentadas nem sempre se parecem com fala. Ative-o nos ajustes avançados apenas quando o áudio tiver muito ruído ou for principalmente falado. No automático, os versos seguem primeiro as linhas da letra encontrada e depois as pausas e a pontuação; a linha atual permanece visível até a próxima começar.</p>
-
-                <p><strong style="color: var(--text-main);">Contas, Biblioteca e Telegram</strong></p>
-                <ul style="margin-left: 1.2rem; display: flex; flex-direction: column; gap: 0.3rem;">
-                    <li>• Cada usuário comum vê apenas biblioteca, cache, letras, perfis, resultados e bot próprios.</li>
-                    <li>• O administrador também começa pelo Modo Rápido, configura seu perfil global em Ajustes e pode abrir o Modo Detalhado quando quiser controlar cada opção.</li>
-                    <li>• Configure seu bot em Ajustes. O link do Telegram é um download direto com endereço aleatório; não compartilhe a mensagem com quem não deve receber o vídeo.</li>
-                    <li>• O botão de tema claro/escuro fica no topo e vale somente para este navegador.</li>
-                </ul>
-
-                <p><strong style="color: var(--text-main);">Se algo der errado</strong><br>
-                Tente novamente com um modelo menor se faltar memória. A tela confere o processamento ao abrir, ao voltar para a aba e enquanto o servidor trabalha. O administrador pode baixar um diagnóstico atualizado em Ajustes. Antes de compartilhar logs, confira nomes de arquivos e endereços que possam ser pessoais.</p>
+    <!-- MANUAL: tutoriais curtos, expansíveis para caber no celular -->
+    <div id="helpModal" role="dialog" aria-modal="true" aria-labelledby="helpTitle" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); backdrop-filter: blur(12px); z-index: 9999; justify-content: center; align-items: center; padding: 1rem;">
+        <div class="help-dialog">
+            <div class="help-heading">
+                <h3 id="helpTitle">Manual do Sal0 Karaokê</h3>
+                <button type="button" id="btnCloseHelpModal" class="btn-secondary">Fechar ✕</button>
             </div>
-
-            <button type="button" id="btnCloseHelpModal" class="btn-primary" style="margin-top: 1.5rem;">Entendido</button>
+            <p class="compact-note">Escolha um tutorial abaixo. O processamento acontece no servidor; você pode acompanhar pelo PC ou pelo Android.</p>
+            <details open>
+                <summary>1. Criar o primeiro karaokê</summary>
+                <ol>
+                    <li>Na aba <strong>Criar</strong>, escolha <strong>Rápido</strong>. Durante outro trabalho, toque antes em <strong>Adicionar novo processo</strong>.</li>
+                    <li>Cole um link, selecione um áudio/vídeo ou use a Biblioteca. Use apenas mídias que você tem autorização para processar.</li>
+                    <li>Escolha o fundo: <strong>Surpresa</strong>, vídeo original, arquivo, Biblioteca ou link. No fundo surpresa, vale a coleção configurada pelo administrador.</li>
+                    <li>Toque em <strong>Criar meu karaokê</strong>. O perfil global define transcrição, legenda e visual.</li>
+                    <li>Acompanhe o progresso em <strong>Criar</strong>. Ao concluir, visualize ou baixe o MP4; a cópia fica em <strong>Biblioteca → Resultados</strong>.</li>
+                </ol>
+            </details>
+            <details>
+                <summary>2. Ajustar o karaokê no modo Detalhado</summary>
+                <ol>
+                    <li>Escolha <strong>Detalhado</strong>, a mídia, o perfil da voz e o modelo Whisper.</li>
+                    <li>Abra <strong>Letra</strong> para buscar ou colar uma letra-guia. O texto manual tem prioridade; se não houver letra, a transcrição usa o Whisper.</li>
+                    <li>Defina o fundo e a animação: sílabas, palavras, linhas ou frase estática.</li>
+                    <li>Em <strong>Mais ajustes</strong>, altere cor, tamanho, posição, limites dos versos, prévia da próxima frase, VAD e fonte da transcrição. Você também pode salvar um perfil e habilitar somente a remoção de vocais.</li>
+                    <li>Ative a revisão para corrigir texto e tempos antes de finalizar. Em canto, o VAD pode cortar notas sustentadas; use com cuidado.</li>
+                </ol>
+            </details>
+            <details>
+                <summary>3. Gerar somente legendas SRT</summary>
+                <ol>
+                    <li>Escolha <strong>Gerar SRT</strong> e envie áudio/vídeo, cole um link ou escolha um original da Biblioteca.</li>
+                    <li>Em <strong>Segundo SRT traduzido</strong>, escolha português, inglês, espanhol ou <strong>Não traduzir</strong>.</li>
+                    <li>Ajuste modelo, leitura da fala, VAD e revisão se necessário. Toque em <strong>Gerar arquivos SRT</strong>.</li>
+                    <li>Baixe o <strong>SRT original</strong> e, se gerado, o <strong>SRT traduzido</strong>. Uma falha da tradução não apaga o original.</li>
+                </ol>
+                <p>Este modo usa o áudio normalizado para MP3, preserva a fala e não usa Demucs nem fundo. O resultado é legenda, sem renderizar outro vídeo. Não há limite fixo de duração do modo; disco, memória e servidor continuam sendo limites. Confira reconhecimento e tempos antes de usar a legenda.</p>
+            </details>
+            <details>
+                <summary>4. Adicionar e organizar a fila</summary>
+                <ol>
+                    <li>Toque em <strong>Adicionar novo processo</strong> para abrir os três modos e preparar o próximo trabalho com suas próprias opções.</li>
+                    <li>Use arquivos, links ou Biblioteca. Vários arquivos selecionados juntos usam os ajustes do mesmo envio.</li>
+                    <li>Use <strong>↑ / ↓</strong> nos itens aguardando para mudar a ordem, ou <strong>Remover</strong> para retirá-los.</li>
+                    <li><strong>Cancelar Processamento</strong> encerra o atual. O próximo elegível começa quando a fila está ativa.</li>
+                </ol>
+                <p>A fila guarda trabalhos ativos, não um histórico. O limite é de 25 trabalhos ativos por perfil. Durante um processo, o usuário comum adiciona apenas se o trabalho em execução é seu; o administrador pode adicionar mesmo durante o de outro perfil. Cada usuário organiza seus itens; o administrador gerencia todos.</p>
+            </details>
+            <details>
+                <summary>5. Entender o progresso e pausar para atualizar</summary>
+                <p>O número maior e a barra representam o <strong>total do processo</strong>. O texto menor informa o avanço da <strong>etapa atual</strong>. Percentual não é uma previsão exata do tempo restante; CPU, modelo e duração da mídia influenciam a velocidade.</p>
+                <ol>
+                    <li>Como administrador, toque em <strong>Pausar ao concluir etapa</strong>, junto da fila.</li>
+                    <li>Aguarde a confirmação de pausa com a etapa salva. A solicitação não interrompe Demucs ou Whisper no meio da etapa.</li>
+                    <li>Atualize/reinicie preservando o volume <strong>/data</strong>. Depois, toque em <strong>Retomar fila</strong>.</li>
+                </ol>
+                <p>Etapas concluídas podem ser reutilizadas. Reiniciar antes da confirmação pode perder o trabalho da etapa em andamento. A pausa de manutenção é diferente da revisão de legendas.</p>
+            </details>
+            <details>
+                <summary>6. Revisar, visualizar e baixar</summary>
+                <ol>
+                    <li>Ative a revisão antes de enviar o processo.</li>
+                    <li>Quando o editor aparecer, selecione os trechos e confira o texto, o início e o fim. Use os controles de reprodução para comparar com a mídia.</li>
+                    <li>Salve e continue, ou use <strong>Continuar sem editar</strong>. No modo SRT, a revisão é do original, antes da tradução opcional.</li>
+                    <li>Na <strong>Biblioteca</strong>, use <strong>Ver</strong>, <strong>Baixar</strong>, <strong>Renomear</strong> e <strong>Excluir</strong> conforme a seção. <strong>Usar</strong> reutiliza originais ou fundos.</li>
+                </ol>
+                <p>O administrador vê também as mídias e os resultados dos outros perfis. No Android, os downloads ficam em <strong>Downloads</strong>; nomes repetidos recebem um sufixo. A reprodução depende dos formatos suportados pelo aparelho.</p>
+            </details>
+            <details>
+                <summary>7. Receber resultados no Telegram</summary>
+                <ol>
+                    <li>Crie um bot pelo <strong>@BotFather</strong> e inicie uma conversa com o bot, ou adicione-o ao grupo desejado.</li>
+                    <li>Em <strong>Ajustes → Telegram → Editar</strong>, informe o token do bot e o Chat ID do destino. Salve. Em grupos, permita o envio de mensagens e arquivos.</li>
+                    <li>Confira as notificações de etapas e o aviso sobre a letra-guia. O resultado inclui o tempo de processamento e os links disponíveis.</li>
+                </ol>
+                <p>O servidor tenta anexar o MP4 ou os SRTs. Para vídeos grandes, tenta gerar uma prévia compactada só para o Telegram; o original permanece na Biblioteca. A fila aguarda a tentativa de entrega terminar. Limites e falhas do Telegram podem impedir o anexo; nesse caso, use os links disponíveis. Proteja tokens e links.</p>
+            </details>
+            <details>
+                <summary>8. Configurar o aplicativo Android</summary>
+                <ol>
+                    <li>Toque em <strong>Configurações do app</strong>, na faixa inferior do APK. O botão funciona mesmo sem conexão com o servidor.</li>
+                    <li>Revise o nome da rede Wi-Fi, o endereço local e o externo. Se usar apenas uma rede, pode repetir o endereço local nos dois campos.</li>
+                    <li>Toque em <strong>Salvar e reconectar</strong>. Use <strong>Voltar ao karaokê</strong> ou o botão Voltar do Android para sair sem salvar.</li>
+                </ol>
+                <p>São configurações deste aparelho. A aba <strong>Ajustes</strong> da página configura recursos do servidor. Abrir as configurações fecha a página e descarta formulários ainda não enviados; os processos já aceitos continuam no servidor. A leitura do nome do Wi-Fi pode exigir permissão de localização.</p>
+            </details>
+            <details>
+                <summary>9. Administrar e resolver problemas</summary>
+                <ul>
+                    <li><strong>Modelos Whisper:</strong> o administrador instala modelos em Ajustes. Os modelos baixados ficam disponíveis para as contas.</li>
+                    <li><strong>Perfil global do Modo Rápido:</strong> configure transcrição, visual, revisão e coleção de fundos; salve ao terminar.</li>
+                    <li><strong>Usuários:</strong> crie contas comuns ou administrativas. Excluir uma conta não equivale a apagar automaticamente todos os seus arquivos.</li>
+                    <li><strong>YouTube:</strong> se um link autorizado falhar, consulte <strong>Ajustes → Compatibilidade com YouTube → Atualizar mecanismo</strong> como administrador e tente novamente. A atualização pode não resolver restrições do provedor.</li>
+                    <li><strong>Sem conexão:</strong> confirme servidor, porta, rede e certificado HTTPS. No APK, use a faixa inferior para revisar os endereços.</li>
+                    <li><strong>Memória ou lentidão:</strong> confira espaço e RAM; um modelo menor pode ajudar na transcrição, com possível perda de qualidade. O Demucs usa CPU e pode levar mais tempo que o vídeo.</li>
+                    <li><strong>Diagnóstico:</strong> o administrador pode baixar os logs em Ajustes. Revise dados pessoais e credenciais antes de compartilhar.</li>
+                </ul>
+            </details>
+            <p class="compact-note">Versão do servidor: 9.5.0. A transcrição é local; fontes, modelos e integrações podem acessar serviços externos. Use conteúdo autorizado.</p>
         </div>
     </div>
 
@@ -3974,8 +4060,31 @@
             const btnOpenHelp = document.getElementById('btnOpenHelp');
             const helpModal = document.getElementById('helpModal');
             const btnCloseHelpModal = document.getElementById('btnCloseHelpModal');
-            if (btnOpenHelp && helpModal) btnOpenHelp.onclick = () => helpModal.style.display = 'flex';
-            if (btnCloseHelpModal && helpModal) btnCloseHelpModal.onclick = () => helpModal.style.display = 'none';
+            const closeHelp = () => {
+                helpModal.style.display = 'none';
+                btnOpenHelp?.focus();
+            };
+            if (btnOpenHelp && helpModal) btnOpenHelp.onclick = () => {
+                helpModal.style.display = 'flex';
+                btnCloseHelpModal?.focus();
+            };
+            if (btnCloseHelpModal && helpModal) btnCloseHelpModal.onclick = closeHelp;
+            helpModal?.addEventListener('click', event => {
+                if (event.target === helpModal) closeHelp();
+            });
+            helpModal?.addEventListener('keydown', event => {
+                if (event.key === 'Escape') { event.preventDefault(); closeHelp(); }
+                if (event.key === 'Tab') {
+                    const controls = [...helpModal.querySelectorAll('button, summary, a[href], input, select, textarea')]
+                        .filter(control => !control.disabled && control.getClientRects().length);
+                    const first = controls[0], last = controls[controls.length - 1];
+                    if (event.shiftKey && document.activeElement === first) {
+                        event.preventDefault(); last?.focus();
+                    } else if (!event.shiftKey && document.activeElement === last) {
+                        event.preventDefault(); first?.focus();
+                    }
+                }
+            });
             const mediaPreviewModal = document.getElementById('mediaPreviewModal');
             const btnCloseMediaPreview = document.getElementById('btnCloseMediaPreview');
             const libraryVideoPreview = document.getElementById('libraryVideoPreview');

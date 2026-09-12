@@ -1,25 +1,24 @@
-# Status do projeto
+# Estado do projeto
 
-## Versão final
+O Sal0 Karaokê está em manutenção mínima. A distribuição descrita pela documentação atual é a **9.5.0**, com restauração do acesso às configurações de conexão do Android e atualização dos manuais.
 
-A versão 9.0.7 é a versão estável final publicada do Sal0 Karaokê. O desenvolvimento ativo foi encerrado e o repositório permanece em manutenção mínima.
+Não há um roteiro público de desenvolvimento ativo. Publicações pontuais não representam compromisso de novas versões, funcionalidades, migrações ou acompanhamento contínuo. Pull requests e solicitações de funcionalidades provavelmente não serão revisados.
 
-Não há compromisso de novas funcionalidades, compatibilidade futura, migrações, suporte individual ou respostas rápidas. Pull requests e solicitações de funcionalidades provavelmente não serão revisados. Bugs críticos podem ser registrados em Issues sem dados sensíveis; vulnerabilidades devem seguir [SECURITY.md](SECURITY.md).
+## Suporte e segurança
 
-## Correções de segurança
-
-Correções de segurança poderão ser avaliadas eventualmente, conforme gravidade, viabilidade e disponibilidade. A presença de uma Issue ou de um advisory não implica prazo ou aceite.
+Bugs críticos podem ser registrados em Issues sem dados privados. Vulnerabilidades devem seguir [SECURITY.md](SECURITY.md) e poderão ser avaliadas conforme disponibilidade, gravidade e viabilidade. Não há prazo garantido de resposta ou correção.
 
 ## Continuidade por forks
 
-Pessoas interessadas em continuar o desenvolvimento são incentivadas a criar um fork, adotar sua própria política de manutenção e documentar claramente mudanças de comportamento, dependências, licenças e migrações.
+Pessoas interessadas em continuar o desenvolvimento são incentivadas a criar um fork sob os termos da [licença MIT](LICENSE), definir sua própria manutenção e documentar alterações, dependências e migrações. Preserve os avisos de autoria e as licenças de terceiros.
 
-## Documentos relacionados
+## Documentação
 
-- [README](README.md)
+- [Apresentação](README.md)
+- [Manual completo](MANUAL.md)
+- [Instalação e atualização](DEPLOYMENT.md)
 - [Segurança](SECURITY.md)
-- [Auditoria de segurança](SECURITY_AUDIT.md)
+- [Auditoria](SECURITY_AUDIT.md)
 - [Privacidade](PRIVACY.md)
-- [Uso jurídico e publicação](LEGAL.md)
+- [Direitos de uso](LEGAL.md)
 - [Terceiros](THIRD_PARTY_NOTICES.md)
-- [Licença MIT](LICENSE)

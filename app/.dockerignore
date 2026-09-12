@@ -38,6 +38,10 @@ __pycache__/
 *.credentials
 credentials.*
 secrets.*
+android-signing/
+.codex-remote-attachments/
+.youtube-fix-publish/
+*.apk
 
 # Backups e arquivos temporarios
 *.zip

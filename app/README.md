@@ -6,6 +6,8 @@ Em especial, o FFmpeg pode estar sujeito à GPL-2.0-or-later quando o pacote dis
 
 Antes de redistribuir esta imagem, consulte os documentos completos no repositório-fonte:
 
+- [manual completo](https://github.com/Sal0-Apps/Sal0-Karaoke/blob/main/MANUAL.md);
+- [instalação e atualização](https://github.com/Sal0-Apps/Sal0-Karaoke/blob/main/DEPLOYMENT.md);
 - [componentes de terceiros](https://github.com/Sal0-Apps/Sal0-Karaoke/blob/main/THIRD_PARTY_NOTICES.md);
 - [uso jurídico e publicação](https://github.com/Sal0-Apps/Sal0-Karaoke/blob/main/LEGAL.md);
 - [auditoria de segurança](https://github.com/Sal0-Apps/Sal0-Karaoke/blob/main/SECURITY_AUDIT.md);

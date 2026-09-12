@@ -2,6 +2,16 @@
 
 > Revisão técnica realizada em 31 de agosto de 2026 sobre a versão 9.0.7. Este documento é um retrato datado, não uma certificação, garantia de ausência de vulnerabilidades ou substituto para testes de intrusão.
 
+## Revisão de publicação de 12 de setembro de 2026
+
+Na preparação da versão 9.5.0, a cópia de publicação foi sincronizada com o GitHub e os 22 commits alcançáveis anteriores à nova versão foram examinados novamente, incluindo branches e tags disponíveis. A varredura por padrões de PAT do GitHub, tokens de Telegram, chaves AWS e chaves privadas não encontrou valores de alta confiança. Os nomes de arquivos sensíveis no histórico apontaram somente para o antigo `.env.example`, que contém um marcador sem credencial. A identidade dos commits usa o endereço público `users.noreply.github.com` do projeto.
+
+Também foram revisados a descrição do repositório, os textos das Releases e os nomes dos anexos. Não foram encontrados segredos nessas superfícies. A proteção preventiva do Git foi ampliada para o volume `/data` inteiro, APKs locais, anexos da tarefa e diretórios de assinatura. Nenhuma chave local de assinatura foi incluída na publicação.
+
+Não houve material sensível identificado que justificasse reescrever commits. Esta verificação não permite afirmar que cópias externas, caches do GitHub ou artefatos binários antigos tenham sido apagados ou inspecionados integralmente. Se houver exposição confirmada, a remoção do histórico deve ser acompanhada de revogação do segredo e da análise das referências e caches descrita na [documentação do GitHub](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/removing-sensitive-data-from-a-repository).
+
+Os achados de dependências e do Bandit abaixo pertencem à revisão de agosto. Eles não foram recalculados nesta revisão de textos e acesso às configurações do Android, nem devem ser apresentados como resolvidos pela versão 9.5.0. As dependências do processamento permanecem as mesmas. A manutenção da documentação não constitui correção das vulnerabilidades registradas.
+
 ## Escopo e método
 
 A revisão abrangeu a árvore de trabalho, os 21 commits alcançáveis do repositório, dependências Python declaradas, código Python do servidor, arquivos de build, cliente Android, workflows, documentação e mecanismos locais de publicação.
@@ -52,7 +62,7 @@ Também foram observados downloads sem revisão imutável ou checksum para Deno,
 
 - O parâmetro de consulta `?token=` é aceito para compatibilidade com downloads e previews. Esse token pode aparecer em histórico, logs e cabeçalhos de referência; prefira cabeçalhos de autenticação e proteja os logs.
 - As sessões são tokens persistidos em texto claro em `/data/sessions.json`, têm validade de até 30 dias e também são armazenadas no `localStorage` do navegador. Uma cópia do volume, um script injetado na origem ou um log com a URL pode permitir reutilização da sessão.
-- Links públicos enviados pelo Telegram usam tokens aleatórios de 256 bits, mas os registros atuais não expiram automaticamente. O acesso termina apenas quando o registro ou o arquivo é removido; trate cada link como credencial compartilhável.
+- Links públicos enviados pelo Telegram usam identificadores aleatórios derivados de UUIDs, mas os registros atuais não expiram automaticamente. O acesso termina apenas quando o registro ou o arquivo é removido; trate cada link como credencial compartilhável.
 - A criação do primeiro administrador é intencionalmente aberta enquanto `users.json` não contém contas. A instalação deve ser inicializada em rede restrita para impedir que outra pessoa conclua o primeiro cadastro.
 - Senhas novas usam PBKDF2-HMAC-SHA-256 com salt aleatório e 100.000 iterações; hashes SHA-256 legados são migrados após login válido. O custo e o algoritmo devem ser revistos periodicamente, e `/data/users.json` continua sendo material sensível.
 - O servidor manipula uploads grandes e executa ferramentas multimídia. Limites de requisição, armazenamento, CPU, RAM e tempo devem ser impostos no proxy e no host.

@@ -196,6 +196,10 @@ public class MainActivity extends ComponentActivity {
             hideCustomVideo();
             return true;
         }
+        if (!browserVisible && config != null) {
+            showBrowser();
+            return true;
+        }
         if (browserVisible && webView != null && webView.canGoBack()) {
             webView.goBack();
             return true;
@@ -231,7 +235,7 @@ public class MainActivity extends ComponentActivity {
         TextView subtitle = text(
             firstRun
                 ? "Seu servidor, no endereço certo em cada rede."
-                : "Conexão do aplicativo",
+                : "Configurações do app",
             15,
             COLOR_MUTED,
             false
@@ -302,8 +306,9 @@ public class MainActivity extends ComponentActivity {
         card.addView(externalInput, fieldParams());
 
         TextView apkHint = text(
-            "A interface web acompanha as atualizações do servidor sozinha. "
-                + "Quando o código nativo do Android mudar, gere e instale o APK localmente.",
+            "Os ajustes de criação, Telegram e Biblioteca ficam na aba Ajustes do servidor. "
+                + "Esta tela altera apenas a conexão deste aparelho. Tarefas já enviadas "
+                + "continuam no servidor. APK " + BuildConfig.VERSION_NAME + ".",
             12,
             COLOR_MUTED,
             false
@@ -365,8 +370,9 @@ public class MainActivity extends ComponentActivity {
         privacy.setGravity(Gravity.CENTER_VERTICAL);
         privacy.setBackground(rounded(COLOR_SURFACE_ALT, COLOR_BORDER, 16));
         TextView privacyText = text(
-            "A música continua sendo processada no seu servidor. O APK guarda apenas "
-                + "os endereços e o nome da rede neste aparelho.",
+            "O processamento continua no servidor. O aparelho guarda a conexão, "
+                + "a sessão da interface e os arquivos que você baixar. "
+                + "Ao abrir estas configurações, a página é fechada; formulários ainda não enviados precisam ser preenchidos novamente.",
             13,
             COLOR_MUTED,
             false
@@ -389,8 +395,8 @@ public class MainActivity extends ComponentActivity {
         browserContainer = verticalLayout();
         browserContainer.setBackgroundColor(COLOR_BACKGROUND);
         root.addView(browserContainer, matchMatch());
-        // A página já possui identidade, estado da conexão, atualização e ajustes.
-        // O APK exibe somente o WebView para não repetir esse cabeçalho no celular.
+        // A identidade permanece na página. O acesso à conexão é nativo,
+        // fora do WebView, para continuar disponível com o servidor offline.
         routeBadge = null;
 
         pageProgress = new ProgressBar(
@@ -409,6 +415,15 @@ public class MainActivity extends ComponentActivity {
         configureWebView(webView);
         webFrame.addView(webView, matchMatch());
         buildOfflineOverlay();
+
+        Button appSettings = secondaryButton("Configurações do app");
+        appSettings.setContentDescription("Configurações do app: rede Wi-Fi e endereços do servidor");
+        appSettings.setOnClickListener(view -> showSetup(false));
+        appSettings.setMinHeight(dp(48));
+        appSettings.setTextSize(14);
+        LinearLayout.LayoutParams appSettingsParams = new LinearLayout.LayoutParams(-1, -2);
+        appSettingsParams.setMargins(dp(8), dp(4), dp(8), dp(4));
+        browserContainer.addView(appSettings, appSettingsParams);
 
         currentBaseUrl = null;
         currentRoute = null;

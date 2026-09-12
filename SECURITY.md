@@ -23,6 +23,7 @@ O projeto está em manutenção mínima. Relatos serão avaliados conforme dispo
 
 ## Operação segura
 
+- inicialize o administrador em uma rede restrita antes de expor a instalação;
 - mantenha o serviço em rede confiável ou atrás de VPN e HTTPS;
 - não exponha diretamente a porta do container à Internet sem controles adicionais;
 - proteja `/data/users.json`, `/data/sessions.json`, configurações do Telegram e logs;
@@ -38,3 +39,5 @@ O projeto está em manutenção mínima. Relatos serão avaliados conforme dispo
 O projeto utiliza bibliotecas, modelos e executáveis de terceiros. Advisories podem surgir depois da última versão. Antes de publicar ou expor uma instalação, execute uma auditoria atualizada das dependências Python, da imagem base, dos pacotes Debian e do aplicativo Android.
 
 O resultado datado da revisão mais recente está em [SECURITY_AUDIT.md](SECURITY_AUDIT.md). Esse relatório registra vulnerabilidades conhecidas e limitações que ainda exigem tratamento; ele não deve ser interpretado como certificação de segurança.
+
+Para pausar, atualizar e preservar dados e checkpoints, siga [DEPLOYMENT.md](DEPLOYMENT.md). Configurar os endereços do APK não aplica automaticamente controles de rede ao servidor.

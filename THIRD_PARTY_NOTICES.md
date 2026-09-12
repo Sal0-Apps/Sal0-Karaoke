@@ -2,6 +2,8 @@
 
 Este arquivo identifica dependências diretas e materiais conhecidos do Sal0 Karaokê. Ele não substitui os textos integrais das licenças, não cobre automaticamente todas as dependências transitivas e deve ser regenerado antes de cada nova distribuição binária.
 
+Na revisão de documentação da distribuição 9.5.0, as dependências do processamento e as URLs de modelos/fundos permaneceram iguais. As situações de licença datadas abaixo continuam registradas como confirmadas ou pendentes conforme a revisão original; não representam uma nova verificação integral dos binários publicados.
+
 ## Dependências Python diretas
 
 | Componente | Uso | Licença indicada pelo projeto |
