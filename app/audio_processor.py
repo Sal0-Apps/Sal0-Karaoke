@@ -5,6 +5,50 @@ from pathlib import Path
 
 logger = logging.getLogger("karaoke")
 
+
+def get_effective_cpu_count() -> int:
+    """Retorna a quantidade de CPUs realmente disponível para o processo.
+
+    Em containers, ``os.cpu_count()`` pode informar os CPUs do host mesmo
+    quando o processo recebeu uma cota menor. Consideramos afinidade e cotas
+    do cgroup para evitar tanto subutilização quanto excesso de threads.
+    """
+    candidates = []
+
+    if hasattr(os, "sched_getaffinity"):
+        try:
+            affinity_count = len(os.sched_getaffinity(0))
+            if affinity_count > 0:
+                candidates.append(affinity_count)
+        except (OSError, AttributeError):
+            pass
+
+    host_count = os.cpu_count()
+    if host_count:
+        candidates.append(host_count)
+
+    cgroup_limits = (
+        ("/sys/fs/cgroup/cpu.max", None),
+        ("/sys/fs/cgroup/cpu/cpu.cfs_quota_us", "/sys/fs/cgroup/cpu/cpu.cfs_period_us"),
+    )
+    for quota_path, period_path in cgroup_limits:
+        try:
+            quota_parts = Path(quota_path).read_text(encoding="utf-8").strip().split()
+            if not quota_parts or quota_parts[0] == "max":
+                continue
+            quota = int(quota_parts[0])
+            if period_path:
+                period = int(Path(period_path).read_text(encoding="utf-8").strip())
+            else:
+                period = int(quota_parts[1])
+            if quota > 0 and period > 0:
+                candidates.append((quota + period - 1) // period)
+                break
+        except (OSError, IndexError, ValueError):
+            continue
+
+    return max(1, min(candidates)) if candidates else 1
+
 def get_file_duration(file_path: str) -> float:
     """Retorna a duração do arquivo de áudio/vídeo em segundos usando ffprobe."""
     try:
@@ -104,7 +148,10 @@ def separate_vocals(audio_path: str, temp_output_dir: str, update_callback=None)
         "-d", "cpu",
         "-n", "htdemucs_ft",
         "--two-stems", "vocals",
-        "--jobs", "1",
+        # Um único arquivo não precisa de vários workers de segmentos. O
+        # padrão 0 mantém o caminho de alta precisão e deixa o PyTorch usar
+        # as threads de CPU configuradas abaixo, como no CLI original.
+        "--jobs", "0",
         "-o", temp_output_dir,
         audio_path
     ]
@@ -119,20 +166,27 @@ def separate_vocals(audio_path: str, temp_output_dir: str, update_callback=None)
         env["TORCHAUDIO_BACKEND"] = "soundfile"
         env["TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD"] = "1"
 
-        cpu_count = max(1, os.cpu_count() or 1)
-        configured_jobs = os.environ.get("DEMUCS_CPU_JOBS", "").strip()
+        cpu_count = get_effective_cpu_count()
+        configured_threads = os.environ.get("DEMUCS_CPU_THREADS", "").strip()
         try:
-            cpu_jobs = int(configured_jobs) if configured_jobs else min(2, max(1, cpu_count // 2))
+            cpu_threads = int(configured_threads) if configured_threads else cpu_count
         except ValueError:
-            cpu_jobs = min(2, max(1, cpu_count // 2))
-        cpu_jobs = max(1, min(cpu_jobs, cpu_count))
-        threads_per_job = max(1, cpu_count // cpu_jobs)
-        cmd[cmd.index("--jobs") + 1] = str(cpu_jobs)
-        env["OMP_NUM_THREADS"] = str(threads_per_job)
-        env["MKL_NUM_THREADS"] = str(threads_per_job)
-        env["OPENBLAS_NUM_THREADS"] = str(threads_per_job)
+            cpu_threads = cpu_count
+        cpu_threads = max(1, min(cpu_threads, cpu_count))
+        # --jobs controla workers internos do Demucs, não a quantidade de
+        # threads de CPU. Para uma única entrada, jobs=0 evita o caminho que
+        # dividia o trabalho e acabava deixando a CPU quase ociosa.
+        cmd[cmd.index("--jobs") + 1] = "0"
+        env["OMP_NUM_THREADS"] = str(cpu_threads)
+        env["MKL_NUM_THREADS"] = str(cpu_threads)
+        env["OPENBLAS_NUM_THREADS"] = str(cpu_threads)
+        env["NUMEXPR_NUM_THREADS"] = str(cpu_threads)
         env["OMP_DYNAMIC"] = "FALSE"
         env["MKL_DYNAMIC"] = "FALSE"
+        logger.info(
+            "Demucs CPU configurado com %s thread(s) disponível(is); jobs internos: 0",
+            cpu_threads,
+        )
         
         # Executar o Demucs com streaming de logs em tempo real
         logger.info(f"Executando Demucs: {' '.join(cmd)}")

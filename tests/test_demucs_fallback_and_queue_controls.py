@@ -75,7 +75,7 @@ class DemucsFallbackAndQueueTests(unittest.TestCase):
         self.assertIn("--two-stems", cmd)
         self.assertIn("vocals", cmd)
         self.assertIn("--jobs", cmd)
-        self.assertEqual(cmd[cmd.index("--jobs") + 1], "2")
+        self.assertEqual(cmd[cmd.index("--jobs") + 1], "0")
         self.assertTrue(vocals.endswith("vocals.wav"))
         self.assertTrue(instrumental.endswith("no_vocals.wav"))
 
