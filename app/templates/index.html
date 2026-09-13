@@ -1196,6 +1196,25 @@
         .quick-choice-label { font-size: 0.78rem; font-weight: 750; }
         .quick-choice-hint { color: var(--text-muted); font-size: 0.68rem; line-height: 1.35; }
         .quick-choice-icon { font-size: 1.18rem; }
+        .upload-area, .quick-file-choice, #libAudioUploadArea, #libBgUploadArea {
+            min-width: 0; max-width: 100%; height: auto !important; min-height: 90px;
+            padding: 0.8rem; white-space: normal !important; overflow-wrap: anywhere; text-overflow: clip !important;
+        }
+        .upload-area > *, .quick-file-choice > *, [id$="FileName"], [id$="TextName"] {
+            min-width: 0; max-width: 100%; white-space: normal !important; overflow-wrap: anywhere;
+        }
+        .library-section { margin: 0; min-width: 0; }
+        .library-section > summary { cursor: pointer; padding: 0.3rem; }
+        .library-section-content { display: flex; flex-direction: column; gap: 0.8rem; margin-top: 1rem; }
+        .result-card { display: flex; flex-direction: column; align-items: stretch; }
+        .result-cover { position: relative; width: 100%; aspect-ratio: 16/9; border-radius: 12px;
+            overflow: hidden; background: #071522; color: white; display: grid; place-items: center; }
+        .result-cover img { width: 100%; height: 100%; object-fit: cover; position: absolute; opacity: 0.38; }
+        .result-cover .cover-title { position: relative; padding: 1rem; text-align: center;
+            overflow-wrap: anywhere; font-weight: 700; font-size: clamp(0.85rem, 3vw, 1.3rem); }
+        .result-card .info { min-width: 0; width: 100%; }
+        .result-card .title { white-space: normal; overflow-wrap: anywhere; }
+        .result-card .actions { flex-wrap: wrap; justify-content: flex-start; }
         .quick-file-choice { min-height: 82px; text-align: center; align-items: center; border-style: dashed; }
         .quick-choice-card .input-text,
         .quick-choice-card .select-input { margin: 0; min-width: 0; }
@@ -2247,7 +2266,12 @@
         <!-- ABA 3: BIBLIOTECA & HISTÓRICO -->
         <!-- ============================================================= -->
         <div id="libraryTabContent" style="display: none; flex-direction: column; gap: 1.5rem;">
-            <!-- Grid de Envio Rápido para a Biblioteca -->
+            <details class="card library-section" id="libraryResults" open>
+                <summary class="card-title">🎬 Resultados</summary>
+                <div id="libHistoryList" class="library-section-content"></div>
+            </details>
+            <details class="card library-section" id="libraryImports">
+                <summary class="card-title">＋ Adicionar à biblioteca</summary>
             <div style="background: var(--input-bg); border: 1px solid var(--glass-border); padding: 1.2rem; border-radius: 12px; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr)); gap: 1rem;">
                 <div>
                     <h4 style="margin: 0 0 0.5rem 0; font-size: 0.9rem; color: var(--text-main);">➕ Música ou vídeo</h4>
@@ -2291,35 +2315,15 @@
                 </div>
             </div>
 
-            <!-- Seção 1: Músicas e Vídeos Originais -->
-            <div class="card" style="margin: 0;">
-                <div class="card-header">
-                    <span class="card-title">🎵 Originais</span>
-                </div>
-                <div id="libVideosList" style="display: flex; flex-direction: column; gap: 0.6rem;">
-                    <!-- Preenchido via JS loadLibrary() -->
-                </div>
-            </div>
-
-            <!-- Seção 2: Imagens e Vídeos de Fundo -->
-            <div class="card" style="margin: 0;">
-                <div class="card-header">
-                    <span class="card-title">🖼️ Fundos</span>
-                </div>
-                <div id="libPhotosList" style="display: flex; flex-direction: column; gap: 0.6rem;">
-                    <!-- Preenchido via JS loadLibrary() -->
-                </div>
-            </div>
-
-            <!-- Seção 3: Karaokês Renderizados no Histórico -->
-            <div class="card" style="margin: 0;">
-                <div class="card-header">
-                    <span class="card-title">🎬 Resultados</span>
-                </div>
-                <div id="libHistoryList" style="display: flex; flex-direction: column; gap: 0.6rem;">
-                    <!-- Preenchido via JS loadLibrary() -->
-                </div>
-            </div>
+            </details>
+            <details class="card library-section" id="libraryOriginals">
+                <summary class="card-title">🎵 Originais</summary>
+                <div id="libVideosList" class="library-section-content"></div>
+            </details>
+            <details class="card library-section" id="libraryBackgrounds">
+                <summary class="card-title">🖼️ Fundos</summary>
+                <div id="libPhotosList" class="library-section-content"></div>
+            </details>
         </div>
 
         <!-- RODAPÉ DISCRETO DA PÁGINA -->
@@ -2384,17 +2388,17 @@
                     <li>Ajuste modelo, leitura da fala, VAD e revisão se necessário. Toque em <strong>Gerar arquivos SRT</strong>.</li>
                     <li>Baixe o <strong>SRT original</strong> e, se gerado, o <strong>SRT traduzido</strong> no Karaokê. Ambos também são enviados por tentativa de anexo ao Telegram configurado, com os links de download. Se a tradução falhar, a entrega do original continua.</li>
                 </ol>
-                <p>Este modo usa o áudio normalizado para MP3, preserva a fala e não usa Demucs nem fundo. O resultado é legenda, sem renderizar outro vídeo. Não há limite fixo de duração do modo; disco, memória e servidor continuam sendo limites. Confira reconhecimento e tempos antes de usar a legenda.</p>
+                <p>Este modo usa o áudio completo normalizado para MP3, sem Demucs nem fundo. As legendas respeitam os tempos das falas e não preenchem silêncios. O SRT traduzido mantém os mesmos tempos. Não há abertura de capa neste modo nem limite fixo de duração; disco, memória e servidor continuam sendo limites.</p>
             </details>
             <details>
                 <summary>4. Adicionar e organizar a fila</summary>
                 <ol>
                     <li>Toque em <strong>Adicionar novo processo</strong> para abrir os três modos e preparar o próximo trabalho com suas próprias opções.</li>
                     <li>Use arquivos, links ou Biblioteca. Vários arquivos selecionados juntos usam os ajustes do mesmo envio.</li>
-                    <li>Use <strong>↑ / ↓</strong> nos itens aguardando para mudar a ordem, ou <strong>Remover</strong> para retirá-los.</li>
+                    <li>O administrador usa <strong>↑ / ↓</strong> para ordenar qualquer item aguardando. Cada perfil pode usar <strong>Remover</strong> nos próprios itens.</li>
                     <li><strong>Cancelar Processamento</strong> encerra o atual. O próximo elegível começa quando a fila está ativa.</li>
                 </ol>
-                <p>A fila guarda trabalhos ativos, não um histórico. O limite é de 25 trabalhos ativos por perfil. Durante um processo, o usuário comum adiciona apenas se o trabalho em execução é seu; o administrador pode adicionar mesmo durante o de outro perfil. Cada usuário organiza seus itens; o administrador gerencia todos.</p>
+                <p>Qualquer perfil pode adicionar tarefas enquanto outro processa. O limite é de 25 trabalhos ativos por perfil. Só o administrador altera a ordem. Cada usuário vê seus itens e recebe apenas suas notificações e resultados; o administrador acompanha todos. A fila não é histórico.</p>
             </details>
             <details>
                 <summary>5. Entender o progresso e pausar para atualizar</summary>
@@ -2414,7 +2418,8 @@
                     <li>Salve e continue, ou use <strong>Continuar sem editar</strong>. No modo SRT, a revisão é do original, antes da tradução opcional.</li>
                     <li>Na <strong>Biblioteca</strong>, use <strong>Ver</strong>, <strong>Baixar</strong>, <strong>Renomear</strong> e <strong>Excluir</strong> conforme a seção. <strong>Usar</strong> reutiliza originais ou fundos.</li>
                 </ol>
-                <p>O administrador vê também as mídias e os resultados dos outros perfis. No Android, os downloads ficam em <strong>Downloads</strong>; nomes repetidos recebem um sufixo. A reprodução depende dos formatos suportados pelo aparelho.</p>
+                <p><strong>Resultados</strong> aparece primeiro, com miniaturas e os mais recentes no topo. Toque no título de cada seção para mostrar ou recolher, como neste manual. O administrador vê o perfil de cada resultado, inclusive com nomes repetidos. No Android, os downloads ficam em <strong>Downloads</strong>.</p>
+                <p>Novos vídeos começam com uma capa silenciosa de três segundos, separada do conteúdo. Depois, imagem, áudio e legendas começam juntos, mantendo a sincronia. As miniaturas são independentes; vídeos antigos não são reeditados. Ao refazer pelo cache, a revisão e o vídeo são gerados novamente; ao retomar uma pausa, as etapas já concluídas são preservadas.</p>
             </details>
             <details>
                 <summary>7. Receber resultados no Telegram</summary>
@@ -2447,7 +2452,7 @@
                     <li><strong>Diagnóstico:</strong> o administrador pode baixar os logs em Ajustes. Revise dados pessoais e credenciais antes de compartilhar.</li>
                 </ul>
             </details>
-            <p class="compact-note">Versão do servidor: 9.6.0. A transcrição é local; fontes, modelos e integrações podem acessar serviços externos. Use conteúdo autorizado.</p>
+            <p class="compact-note">Versão do servidor: 9.8.0. A transcrição é local; fontes, modelos e integrações podem acessar serviços externos. Use conteúdo autorizado.</p>
         </div>
     </div>
 
@@ -3426,9 +3431,9 @@
                 button.textContent = processingQueuePaused ? '▶ Retomar do checkpoint' : '⏸ Pausar ao concluir etapa';
                 button.onclick = toggleProcessingQueuePause;
             });
-            card.style.display = activeJobs.length > 1 || (adminCanControl && processingQueuePaused) ? '' : 'none';
+            card.style.display = queuedCount > 0 || activeJobs.length > 1 || (adminCanControl && processingQueuePaused) ? '' : 'none';
             badge.textContent = processingQueuePaused ? `${queuedCount} pausados` : `${queuedCount} aguardando`;
-            if (activeJobs.length <= 1 && !processingQueuePaused) {
+            if (activeJobs.length <= 1 && queuedCount === 0 && !processingQueuePaused) {
                 container.replaceChildren();
                 return;
             }
@@ -3442,9 +3447,11 @@
                     </div>
                     <div class="queue-actions">
                         <span class="queue-status">${escapeHtml(queueStatusLabel(job))}</span>
-                        ${job.status === 'queued' ? `
+                        ${job.status === 'queued' && adminCanControl ? `
                             <button type="button" class="btn-secondary queue-move-btn" title="Mover para cima" aria-label="Mover ${escapeHtml(job.title || 'item')} para cima" ${queuedOrder.get(job.id) === 0 ? 'disabled' : ''} onclick="moveQueuedJob('${encodeURIComponent(job.id)}', 'up')">↑</button>
                             <button type="button" class="btn-secondary queue-move-btn" title="Mover para baixo" aria-label="Mover ${escapeHtml(job.title || 'item')} para baixo" ${queuedOrder.get(job.id) === queuedJobs.length - 1 ? 'disabled' : ''} onclick="moveQueuedJob('${encodeURIComponent(job.id)}', 'down')">↓</button>
+                        ` : ''}
+                        ${job.status === 'queued' ? `
                             <button type="button" class="btn-secondary" onclick="removeQueuedJob('${encodeURIComponent(job.id)}')">Remover</button>
                         ` : ''}
                     </div>
@@ -3649,7 +3656,10 @@
                 return;
             }
 
-            files.forEach(file => {
+            files.forEach(item => {
+                const file = typeof item === 'string' ? item : item.filename;
+                const owner = typeof item === 'string' ? '' : item.owner;
+                const ownerQuery = `owner=${encodeURIComponent(owner || '')}`;
                 const row = document.createElement('div');
                 row.className = 'library-item';
                 const info = document.createElement('div');
@@ -3673,20 +3683,47 @@
                 const ext = (file.split('.').pop() || '').toLowerCase();
                 if (ext === 'srt') fileIcon.textContent = '▤';
                 if (['mp4', 'mkv', 'webm', 'mov', 'avi', 'mp3', 'wav', 'm4a', 'flac', 'png', 'jpg', 'jpeg', 'gif', 'webp'].includes(ext)) {
-                    actions.appendChild(makeLibraryButton('▶️ Ver', 'btn-secondary', () => openMediaPreview(section, file)));
+                    actions.appendChild(makeLibraryButton('▶️ Ver', 'btn-secondary', () => openMediaPreview(section, file, owner)));
                 }
                 if (section === 'history') {
+                    row.classList.add('result-card');
+                    const cover = document.createElement('div');
+                    cover.className = 'result-cover';
+                    const coverTitle = document.createElement('div');
+                    coverTitle.className = 'cover-title';
+                    coverTitle.textContent = file;
+                    if (ext !== 'srt') {
+                        const image = document.createElement('img');
+                        image.loading = 'lazy';
+                        image.alt = '';
+                        image.src = `/api/library/thumbnail/history/${encodeURIComponent(file)}?token=${encodeURIComponent(authToken)}&${ownerQuery}&v=${item.modified_at || ''}`;
+                        image.onerror = () => image.remove();
+                        cover.appendChild(image);
+                    } else {
+                        cover.setAttribute('role', 'img');
+                        cover.setAttribute('aria-label', 'Legenda SRT: ' + file);
+                        coverTitle.textContent = '▤ SRT · ' + file;
+                    }
+                    cover.appendChild(coverTitle);
+                    row.appendChild(cover);
+                    if (owner && currentUser?.role === 'admin') {
+                        const profile = document.createElement('p');
+                        profile.className = 'compact-note';
+                        profile.textContent = 'Perfil: ' + owner;
+                        row.appendChild(profile);
+                    }
                     const link = document.createElement('a');
-                    link.href = `/api/library/download/history/${encodeURIComponent(file)}?token=${encodeURIComponent(authToken)}`;
+                    link.href = `/api/library/download/history/${encodeURIComponent(file)}?token=${encodeURIComponent(authToken)}&${ownerQuery}`;
                     link.download = file;
                     link.className = 'btn-primary';
                     link.textContent = '⬇️ Baixar';
                     link.style.cssText = 'padding:0.3rem 0.65rem;font-size:0.75rem;text-decoration:none;display:inline-flex;align-items:center;';
                     actions.appendChild(link);
                 }
-                actions.appendChild(makeLibraryButton('✏️ Renomear', 'btn-secondary', () => renameInLibrary(section, file)));
-                actions.appendChild(makeLibraryButton('🗑️ Excluir', 'btn-delete', () => deleteFromLibrary(section, file)));
-                row.append(info, actions);
+                actions.appendChild(makeLibraryButton('✏️ Renomear', 'btn-secondary', () => renameInLibrary(section, file, owner)));
+                actions.appendChild(makeLibraryButton('🗑️ Excluir', 'btn-delete', () => deleteFromLibrary(section, file, owner)));
+                if (section !== 'history') row.appendChild(info);
+                row.appendChild(actions);
                 container.appendChild(row);
             });
         }
@@ -3704,7 +3741,7 @@
                 const data = await res.json();
                 renderLibrarySection(document.getElementById('libVideosList'), 'videos', data.videos, '🎵', 'Nenhum original nesta conta.');
                 renderLibrarySection(document.getElementById('libPhotosList'), 'photos', data.photos, '🖼️', 'Nenhum fundo nesta conta.');
-                renderLibrarySection(document.getElementById('libHistoryList'), 'history', data.history, '🎬', 'Nenhum resultado nesta conta.');
+                renderLibrarySection(document.getElementById('libHistoryList'), 'history', data.history_items || data.history, '🎬', 'Nenhum resultado nesta conta.');
                 fillLibrarySelect(document.getElementById('libraryAudioSelect'), data.videos, 'Selecione uma música da biblioteca...');
                 fillLibrarySelect(document.getElementById('libraryBgSelect'), data.photos, 'Selecione um fundo da biblioteca...');
                 fillLibrarySelect(document.getElementById('easyLibraryAudio'), data.videos, 'Escolha na biblioteca...');
@@ -3758,13 +3795,13 @@
             updateMediaTimeLabel();
         }
 
-        function openMediaPreview(section, filename) {
+        function openMediaPreview(section, filename, owner = '') {
             const modal = document.getElementById('mediaPreviewModal');
             const title = document.getElementById('mediaPreviewTitle');
             const video = document.getElementById('libraryVideoPreview');
             const image = document.getElementById('libraryImagePreview');
             const seekControls = document.getElementById('mediaSeekControls');
-            const url = `/api/library/preview/${encodeURIComponent(section)}/${encodeURIComponent(filename)}?token=${encodeURIComponent(authToken)}`;
+            const url = `/api/library/preview/${encodeURIComponent(section)}/${encodeURIComponent(filename)}?token=${encodeURIComponent(authToken)}&owner=${encodeURIComponent(owner)}`;
             const imageType = /\.(png|jpe?g|gif|webp|bmp)$/i.test(filename);
             if (title) title.textContent = filename;
             if (video) {
@@ -3819,12 +3856,12 @@
         }
 
         // Função de renomear arquivo na biblioteca
-        async function renameInLibrary(section, oldFilename) {
+        async function renameInLibrary(section, oldFilename, owner = '') {
             const newName = prompt(`Renomear arquivo '${oldFilename}':`, oldFilename);
             if (!newName || newName.trim() === '' || newName.trim() === oldFilename) return;
 
             try {
-                const res = await authFetch(`/api/library/${section}/rename`, {
+                const res = await authFetch(`/api/library/${section}/rename?owner=${encodeURIComponent(owner)}`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ old_name: oldFilename, new_name: newName.trim() })
@@ -3842,10 +3879,10 @@
             }
         }
 
-        async function deleteFromLibrary(section, filename) {
+        async function deleteFromLibrary(section, filename, owner = '') {
             if (!confirm(`Deseja realmente excluir '${filename}' da biblioteca?`)) return;
             try {
-                const res = await authFetch(`/api/library/${section}/${encodeURIComponent(filename)}`, {
+                const res = await authFetch(`/api/library/${section}/${encodeURIComponent(filename)}?owner=${encodeURIComponent(owner)}`, {
                     method: 'DELETE'
                 });
                 if (res.ok) {
@@ -5935,8 +5972,7 @@
                 if (data.status === "busy") {
                     clientPreparationInProgress = false;
                     renderProcessSummary({});
-                    queueCreationExpanded = false;
-                    setCreationUiLocked(true);
+                    setCreationUiLocked(!queueCreationExpanded);
                     setActiveProcessLayout(true);
                     if (correctionCard) correctionCard.style.display = 'none';
                     if (processCard) processCard.style.display = 'block';
@@ -5944,14 +5980,14 @@
                     if (progressPercent) progressPercent.innerText = '—';
                     if (progressBarFill) progressBarFill.style.width = '0%';
                     if (stageProgressText) stageProgressText.textContent = '';
-                    if (btnSubmit) { btnSubmit.disabled = true; btnSubmit.innerHTML = '⏳ Servidor ocupado'; }
-                    if (easySubmitBtn) { easySubmitBtn.disabled = true; easySubmitBtn.innerHTML = '⏳ Servidor ocupado'; }
-                    if (subtitleSubmitBtn) { subtitleSubmitBtn.disabled = true; subtitleSubmitBtn.innerHTML = '⏳ Servidor ocupado'; }
-                    if (queueAddProcessCard) queueAddProcessCard.style.display = 'none';
+                    for (const button of [btnSubmit, easySubmitBtn, subtitleSubmitBtn]) {
+                        if (button) { button.disabled = !queueCreationExpanded; button.textContent = '＋ Adicionar à fila'; }
+                    }
+                    if (queueAddProcessCard) queueAddProcessCard.style.display = 'block';
                     if (downloadBox) downloadBox.style.display = 'none';
                 } else if (data.status === "processing" || data.status === "downloading") {
                     clientPreparationInProgress = false;
-                    const canAddToQueue = Boolean(data.owned_by_current_user || currentUser?.role === 'admin');
+                    const canAddToQueue = Boolean(currentUser);
                     if (!canAddToQueue) queueCreationExpanded = false;
                     setCreationUiLocked(!(canAddToQueue && queueCreationExpanded));
                     setActiveProcessLayout(true);
@@ -5990,7 +6026,7 @@
 
                     updateTimelineUI(data.step || "");
                 } else if (data.status === "waiting_for_user_correction" || data.status === "awaiting_review") {
-                    const canAddToQueue = Boolean(data.owned_by_current_user || currentUser?.role === 'admin');
+                    const canAddToQueue = Boolean(currentUser);
                     if (!canAddToQueue) queueCreationExpanded = false;
                     setCreationUiLocked(!(canAddToQueue && queueCreationExpanded));
                     setActiveProcessLayout(true);

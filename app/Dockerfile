@@ -2,7 +2,7 @@ FROM python:3.12-slim
 
 LABEL org.opencontainers.image.title="Sal0 Karaokê" \
       org.opencontainers.image.description="Servidor auto-hospedado para criação local de karaokê e legendas" \
-      org.opencontainers.image.version="9.6.0" \
+      org.opencontainers.image.version="9.8.0" \
       org.opencontainers.image.source="https://github.com/Sal0-Apps/Sal0-Karaoke" \
       org.opencontainers.image.licenses="MIT"
 
@@ -14,6 +14,7 @@ ENV NUMBA_CACHE_DIR=/tmp/numba_cache
 # Instalar FFmpeg, libsndfile, certificados e o runtime JavaScript exigido pelo YouTube
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg \
+    fonts-dejavu-core \
     libsndfile1 \
     ca-certificates \
     curl \

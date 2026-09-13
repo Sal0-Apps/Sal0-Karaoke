@@ -13,26 +13,39 @@ def normalize_translation_language(value):
 
 
 def cover_full_media_timeline(segments: list[dict], duration: float) -> list[dict]:
-    """Ajusta os intervalos para o SRT cobrir a mídia inteira, sem lacunas."""
-    normalized = [dict(segment) for segment in segments if str(segment.get("text") or "").strip()]
-    normalized.sort(key=lambda segment: float(segment.get("start", 0.0)))
-    if not normalized:
-        return []
+    """Cobre as falas de toda a mídia, sem preencher períodos de silêncio.
 
-    media_end = max(float(duration or 0.0), float(normalized[-1].get("end", 0.0)))
-    normalized[0]["start"] = 0.0
-    for index in range(len(normalized) - 1):
-        current = normalized[index]
-        following = normalized[index + 1]
-        current_start = float(current.get("start", 0.0))
-        current_end = max(current_start, float(current.get("end", current_start)))
-        following_start = max(current_start, float(following.get("start", current_end)))
-        boundary = max(current_start, min(media_end, (current_end + following_start) / 2.0))
-        current["end"] = boundary
-        following["start"] = boundary
-
-    normalized[-1]["end"] = max(float(normalized[-1].get("start", 0.0)), media_end)
-    return normalized
+    Mantém o nome antigo por compatibilidade. Timestamps por palavra têm
+    prioridade; pausas de pelo menos 600 ms separam os blocos do SRT.
+    """
+    cues = []
+    for segment in segments:
+        words = [word for word in segment.get('words', [])
+                 if str(word.get('word') or '').strip()
+                 and word.get('start') is not None and word.get('end') is not None]
+        if not words:
+            cues.append(dict(segment))
+            continue
+        groups = []
+        for word in words:
+            if not groups or float(word['start']) - float(groups[-1][-1]['end']) >= 0.6:
+                groups.append([])
+            groups[-1].append(word)
+        for group in groups:
+            cues.append({'start': group[0]['start'], 'end': group[-1]['end'],
+                         'text': ' '.join(str(word['word']).strip() for word in group)})
+    normalized = []
+    for cue in sorted(cues, key=lambda item: float(item.get('start', 0))):
+        start = max(0.0, float(cue.get('start', 0)))
+        end = float(cue.get('end', start))
+        if duration > 0:
+            end = min(end, duration)
+        text = str(cue.get('text') or '').strip()
+        if text and end > start:
+            if normalized and normalized[-1]['end'] > start:
+                normalized[-1]['end'] = max(normalized[-1]['start'], start)
+            normalized.append({'start': start, 'end': end, 'text': text})
+    return [cue for cue in normalized if cue['end'] > cue['start']]
 
 
 def rebuild_segment_words(text: str, start: float, end: float) -> list[dict]:

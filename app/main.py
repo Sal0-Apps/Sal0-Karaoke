@@ -41,6 +41,8 @@ from subtitle_translator import (
 from karaoke_generator import generate_ass_karaoke
 import libretranslate_client
 from video_renderer import render_karaoke_video, check_has_video
+from reprocess_cache import copy_reusable_inputs
+from media_covers import video_thumbnail
 
 # Configurar logs
 logging.basicConfig(
@@ -777,19 +779,9 @@ def ensure_processing_queue_capacity(username: str):
 def ensure_processing_queue_access(
     current_user: dict,
 ):
-    """Durante um trabalho ativo, permite novos itens ao dono ou administrador."""
-    with processing_queue_lock:
-        active_job = next(
-            (job for job in processing_queue if job.get("status") == "processing"),
-            None,
-        )
-    if not active_job:
-        return
-    if not is_admin(current_user) and active_job.get("owner_username") != current_user.get("username"):
-        raise HTTPException(
-            status_code=409,
-            detail="Aguarde: o servidor está processando um trabalho de outro perfil.",
-        )
+    """Qualquer perfil autenticado pode adicionar tarefas, mesmo com o servidor ocupado."""
+    if not current_user.get("username"):
+        raise HTTPException(status_code=401, detail="Autenticação necessária.")
 
 
 def active_queue_pipeline_for_user(current_user: dict) -> dict:
@@ -1037,6 +1029,7 @@ def move_queued_job(
     payload: QueueMoveRequest,
     current_user: dict = Depends(get_current_user),
 ):
+    require_admin(current_user)
     direction = payload.direction.strip().lower()
     if direction not in {"up", "down"}:
         raise HTTPException(status_code=422, detail="Direção inválida para a fila.")
@@ -2219,7 +2212,7 @@ def download_bg_youtube_preset(
 
 
 LRCLIB_API_URL = "https://lrclib.net/api"
-LRCLIB_USER_AGENT = "Sal0-Karaoke/9.6.0 (+https://github.com/Sal0-Apps/Sal0-Karaoke)"
+LRCLIB_USER_AGENT = "Sal0-Karaoke/9.8.0 (+https://github.com/Sal0-Apps/Sal0-Karaoke)"
 LYRICS_OVH_API_URL = "https://api.lyrics.ovh/v1"
 LYRICS_PROVIDER_TIMEOUT = (3.05, 6)
 MUSIXMATCH_API_URL = "https://apic-desktop.musixmatch.com/ws/1.1"
@@ -2683,7 +2676,7 @@ def download_diagnostic_logs(current_user: dict = Depends(get_current_user)):
     with state_lock:
         current_state = dict(state)
     report = "\n".join([
-"Sal0 Karaokê v9.6.0 — diagnóstico ao vivo",
+"Sal0 Karaokê v9.8.0 — diagnóstico ao vivo",
         f"Gerado em: {time.strftime('%Y-%m-%d %H:%M:%S')}",
         "",
         "=== ESTADO ATUAL ===",
@@ -3183,7 +3176,54 @@ def get_library_files(current_user: dict = Depends(get_current_user)):
                 except Exception as e:
                     logger.error(f"Erro ao listar biblioteca {section}: {e}")
         result[section] = sorted(names)
+    result["history_items"] = library_history_items(current_user)
     return result
+
+
+def library_history_items(current_user: dict) -> list[dict]:
+    owners = [current_user]
+    if is_admin(current_user):
+        owners += [{"username": username, "role": record.get("role", "user")}
+                   for username, record in load_users().items() if record.get("role") != "admin"]
+    items = []
+    for owner in owners:
+        root = os.path.join(get_user_paths(owner)["library"], "history")
+        if not os.path.isdir(root):
+            continue
+        for filename in os.listdir(root):
+            path = os.path.join(root, filename)
+            if filename.startswith('.') or not os.path.isfile(path):
+                continue
+            stat = os.stat(path)
+            items.append({"filename": filename, "owner": owner["username"],
+                          "modified_at": stat.st_mtime, "size": stat.st_size})
+    return sorted(items, key=lambda item: item["modified_at"], reverse=True)
+
+
+def library_request_user(current_user: dict, owner: str = "") -> dict:
+    if not owner or owner == current_user.get("username"):
+        return current_user
+    require_admin(current_user)
+    target = user_from_username(owner)
+    if not target:
+        raise HTTPException(status_code=404, detail="Perfil não encontrado.")
+    return target
+
+
+@app.get("/api/library/thumbnail/{section}/{filename}")
+def get_library_thumbnail(section: str, filename: str, owner: str = "",
+                          current_user: dict = Depends(get_current_user)):
+    target = library_request_user(current_user, owner)
+    resolved = resolve_library_file(target, section, filename)
+    if not resolved:
+        raise HTTPException(status_code=404, detail="Arquivo não encontrado.")
+    if os.path.splitext(filename)[1].lower() not in {".mp4", ".mkv", ".mov", ".avi", ".webm", ".m4v"}:
+        raise HTTPException(status_code=400, detail="A miniatura requer um vídeo.")
+    try:
+        thumbnail = video_thumbnail(resolved[0])
+    except (OSError, subprocess.SubprocessError):
+        raise HTTPException(status_code=503, detail="Miniatura temporariamente indisponível.") from None
+    return FileResponse(thumbnail, media_type="image/jpeg", headers={"Cache-Control": "private, no-cache"})
 
 
 def admin_result_owner(owner_key: str, current_user: dict) -> dict:
@@ -3337,9 +3377,11 @@ def resolve_library_file(current_user: dict, section: str, filename: str):
 def rename_library_file(
     section: str,
     req: RenameRequest,
+    owner: str = "",
     current_user: dict = Depends(get_current_user)
 ):
     """Renomeia um arquivo na biblioteca (videos, photos ou history)."""
+    current_user = library_request_user(current_user, owner)
     library_dir = get_user_paths(current_user)["library"]
     valid_sections = {
         "videos": os.path.join(library_dir, "videos"),
@@ -3384,8 +3426,9 @@ def rename_library_file(
 
 
 @app.delete("/api/library/{section}/{filename}")
-def delete_from_library(section: str, filename: str, current_user: dict = Depends(get_current_user)):
+def delete_from_library(section: str, filename: str, owner: str = "", current_user: dict = Depends(get_current_user)):
     """Exclui fisicamente um arquivo da biblioteca."""
+    current_user = library_request_user(current_user, owner)
     if section not in ["videos", "photos", "history"]:
         raise HTTPException(status_code=400, detail="Seção inválida.")
 
@@ -3404,8 +3447,9 @@ def delete_from_library(section: str, filename: str, current_user: dict = Depend
     raise HTTPException(status_code=404, detail="Arquivo não encontrado na biblioteca.")
 
 @app.get("/api/library/download/{section}/{filename}")
-def download_from_library(section: str, filename: str, current_user: dict = Depends(get_current_user)):
+def download_from_library(section: str, filename: str, owner: str = "", current_user: dict = Depends(get_current_user)):
     """Faz o download de um arquivo da biblioteca."""
+    current_user = library_request_user(current_user, owner)
     if section not in ["videos", "photos", "history"]:
         raise HTTPException(status_code=400, detail="Seção inválida.")
 
@@ -3496,9 +3540,11 @@ def preview_from_library(
     section: str,
     filename: str,
     request: Request,
+    owner: str = "",
     current_user: dict = Depends(get_current_user)
 ):
     """Abre áudio/vídeo na interface sem forçar download."""
+    current_user = library_request_user(current_user, owner)
     if section not in ["videos", "photos", "history"]:
         raise HTTPException(status_code=400, detail="Seção inválida.")
     safe_filename = os.path.basename(filename)
@@ -3938,8 +3984,9 @@ def process_karaoke(
     )
     if not has_new_source:
         legacy_cache_dir = user_paths["cache"]
-        if os.path.isdir(legacy_cache_dir):
-            shutil.copytree(legacy_cache_dir, cache_dir, dirs_exist_ok=True)
+        with legacy_cache_promotion_lock:
+            if os.path.isdir(legacy_cache_dir):
+                copy_reusable_inputs(legacy_cache_dir, cache_dir)
 
     if quick_random_background_requested:
         library_bg, quick_background_title = stage_quick_random_background(easy_config, current_user)
@@ -5374,6 +5421,7 @@ def run_pipeline(
                         original_video_path=input_audio_path,
                         background_mode="original_video",
                         progress_callback=publish_render_progress,
+                        cover_title=orig_name,
                     )
                 else:
                     update_state("processing", "Using rendered video checkpoint", 98)
@@ -5636,6 +5684,7 @@ def run_pipeline(
                     original_video_path=input_audio_path,
                     background_mode=bg_mode_param,
                     progress_callback=publish_render_progress,
+                    cover_title=orig_name,
                 )
                 shutil.copy2(ass_path, final_ass_path)
             else:

@@ -104,7 +104,7 @@ class SubtitleTranslationModeTests(unittest.TestCase):
         self.assertIn("00:00:01,250 --> 00:01:05,750", content)
         self.assertIn("Olá, mundo!", content)
 
-    def test_srt_timeline_covers_media_from_start_to_finish_without_gaps(self):
+    def test_srt_timeline_preserves_silences(self):
         namespace = {}
         tree = ast.parse(TRANSLATOR)
         selected = next(
@@ -119,9 +119,10 @@ class SubtitleTranslationModeTests(unittest.TestCase):
             ],
             20.0,
         )
-        self.assertEqual(covered[0]["start"], 0.0)
-        self.assertEqual(covered[0]["end"], covered[1]["start"])
-        self.assertEqual(covered[-1]["end"], 20.0)
+        self.assertEqual(covered[0]["start"], 3.0)
+        self.assertEqual(covered[0]["end"], 5.0)
+        self.assertEqual(covered[1]["start"], 8.0)
+        self.assertEqual(covered[-1]["end"], 10.0)
 
 
 if __name__ == "__main__":

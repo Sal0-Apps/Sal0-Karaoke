@@ -1,6 +1,6 @@
 # Manual do Sal0 Karaokê
 
-Este manual descreve os controles disponíveis na distribuição 9.6.0. Para instalar o servidor, consulte [DEPLOYMENT.md](DEPLOYMENT.md). Para configurar o aparelho, consulte o [guia Android](android/README.md).
+Este manual descreve os controles disponíveis na distribuição 9.8.0. Para instalar o servidor, consulte [DEPLOYMENT.md](DEPLOYMENT.md). Para configurar o aparelho, consulte o [guia Android](android/README.md).
 
 ## 1. Primeiro acesso e navegação
 
@@ -112,7 +112,7 @@ Este modo cria arquivos de legenda e preserva a fala. Ele não separa vocais, n�
 7. Toque em **Gerar arquivos SRT**.
 8. Baixe o **SRT original** e o **SRT traduzido**, quando disponível.
 
-O servidor extrai/normaliza o áudio para MP3 e transcreve o idioma detectado. A duração total da mídia é usada para ajustar a linha do tempo do SRT; isso pode prolongar a exibição de um trecho durante pausas e não significa que haja fala em todos os instantes.
+O servidor extrai/normaliza o áudio completo para MP3 e transcreve o idioma detectado. O SRT respeita os tempos das falas, priorizando os timestamps por palavra do Whisper. Pausas de pelo menos 600 ms separam blocos: a legenda não é antecipada para preencher silêncio inicial, intervalos ou o fim da mídia. A tradução preserva esses mesmos tempos.
 
 A tradução depende exclusivamente do **LibreTranslate** configurado pelo administrador. O Karaokê envia os textos ao serviço e preserva os tempos das legendas; não carrega mais o modelo M2M100 para traduzir. O original e a tradução concluída continuam disponíveis no aplicativo e na Biblioteca. O Karaokê também tenta anexar ambos ao Telegram configurado, acompanhados dos links de download. Se o LibreTranslate estiver indisponível, o SRT original permanece salvo e sua entrega continua. Se a transcrição falhar antes de gerar qualquer legenda, não há SRT original para entregar.
 
@@ -159,14 +159,14 @@ Os formulários ficam recolhidos durante o acompanhamento e só abrem quando voc
 
 - O servidor processa uma tarefa por vez.
 - Cada perfil pode ter até 25 trabalhos ativos, incluindo o que estiver em execução.
-- Um usuário comum pode adicionar enquanto o trabalho atual pertence ao próprio perfil.
-- O administrador pode adicionar enquanto outro perfil está processando.
+- Qualquer perfil autenticado pode adicionar tarefas enquanto outro perfil está processando.
 - Usuários comuns visualizam e gerenciam os próprios itens; o administrador gerencia todos.
-- Reordenação comum troca posições entre os itens do próprio perfil; a administração pode organizar a fila inteira.
+- Somente o administrador pode alterar a ordem, incluindo tarefas de outros perfis.
+- Notificações e resultados são enviados apenas ao dono da tarefa e à administração; não são distribuídos aos demais perfis.
 
 ### Reordenar, remover e cancelar
 
-Use **↑ / ↓** para mover itens aguardando. Um item em processamento não muda de posição.
+Como administrador, use **↑ / ↓** para mover itens aguardando. Um item em processamento não muda de posição. Os demais perfis não veem esses botões.
 
 **Remover** tira um item pendente da fila e limpa seus temporários. **Cancelar Processamento** encerra a tarefa atual. A próxima tarefa elegível começa se a fila estiver ativa e não houver uma pausa/revisão impedindo o avanço.
 
@@ -198,11 +198,15 @@ A pausa não interrompe a etapa pela metade. O servidor reutiliza resultados con
 | Fundos | Imagens e vídeos destinados ao visual | Usar, Ver quando compatível, Renomear, Excluir |
 | Resultados | MP4 final e SRT gerado | Ver quando compatível, Baixar, Renomear, Excluir |
 
-Os formulários no início da Biblioteca permitem enviar mídia ou guardar um link autorizado. A ação **Usar** preenche a fonte/fundo para a criação; confira o modo e os demais ajustes antes de enviar.
+**Resultados** aparece primeiro, com os mais recentes no topo. Toque no título de cada seção para mostrar ou esconder seu conteúdo, como no manual. Expanda **Adicionar à biblioteca** para enviar mídia ou guardar um link autorizado. A ação **Usar** preenche a fonte/fundo para a criação; confira o modo e os demais ajustes antes de enviar.
 
 Toque no título de um item para expandir o nome completo. A visualização inclui controles de avanço/retrocesso de dez segundos quando a mídia permite. SRT é entregue como arquivo de texto, não como vídeo.
 
-O administrador acessa também arquivos de outros perfis na Biblioteca. A lista atual reúne os nomes e pode condensar arquivos homônimos de contas diferentes; confirme o arquivo antes de renomear ou excluir. Contas comuns permanecem limitadas à própria Biblioteca.
+Os resultados de vídeo têm miniatura independente, com frame escurecido e título; SRTs têm um cartão de título. As miniaturas são geradas localmente sob demanda e armazenadas em `/data/cache/thumbnails`. Novos vídeos incluem uma abertura silenciosa de três segundos com a capa, antes do conteúdo. Áudio, imagem e legenda do conteúdo começam juntos depois dela: a abertura não encobre falas nem muda sua sincronização. Vídeos já salvos recebem miniaturas na Biblioteca, mas não são reeditados automaticamente. O modo Gerar SRT não ganha abertura nem deslocamento de tempos.
+
+O administrador acessa resultados de todos os perfis, identificados pelo proprietário, mesmo quando os nomes são iguais. Download, visualização, renomeação e exclusão dos resultados usam esse proprietário para evitar selecionar o arquivo de outra conta por engano. Contas comuns permanecem limitadas à própria Biblioteca.
+
+Ao refazer um karaokê usando o cache, o aplicativo pode reutilizar o áudio extraído, a separação e a transcrição compatível. Revisão, ASS e vídeo final são produzidos para a nova tarefa; checkpoints do trabalho anterior não são reutilizados. Retomar uma tarefa pausada é diferente: mantém os checkpoints da própria tarefa para não perder etapas concluídas.
 
 Na conclusão da tarefa, os botões da tela dão acesso ao MP4 ou aos SRTs. No Android, os arquivos são salvos pelo sistema em **Downloads**; nomes repetidos recebem sufixos. No PC, o destino depende das preferências do navegador.
 
@@ -284,7 +288,7 @@ Consulte [android/README.md](android/README.md) para instalação, assinatura e 
 | Whisper parece parado | Carregamento/download do modelo, duração do áudio e etapa atual; o percentual pode não mudar continuamente |
 | Tradução falha | Baixe o original; em Ajustes teste o LibreTranslate, confira endereço, chave, idioma PT-BR, limite de upload e tempo de resposta |
 | Fila não avança | Pausa administrativa, revisão aguardando ou envio ao Telegram ainda em andamento |
-| Sem botão para adicionar | Trabalho atual de outro perfil, limite do perfil ou formulário recolhido |
+| Sem botão para adicionar | Verifique a sessão e o limite de 25 trabalhos; use Adicionar novo processo para abrir os formulários |
 | Telegram sem anexo | Permissões do bot, destino, conectividade, tempo de envio e resultado da compressão; procure os links |
 | Download não aparece no Android | Pasta Downloads, notificações do gerenciador, espaço livre e permissões em versões antigas |
 | Arquivo não reproduz no navegador | Codec incompatível; baixe e use um reprodutor compatível |

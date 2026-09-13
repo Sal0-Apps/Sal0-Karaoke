@@ -38,22 +38,22 @@ class VersionEightQueueTests(unittest.TestCase):
         self.assertIn('job.get("status") in ACTIVE_QUEUE_STATUSES', MAIN)
         self.assertIn('id="queueCard" style="display: none;"', HTML)
         self.assertIn("activeJobs.length > 1 || (adminCanControl && processingQueuePaused)", HTML)
-        self.assertIn("if (activeJobs.length <= 1 && !processingQueuePaused)", HTML)
+        self.assertIn("if (activeJobs.length <= 1 && queuedCount === 0 && !processingQueuePaused)", HTML)
         self.assertNotIn("queueResultUrl", HTML)
 
-    def test_queue_accepts_owner_and_admin_but_blocks_other_profiles(self):
+    def test_queue_accepts_all_authenticated_profiles(self):
         tree = ast.parse(MAIN)
         function = next(
             node for node in tree.body
             if isinstance(node, ast.FunctionDef) and node.name == "ensure_processing_queue_access"
         )
         source = ast.get_source_segment(MAIN, function)
-        self.assertIn("is_admin(current_user)", source)
-        self.assertIn('active_job.get("owner_username") != current_user.get("username")', source)
-        self.assertIn("status_code=409", source)
+        self.assertIn('current_user.get("username")', source)
+        self.assertNotIn('active_job', source)
+        self.assertIn("status_code=401", source)
         self.assertNotIn("youtube_url", source)
         self.assertIn("ensure_processing_queue_access(", MAIN)
-        self.assertIn("data.owned_by_current_user || currentUser?.role === 'admin'", HTML)
+        self.assertIn("const canAddToQueue = Boolean(currentUser)", HTML)
         self.assertIn('id="queueAddProcessCard"', HTML)
         self.assertIn('id="btnToggleQueueCreation"', HTML)
         self.assertIn("setCreatorMode(currentCreatorMode)", HTML)
@@ -86,15 +86,15 @@ class VersionEightQueueTests(unittest.TestCase):
         self.assertIn('class="btn-primary"', form)
         self.assertNotIn('#ec4899', form)
 
-    def test_release_metadata_is_9_5_0(self):
-        self.assertIn("Versão do servidor: 9.6.0", HTML)
+    def test_release_metadata_is_9_8_0(self):
+        self.assertIn("Versão do servidor: 9.8.0", HTML)
         self.assertIn("<title>Sal0 Karaokê</title>", HTML)
         self.assertEqual(HTML.split("<footer>")[1].split("</footer>")[0].strip(), "Sal0 Karaokê")
-        self.assertIn('.orElse("9.6.0")', ANDROID_BUILD)
-        self.assertIn('.orElse("90600")', ANDROID_BUILD)
-        self.assertIn("-PVERSION_CODE=90600", WORKFLOW)
-        self.assertIn("sal0-karaoke:9.6.0", COMPOSE)
-        self.assertIn('org.opencontainers.image.version="9.6.0"', DOCKERFILE)
+        self.assertIn('.orElse("9.8.0")', ANDROID_BUILD)
+        self.assertIn('.orElse("90800")', ANDROID_BUILD)
+        self.assertIn("-PVERSION_CODE=90800", WORKFLOW)
+        self.assertIn("sal0-karaoke:9.8.0", COMPOSE)
+        self.assertIn('org.opencontainers.image.version="9.8.0"', DOCKERFILE)
 
     def test_generated_icon_is_committed_for_web_and_android(self):
         self.assertTrue((ROOT / "app" / "templates" / "app-icon-v8.png").is_file())

@@ -32,6 +32,7 @@ Os pacotes podem trazer NumPy, CTranslate2, Hugging Face Hub, PyAV, Silero VAD e
 | [FFmpeg](https://ffmpeg.org/legal.html) | LGPL-2.1-or-later na base; componentes GPL como `libx264` alteram as obrigações. Confirmar a configuração do binário Debian efetivamente distribuído. |
 | [libsndfile](https://libsndfile.github.io/libsndfile/) | biblioteca distribuída separadamente e sujeita à licença do pacote Debian. |
 | [Deno](https://github.com/denoland/deno) | runtime JavaScript sob MIT; baixado durante o build. |
+| [DejaVu Fonts](https://dejavu-fonts.github.io/) | fonte das capas locais; instalada pelo pacote Debian `fonts-dejavu-core`, com os avisos de licença preservados em `/usr/share/doc/fonts-dejavu-core`. |
 | Debian e Python | a imagem base e os pacotes mantêm seus próprios avisos e licenças em `/usr/share/doc` e na distribuição Python. |
 
 ## Modelos

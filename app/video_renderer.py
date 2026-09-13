@@ -2,6 +2,8 @@ import os
 import subprocess
 import logging
 import random
+import tempfile
+from media_covers import create_video_cover, add_cover_to_command
 from audio_processor import get_file_duration
 
 logger = logging.getLogger("karaoke")
@@ -106,6 +108,7 @@ def render_karaoke_video(
     original_video_path: str = None,
     background_mode: str = "image",
     progress_callback=None,
+    cover_title: str = "",
 ) -> str:
     """
     Renderiza o vídeo final de Karaokê em formato MP4.
@@ -244,7 +247,15 @@ def render_karaoke_video(
         ])
         
     try:
-        run_ffmpeg_with_logging(cmd, progress_callback=progress_callback, total_duration=duration)
+        if cover_title:
+            with tempfile.TemporaryDirectory(prefix="sal0-render-cover-") as cover_dir:
+                cover_path = os.path.join(cover_dir, "cover.png")
+                cover_source = original_video_path if use_original_video else final_bg_image
+                create_video_cover(cover_source, cover_title, cover_path, run_ffmpeg_with_logging)
+                cmd = add_cover_to_command(cmd, cover_path, duration)
+                run_ffmpeg_with_logging(cmd, progress_callback=progress_callback, total_duration=duration + 3)
+        else:
+            run_ffmpeg_with_logging(cmd, progress_callback=progress_callback, total_duration=duration)
         logger.info("Renderização do vídeo concluída com sucesso.")
         return output_mp4_path
     except Exception as e:

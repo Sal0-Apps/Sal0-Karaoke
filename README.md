@@ -82,11 +82,13 @@ Transcrição, tradução e sincronização são estimativas de modelos. A letra
 - Retomada após reiniciar, desde que o mesmo volume e os arquivos da tarefa sejam preservados.
 - Conclusão da tentativa de entrega ao Telegram antes do início do próximo trabalho.
 
-O usuário comum pode adicionar durante o processamento do próprio perfil. O administrador também pode adicionar durante o de outro perfil. Itens concluídos ou cancelados saem da fila; os resultados salvos permanecem na Biblioteca. Percentuais de progresso não representam uma previsão exata do tempo restante.
+Qualquer perfil autenticado pode adicionar tarefas, independentemente do dono da tarefa em execução. Só o administrador altera a ordem. Cada perfil vê seus itens e recebe somente suas notificações e resultados; a administração acompanha todos. Itens concluídos ou cancelados saem da fila; os resultados salvos permanecem na Biblioteca. Percentuais de progresso não representam uma previsão exata do tempo restante.
 
 ### Biblioteca e contas
 
-- Seções **Originais**, **Fundos** e **Resultados**.
+- **Resultados** primeiro, com ordenação do mais recente para o mais antigo e identificação do proprietário para a administração.
+- Seções **Resultados**, **Adicionar à biblioteca**, **Originais** e **Fundos** recolhíveis, como no manual.
+- Miniaturas de vídeo com frame escurecido e título; cartões de título para SRT.
 - Uploads e importações opcionais por URL.
 - Reutilização, visualização, renomeação e exclusão, conforme o tipo de item.
 - Download de MP4 e SRT em Resultados.
@@ -99,6 +101,10 @@ O usuário comum pode adicionar durante o processamento do próprio perfil. O ad
 
 ### Telegram e Android
 
+Novos vídeos incluem uma capa em uma abertura silenciosa adicional de três segundos, independente do tempo do conteúdo. O áudio, a imagem e as legendas do karaokê começam juntos após a abertura. O modo SRT preserva os tempos de fala e os silêncios, sem essa abertura. Vídeos antigos não são reeditados automaticamente. A geração usa os [filtros locais do FFmpeg](https://ffmpeg.org/ffmpeg-filters.html), sem serviço externo de imagens.
+
+Refazer um karaokê pelo cache reaproveita apenas insumos compatíveis, não a renderização ou os checkpoints da tarefa anterior. A retomada de uma tarefa pausada continua preservando suas etapas concluídas.
+
 Cada conta pode configurar seu bot e destinatário. As mensagens intermediárias informam as etapas e a situação da letra-guia. A conclusão informa o tempo de processamento e os links local/externo disponíveis, além de tentar anexar o vídeo ou os arquivos SRT.
 
 Quando o vídeo excede o limite adotado pelo envio, o servidor tenta criar uma prévia compactada apenas para o Telegram. O original salvo permanece intacto. Falhas de rede, limites da API e erros de compressão podem impedir o anexo; o envio direto não é garantido para toda mídia.
@@ -107,14 +113,14 @@ No Android, **Configurações do app** fica na faixa inferior, inclusive quando 
 
 ## Início rápido com Docker
 
-A versão de distribuição desta documentação é **9.6.0**. O título e o rodapé da página mostram apenas o nome da aplicação. A versão do servidor pode ser consultada no Manual; a versão do APK aparece nas configurações nativas.
+A versão de distribuição desta documentação é **9.8.0**. O título e o rodapé da página mostram apenas o nome da aplicação. A versão do servidor pode ser consultada no Manual; a versão do APK aparece nas configurações nativas.
 
 Crie um arquivo `compose.yaml`:
 
 ```yaml
 services:
   karaoke-app:
-    image: ghcr.io/sal0-apps/sal0-karaoke:9.6.0
+    image: ghcr.io/sal0-apps/sal0-karaoke:9.8.0
     container_name: karaoke-app
     ports:
       - "7885:7860"
