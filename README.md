@@ -29,7 +29,15 @@ Dentro da aplicação, o botão **Manual** abre tutoriais curtos, organizados em
 | Detalhado | Controlar reconhecimento, versos, visual e revisão | Fonte, perfil, modelo Whisper, letra-guia, fundo e ajustes avançados | MP4 de karaokê; a opção de somente remover vocais gera vídeo instrumental sem legenda |
 | Gerar SRT | Legendar áudio ou vídeo preservando a fala | Fonte, modelo, leitura da fala, VAD, revisão e idioma da tradução opcional | SRT original e, quando solicitado e gerado, SRT traduzido |
 
-**Gerar SRT** normaliza o áudio para MP3, não chama o Demucs e não renderiza um novo vídeo. A tradução é local e opcional. Se ela falhar, o original já gerado continua disponível. Não há limite fixo de duração imposto pelo modo, mas capacidade de disco, memória, servidor e tempo de processamento continuam limitando a operação.
+**Gerar SRT** normaliza o áudio para MP3, não chama o Demucs e não renderiza um novo vídeo. A tradução depende exclusivamente de uma instância LibreTranslate configurada pelo administrador, com padrão de detecção automática → português do Brasil (`pt-BR`). O SRT original é salvo antes da tradução. O Karaokê continua entregando os arquivos gerados pela interface, Biblioteca e Telegram configurado, com os links de download. Se o LibreTranslate falhar, o original continua disponível e sua entrega ao Telegram ainda é tentada. Não há limite fixo de duração imposto pelo modo, mas os recursos do servidor limitam a operação.
+
+### Configurar e manter a tradução
+
+Em **Ajustes → Tradução de SRT · LibreTranslate**, salve a URL base da sua instância, a chave de API se exigida, o tempo limite para enviar o SRT completo. Use **Testar e atualizar idiomas** para consultar os idiomas instalados e verificar uma tradução automática para PT-BR. A configuração fica em `/data/output/libretranslate.json`.
+
+O cliente envia o **arquivo SRT completo** à [API oficial `/translate_file`](https://docs.libretranslate.com/api/operations/translate_file/), baixa o resultado e verifica a quantidade e os tempos das legendas antes de disponibilizá-lo. A instância deve permitir tradução de arquivos e ter `pt-BR` instalado. O tempo limite padrão é de 1.800 segundos por requisição, configurável até 7.200 segundos. A API não informa percentual interno de tradução. Erros temporários têm até três tentativas, sempre preservando o original.
+
+O container `libretranslate/libretranslate:latest` pode ser atualizado separadamente pelo CasaOS/Docker; [modelos de idiomas são atualizados no LibreTranslate](https://docs.libretranslate.com/guides/installation/#update). O botão do Karaokê verifica idiomas e testa o envio e download de um SRT, mas não atualiza outro container. Mudanças incompatíveis futuras na API ainda podem exigir correção do cliente.
 
 ## Recursos disponíveis
 
@@ -99,14 +107,14 @@ No Android, **Configurações do app** fica na faixa inferior, inclusive quando 
 
 ## Início rápido com Docker
 
-A versão de distribuição desta documentação é **9.5.0**. O título e o rodapé da página mostram apenas o nome da aplicação. A versão do servidor pode ser consultada no Manual; a versão do APK aparece nas configurações nativas.
+A versão de distribuição desta documentação é **9.6.0**. O título e o rodapé da página mostram apenas o nome da aplicação. A versão do servidor pode ser consultada no Manual; a versão do APK aparece nas configurações nativas.
 
 Crie um arquivo `compose.yaml`:
 
 ```yaml
 services:
   karaoke-app:
-    image: ghcr.io/sal0-apps/sal0-karaoke:9.5.0
+    image: ghcr.io/sal0-apps/sal0-karaoke:9.6.0
     container_name: karaoke-app
     ports:
       - "7885:7860"

@@ -1,6 +1,6 @@
 # Manual do Sal0 Karaokê
 
-Este manual descreve os controles disponíveis na distribuição 9.5.0. Para instalar o servidor, consulte [DEPLOYMENT.md](DEPLOYMENT.md). Para configurar o aparelho, consulte o [guia Android](android/README.md).
+Este manual descreve os controles disponíveis na distribuição 9.6.0. Para instalar o servidor, consulte [DEPLOYMENT.md](DEPLOYMENT.md). Para configurar o aparelho, consulte o [guia Android](android/README.md).
 
 ## 1. Primeiro acesso e navegação
 
@@ -105,7 +105,7 @@ Este modo cria arquivos de legenda e preserva a fala. Ele não separa vocais, n�
 
 1. Escolha **Gerar SRT**.
 2. Envie áudio/vídeo, cole um link autorizado ou selecione um original.
-3. Em **Segundo SRT traduzido**, escolha português, inglês, espanhol ou **Não traduzir**.
+3. Em **Segundo SRT traduzido**, o padrão é **Português (Brasil)**, com detecção automática do idioma de origem pelo LibreTranslate. Também é possível selecionar português, inglês, espanhol ou **Não traduzir**.
 4. Configure modelo Whisper, leitura da fala e VAD. Para fala, o filtro pode ajudar a ignorar silêncio; para canto, avalie desligá-lo.
 5. Habilite a revisão se quiser corrigir o original antes da tradução.
 6. Decida se a mídia de entrada deve ser salva na Biblioteca.
@@ -114,7 +114,18 @@ Este modo cria arquivos de legenda e preserva a fala. Ele não separa vocais, n�
 
 O servidor extrai/normaliza o áudio para MP3 e transcreve o idioma detectado. A duração total da mídia é usada para ajustar a linha do tempo do SRT; isso pode prolongar a exibição de um trecho durante pausas e não significa que haja fala em todos os instantes.
 
-A tradução usa um modelo local, que pode exigir download e memória adicionais no primeiro uso. Se a tradução falhar depois da geração do original, o original continua salvo. Se a transcrição falhar antes de gerar qualquer legenda, não há SRT original para entregar. Quando origem e destino já coincidem, pode não ser necessário criar um segundo arquivo.
+A tradução depende exclusivamente do **LibreTranslate** configurado pelo administrador. O Karaokê envia os textos ao serviço e preserva os tempos das legendas; não carrega mais o modelo M2M100 para traduzir. O original e a tradução concluída continuam disponíveis no aplicativo e na Biblioteca. O Karaokê também tenta anexar ambos ao Telegram configurado, acompanhados dos links de download. Se o LibreTranslate estiver indisponível, o SRT original permanece salvo e sua entrega continua. Se a transcrição falhar antes de gerar qualquer legenda, não há SRT original para entregar.
+
+### Configuração e atualizações do LibreTranslate
+
+1. Abra **Ajustes → Tradução de SRT · LibreTranslate**, como administrador.
+2. Informe a URL base do serviço, incluindo a porta. Use um endereço acessível pelo container do Karaokê; `localhost` refere-se ao próprio container.
+3. Informe a chave de API somente se sua instância exigir. Deixar o campo vazio mantém a chave salva; marque **Remover chave salva** para apagá-la.
+4. Salve e use **Testar e atualizar idiomas**. O teste consulta `/languages`, envia um pequeno SRT por `/translate_file` com origem `auto` e destino `pt-BR` e baixa sua tradução.
+5. Se houver lentidão, aumente o tempo limite por requisição. Verifique se a tradução de arquivos está habilitada e se o limite de upload aceita o SRT. O padrão de espera é de 1.800 segundos; a API não informa percentual interno da tradução.
+6. Atualize a imagem LibreTranslate no CasaOS/Docker quando necessário. Para atualizar os modelos, use os recursos do próprio LibreTranslate, como `LT_UPDATE_MODELS=true` na inicialização de manutenção. Depois teste novamente pelo Karaokê.
+
+A URL, chave e tempo limite ficam em `/data/output/libretranslate.json`, no volume persistente. Mudanças salvas valem para a próxima tradução; uma tradução em andamento mantém sua configuração inicial. O cliente consulta os idiomas novamente a cada trabalho, envia o SRT completo por `/translate_file` e baixa o arquivo traduzido. Antes de publicar o resultado, verifica se a quantidade e os tempos das legendas foram preservados. Erros temporários têm até três tentativas; erros de chave, idioma ou formato são informados sem apagar o original. O botão de teste envia um pequeno SRT e baixa sua tradução; não instala pacotes nem atualiza a imagem do LibreTranslate.
 
 Não há corte fixo de duração no modo. Ainda é necessário ter espaço para mídia, MP3 intermediário, modelos, cache e resultados; o proxy e a instalação podem impor limites adicionais.
 
@@ -271,7 +282,7 @@ Consulte [android/README.md](android/README.md) para instalação, assinatura e 
 | Link do YouTube falha | Disponibilidade e autorização da mídia, internet do servidor e atualização do mecanismo |
 | Demucs demora | O processamento em CPU pode ser longo; confira carga, RAM, disco e logs antes de cancelar |
 | Whisper parece parado | Carregamento/download do modelo, duração do áudio e etapa atual; o percentual pode não mudar continuamente |
-| Tradução falha | Baixe o original, confira RAM/modelo/rede e gere novamente com tradução se necessário |
+| Tradução falha | Baixe o original; em Ajustes teste o LibreTranslate, confira endereço, chave, idioma PT-BR, limite de upload e tempo de resposta |
 | Fila não avança | Pausa administrativa, revisão aguardando ou envio ao Telegram ainda em andamento |
 | Sem botão para adicionar | Trabalho atual de outro perfil, limite do perfil ou formulário recolhido |
 | Telegram sem anexo | Permissões do bot, destino, conectividade, tempo de envio e resultado da compressão; procure os links |

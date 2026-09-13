@@ -33,11 +33,13 @@ from audio_processor import extract_audio, extract_audio_mp3, get_file_duration,
 from transcriber import transcribe_vocals
 from subtitle_translator import (
     SUPPORTED_TARGET_LANGUAGES,
+    normalize_translation_language,
     cover_full_media_timeline,
-    translate_subtitle_segments,
+    translate_subtitle_file,
     write_srt,
 )
 from karaoke_generator import generate_ass_karaoke
+import libretranslate_client
 from video_renderer import render_karaoke_video, check_has_video
 
 # Configurar logs
@@ -512,6 +514,36 @@ def update_youtube_tools(current_user: dict = Depends(get_current_user)):
 
     threading.Thread(target=run_yt_dlp_update, daemon=True).start()
     return {"status": "started"}
+
+class LibreTranslateSettings(BaseModel):
+    url: str = Field(max_length=2048)
+    api_key: str | None = Field(default=None, max_length=512)
+    timeout: int = Field(default=1800, ge=10, le=7200)
+
+
+@app.get("/api/translation-tools/settings")
+def get_translation_settings(current_user: dict = Depends(get_current_user)):
+    require_admin(current_user)
+    return libretranslate_client.public_config()
+
+
+@app.put("/api/translation-tools/settings")
+def put_translation_settings(settings: LibreTranslateSettings, current_user: dict = Depends(get_current_user)):
+    require_admin(current_user)
+    try:
+        return libretranslate_client.save_config(**settings.model_dump())
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from None
+
+
+@app.post("/api/translation-tools/test")
+def test_translation_service(current_user: dict = Depends(get_current_user)):
+    require_admin(current_user)
+    try:
+        return libretranslate_client.test_connection()
+    except libretranslate_client.TranslationServiceError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from None
+
 
 # Proteção contra brute-force no login
 _login_attempts: dict = {}  # {ip_or_user: {"count": int, "locked_until": float}}
@@ -2187,7 +2219,7 @@ def download_bg_youtube_preset(
 
 
 LRCLIB_API_URL = "https://lrclib.net/api"
-LRCLIB_USER_AGENT = "Sal0-Karaoke/9.5.0 (+https://github.com/Sal0-Apps/Sal0-Karaoke)"
+LRCLIB_USER_AGENT = "Sal0-Karaoke/9.6.0 (+https://github.com/Sal0-Apps/Sal0-Karaoke)"
 LYRICS_OVH_API_URL = "https://api.lyrics.ovh/v1"
 LYRICS_PROVIDER_TIMEOUT = (3.05, 6)
 MUSIXMATCH_API_URL = "https://apic-desktop.musixmatch.com/ws/1.1"
@@ -2651,7 +2683,7 @@ def download_diagnostic_logs(current_user: dict = Depends(get_current_user)):
     with state_lock:
         current_state = dict(state)
     report = "\n".join([
-"Sal0 Karaokê v9.5.0 — diagnóstico ao vivo",
+"Sal0 Karaokê v9.6.0 — diagnóstico ao vivo",
         f"Gerado em: {time.strftime('%Y-%m-%d %H:%M:%S')}",
         "",
         "=== ESTADO ATUAL ===",
@@ -3825,14 +3857,14 @@ def process_karaoke(
     easy_mode: bool = Form(False),
     easy_background_choice: str = Form("default"),
     subtitle_only: bool = Form(False),
-    translation_language: str = Form("pt")
+    translation_language: str = Form("pt-BR")
 ):
     """
     Recebe os arquivos enviados, valida a concorrência e inicia o pipeline em segundo plano.
     """
     ensure_processing_queue_access(current_user)
     ensure_processing_queue_capacity(current_user.get("username"))
-    translation_language = (translation_language or "pt").strip().lower()
+    translation_language = normalize_translation_language(translation_language)
     if translation_language not in SUPPORTED_TARGET_LANGUAGES:
         raise HTTPException(status_code=400, detail="Idioma de tradução inválido.")
     quick_random_background_requested = False
@@ -4792,14 +4824,16 @@ def run_subtitle_srt_pipeline(
 
     translated_filename = None
     translation_error = ""
-    source_language = str(transcription_info.get("language") or "").split("-")[0].lower()
     translation_checkpoint = stage_checkpoint(cache_dir, "subtitle_translation_finished")
     checkpoint_translation_filename = str(translation_checkpoint.get("filename") or "")
     checkpoint_translation_path = (
         os.path.join(library_dir, "history", checkpoint_translation_filename)
         if checkpoint_translation_filename else ""
     )
-    if translation_checkpoint:
+    if (translation_checkpoint and not translation_checkpoint.get("error")
+            and translation_checkpoint.get("provider") == "libretranslate"
+            and translation_checkpoint.get("target") == translation_language
+            and os.path.isfile(checkpoint_translation_path)):
         translation_error = str(translation_checkpoint.get("error") or "")
         if checkpoint_translation_filename and os.path.isfile(checkpoint_translation_path):
             translated_filename = checkpoint_translation_filename
@@ -4823,23 +4857,23 @@ def run_subtitle_srt_pipeline(
                     "Translating optional SRT",
                     80 + round(percent * 0.15),
                     stage_progress=percent,
-                    stage_detail=f"{completed} de {total} trechos traduzidos",
+                    stage_detail=("SRT traduzido recebido" if completed else "Aguardando o LibreTranslate traduzir o arquivo SRT; a API não informa percentual interno"),
                 )
 
-            translated_segments = translate_subtitle_segments(
-                original_segments,
-                source_language=source_language,
+            translate_subtitle_file(
+                final_original_srt,
+                final_translated_srt,
                 target_language=translation_language,
                 progress_callback=translation_progress,
             )
-            translated_segments = cover_full_media_timeline(translated_segments, media_duration)
-            write_srt(translated_segments, final_translated_srt)
             translated_filename = save_srt_result(
                 final_translated_srt,
                 orig_name,
                 library_dir,
                 translation_language,
             )
+        except InterruptedError:
+            raise
         except Exception as exc:
             translation_error = str(exc)
             logger.exception("A tradução opcional falhou; o SRT original foi preservado.")
@@ -4859,6 +4893,8 @@ def run_subtitle_srt_pipeline(
         95,
         filename=translated_filename or "",
         error=translation_error,
+        provider="libretranslate",
+        target=translation_language,
     )
 
     primary_subtitle = translated_filename or original_filename
@@ -4948,7 +4984,7 @@ def run_pipeline(
     library_dir: str = None,
     app_base_url: str = "",
     subtitle_only: bool = False,
-    translation_language: str = "pt",
+    translation_language: str = "pt-BR",
 ):
     """Pipeline principal de processamento sequencial."""
     # Obter o lock de processamento exclusivo (segurança de job único)

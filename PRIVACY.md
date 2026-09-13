@@ -28,6 +28,7 @@ Embora o processamento principal seja local, a instalação não é totalmente o
 - URLs e metadados de mídia podem ser enviados ao YouTube por meio de `yt-dlp` quando o usuário solicita esse recurso;
 - consultas de letras podem transmitir título e artista a LRCLIB, Lyrics.ovh ou Musixmatch;
 - Telegram recebe mensagens, documentos, vídeos compactados e links quando configurado;
+- a tradução de SRT envia o arquivo de legenda completo à instância LibreTranslate configurada pelo administrador; o padrão detecta a origem automaticamente e traduz para português do Brasil. O operador dessa instância controla seus registros, arquivos e retenção. A URL e a chave opcional ficam em `/data/output/libretranslate.json`;
 - GitHub e GHCR recebem dados normais de acesso quando código, imagem, APK ou Release são consultados.
 
 Esses serviços aplicam suas próprias políticas, termos, registros e períodos de retenção. O projeto não controla o tratamento realizado por terceiros.
@@ -36,7 +37,7 @@ Esses serviços aplicam suas próprias políticas, termos, registros e períodos
 
 Alguns downloads e previews aceitam sessão ou link público no endereço. URLs podem ser registradas pelo navegador, proxy reverso, servidor HTTP, roteador ou ferramenta de diagnóstico. Logs devem ser protegidos e revisados antes de compartilhamento.
 
-Os links públicos enviados pelo Telegram possuem tokens aleatórios, mas a versão 9.5.0 não aplica expiração automática a esses registros. Quem receber ou copiar um link poderá usá-lo enquanto o registro e o arquivo permanecerem no servidor. O operador deve remover resultados e registros que não devam mais ser acessíveis e evitar publicar esses endereços em canais abertos.
+Os links públicos enviados pelo Telegram possuem tokens aleatórios, mas a versão 9.6.0 não aplica expiração automática a esses registros. Quem receber ou copiar um link poderá usá-lo enquanto o registro e o arquivo permanecerem no servidor. O operador deve remover resultados e registros que não devam mais ser acessíveis e evitar publicar esses endereços em canais abertos.
 
 ## Dados no Android
 

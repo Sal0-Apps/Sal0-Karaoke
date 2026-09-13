@@ -1,14 +1,15 @@
-import gc
-import logging
 import os
+import re
+import tempfile
+from pathlib import Path
 
 
-logger = logging.getLogger("karaoke")
+SUPPORTED_TARGET_LANGUAGES = {"original", "pt-BR", "pt", "en", "es"}
 
-TRANSLATION_MODEL = "facebook/m2m100_418M"
-TRANSLATION_MODEL_REVISION = "791dc1c6d300846c9a747d4bd11fcc7f369b750e"
-TRANSLATION_MODEL_DIR = "/data/output/models/translation"
-SUPPORTED_TARGET_LANGUAGES = {"original", "pt", "en", "es"}
+
+def normalize_translation_language(value):
+    language = (value or "pt-BR").strip().replace("_", "-").lower()
+    return "pt-BR" if language == "pt-br" else language
 
 
 def cover_full_media_timeline(segments: list[dict], duration: float) -> list[dict]:
@@ -52,94 +53,62 @@ def rebuild_segment_words(text: str, start: float, end: float) -> list[dict]:
 
 def translate_subtitle_segments(
     segments: list[dict],
-    source_language: str,
-    target_language: str,
+    source_language: str = "auto",
+    target_language: str = "pt-BR",
     progress_callback=None,
 ) -> list[dict]:
-    """Traduz textos localmente e preserva os intervalos originais da legenda."""
-    source_language = (source_language or "").split("-")[0].lower()
-    target_language = (target_language or "original").split("-")[0].lower()
+    """Traduz exclusivamente via LibreTranslate, preservando os tempos."""
+    target_language = normalize_translation_language(target_language)
     if target_language not in SUPPORTED_TARGET_LANGUAGES:
         raise ValueError("Idioma de tradução não suportado.")
-    if target_language == "original" or target_language == source_language:
+    if target_language == "original" or not segments:
         return [dict(segment) for segment in segments]
-    if not source_language:
-        raise ValueError("O Whisper não conseguiu identificar o idioma do vídeo.")
-
+    from libretranslate_client import LibreTranslateClient
+    import process_manager as pm
+    client = LibreTranslateClient(cancel_event=pm.cancel_event)
     try:
-        import torch
-        from transformers import M2M100ForConditionalGeneration, M2M100Tokenizer
-    except ImportError as exc:
-        raise RuntimeError("Os componentes locais de tradução não estão instalados na imagem.") from exc
-
-    os.makedirs(TRANSLATION_MODEL_DIR, exist_ok=True)
-    logger.info(
-        "Carregando tradução local %s (%s → %s).",
-        TRANSLATION_MODEL,
-        source_language,
-        target_language,
-    )
-    tokenizer = M2M100Tokenizer.from_pretrained(
-        TRANSLATION_MODEL,
-        revision=TRANSLATION_MODEL_REVISION,
-        cache_dir=TRANSLATION_MODEL_DIR,
-    )
-    if source_language not in tokenizer.lang_code_to_id:
-        raise ValueError(f"O idioma detectado ({source_language}) não é suportado pelo tradutor local.")
-    if target_language not in tokenizer.lang_code_to_id:
-        raise ValueError(f"O idioma de destino ({target_language}) não é suportado pelo tradutor local.")
-    tokenizer.src_lang = source_language
-
-    model = M2M100ForConditionalGeneration.from_pretrained(
-        TRANSLATION_MODEL,
-        revision=TRANSLATION_MODEL_REVISION,
-        cache_dir=TRANSLATION_MODEL_DIR,
-        use_safetensors=True,
-        low_cpu_mem_usage=False,
-        device_map=None,
-    )
-    model.to(torch.device("cpu"))
-    model.eval()
-    translated_segments = []
-    batch_size = 8
-    try:
-        for offset in range(0, len(segments), batch_size):
-            batch = segments[offset:offset + batch_size]
-            texts = [str(segment.get("text") or "").strip() for segment in batch]
-            encoded = tokenizer(
-                texts,
-                return_tensors="pt",
-                padding=True,
-                truncation=True,
-                max_length=512,
-            )
-            encoded = {name: tensor.to("cpu") for name, tensor in encoded.items()}
-            with torch.inference_mode():
-                generated = model.generate(
-                    **encoded,
-                    forced_bos_token_id=tokenizer.get_lang_id(target_language),
-                    max_length=512,
-                    num_beams=4,
-                )
-            translations = tokenizer.batch_decode(generated, skip_special_tokens=True)
-            for segment, translated_text in zip(batch, translations):
-                translated = dict(segment)
-                translated["text"] = translated_text.strip()
-                translated["words"] = rebuild_segment_words(
-                    translated["text"],
-                    float(segment.get("start", 0.0)),
-                    float(segment.get("end", 0.0)),
-                )
-                translated_segments.append(translated)
-            if progress_callback:
-                completed = min(offset + len(batch), len(segments))
-                progress_callback(completed, len(segments))
+        with tempfile.TemporaryDirectory() as directory:
+            original = str(Path(directory) / "original.srt")
+            translated = str(Path(directory) / "translated.srt")
+            write_srt(segments, original)
+            return client.translate_srt_file(original, translated, target_language, progress_callback)
     finally:
-        del model
-        del tokenizer
-        gc.collect()
+        client.close()
 
-    return translated_segments
+
+def translate_subtitle_file(source_path, destination, target_language="pt-BR", progress_callback=None):
+    from libretranslate_client import LibreTranslateClient
+    import process_manager as pm
+    target_language = normalize_translation_language(target_language)
+    if target_language not in SUPPORTED_TARGET_LANGUAGES - {"original"}:
+        raise ValueError("Idioma de tradução não suportado.")
+    client = LibreTranslateClient(cancel_event=pm.cancel_event)
+    try:
+        return client.translate_srt_file(source_path, destination, target_language, progress_callback)
+    finally:
+        client.close()
+
+
+def parse_srt(text):
+    """Valida a estrutura do SRT antes de publicar o arquivo traduzido."""
+    stamp = r"(\d{2,}):(\d{2}):(\d{2}),(\d{3})"
+    pattern = re.compile(r"^" + stamp + r"\s*-->\s*" + stamp + r"(?:\s+.*)?$")
+    segments = []
+    for block in re.split(r"\n\s*\n", text.replace("\r\n", "\n").strip()):
+        lines = block.splitlines()
+        if len(lines) < 3 or not lines[0].strip().isdigit():
+            raise ValueError("Bloco SRT inválido.")
+        match = pattern.fullmatch(lines[1].strip())
+        if not match:
+            raise ValueError("Tempos SRT inválidos.")
+        h1, m1, s1, ms1, h2, m2, s2, ms2 = map(int, match.groups())
+        start = h1 * 3600 + m1 * 60 + s1 + ms1 / 1000
+        end = h2 * 3600 + m2 * 60 + s2 + ms2 / 1000
+        body = "\n".join(lines[2:]).strip()
+        if not body or end < start or max(m1, m2, s1, s2) >= 60:
+            raise ValueError("Conteúdo SRT inválido.")
+        segments.append({"start": start, "end": end, "text": body})
+    return segments
 
 
 def srt_timestamp(seconds: float) -> str:

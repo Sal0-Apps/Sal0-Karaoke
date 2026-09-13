@@ -905,6 +905,7 @@
         .settings-grid > .card { height: 100%; margin: 0; }
         #modelManagerSection,
         #youtubeToolsSection,
+        #translationToolsSection,
         #easyModeSettingsSection { grid-column: 1 / -1; }
         #telegramSection { grid-column: 1 / 7; }
         #externalUrlSection { grid-column: 7 / 13; }
@@ -1594,7 +1595,7 @@
                     <div class="card" style="margin: 0 0 1rem; box-shadow: none;">
                         <div class="card-header"><span class="card-title"><span class="line-glyph">2</span> Transcrição e tradução opcional</span></div>
                         <div class="form-grid">
-                            <div class="form-group"><span class="label">Segundo SRT traduzido</span><select id="subtitleTranslationLanguage" class="select-input"><option value="pt" selected>Português</option><option value="en">Inglês</option><option value="es">Espanhol</option><option value="original">Não traduzir</option></select></div>
+                            <div class="form-group"><span class="label">Segundo SRT traduzido · origem automática</span><select id="subtitleTranslationLanguage" class="select-input"><option value="pt-BR" selected>Português (Brasil)</option><option value="pt">Português</option><option value="en">Inglês</option><option value="es">Espanhol</option><option value="original">Não traduzir</option></select><p class="compact-note">Tradução pelo LibreTranslate configurado pelo administrador. O Karaokê entrega os SRTs no aplicativo e no Telegram; o original permanece disponível se a tradução falhar.</p></div>
                             <div class="form-group"><span class="label">Modelo Whisper</span><select id="subtitleWhisperModel" class="select-input"><option value="large-v3-turbo">Large V3 Turbo</option><option value="large-v3">Large V3 (máxima)</option><option value="medium">Medium</option><option value="small">Small</option><option value="tiny">Tiny</option></select></div>
                             <div class="form-group"><span class="label">Leitura da fala</span><select id="subtitleTranscriptionPreset" class="select-input"><option value="difficult">Voz difícil</option><option value="karaoke">Equilibrada</option><option value="continuous">Fala contínua</option><option value="fast">Rápida</option></select></div>
                             <div class="form-group"><span class="label">Filtro de fala (VAD)</span><select id="subtitleEnableVad" class="select-input"><option value="true">Ligado (recomendado para fala)</option><option value="false">Desligado</option></select></div>
@@ -2073,6 +2074,22 @@
                 <p id="youtubeToolsMessage" class="compact-note" style="margin: 0.75rem 0 0;">Consultando o estado do mecanismo...</p>
             </div>
 
+            <div class="card" id="translationToolsSection" style="display: none;">
+                <div class="card-header"><span class="card-title">Tradução de SRT · LibreTranslate</span></div>
+                <p class="compact-note">A tradução depende do seu servidor LibreTranslate. O padrão é detecção automática → português do Brasil. Os resultados continuam na Biblioteca, nos downloads do Karaokê e no Telegram configurado.</p>
+                <div class="easy-config-fields">
+                    <div class="form-group"><label class="label" for="translationServerUrl">Endereço do LibreTranslate</label><input id="translationServerUrl" class="input-text" type="url" placeholder="http://servidor:5000" autocomplete="off"></div>
+                    <div class="form-group"><label class="label" for="translationApiKey">Chave de API (opcional)</label><input id="translationApiKey" class="input-text" type="password" autocomplete="new-password" placeholder="Em branco mantém a chave atual"><label><input type="checkbox" id="translationClearKey"> Remover chave salva</label></div>
+                    <div class="form-group"><label class="label" for="translationTimeout">Tempo limite por requisição (segundos)</label><input id="translationTimeout" class="input-text" type="number" min="10" max="7200" value="1800"></div>
+                </div>
+                <div style="display: flex; flex-wrap: wrap; gap: .7rem;">
+                    <button type="button" class="btn-secondary" id="translationSave" onclick="saveTranslationSettings()">Salvar configuração</button>
+                    <button type="button" class="btn-secondary" id="translationTest" onclick="testTranslationConnection()">Testar e atualizar idiomas</button>
+                </div>
+                <p id="translationToolsMessage" class="compact-note" role="status" style="overflow-wrap: anywhere;"></p>
+                <p class="compact-note">Depois de atualizar o container LibreTranslate, teste novamente aqui. O botão consulta a API e envia e baixa um SRT de teste; a atualização da imagem é feita no CasaOS/Docker. A configuração permanece salva após reiniciar o Karaokê.</p>
+            </div>
+
             <div class="card" id="easyModeSettingsSection">
                 <div class="card-header">
                     <span class="card-title">⚡ Perfil global do Modo Rápido</span>
@@ -2362,9 +2379,10 @@
                 <summary>3. Gerar somente legendas SRT</summary>
                 <ol>
                     <li>Escolha <strong>Gerar SRT</strong> e envie áudio/vídeo, cole um link ou escolha um original da Biblioteca.</li>
-                    <li>Em <strong>Segundo SRT traduzido</strong>, escolha português, inglês, espanhol ou <strong>Não traduzir</strong>.</li>
+                    <li>Como administrador, configure <strong>Ajustes → Tradução de SRT · LibreTranslate</strong>: salve o endereço e a chave opcional, depois toque em <strong>Testar e atualizar idiomas</strong>.</li>
+                    <li>Em <strong>Segundo SRT traduzido</strong>, o padrão é <strong>detecção automática → Português (Brasil)</strong>. A tradução depende desse LibreTranslate. Você também pode escolher outro destino ou <strong>Não traduzir</strong>.</li>
                     <li>Ajuste modelo, leitura da fala, VAD e revisão se necessário. Toque em <strong>Gerar arquivos SRT</strong>.</li>
-                    <li>Baixe o <strong>SRT original</strong> e, se gerado, o <strong>SRT traduzido</strong>. Uma falha da tradução não apaga o original.</li>
+                    <li>Baixe o <strong>SRT original</strong> e, se gerado, o <strong>SRT traduzido</strong> no Karaokê. Ambos também são enviados por tentativa de anexo ao Telegram configurado, com os links de download. Se a tradução falhar, a entrega do original continua.</li>
                 </ol>
                 <p>Este modo usa o áudio normalizado para MP3, preserva a fala e não usa Demucs nem fundo. O resultado é legenda, sem renderizar outro vídeo. Não há limite fixo de duração do modo; disco, memória e servidor continuam sendo limites. Confira reconhecimento e tempos antes de usar a legenda.</p>
             </details>
@@ -2423,12 +2441,13 @@
                     <li><strong>Perfil global do Modo Rápido:</strong> configure transcrição, visual, revisão e coleção de fundos; salve ao terminar.</li>
                     <li><strong>Usuários:</strong> crie contas comuns ou administrativas. Excluir uma conta não equivale a apagar automaticamente todos os seus arquivos.</li>
                     <li><strong>YouTube:</strong> se um link autorizado falhar, consulte <strong>Ajustes → Compatibilidade com YouTube → Atualizar mecanismo</strong> como administrador e tente novamente. A atualização pode não resolver restrições do provedor.</li>
+                    <li><strong>Tradução:</strong> atualize o container e os modelos do LibreTranslate no CasaOS/Docker e use <strong>Testar e atualizar idiomas</strong> no Karaokê. O botão verifica a API; não atualiza outro container. Confira PT-BR, chave, tradução de arquivos habilitada, limite de upload e tempo limite se houver falha.</li>
                     <li><strong>Sem conexão:</strong> confirme servidor, porta, rede e certificado HTTPS. No APK, use a faixa inferior para revisar os endereços.</li>
                     <li><strong>Memória ou lentidão:</strong> confira espaço e RAM; um modelo menor pode ajudar na transcrição, com possível perda de qualidade. O Demucs usa CPU e pode levar mais tempo que o vídeo.</li>
                     <li><strong>Diagnóstico:</strong> o administrador pode baixar os logs em Ajustes. Revise dados pessoais e credenciais antes de compartilhar.</li>
                 </ul>
             </details>
-            <p class="compact-note">Versão do servidor: 9.5.0. A transcrição é local; fontes, modelos e integrações podem acessar serviços externos. Use conteúdo autorizado.</p>
+            <p class="compact-note">Versão do servidor: 9.6.0. A transcrição é local; fontes, modelos e integrações podem acessar serviços externos. Use conteúdo autorizado.</p>
         </div>
     </div>
 
@@ -2487,7 +2506,7 @@
         function applyRoleUI() {
             const admin = currentUser?.role === 'admin';
             document.querySelector('.settings-grid')?.classList.toggle('user-settings', !admin);
-            ['modelManagerSection', 'youtubeToolsSection', 'easyModeSettingsSection', 'externalUrlSection', 'userManagementSection', 'logsSection'].forEach(id => {
+            ['modelManagerSection', 'youtubeToolsSection', 'translationToolsSection', 'easyModeSettingsSection', 'externalUrlSection', 'userManagementSection', 'logsSection'].forEach(id => {
                 const element = document.getElementById(id);
                 if (element) element.style.display = admin ? '' : 'none';
             });
@@ -3270,6 +3289,56 @@
             } catch (e) { alert("Erro ao baixar modelo: " + e.message); }
         }
 
+        async function fetchTranslationSettings() {
+            if (currentUser?.role !== 'admin') return;
+            const message = document.getElementById('translationToolsMessage');
+            try {
+                const response = await authFetch('/api/translation-tools/settings');
+                const data = await response.json();
+                if (!response.ok) throw new Error(data.detail || 'Não foi possível consultar a configuração.');
+                document.getElementById('translationServerUrl').value = data.url || '';
+                document.getElementById('translationTimeout').value = data.timeout;
+                message.textContent = data.url ? 'Servidor configurado. ' + (data.has_api_key ? 'Chave salva.' : 'Sem chave de API.') : 'Informe o endereço do LibreTranslate para habilitar a tradução.';
+            } catch (error) { message.textContent = error.message; }
+        }
+
+        async function saveTranslationSettings() {
+            const button = document.getElementById('translationSave');
+            const message = document.getElementById('translationToolsMessage');
+            button.disabled = true;
+            try {
+                const key = document.getElementById('translationApiKey');
+                const clear = document.getElementById('translationClearKey');
+                const response = await authFetch('/api/translation-tools/settings', {
+                    method: 'PUT', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        url: document.getElementById('translationServerUrl').value.trim(),
+                        api_key: clear.checked ? '' : (key.value || null),
+                        timeout: Number(document.getElementById('translationTimeout').value),
+                    })
+                });
+                const data = await response.json();
+                if (!response.ok) throw new Error(typeof data.detail === 'string' ? data.detail : 'Verifique os campos da configuração.');
+                key.value = ''; clear.checked = false;
+                message.textContent = 'Configuração salva. Use Testar e atualizar idiomas para verificar o serviço.';
+            } catch (error) { message.textContent = error.message; }
+            finally { button.disabled = false; }
+        }
+
+        async function testTranslationConnection() {
+            const button = document.getElementById('translationTest');
+            const message = document.getElementById('translationToolsMessage');
+            button.disabled = true;
+            message.textContent = 'Consultando o servidor salvo e testando tradução automática → PT-BR…';
+            try {
+                const response = await authFetch('/api/translation-tools/test', { method: 'POST' });
+                const data = await response.json();
+                if (!response.ok) throw new Error(data.detail || 'Falha ao testar o LibreTranslate.');
+                message.textContent = data.message + ' Idiomas: ' + data.languages.map(item => item.code).join(', ') + (data.sample ? ' Exemplo: ' + data.sample : '');
+            } catch (error) { message.textContent = error.message; }
+            finally { button.disabled = false; }
+        }
+
         function renderYoutubeToolsStatus(data) {
             const version = document.getElementById('youtubeToolsVersion');
             const deno = document.getElementById('youtubeToolsDeno');
@@ -3994,7 +4063,7 @@
 
                 const formData = new FormData();
                 formData.set('subtitle_only', 'true');
-                formData.set('translation_language', document.getElementById('subtitleTranslationLanguage')?.value || 'pt');
+                formData.set('translation_language', document.getElementById('subtitleTranslationLanguage')?.value || 'pt-BR');
                 formData.set('whisper_model', document.getElementById('subtitleWhisperModel')?.value || 'large-v3-turbo');
                 formData.set('transcription_preset', document.getElementById('subtitleTranscriptionPreset')?.value || 'difficult');
                 formData.set('enable_vad', document.getElementById('subtitleEnableVad')?.value || 'true');
@@ -5255,7 +5324,7 @@
                 })(),
             ];
             if (currentUser?.role === 'admin') {
-                initialLoads.push(fetchExternalUrlConfig(), fetchUsers(), fetchModelsStatus(), fetchYoutubeToolsStatus());
+                initialLoads.push(fetchExternalUrlConfig(), fetchUsers(), fetchModelsStatus(), fetchYoutubeToolsStatus(), fetchTranslationSettings());
             }
             await Promise.allSettled(initialLoads);
         });

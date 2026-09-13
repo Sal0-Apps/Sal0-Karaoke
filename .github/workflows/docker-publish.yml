@@ -22,7 +22,9 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Validate subtitle and easy-mode rules
-        run: python -m unittest discover -s tests -v
+        run: |
+          python -m pip install requests==2.32.3
+          python -m unittest discover -s tests -v
 
       - name: Log in to the Container registry
         uses: docker/login-action@v3
@@ -74,7 +76,7 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/v')
         working-directory: android
         run: |
-          gradle --no-daemon :app:testDebugUnitTest :app:lintRelease :app:assembleRelease -PVERSION_NAME=${{ env.VERSION_TAG }} -PVERSION_CODE=90500
+          gradle --no-daemon :app:testDebugUnitTest :app:lintRelease :app:assembleRelease -PVERSION_NAME=${{ env.VERSION_TAG }} -PVERSION_CODE=90600
           test -f app/build/outputs/apk/release/app-release.apk
           mv app/build/outputs/apk/release/app-release.apk app/build/outputs/apk/release/Sal0-Karaoke-v${{ env.VERSION_TAG }}.apk
 

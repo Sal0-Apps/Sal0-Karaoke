@@ -69,7 +69,7 @@ class SubtitleTranslationModeTests(unittest.TestCase):
 
     def test_backend_enforces_subtitle_mode_invariants(self):
         self.assertIn('subtitle_only: bool = Form(False)', MAIN)
-        self.assertIn('translation_language: str = Form("pt")', MAIN)
+        self.assertIn('translation_language: str = Form("pt-BR")', MAIN)
         self.assertIn('transcribe_source = "original"', MAIN)
         self.assertIn('show_instrumental = False', MAIN)
         self.assertIn('@app.get("/api/download-subtitles")', MAIN)
@@ -80,19 +80,11 @@ class SubtitleTranslationModeTests(unittest.TestCase):
         self.assertIn('"task": "translate" if task == "translate" else "transcribe"', TRANSCRIBER)
         self.assertIn('"language": str(getattr(info, "language"', TRANSCRIBER)
 
-    def test_local_translation_model_is_open_and_persistent(self):
+    def test_translation_depends_exclusively_on_libretranslate(self):
         ast.parse(TRANSLATOR)
-        self.assertIn('TRANSLATION_MODEL = "facebook/m2m100_418M"', TRANSLATOR)
-        self.assertIn('TRANSLATION_MODEL_REVISION = "791dc1c6d300846c9a747d4bd11fcc7f369b750e"', TRANSLATOR)
-        self.assertIn('TRANSLATION_MODEL_DIR = "/data/output/models/translation"', TRANSLATOR)
-        self.assertIn("use_safetensors=True", TRANSLATOR)
-        self.assertIn("low_cpu_mem_usage=False", TRANSLATOR)
-        self.assertIn('model.to(torch.device("cpu"))', TRANSLATOR)
-        self.assertIn("torch==2.6.0", REQUIREMENTS)
-        self.assertIn("torchaudio==2.6.0", REQUIREMENTS)
-        self.assertIn("safetensors>=0.4.3,<1", REQUIREMENTS)
-        self.assertIn("transformers>=4.45,<5", REQUIREMENTS)
-        self.assertIn("sentencepiece>=0.2,<1", REQUIREMENTS)
+        self.assertIn("LibreTranslateClient", TRANSLATOR)
+        self.assertNotIn("M2M100", TRANSLATOR)
+        self.assertNotIn("import torch", TRANSLATOR)
 
     def test_srt_writer_preserves_unicode_and_timing(self):
         namespace = {"os": __import__("os")}

@@ -19,7 +19,7 @@ Na revisão de documentação da distribuição 9.5.0, as dependências do proce
 | [Requests](https://github.com/psf/requests) | cliente HTTP | Apache-2.0 |
 | [SoundFile](https://github.com/bastibe/python-soundfile) | leitura e escrita de áudio | BSD-3-Clause |
 | [yt-dlp](https://github.com/yt-dlp/yt-dlp) | importação opcional por URL | Unlicense |
-| [Transformers](https://github.com/huggingface/transformers) | modelo de tradução | Apache-2.0 |
+| [Transformers](https://github.com/huggingface/transformers) | componente presente na imagem; a tradução SRT é realizada pelo serviço LibreTranslate | Apache-2.0 |
 | [SentencePiece](https://github.com/google/sentencepiece) | tokenização | Apache-2.0 |
 | [Safetensors](https://github.com/huggingface/safetensors) | pesos de modelos | Apache-2.0 |
 
@@ -40,7 +40,7 @@ Os pacotes podem trazer NumPy, CTranslate2, Hugging Face Hub, PyAV, Silero VAD e
 | --- | --- | --- |
 | [Systran/faster-whisper-medium](https://huggingface.co/Systran/faster-whisper-medium) | transcrição alternativa | model card MIT |
 | `deepdml/faster-whisper-large-v3-turbo` | transcrição padrão solicitada pelo código | metadados públicos de licença não recuperados na auditoria de 2026-08-31; não confundir com repositórios de nome semelhante |
-| [facebook/m2m100_418M](https://huggingface.co/facebook/m2m100_418M) | tradução local opcional | model card MIT |
+| [LibreTranslate](https://github.com/LibreTranslate/LibreTranslate) | serviço independente de tradução de SRT, acessado por HTTP | consulte a licença do serviço e de seus modelos na distribuição utilizada |
 | `htdemucs_ft` | separação de voz | distribuído pelo projeto Demucs; confirmar a revisão e os arquivos efetivamente incorporados |
 
 Model cards e licenças podem mudar. Registre o hash da revisão de cada peso utilizado em uma imagem publicada.
