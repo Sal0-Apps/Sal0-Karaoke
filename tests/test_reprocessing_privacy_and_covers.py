@@ -108,6 +108,34 @@ class ReprocessingPrivacyAndCovers(unittest.TestCase):
         state['status'] = 'processing'
         self.assertEqual(scope['get_status'](response, {'username': 'alice'})['status'], 'busy')
 
+    def test_explicit_admin_owner_never_falls_back_to_another_profile(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'alice' / 'history'
+            path.mkdir(parents=True)
+            (path / 'same.mp4').write_bytes(b'keep')
+            scope = functions('library_request_user', 'resolve_library_file',
+                load_users=lambda: {'alice': {'role': 'user'}},
+                get_user_paths=lambda user: {'library': str(Path(directory) / user['username'])})
+            target = scope['library_request_user']({'username': 'root', 'role': 'admin'}, 'root')
+            self.assertIsNone(scope['resolve_library_file'](target, 'history', 'same.mp4'))
+            self.assertEqual((path / 'same.mp4').read_bytes(), b'keep')
+
+    def test_all_categories_keep_distinct_owners_for_bulk_selection(self):
+        with tempfile.TemporaryDirectory() as directory:
+            for section in ('videos', 'photos'):
+                for owner in ('alice', 'bob'):
+                    path = Path(directory) / owner / section
+                    path.mkdir(parents=True)
+                    (path / 'same.mp4').write_bytes(b'video')
+                    (path / '.hidden').write_bytes(b'hidden')
+            scope = functions('library_history_items',
+                load_users=lambda: {'alice': {'role': 'user'}, 'bob': {'role': 'user'}},
+                get_user_paths=lambda user: {'library': str(Path(directory) / user['username'])})
+            for section in ('videos', 'photos'):
+                items = scope['library_history_items']({'username': 'root', 'role': 'admin'}, section)
+                self.assertEqual({(item['owner'], item['filename']) for item in items},
+                                 {('alice', 'same.mp4'), ('bob', 'same.mp4')})
+
     def test_admin_results_keep_identical_names_separate_and_newest_first(self):
         with tempfile.TemporaryDirectory() as directory:
             for index, owner in enumerate(('alice', 'bob')):

@@ -1215,6 +1215,19 @@
         .result-card .info { min-width: 0; width: 100%; }
         .result-card .title { white-space: normal; overflow-wrap: anywhere; }
         .result-card .actions { flex-wrap: wrap; justify-content: flex-start; }
+        #libHistoryList { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(280px, 100%), 1fr)); align-items: start; }
+        #libHistoryList .result-card { min-width: 0; padding: 0.75rem; gap: 0.65rem; }
+        #libHistoryList .cover-title { font-size: 0.88rem; padding: 0.7rem; }
+        .library-bulk-bar { display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.8rem; }
+        .library-bulk-bar button { padding: 0.35rem 0.65rem; font-size: 0.78rem; }
+        .library-bulk-bar .bulk-delete { color: #fca5a5; border-color: rgba(239,68,68,0.3); }
+        .library-bulk-status { font-size: 0.78rem; color: var(--text-muted); overflow-wrap: anywhere; }
+        .library-item.is-selected { border-color: var(--accent); background: var(--bg-card-hover); }
+        .library-selection { display: none; gap: 0.4rem; align-items: center; font-size: 0.78rem; color: var(--text-muted); }
+        .library-selection input { width: 18px; height: 18px; accent-color: var(--accent); cursor: pointer; }
+        .library-section-content.is-selecting .library-selection { display: flex; }
+        .result-card .library-selection { align-self: flex-start; }
+        .library-bulk-bar [hidden] { display: none !important; }
         .quick-file-choice { min-height: 82px; text-align: center; align-items: center; border-style: dashed; }
         .quick-choice-card .input-text,
         .quick-choice-card .select-input { margin: 0; min-width: 0; }
@@ -2417,6 +2430,7 @@
                     <li>Quando o editor aparecer, selecione os trechos e confira o texto, o início e o fim. Use os controles de reprodução para comparar com a mídia.</li>
                     <li>Salve e continue, ou use <strong>Continuar sem editar</strong>. No modo SRT, a revisão é do original, antes da tradução opcional.</li>
                     <li>Na <strong>Biblioteca</strong>, use <strong>Ver</strong>, <strong>Baixar</strong>, <strong>Renomear</strong> e <strong>Excluir</strong> conforme a seção. <strong>Usar</strong> reutiliza originais ou fundos.</li>
+                    <li>Para apagar vários, toque em <strong>Selecionar</strong> na categoria, marque arquivos ou use <strong>Selecionar todos</strong> e confirme <strong>Excluir selecionados</strong>. A exclusão é permanente. <strong>Concluir seleção</strong> fecha a seleção sem apagar.</li>
                 </ol>
                 <p><strong>Resultados</strong> aparece primeiro, com miniaturas e os mais recentes no topo. Toque no título de cada seção para mostrar ou recolher, como neste manual. O administrador vê o perfil de cada resultado, inclusive com nomes repetidos. No Android, os downloads ficam em <strong>Downloads</strong>.</p>
                 <p>Novos vídeos começam com uma capa silenciosa de três segundos, separada do conteúdo. Depois, imagem, áudio e legendas começam juntos, mantendo a sincronia. As miniaturas são independentes; vídeos antigos não são reeditados. Ao refazer pelo cache, a revisão e o vídeo são gerados novamente; ao retomar uma pausa, as etapas já concluídas são preservadas.</p>
@@ -3644,9 +3658,104 @@
             return button;
         }
 
+        const libraryBulk = new Map();
+
+        function libraryItemKey(item) {
+            return JSON.stringify([item.owner || currentUser?.username || '', item.filename]);
+        }
+
+        function updateLibrarySelection(section) {
+            const state = libraryBulk.get(section);
+            if (!state) return;
+            state.container.classList.toggle('is-selecting', state.selecting);
+            state.toggle.textContent = state.selecting ? 'Concluir seleção' : 'Selecionar';
+            state.toggle.disabled = state.busy || !state.items.length;
+            state.all.hidden = state.remove.hidden = !state.selecting;
+            state.all.disabled = state.busy || !state.items.length;
+            state.remove.disabled = state.busy || !state.selected.size;
+            state.all.textContent = state.items.length && state.selected.size === state.items.length ? 'Desmarcar todos' : 'Selecionar todos';
+            state.remove.textContent = `Excluir selecionados (${state.selected.size})`;
+            state.status.textContent = state.message || (state.selecting ? `${state.selected.size} de ${state.items.length} selecionados` : '');
+            state.container.querySelectorAll('.library-selection input').forEach(input => {
+                input.checked = state.selected.has(input.value);
+                input.disabled = state.busy;
+                input.closest('.library-item').classList.toggle('is-selected', state.selecting && input.checked);
+            });
+        }
+
+        async function deleteLibrarySelection(section) {
+            const state = libraryBulk.get(section);
+            if (!state || state.busy || !state.selected.size) return;
+            const items = state.items.filter(item => state.selected.has(libraryItemKey(item)));
+            const category = {history: 'Resultados', videos: 'Originais', photos: 'Fundos'}[section];
+            const owners = new Set(items.map(item => item.owner || currentUser?.username));
+            const scope = currentUser?.role === 'admin' ? ` de ${owners.size} perfil(is)` : '';
+            if (!confirm(`Excluir permanentemente ${items.length} arquivo(s)${scope} de ${category}? Esta ação não pode ser desfeita.`)) return;
+            state.busy = true;
+            let deleted = 0;
+            const failures = [];
+            updateLibrarySelection(section);
+            try {
+                for (let index = 0; index < items.length; index++) {
+                    const item = items[index];
+                    state.message = `Excluindo ${index + 1} de ${items.length}…`;
+                    updateLibrarySelection(section);
+                    try {
+                        const response = await authFetch(`/api/library/${section}/${encodeURIComponent(item.filename)}?owner=${encodeURIComponent(item.owner || currentUser?.username || '')}`, {method: 'DELETE'});
+                        if (!response.ok && response.status !== 404) throw new Error('Falha ao excluir');
+                        state.selected.delete(libraryItemKey(item));
+                        deleted++;
+                    } catch (_) {
+                        failures.push(item);
+                    }
+                }
+                state.message = `${deleted} arquivo(s) removido(s).` + (failures.length ? ` ${failures.length} não removido(s); continuam selecionados para tentar novamente.` : '');
+                if (!failures.length) state.selecting = false;
+                await loadLibrary();
+            } finally {
+                state.busy = false;
+                updateLibrarySelection(section);
+            }
+        }
+
+        function prepareLibrarySelection(container, section, files) {
+            let state = libraryBulk.get(section);
+            if (!state) {
+                const bar = document.createElement('div');
+                bar.className = 'library-bulk-bar';
+                bar.setAttribute('aria-label', 'Seleção de arquivos');
+                const toggle = makeLibraryButton('Selecionar', 'btn-secondary', () => {
+                    state.selecting = !state.selecting;
+                    state.message = '';
+                    if (!state.selecting) state.selected.clear();
+                    updateLibrarySelection(section);
+                });
+                const all = makeLibraryButton('Selecionar todos', 'btn-secondary', () => {
+                    if (state.selected.size === state.items.length) state.selected.clear();
+                    else state.items.forEach(item => state.selected.add(libraryItemKey(item)));
+                    state.message = '';
+                    updateLibrarySelection(section);
+                });
+                const remove = makeLibraryButton('Excluir selecionados', 'btn-secondary bulk-delete', () => deleteLibrarySelection(section));
+                const status = document.createElement('span');
+                status.className = 'library-bulk-status';
+                status.setAttribute('role', 'status');
+                bar.append(toggle, all, remove, status);
+                container.before(bar);
+                state = {container, toggle, all, remove, status, selected: new Set(), items: [], selecting: false, busy: false, message: ''};
+                libraryBulk.set(section, state);
+            }
+            state.items = (files || []).map(item => typeof item === 'string' ? {filename: item, owner: currentUser?.username || ''} : item);
+            const available = new Set(state.items.map(libraryItemKey));
+            state.selected.forEach(key => { if (!available.has(key)) state.selected.delete(key); });
+            updateLibrarySelection(section);
+            return state;
+        }
+
         function renderLibrarySection(container, section, files, icon, emptyText) {
             if (!container) return;
             container.replaceChildren();
+            const selection = prepareLibrarySelection(container, section, files);
             if (!files?.length) {
                 const empty = document.createElement('p');
                 empty.className = 'compact-note';
@@ -3662,6 +3771,20 @@
                 const ownerQuery = `owner=${encodeURIComponent(owner || '')}`;
                 const row = document.createElement('div');
                 row.className = 'library-item';
+                const pick = document.createElement('label');
+                pick.className = 'library-selection';
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.value = libraryItemKey({filename: file, owner});
+                checkbox.setAttribute('aria-label', `Selecionar ${file}${owner ? ' · ' + owner : ''}`);
+                checkbox.onchange = () => {
+                    if (checkbox.checked) selection.selected.add(checkbox.value);
+                    else selection.selected.delete(checkbox.value);
+                    selection.message = '';
+                    updateLibrarySelection(section);
+                };
+                pick.append(checkbox, document.createTextNode('Selecionar'));
+                row.appendChild(pick);
                 const info = document.createElement('div');
                 info.className = 'info';
                 info.title = 'Clique para ver o nome completo';
@@ -3672,7 +3795,7 @@
                 const title = document.createElement('div');
                 title.className = 'title';
                 title.style.cursor = 'pointer';
-                title.textContent = file;
+                title.textContent = owner && currentUser?.role === 'admin' && section !== 'history' ? `${file} · Perfil: ${owner}` : file;
                 info.append(fileIcon, title);
 
                 const actions = document.createElement('div');
@@ -3726,6 +3849,7 @@
                 row.appendChild(actions);
                 container.appendChild(row);
             });
+            updateLibrarySelection(section);
         }
 
         function fillLibrarySelect(select, files, placeholder) {
@@ -3739,8 +3863,8 @@
                 const res = await authFetch('/api/library');
                 if (!res.ok) return;
                 const data = await res.json();
-                renderLibrarySection(document.getElementById('libVideosList'), 'videos', data.videos, '🎵', 'Nenhum original nesta conta.');
-                renderLibrarySection(document.getElementById('libPhotosList'), 'photos', data.photos, '🖼️', 'Nenhum fundo nesta conta.');
+                renderLibrarySection(document.getElementById('libVideosList'), 'videos', data.videos_items || data.videos, '🎵', 'Nenhum original nesta conta.');
+                renderLibrarySection(document.getElementById('libPhotosList'), 'photos', data.photos_items || data.photos, '🖼️', 'Nenhum fundo nesta conta.');
                 renderLibrarySection(document.getElementById('libHistoryList'), 'history', data.history_items || data.history, '🎬', 'Nenhum resultado nesta conta.');
                 fillLibrarySelect(document.getElementById('libraryAudioSelect'), data.videos, 'Selecione uma música da biblioteca...');
                 fillLibrarySelect(document.getElementById('libraryBgSelect'), data.photos, 'Selecione um fundo da biblioteca...');

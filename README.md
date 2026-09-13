@@ -89,6 +89,7 @@ Qualquer perfil autenticado pode adicionar tarefas, independentemente do dono da
 - **Resultados** primeiro, com ordenação do mais recente para o mais antigo e identificação do proprietário para a administração.
 - Seções **Resultados**, **Adicionar à biblioteca**, **Originais** e **Fundos** recolhíveis, como no manual.
 - Miniaturas de vídeo com frame escurecido e título; cartões de título para SRT.
+- Grade compacta de resultados no PC e seleção discreta para excluir vários arquivos ou todos os itens de uma categoria, com confirmação e identificação por perfil.
 - Uploads e importações opcionais por URL.
 - Reutilização, visualização, renomeação e exclusão, conforme o tipo de item.
 - Download de MP4 e SRT em Resultados.

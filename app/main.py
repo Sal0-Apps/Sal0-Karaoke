@@ -3177,22 +3177,24 @@ def get_library_files(current_user: dict = Depends(get_current_user)):
                     logger.error(f"Erro ao listar biblioteca {section}: {e}")
         result[section] = sorted(names)
     result["history_items"] = library_history_items(current_user)
+    result["videos_items"] = library_history_items(current_user, "videos")
+    result["photos_items"] = library_history_items(current_user, "photos")
     return result
 
 
-def library_history_items(current_user: dict) -> list[dict]:
+def library_history_items(current_user: dict, section: str = "history") -> list[dict]:
     owners = [current_user]
     if is_admin(current_user):
         owners += [{"username": username, "role": record.get("role", "user")}
                    for username, record in load_users().items() if record.get("role") != "admin"]
     items = []
     for owner in owners:
-        root = os.path.join(get_user_paths(owner)["library"], "history")
+        root = os.path.join(get_user_paths(owner)["library"], section)
         if not os.path.isdir(root):
             continue
         for filename in os.listdir(root):
             path = os.path.join(root, filename)
-            if filename.startswith('.') or not os.path.isfile(path):
+            if filename.startswith(('.', 'tmp', 'original_', 'cache_')) or not os.path.isfile(path):
                 continue
             stat = os.stat(path)
             items.append({"filename": filename, "owner": owner["username"],
@@ -3201,13 +3203,15 @@ def library_history_items(current_user: dict) -> list[dict]:
 
 
 def library_request_user(current_user: dict, owner: str = "") -> dict:
-    if not owner or owner == current_user.get("username"):
+    if not owner:
         return current_user
+    if owner == current_user.get("username"):
+        return {**current_user, "_library_exact_owner": True}
     require_admin(current_user)
     target = user_from_username(owner)
     if not target:
         raise HTTPException(status_code=404, detail="Perfil não encontrado.")
-    return target
+    return {**target, "_library_exact_owner": True}
 
 
 @app.get("/api/library/thumbnail/{section}/{filename}")
@@ -3363,7 +3367,7 @@ def resolve_library_file(current_user: dict, section: str, filename: str):
         return None
     safe = os.path.basename(filename)
     roots = [get_user_paths(current_user)["library"]]
-    if is_admin(current_user):
+    if is_admin(current_user) and not current_user.get("_library_exact_owner"):
         for username, record in load_users().items():
             if record.get("role") != "admin":
                 roots.append(get_user_paths({"username": username, "role": record.get("role", "user")})["library"])
