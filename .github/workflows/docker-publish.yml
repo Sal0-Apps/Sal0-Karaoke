@@ -2,6 +2,8 @@ name: Build, Publish and Release
 
 on:
   push:
+    branches:
+      - main
     tags:
       - 'v*'
   workflow_dispatch: # Dispara quando tags começando com v são criadas, ex: v1.0
