@@ -12,6 +12,7 @@ import subprocess
 import tempfile
 import threading
 import time
+import zipfile
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import requests
 import re
@@ -24,6 +25,7 @@ import html
 from urllib.parse import quote
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Header, Depends, Query, Request
 from fastapi.responses import HTMLResponse, FileResponse, Response, StreamingResponse
+from starlette.background import BackgroundTask
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field
@@ -3357,6 +3359,9 @@ class RenameRequest(BaseModel):
     old_name: str
     new_name: str
 
+class LibraryBulkRequest(BaseModel):
+    files: list[str] = Field(min_length=1)
+
 def resolve_library_file(current_user: dict, section: str, filename: str):
     """Resolve mídias próprias ou, para o administrador, de qualquer usuário."""
     if section not in {"videos", "photos", "history"}:
@@ -3461,6 +3466,30 @@ def download_from_library(section: str, filename: str, owner: str = "", current_
         return attachment_file_response(file_path, safe_filename)
 
     raise HTTPException(status_code=404, detail="Arquivo não encontrado na biblioteca.")
+
+@app.post("/api/library/{section}/bulk-delete")
+def bulk_delete_from_library(section: str, req: LibraryBulkRequest, owner: str = "", current_user: dict = Depends(get_current_user)):
+    current_user = library_request_user(current_user, owner)
+    if section not in {"videos", "photos", "history"}: raise HTTPException(status_code=400, detail="Seção inválida.")
+    deleted = []
+    for filename in dict.fromkeys(req.files):
+        resolved = resolve_library_file(current_user, section, os.path.basename(filename))
+        if resolved: os.remove(resolved[0]); deleted.append(os.path.basename(filename))
+    if not deleted: raise HTTPException(status_code=404, detail="Nenhum arquivo selecionado foi encontrado.")
+    return {"status":"success","deleted":deleted}
+
+@app.post("/api/library/{section}/bulk-download")
+def bulk_download_from_library(section: str, req: LibraryBulkRequest, owner: str = "", current_user: dict = Depends(get_current_user)):
+    current_user = library_request_user(current_user, owner)
+    if section not in {"videos", "photos", "history"}: raise HTTPException(status_code=400, detail="Seção inválida.")
+    selected = [(resolve_library_file(current_user, section, os.path.basename(f)), os.path.basename(f)) for f in dict.fromkeys(req.files)]
+    selected = [(r,n) for r,n in selected if r]
+    if not selected: raise HTTPException(status_code=404, detail="Nenhum arquivo selecionado foi encontrado.")
+    tmp=tempfile.NamedTemporaryFile(prefix="karaoke-library-",suffix=".zip",delete=False); path=tmp.name; tmp.close()
+    with zipfile.ZipFile(path,"w",zipfile.ZIP_DEFLATED) as archive:
+        for (resolved,name) in selected: archive.write(resolved[0],arcname=name)
+    response=attachment_file_response(path,f"biblioteca-{section}-{len(selected)}-itens.zip","application/zip")
+    response.background=BackgroundTask(lambda: os.path.exists(path) and os.remove(path)); return response
 
 
 def iter_file_range(file_path: str, start: int, end: int, chunk_size: int = 1024 * 1024):

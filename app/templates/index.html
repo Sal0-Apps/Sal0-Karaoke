@@ -576,7 +576,7 @@
         .library-item {
             background: var(--input-bg);
             border: 1px solid var(--glass-border);
-            padding: 1rem;
+            padding: 0.55rem 0.7rem;
             border-radius: var(--radius-md);
             display: flex;
             justify-content: space-between;
@@ -922,6 +922,8 @@
             gap: 0.25rem;
             margin-bottom: 0.8rem;
         }
+        .library-item .select-file { width:1rem; height:1rem; accent-color:var(--accent); }
+        .library-bulk-toolbar { display:flex; gap:.4rem; align-items:center; margin-left:auto; }
         .process-overall-progress {
             margin: -0.15rem 0 0.85rem;
         }
@@ -2267,7 +2269,7 @@
         <!-- ============================================================= -->
         <div id="libraryTabContent" style="display: none; flex-direction: column; gap: 1.5rem;">
             <details class="card library-section" id="libraryResults" open>
-                <summary class="card-title">🎬 Resultados</summary>
+                <summary class="card-title">🎬 Resultados <span class="library-bulk-toolbar"><button type="button" class="btn-secondary" onclick="downloadSelectedFromLibrary('history')">⬇️ Baixar selecionados</button><button type="button" class="btn-delete" onclick="deleteSelectedFromLibrary('history')">🗑️ Excluir selecionados</button></span></summary>
                 <div id="libHistoryList" class="library-section-content"></div>
             </details>
             <details class="card library-section" id="libraryImports">
@@ -2317,11 +2319,11 @@
 
             </details>
             <details class="card library-section" id="libraryOriginals">
-                <summary class="card-title">🎵 Originais</summary>
+                <summary class="card-title">🎵 Originais <span class="library-bulk-toolbar"><button type="button" class="btn-secondary" onclick="downloadSelectedFromLibrary('videos')">⬇️ Baixar selecionados</button><button type="button" class="btn-delete" onclick="deleteSelectedFromLibrary('videos')">🗑️ Excluir selecionados</button></span></summary>
                 <div id="libVideosList" class="library-section-content"></div>
             </details>
             <details class="card library-section" id="libraryBackgrounds">
-                <summary class="card-title">🖼️ Fundos</summary>
+                <summary class="card-title">🖼️ Fundos <span class="library-bulk-toolbar"><button type="button" class="btn-secondary" onclick="downloadSelectedFromLibrary('photos')">⬇️ Baixar selecionados</button><button type="button" class="btn-delete" onclick="deleteSelectedFromLibrary('photos')">🗑️ Excluir selecionados</button></span></summary>
                 <div id="libPhotosList" class="library-section-content"></div>
             </details>
         </div>
@@ -3644,6 +3646,11 @@
             return button;
         }
 
+        window.librarySelections = window.librarySelections || {videos:new Set(), photos:new Set(), history:new Set()};
+        function selectAllLibrary(section) { const list=(window.latestLibraryData?.[section]||[]).map(x=>typeof x==='string'?x:x.filename); const set=window.librarySelections[section]; if(set.size===list.length) set.clear(); else list.forEach(f=>set.add(f)); loadLibrary(); }
+        async function downloadSelectedFromLibrary(section, owner='') { const files=[...window.librarySelections[section]]; if(!files.length)return; const r=await authFetch(`/api/library/${section}/bulk-download?owner=${encodeURIComponent(owner)}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({files})}); if(!r.ok)return alert('Falha no download'); const u=URL.createObjectURL(await r.blob()),a=document.createElement('a'); a.href=u; a.download=`biblioteca-${section}-${files.length}-itens.zip`; a.click(); setTimeout(()=>URL.revokeObjectURL(u),1000); }
+        async function deleteSelectedFromLibrary(section, owner='') { const files=[...window.librarySelections[section]]; if(!files.length||!confirm(`Excluir ${files.length} arquivo(s) selecionado(s)?`))return; const r=await authFetch(`/api/library/${section}/bulk-delete?owner=${encodeURIComponent(owner)}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({files})}); if(r.ok){window.librarySelections[section].clear(); await loadLibrary();} }
+
         function renderLibrarySection(container, section, files, icon, emptyText) {
             if (!container) return;
             container.replaceChildren();
@@ -3673,7 +3680,9 @@
                 title.className = 'title';
                 title.style.cursor = 'pointer';
                 title.textContent = file;
-                info.append(fileIcon, title);
+                const checkbox = document.createElement('input'); checkbox.type='checkbox'; checkbox.className='select-file'; checkbox.checked=Boolean(window.librarySelections?.[section]?.has(file));
+                checkbox.onchange=()=>{ window.librarySelections=window.librarySelections||{videos:new Set(),photos:new Set(),history:new Set()}; checkbox.checked?window.librarySelections[section].add(file):window.librarySelections[section].delete(file); renderLibrarySection(container,section,files,icon,emptyText); };
+                info.append(checkbox, fileIcon, title);
 
                 const actions = document.createElement('div');
                 actions.className = 'actions';
@@ -3739,6 +3748,8 @@
                 const res = await authFetch('/api/library');
                 if (!res.ok) return;
                 const data = await res.json();
+                window.latestLibraryData = {videos:data.videos||[], photos:data.photos||[], history:data.history_items||data.history||[]};
+                [['videos','libVideosList'],['photos','libPhotosList'],['history','libHistoryList']].forEach(([section,id])=>{ const summary=document.getElementById(id)?.closest('details')?.querySelector('summary'); if(summary&&!summary.querySelector('.library-select-all')){const cb=document.createElement('input'); cb.type='checkbox'; cb.className='library-select-all'; cb.onclick=e=>{e.stopPropagation();selectAllLibrary(section)}; summary.prepend(cb);}});
                 renderLibrarySection(document.getElementById('libVideosList'), 'videos', data.videos, '🎵', 'Nenhum original nesta conta.');
                 renderLibrarySection(document.getElementById('libPhotosList'), 'photos', data.photos, '🖼️', 'Nenhum fundo nesta conta.');
                 renderLibrarySection(document.getElementById('libHistoryList'), 'history', data.history_items || data.history, '🎬', 'Nenhum resultado nesta conta.');
