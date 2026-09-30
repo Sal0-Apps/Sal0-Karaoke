@@ -80,7 +80,7 @@ Transcrição, tradução e sincronização são estimativas de modelos. A letra
 - Reordenação de itens aguardando e remoção individual.
 - Cancelamento do processo atual.
 - Progresso total em destaque, acompanhado pelo avanço da etapa atual, incluindo backing vocals e MP4 do modo SRT.
-- Avisos de novas etapas no Telegram; separação das vozes de apoio e renderização do vídeo de áudio informam o avanço em marcos de 25%.
+- Um aviso no Telegram ao iniciar cada etapa, sem mensagens repetidas de porcentagem; os arquivos finais continuam sendo entregues.
 - Pausa administrativa ao fim de uma etapa, com salvamento dos resultados intermediários.
 - Retomada após reiniciar, desde que o mesmo volume e os arquivos da tarefa sejam preservados.
 - Conclusão da tentativa de entrega ao Telegram antes do início do próximo trabalho.

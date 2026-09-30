@@ -82,7 +82,7 @@ def preserve_backing_vocals(vocals, instrumental, cache_dir, gain=1.0, update_ca
         def inference_progress(percent):
             if update_callback:
                 update_callback("processing", "Separando backing vocals", 56 + round(percent * 0.03),
-                                stage_progress=round(percent * 0.9),
+                                stage_progress=percent,
                                 stage_detail="Analisando voz principal e vozes de apoio em CPU")
         with tempfile.TemporaryDirectory(dir=cache_dir, prefix="backing-") as folder:
             run_cancellable([
@@ -95,7 +95,7 @@ def preserve_backing_vocals(vocals, instrumental, cache_dir, gain=1.0, update_ca
             os.replace(os.path.join(folder, "backing_vocals.wav"), backing)
             Path(marker).write_text(BACKING_MODEL_VERSION)
     if update_callback:
-        update_callback("processing", "Misturando backing vocals", 59, stage_progress=90,
+        update_callback("processing", "Misturando backing vocals", 59, stage_progress=0,
                         stage_detail="Aplicando o volume das vozes de apoio ao instrumental")
     with tempfile.TemporaryDirectory(dir=cache_dir, prefix="backing-mix-") as folder:
         mixed = os.path.join(folder, "mixed.wav")

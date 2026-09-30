@@ -72,9 +72,28 @@ class BackingVocalsTests(unittest.TestCase):
     def test_inference_progress_is_forwarded_and_never_regresses(self):
         callback = Mock()
         backing.run_cancellable([sys.executable, '-c',
-            "print('Downloading model: 100%'); print('SAL0_BVE_INFERENCE_START'); print('Inference: 25%'); print('Inference: 75%'); print('Inference: 50%'); print('Inference: 100%')"],
+            "print('Downloading model: 100%'); print('SAL0_BVE_INFERENCE_START'); print('Inference: 25%', end='\\r'); print('Inference: 75%', end='\\r'); print('Inference: 50%'); print('Inference: 100%')"],
             progress_callback=callback)
         self.assertEqual([call.args[0] for call in callback.call_args_list], [25, 75, 100])
+
+    def test_stage_percentage_matches_inference_logs_before_separate_mix_stage(self):
+        callback = Mock()
+        with tempfile.TemporaryDirectory() as folder:
+            def infer(command, **kwargs):
+                for percent in (0, 25, 75, 100):
+                    kwargs["progress_callback"](percent)
+                for name in ("lead_vocals.wav", "backing_vocals.wav"):
+                    tone(Path(command[3]) / name, 800)
+            def mix(original, voices, output, gain):
+                tone(Path(output), 800)
+            with patch.object(backing, "run_cancellable", side_effect=infer), patch.object(backing, "mix_backing", side_effect=mix):
+                backing.preserve_backing_vocals("vocals.wav", "instrumental.wav", folder, update_callback=callback)
+        inference = [call.kwargs["stage_progress"] for call in callback.call_args_list
+                     if call.args[1] == "Separando backing vocals"]
+        self.assertEqual(inference, [0, 0, 25, 75, 100])
+        self.assertEqual(callback.call_args_list[-2].args[1], "Misturando backing vocals")
+        self.assertEqual(callback.call_args_list[-2].kwargs["stage_progress"], 0)
+        self.assertEqual(callback.call_args_list[-1].kwargs["stage_progress"], 100)
 
     def test_gain_outside_the_supported_range_is_rejected(self):
         for gain in (-1, 1.1, float("nan")):

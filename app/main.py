@@ -5058,17 +5058,9 @@ def run_subtitle_srt_pipeline(
         notify_targets(telegram_targets, telegram_notice("🎬", "Vídeo legendado do áudio",
             f"🎵 <b>{telegram_escape(orig_name)}</b>",
             "📊 Progresso geral: <b>96%</b> · etapa atual: <b>0%</b>"))
-        notified_render_percent = -1
         def publish_subtitle_video_progress(percent):
-            nonlocal notified_render_percent
             update_state("processing", "Rendering subtitle video", 96 + min(2, int(percent * 2 / 100)),
                          stage_progress=percent, stage_detail="Criando MP4 com o áudio original e as legendas")
-            milestone = int(percent // 25) * 25
-            if milestone >= 25 and milestone > notified_render_percent:
-                notified_render_percent = milestone
-                notify_targets(telegram_targets, telegram_notice("🎬", "Vídeo legendado do áudio",
-                    f"🎵 <b>{telegram_escape(orig_name)}</b>",
-                    f"📊 Etapa atual: <b>{percent}%</b>"))
         publish_subtitle_video_progress(0)
         render_audio_subtitle_video(normalized_mp3,
             final_translated_srt if translated_filename else final_original_srt,
@@ -5569,20 +5561,12 @@ def run_pipeline(
             pm.check_cancelled()
             save_stage_checkpoint(cache_dir, "vocals_separated", "vocais separados pelo Demucs", 55)
             if keep_backing_vocals and backing_vocals_volume > 0:
-                notified_backing_percent = -1
-                def publish_backing_progress(status, step, progress, **details):
-                    nonlocal notified_backing_percent
-                    update_state(status, step, progress, **details)
-                    percent = details.get("stage_progress", 0)
-                    milestone = int(percent // 25) * 25
-                    if milestone > notified_backing_percent:
-                        notified_backing_percent = milestone
-                        notify_targets(telegram_targets, telegram_notice("🎤", "Preservando backing vocals",
-                            f"🎵 <b>{telegram_escape(orig_name)}</b>",
-                            f"📊 Progresso geral: <b>{progress}%</b> · etapa atual: <b>{percent}%</b>"))
+                notify_targets(telegram_targets, telegram_notice("🎤", "Preservando backing vocals",
+                    f"🎵 <b>{telegram_escape(orig_name)}</b>",
+                    "Separando a voz principal e preservando as vozes de apoio."))
                 vocals_wav, instrumental_wav = preserve_backing_vocals(
                     vocals_wav, instrumental_wav, cache_dir,
-                    gain=backing_vocals_volume / 100, update_callback=publish_backing_progress,
+                    gain=backing_vocals_volume / 100, update_callback=update_state,
                 )
             vocal_source = "lead" if keep_backing_vocals and backing_vocals_volume > 0 else "all"
 

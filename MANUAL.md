@@ -182,7 +182,7 @@ A fila não é histórico: trabalhos encerrados saem dela. Os arquivos concluíd
 
 ## 8. Progresso e pausa por etapa
 
-O número maior e a barra são o **progresso total**. O indicador menor representa a **etapa atual**, incluindo transcrição, separação de backing vocals e renderização do MP4 de áudio quando há informação disponível. As novas etapas também enviam avisos ao Telegram; backing vocals e vídeo de áudio informam marcos de progresso de 25%. A aplicação da letra sincronizada informa a etapa concluída. A tradução informa início e resultado, pois o LibreTranslate não oferece percentual interno contínuo. Downloads, carregamento de modelo e certas operações podem não fornecer um percentual contínuo.
+O número maior e a barra são o **progresso total**. O indicador menor representa a **etapa atual**, incluindo transcrição, separação de backing vocals e renderização do MP4 de áudio quando há informação disponível. O percentual da separação de backing vocals acompanha o percentual da inferência exibido nos logs. O Telegram envia um aviso ao iniciar cada etapa, sem mensagens repetidas de porcentagem. A aplicação da letra sincronizada informa a etapa concluída. A tradução informa início e resultado, pois o LibreTranslate não oferece percentual interno contínuo. Downloads, carregamento de modelo e certas operações podem não fornecer um percentual contínuo.
 
 O total combina etapas com pesos; não mede diretamente tempo restante. Um avanço de 50% não significa que falta metade do tempo. CPU, duração, modelo, disco, rede e complexidade do áudio alteram a duração.
 
