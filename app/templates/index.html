@@ -1658,7 +1658,7 @@
                     </details>
 <div id="easyYoutubePublication" style="display:none;margin:1rem 0">
                     <label style="display:flex;gap:.5rem;align-items:center"><input type="checkbox" id="easyYoutubePublish" value="true"> Publicar no YouTube ao concluir</label>
-                    <label for="easyYoutubePlaylist" class="compact-note">Playlist de publicação</label>
+                    <label for="easyYoutubePlaylist" class="compact-note">Playlist deste vídeo</label>
                     <select id="easyYoutubePlaylist" class="select-input"></select>
                     <details><summary>Alterar título (opcional)</summary>
                     <label for="easyYoutubeTitle" class="compact-note">Título no YouTube (opcional)</label>
@@ -6666,7 +6666,7 @@
                     const container = ytElement(prefix + 'YoutubePublication');
                     container.style.display = options.enabled ? 'block' : 'none';
                     const checkbox = ytElement(prefix + 'YoutubePublish');
-                    checkbox.checked = options.enabled && options.default_publish;
+                    checkbox.checked = options.enabled && options.can_publish && options.default_publish;
                     checkbox.disabled = !options.can_publish;
                     const select = ytElement(prefix + 'YoutubePlaylist');
                     select.replaceChildren();
