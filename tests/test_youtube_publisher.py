@@ -118,6 +118,46 @@ class PublisherTests(unittest.TestCase):
         self.assertIsNone(self.publisher.publication_options(user, False))
         self.assertEqual(self.publisher.publication_options(user, True, 'playlist-one')['playlist_id'], 'playlist-one')
 
+    def test_admin_publish_and_playlist_defaults_persist_with_unlisted_privacy(self):
+        admin = {'username':'admin', 'role':'admin'}
+        playlists = [{'id':'playlist-one', 'title':'Playlist'}]
+        with patch.object(self.publisher, 'playlists', return_value=playlists):
+            self.assertTrue(self.publisher.quick_options(admin)['default_publish'])
+            self.publisher.save_settings('admin', {'privacy':'private', 'playlist_id':'playlist-one',
+                'title_template':'{title}', 'default_publish':True})
+            options = self.publisher.quick_options(admin)
+            self.assertTrue(options['default_publish'])
+            self.assertEqual(options['playlist_id'], 'playlist-one')
+            self.assertEqual(options['privacy'], 'unlisted')
+            self.assertIsNone(self.publisher.publication_options(admin, False))
+            self.assertEqual(self.publisher.publication_options(admin, True, 'playlist-one')['privacy'], 'unlisted')
+            self.publisher.save_settings('admin', {'privacy':'public', 'title_template':'{title}',
+                'default_publish':False, 'playlist_id':''})
+            restored = YouTubePublisher(self.folder.name)
+            with patch.object(restored, 'playlists', return_value=playlists):
+                self.assertTrue(restored.quick_options(admin)['default_publish'])
+                self.assertEqual(restored.quick_options(admin)['playlist_id'], '')
+                self.assertEqual(restored.quick_options(admin)['privacy'], 'unlisted')
+
+    def test_old_privacy_defaults_migrate_to_unlisted_and_disconnected_never_preselects(self):
+        self.publisher.save('settings.json', {'defaults':{'privacy':'private'}})
+        with patch.object(self.publisher, 'playlists', return_value=[]):
+            self.assertEqual(self.publisher.quick_options({'username':'admin','role':'admin'})['privacy'], 'unlisted')
+        self.publisher.save('token.json', {})
+        self.assertFalse(self.publisher.quick_options({'username':'admin','role':'admin'})['default_publish'])
+
+    def test_all_users_preselect_publication_including_new_and_legacy_disabled_accounts(self):
+        self.publisher.save('settings.json', {'users_can_publish':False, 'user_assignments':{
+            'alice':{'enabled':False, 'default_publish':False, 'playlist_id':'playlist-one'}}})
+        alice = {'username':'alice', 'role':'user'}
+        self.assertTrue(self.publisher.quick_options(alice)['default_publish'])
+        self.assertEqual(self.publisher.publication_options(alice, True, 'playlist-one')['privacy'], 'unlisted')
+        bob = {'username':'bob', 'role':'user'}
+        self.assertTrue(self.publisher.quick_options(bob)['default_publish'])
+        self.assertEqual(self.publisher.quick_options(bob)['playlist_id'], '')
+        self.assertIsNone(self.publisher.publication_options(bob, False))
+        self.assertEqual(self.publisher.publication_options(bob, True)['playlist_id'], '')
+
     def test_user_can_only_publish_to_own_assigned_playlist(self):
         self.configure_user()
         user = {'username': 'alice', 'role': 'user'}
@@ -126,13 +166,13 @@ class PublisherTests(unittest.TestCase):
         with self.assertRaises(PublicationError):
             self.publisher.publication_options({'username': 'bob', 'role': 'user'}, True, 'playlist-one')
 
-    def test_admin_can_assign_no_playlist_and_unchecked_default(self):
+    def test_no_playlist_still_preselects_publication_for_every_user(self):
         self.configure_user('', False)
         user = {'username': 'alice', 'role': 'user'}
         options = self.publisher.quick_options(user)
         self.assertTrue(options['enabled'])
         self.assertTrue(options['allow_no_playlist'])
-        self.assertFalse(options['default_publish'])
+        self.assertTrue(options['default_publish'])
         self.assertEqual(self.publisher.publication_options(user, True)['playlist_id'], '')
 
     def test_revoking_assignment_blocks_queued_job_before_upload(self):

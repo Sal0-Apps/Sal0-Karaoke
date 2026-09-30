@@ -1,7 +1,8 @@
-# 9.9.5
+# 9.9.6
 
-- Letras LRC já sincronizadas agora recebem animação progressiva do destaque durante cada verso, preservando os tempos originais.
-- O destaque por palavra continua usando os tempos do Whisper; a animação de LRC não inventa tempos de palavras ou sílabas.
-- README, manual completo e tutoriais do aplicativo incluem o comportamento, mantendo a documentação dos recursos existentes.
+- **Publicar no YouTube** começa marcado para todos os usuários, incluindo contas novas e configurações antigas. Desmarcar por vídeo continua impedindo o envio.
+- A privacidade padrão é **Não listado**. A publicação manual de vídeo pronto permite escolher outra privacidade.
+- Administrador define a playlist de cada usuário e sua playlist padrão. **Sem playlist** publica somente no canal. As atribuições são preservadas e verificadas pelo servidor.
+- O painel de playlists foi simplificado, removendo permissões e marcações individuais que já são padrão para todas as contas.
 
-A versão mantém os modos Rápido, Detalhado e SRT, busca no YouTube com miniaturas, backing vocals locais, publicação opcional com playlists por usuário, fila, Biblioteca e Telegram. Entradas somente de áudio no modo SRT recebem MP4 legendado e SRTs separados. As novas etapas mostram progresso e avisos no Telegram, conforme a informação disponível.
+A versão mantém as letras sincronizadas com destaque progressivo, busca no YouTube com miniaturas em todos os modos, backing vocals, vídeo automático para áudio no modo SRT, fila, Biblioteca e avisos de progresso no Telegram. README, manual e tutoriais continuam documentando todos os recursos.

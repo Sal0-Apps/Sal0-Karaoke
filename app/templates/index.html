@@ -2207,18 +2207,17 @@
                 </section>
                 <section class="yt-panel" aria-labelledby="ytUsersHeading">
                     <h3 id="ytUsersHeading">2. Playlist de cada usuário</h3>
-                    <p class="compact-note">Escolha quem pode publicar, o destino dos vídeos de cada pessoa e se a publicação começa marcada no modo rápido.</p>
+                    <p class="compact-note">A publicação começa marcada para todas as contas, com privacidade Não listado. Defina a playlist de destino de cada pessoa; ela pode desmarcar o envio em um vídeo específico.</p>
                     <p id="ytPlaylistStatus" class="yt-status" role="status"></p>
-                    <label class="yt-check"><input type="checkbox" id="ytUsersCanPublish"> Liberar publicação pelos usuários</label>
                     <div id="ytUserAssignments" class="yt-user-list"></div>
-                    <details class="yt-defaults"><summary>Título e privacidade usados no modo rápido</summary>
+                    <details class="yt-defaults"><summary>Padrões de publicação do administrador</summary>
                         <div class="yt-fields">
-                            <div><label for="ytDefaultPrivacy" class="label">Privacidade padrão</label><select id="ytDefaultPrivacy" class="select-input"><option value="private">Privado</option><option value="unlisted">Não listado</option><option value="public">Público</option></select></div>
+                            <div><label for="ytDefaultPrivacy" class="label">Privacidade padrão</label><select id="ytDefaultPrivacy" class="select-input" disabled><option value="unlisted">Não listado</option></select><p class="compact-note">A publicação automática usa Não listado. Para publicar como privado ou público, use o painel de vídeos prontos.</p></div>
                             <div><label for="ytDefaultPlaylist" class="label">Playlist padrão do administrador</label><select id="ytDefaultPlaylist" class="select-input"><option value="">Sem playlist</option></select></div>
                             <div class="yt-wide"><label for="ytPublishTemplate" class="label">Modelo de título</label><input id="ytPublishTemplate" class="input-text" maxlength="100" value="{title} | Karaokê"><p class="compact-note">{title} será substituído pelo nome da música.</p></div>
                         </div>
                     </details>
-                    <button type="button" id="ytPublishSave" class="btn-primary">Salvar playlists e permissões</button>
+                    <button type="button" id="ytPublishSave" class="btn-primary">Salvar playlists</button>
                     <p id="ytUsersMessage" class="yt-status" role="status" aria-live="polite" hidden></p>
                 </section>
                 <details class="yt-panel" id="ytManualPublication"><summary>3. Publicar um vídeo já pronto</summary>
@@ -2227,7 +2226,7 @@
                 <label for="ytPublishTitle" class="label">Título no YouTube</label>
                 <input id="ytPublishTitle" class="input-text" maxlength="100" placeholder="Título do vídeo">
                 <div class="two-col" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(180px,100%),1fr));gap:.6rem;margin-top:.6rem">
-                    <div><label for="ytPublishPrivacy" class="label">Privacidade</label><select id="ytPublishPrivacy" class="select-input"><option value="private">Privado</option><option value="unlisted">Não listado</option><option value="public">Público</option></select></div>
+                    <div><label for="ytPublishPrivacy" class="label">Privacidade</label><select id="ytPublishPrivacy" class="select-input"><option value="private">Privado</option><option value="unlisted" selected>Não listado</option><option value="public">Público</option></select></div>
                     <div><label for="ytPublishPlaylist" class="label">Playlist</label><select id="ytPublishPlaylist" class="select-input"><option value="">Sem playlist</option></select></div>
                 </div>
                 <details><summary>Trocar a capa automática (opcional)</summary><label for="ytPublishCover" class="label">JPEG ou PNG até 2 MB</label>
@@ -2641,13 +2640,13 @@
                 <ol>
                     <li>Em <strong>Ajustes → Publicar no YouTube → Conexão do canal</strong>, abra o guia de autorização. Habilite a YouTube Data API v3 no projeto Google, adicione sua conta como usuário de teste e baixe uma credencial de aplicativo para computador.</li>
                     <li>Abra o assistente no computador, escolha a credencial e autorize no navegador do Google. Baixe <strong>youtube-autorizacao.json</strong>, importe no Karaokê e toque em <strong>Conectar meu canal</strong>. Confira a confirmação com o nome do canal. O servidor pode continuar em HTTP; não exige serviço pago.</li>
-                    <li>Em <strong>Playlist de cada usuário</strong>, defina permissão, playlist ou <strong>Sem playlist</strong> e a marcação padrão. Para o administrador, abra <strong>Título e privacidade usados no modo rápido → Playlist padrão do administrador</strong>. Salve e confira a confirmação.</li>
+                    <li>Em <strong>Playlist de cada usuário</strong>, defina a playlist ou <strong>Sem playlist</strong> de cada conta. Para o administrador, abra <strong>Padrões de publicação do administrador → Playlist padrão do administrador</strong>. O envio começa marcado para todas as contas. A privacidade automática é <strong>Não listado</strong>. Salve e confira a confirmação.</li>
                     <li>No modo Rápido ou Detalhado, marque <strong>Publicar no YouTube</strong> somente quando quiser enviar esse vídeo. Desmarcado, não há publicação. Sem playlist, o vídeo vai ao canal sem inclusão em lista.</li>
                     <li>Use <strong>Publicar um vídeo já pronto</strong> para revisar título, capa, playlist e privacidade de um resultado existente. Acompanhe erros e links no histórico de publicações.</li>
                 </ol>
                 <p>A API tem cota gratuita e pode limitar projetos sem auditoria a vídeos privados. Guarde a autorização como uma senha. Backing vocals e vídeo do modo SRT mostram porcentagem da etapa e avisam o avanço no Telegram; o LibreTranslate informa apenas início e término.</p>
             </details>
-            <p class="compact-note">Versão do servidor: 9.9.5. A transcrição é local; fontes, modelos e integrações podem acessar serviços externos. Use conteúdo autorizado.</p>
+            <p class="compact-note">Versão do servidor: 9.9.6. A transcrição é local; fontes, modelos e integrações podem acessar serviços externos. Use conteúdo autorizado.</p>
         </div>
     </div>
 
@@ -6687,11 +6686,7 @@
                 const row = document.createElement('div'); row.className = 'yt-user-row'; row.dataset.username = user.username;
                 const heading = document.createElement('h4'); heading.textContent = user.username; row.append(heading);
                 const controls = document.createElement('div'); controls.className = 'yt-user-controls';
-                const enabledLabel = document.createElement('label'); enabledLabel.className = 'yt-check';
-                const enabled = document.createElement('input'); enabled.type = 'checkbox'; enabled.dataset.field = 'enabled'; enabled.checked = !!assignment.enabled;
-                enabled.disabled = !youtubeChannelConnected;
-                enabledLabel.append(enabled, document.createTextNode('Permitir que este usuário publique')); controls.append(enabledLabel);
-                const playlistBox = document.createElement('div');
+                const playlistBox = document.createElement('div'); playlistBox.className = 'yt-wide';
                 const label = document.createElement('label'); label.className = 'label'; label.htmlFor = 'yt-user-playlist-' + index; label.textContent = 'Playlist de destino';
                 const select = document.createElement('select'); select.id = label.htmlFor; select.className = 'select-input'; select.dataset.field = 'playlist';
                 select.add(new Option('Sem playlist — publicar somente no canal', ''));
@@ -6699,12 +6694,7 @@
                 if (assignment.playlist_id && !playlists.some(p => p.id === assignment.playlist_id)) select.add(new Option((assignment.playlist_title || assignment.playlist_id) + ' · destino salvo', assignment.playlist_id));
                 select.value = assignment.playlist_id || '';
                 playlistBox.append(label, select); controls.append(playlistBox);
-                const defaultLabel = document.createElement('label'); defaultLabel.className = 'yt-check yt-wide';
-                const checkbox = document.createElement('input'); checkbox.type = 'checkbox'; checkbox.dataset.field = 'default'; checkbox.checked = !!assignment.default_publish;
-                defaultLabel.append(checkbox, document.createTextNode('Deixar “Publicar no YouTube” marcado no modo rápido'));
-                controls.append(defaultLabel); row.append(controls);
-                const sync = () => { select.disabled = !enabled.checked || !youtubePlaylistsAvailable; checkbox.disabled = !enabled.checked || !youtubeChannelConnected; };
-                enabled.onchange = sync; sync(); container.append(row);
+                select.disabled = !youtubePlaylistsAvailable; row.append(controls); container.append(row);
             }
             if (!container.children.length) {
                 const empty = document.createElement('p'); empty.className = 'compact-note'; empty.textContent = 'Não há contas de usuário. Cadastre uma em Gerenciar usuários para definir a playlist dela.'; container.append(empty);
@@ -6714,8 +6704,7 @@
             const assignments = Object.create(null);
             for (const row of ytElement('ytUserAssignments').querySelectorAll('[data-username]')) {
                 const playlist = row.querySelector('[data-field="playlist"]').value;
-                assignments[row.dataset.username] = { enabled: row.querySelector('[data-field="enabled"]').checked, playlist_id: playlist,
-                    default_publish: row.querySelector('[data-field="default"]').checked };
+                assignments[row.dataset.username] = { enabled: true, playlist_id: playlist, default_publish: true };
             }
             return assignments;
         }
@@ -6729,11 +6718,9 @@
                 renderYoutubePublicationJobs(status.jobs || []);
                 if (!full) return;
                 if (status.connected) ytElement('ytConnectionGuide').open = false;
-                ytElement('ytDefaultPrivacy').value = status.settings.privacy;
-                ytElement('ytPublishPrivacy').value = status.settings.privacy;
+                ytElement('ytDefaultPrivacy').value = 'unlisted';
+                ytElement('ytPublishPrivacy').value = 'unlisted';
                 ytElement('ytPublishTemplate').value = status.settings.title_template;
-                ytElement('ytUsersCanPublish').checked = status.settings.users_can_publish;
-                ytElement('ytUsersCanPublish').disabled = !status.connected;
                 let playlists = []; youtubePlaylistsAvailable = false;
                 if (status.connected) {
                     try {
@@ -6845,11 +6832,11 @@
                 ytNotice('ytUsersMessage', 'Salvando playlists e permissões…');
                 try {
                     await ytRequest('settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
-                        privacy: ytElement('ytDefaultPrivacy').value, playlist_id: ytElement('ytDefaultPlaylist').value,
-                        title_template: ytElement('ytPublishTemplate').value, users_can_publish: ytElement('ytUsersCanPublish').checked, user_assignments: readYoutubeUserAssignments() }) });
-                    ytNotice('ytUsersMessage', '✓ Playlists e permissões salvas.', 'success'); await loadYoutubePublicationOptions();
+                        privacy: 'unlisted', default_publish: true, playlist_id: ytElement('ytDefaultPlaylist').value,
+                        title_template: ytElement('ytPublishTemplate').value, users_can_publish: true, user_assignments: readYoutubeUserAssignments() }) });
+                    ytNotice('ytUsersMessage', '✓ Playlists salvas.', 'success'); await loadYoutubePublicationOptions();
                 } catch (error) { ytNotice('ytUsersMessage', 'Não foi possível salvar: ' + error.message, 'error'); }
-                finally { youtubeSettingsBusy = false; button.disabled = !youtubeChannelConnected || !youtubePlaylistsAvailable; button.textContent = 'Salvar playlists e permissões'; }
+                finally { youtubeSettingsBusy = false; button.disabled = !youtubeChannelConnected || !youtubePlaylistsAvailable; button.textContent = 'Salvar playlists'; }
             };
             setInterval(() => {
                 if (!document.hidden && currentUser?.role === 'admin' && ytElement('settingsTabContent')?.style.display !== 'none') loadYoutubePublisher(false);

@@ -1,6 +1,6 @@
 # Manual do Sal0 Karaokê
 
-Este manual descreve os controles disponíveis na distribuição 9.9.5. Para instalar o servidor, consulte [DEPLOYMENT.md](DEPLOYMENT.md). Para configurar o aparelho, consulte o [guia Android](android/README.md).
+Este manual descreve os controles disponíveis na distribuição 9.9.6. Para instalar o servidor, consulte [DEPLOYMENT.md](DEPLOYMENT.md). Para configurar o aparelho, consulte o [guia Android](android/README.md).
 
 ## 1. Primeiro acesso e navegação
 
@@ -41,7 +41,7 @@ Use este modo quando quiser selecionar a música e aproveitar o perfil global pr
    - **Escolher fundo:** envia uma imagem ou vídeo;
    - **Da Biblioteca:** usa um fundo já salvo;
    - **Link de fundo:** solicita outro vídeo como fundo.
-4. Confira os indicadores do perfil apresentado. Em **Personalizar**, ajuste fundo, vozes de apoio e sincronização, se desejar. A opção de publicação no YouTube aparece quando liberada; confira a playlist e marque somente se quiser enviar esse vídeo.
+4. Confira os indicadores do perfil apresentado. Em **Personalizar**, ajuste fundo, vozes de apoio e sincronização, se desejar. A opção de publicação no YouTube aparece quando o canal está conectado; confira a playlist e marque somente se quiser enviar esse vídeo.
 5. Toque em **Criar meu karaokê** e acompanhe a aba Criar.
 6. Se o perfil exigir revisão, corrija as legendas quando o editor aparecer.
 7. Ao concluir, visualize ou baixe o resultado.
@@ -320,15 +320,14 @@ Os três modos e as entradas do YouTube na Biblioteca permitem pesquisar por nom
 
 O retorno do Google ocorre no próprio computador. O servidor continua em HTTP e não precisa de variáveis OAuth no Compose para este método. Guarde o JSON de autorização como uma senha. Se aparecer `access_denied`, confira o usuário de teste; se o painel pedir a API, ative-a no projeto correto. Erros de conexão e carregamento aparecem na própria seção, sem esconder a configuração dos usuários.
 
-### Playlists, permissões e padrão do administrador
+### Playlists e publicação padrão de todas as contas
 
 1. Abra **Playlist de cada usuário**, após conectar o canal.
-2. Marque **Liberar publicação pelos usuários** quando quiser permitir que contas comuns publiquem.
-3. Em cada cartão, defina a permissão individual, **Playlist de destino** ou **Sem playlist**, e se **Publicar no YouTube** começa marcado.
-4. Para o administrador, expanda **Título e privacidade usados no modo rápido** e configure **Playlist padrão do administrador**. Essa opção fica neste grupo, não nos cartões das contas comuns.
-5. Ajuste privacidade e modelo de título. `{title}` é substituído pelo nome da música. Toque em **Salvar playlists e permissões** e confira a confirmação.
+2. Em cada cartão, defina **Playlist de destino** ou **Sem playlist**. Todas as contas começam com o envio marcado, sem precisar liberar cada pessoa individualmente.
+3. Para o administrador, expanda **Padrões de publicação do administrador** e configure **Playlist padrão do administrador**.
+4. Ajuste o modelo de título. `{title}` é substituído pelo nome da música. Toque em **Salvar playlists** e confira a confirmação.
 
-No modo Rápido ou Detalhado, a publicação é opcional por vídeo. Desmarcada, nenhum envio ocorre, mesmo que haja playlist padrão. Uma conta comum usa a playlist atribuída; o administrador pode escolher outra playlist ou **Sem playlist** para seu vídeo. **Sem playlist** publica no canal sem incluir o vídeo em nenhuma lista. O título e a capa automática são preparados na conclusão.
+Nos modos Rápido e Detalhado, **Publicar no YouTube** começa marcado para todos os usuários, inclusive contas novas e configurações antigas. A privacidade automática é **Não listado**. Desmarcar no vídeo impede o envio. Uma conta comum usa a playlist atribuída; o administrador pode escolher outra playlist ou **Sem playlist** para seu vídeo. **Sem playlist** publica no canal sem incluir o vídeo em nenhuma lista. O título e a capa automática são preparados na conclusão. Sem conexão do canal, a opção fica indisponível.
 
 ### Publicar um resultado já pronto
 

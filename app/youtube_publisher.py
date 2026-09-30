@@ -214,12 +214,14 @@ class YouTubePublisher:
 
     def settings(self, username):
         settings = self.read('settings.json')
-        return {**{'privacy': 'private', 'playlist_id': '', 'title_template': '{title} | Karaokê'},
-                **settings.get('defaults', {}),
-                'users_can_publish': settings.get('users_can_publish', False),
+        return {**{'playlist_id': '', 'title_template': '{title} | Karaokê'},
+                **settings.get('defaults', {}), 'privacy': 'unlisted', 'default_publish': True,
+                'users_can_publish': True,
                 'user_assignments': settings.get('user_assignments', {})}
 
     def save_settings(self, username, options):
+        if not isinstance(options.get('default_publish', True), bool):
+            raise PublicationError('A marcação padrão de publicação deve ser verdadeira ou falsa.')
         if not isinstance(options.get('users_can_publish', False), bool):
             raise PublicationError('Ative a permissão de publicação explicitamente.')
         if options.get('privacy') not in PRIVACY:
@@ -240,9 +242,9 @@ class YouTubePublisher:
             playlist_id = assignment.get('playlist_id', '')
             if not isinstance(playlist_id, str):
                 raise PublicationError('Playlist inválida.')
-            validated[name] = {'enabled': assignment.get('enabled', False),
+            validated[name] = {'enabled': True,
                                'playlist_id': playlist_id,
-                               'default_publish': assignment.get('default_publish', False)}
+                               'default_publish': True}
         selected = [value['playlist_id'] for value in validated.values() if value['playlist_id']]
         default_playlist = options.get('playlist_id', '')
         available = {p['id']: p for p in self.playlists()} if selected or default_playlist else {}
@@ -252,20 +254,18 @@ class YouTubePublisher:
             assignment['playlist_title'] = available.get(assignment['playlist_id'], {}).get('title', '')
         if options.get('users_can_publish'):
             self.token()
-        self.save('settings.json', {'defaults': {'privacy': options['privacy'],
+        self.save('settings.json', {'defaults': {'privacy': 'unlisted', 'default_publish': True,
                     'playlist_id': default_playlist, 'title_template': template},
-                    'users_can_publish': options.get('users_can_publish', False),
+                    'users_can_publish': True,
                     'user_assignments': validated})
 
     def publication_options(self, user, requested=False, playlist_id='', title=''):
-        # A saved default only preselects the UI. Each video must explicitly opt in.
+        # Every account starts checked in the UI; each video still submits its own choice.
         if not requested:
             return None
         settings = self.settings(user.get('username'))
         if user.get('role') != 'admin':
             assignment = settings['user_assignments'].get(user.get('username'), {})
-            if not settings['users_can_publish'] or not assignment.get('enabled'):
-                raise PublicationError('O administrador ainda não liberou sua publicação no YouTube.')
             if playlist_id != assignment.get('playlist_id', ''):
                 raise PublicationError('Use a playlist atribuída à sua conta pelo administrador.')
         token = self.read('token.json')
@@ -282,17 +282,16 @@ class YouTubePublisher:
         token = self.read('token.json')
         admin = user.get('role') == 'admin'
         assignment = settings['user_assignments'].get(user.get('username'), {})
-        enabled = bool(token.get('channel_id') and token.get('refresh_token') and
-                       (admin or (settings['users_can_publish'] and assignment.get('enabled'))))
+        enabled = bool(token.get('channel_id') and token.get('refresh_token'))
         playlist_id = settings['playlist_id'] if admin else assignment.get('playlist_id', '')
         playlists = self.playlists() if enabled and admin else ([{'id': playlist_id,
             'title': assignment.get('playlist_title', playlist_id)}] if enabled and playlist_id else [])
         return {'enabled': enabled, 'playlists': playlists, 'allow_no_playlist': admin or not playlist_id,
-                'playlist_id': playlist_id, 'default_publish': bool(enabled and assignment.get('default_publish', False)),
+                'playlist_id': playlist_id, 'default_publish': enabled,
                 'privacy': settings['privacy'], 'channel_title': token.get('channel_title', ''),
                 'title_template': settings['title_template']}
 
-    def enqueue(self, video, title, privacy='private', playlist_id='', thumbnail=None, channel_id=None, requester=None):
+    def enqueue(self, video, title, privacy='unlisted', playlist_id='', thumbnail=None, channel_id=None, requester=None):
         video = Path(video).resolve()
         title = str(title).strip()
         if not video.is_file() or video.suffix.lower() != '.mp4' or not 1 <= len(title) <= 100 or '<' in title or '>' in title:
@@ -571,7 +570,7 @@ def install_routes(app, get_current_user, require_admin, resolve_video, check_ad
 
     @app.post('/api/admin/youtube/publish')
     def publish(owner_key: str = Form(...), filename: str = Form(...), title: str = Form(...),
-                privacy: str = Form('private'), playlist_id: str = Form(''),
+                privacy: str = Form('unlisted'), playlist_id: str = Form(''),
                 cover: UploadFile = File(None), user=Depends(admin)):
         video = resolve_video(owner_key, filename, user)
         data = cover.file.read(2 * 1024 * 1024 + 1) if cover else None

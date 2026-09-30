@@ -22,6 +22,7 @@ jobs:
           sudo apt-get update -qq && sudo apt-get install -y ffmpeg
           python -m compileall -q app
           python -m unittest discover -s tests -p test_youtube_connection_feedback.py -v
+          python -m unittest discover -s tests -p test_youtube_publisher.py -v
           python -m unittest discover -s tests -p "test_subtitle*.py" -v
           python -m unittest discover -s tests -p test_backing_vocals.py -v
           python -m unittest discover -s tests -p test_automatic_lyrics_and_search.py -v
