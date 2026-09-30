@@ -80,7 +80,7 @@ Transcrição, tradução e sincronização são estimativas de modelos. A letra
 - Reordenação de itens aguardando e remoção individual.
 - Cancelamento do processo atual.
 - Progresso total em destaque, acompanhado pelo avanço da etapa atual, incluindo backing vocals e MP4 do modo SRT.
-- Avisos de novas etapas no Telegram; separação das vozes de apoio e renderização do vídeo de áudio informam o avanço em marcos de 25%.
+- Um aviso no Telegram ao iniciar cada etapa, sem mensagens repetidas de porcentagem; os arquivos finais continuam sendo entregues.
 - Pausa administrativa ao fim de uma etapa, com salvamento dos resultados intermediários.
 - Retomada após reiniciar, desde que o mesmo volume e os arquivos da tarefa sejam preservados.
 - Conclusão da tentativa de entrega ao Telegram antes do início do próximo trabalho.
@@ -119,18 +119,18 @@ No Android, **Configurações do app** fica na faixa inferior, inclusive quando 
 
 O administrador conecta o canal em **Ajustes → Publicar no YouTube**, verifica a confirmação com o nome do canal e carrega as playlists. A autorização gratuita usa um assistente no computador e o navegador do Google; o servidor pode continuar em HTTP. Não exige serviço pago nem contratação de HTTPS. Consulte o [tutorial de conexão](UPDATES_AUTOMATIC_KARAOKE.md#conectar-o-canal-sem-https-no-servidor).
 
-Em **Playlist de cada usuário**, a administração define a playlist de cada conta ou **Sem playlist**. A playlist do administrador fica em **Padrões de publicação do administrador**. Com o canal conectado, **Publicar no YouTube** começa marcado para todos os usuários, inclusive contas novas e configurações antigas, e a publicação automática usa **Não listado**. O envio continua opcional por vídeo: desmarcado, nada é publicado. Título e capa automática ficam definidos antes da publicação. Vídeos prontos também podem ser publicados pelo painel administrativo, com outra privacidade escolhida explicitamente. O [manual](MANUAL.md#youtube-e-publicação-por-usuário) explica configuração e falhas comuns.
+Em **Playlist de cada usuário**, a administração define uma playlist válida para cada conta. A playlist do administrador fica em **Padrões de publicação do administrador**. Com o canal conectado e uma playlist definida no perfil, **Publicar no YouTube** começa marcado para todos os usuários, inclusive contas novas e configurações antigas, e a publicação automática usa **Não listado**. A playlist do perfil é obrigatória: sem ela, a interface e o servidor bloqueiam a publicação. No modo rápido, o administrador pode escolher outra playlist para aquele vídeo, com a do perfil selecionada por padrão. O envio continua opcional por vídeo: desmarcado, nada é publicado. Título e capa automática ficam definidos antes da publicação. Vídeos prontos também podem ser publicados pelo painel administrativo, com outra privacidade escolhida explicitamente. O [manual](MANUAL.md#youtube-e-publicação-por-usuário) explica configuração e falhas comuns.
 
 ## Início rápido com Docker
 
-A versão de distribuição desta documentação é **9.9.6**. O título e o rodapé da página mostram apenas o nome da aplicação. A versão do servidor pode ser consultada no Manual; a versão do APK aparece nas configurações nativas.
+A versão de distribuição desta documentação é **9.9.7**. O título e o rodapé da página mostram apenas o nome da aplicação. A versão do servidor pode ser consultada no Manual; a versão do APK aparece nas configurações nativas.
 
 Crie um arquivo `compose.yaml`:
 
 ```yaml
 services:
   karaoke-app:
-    image: ghcr.io/sal0-apps/sal0-karaoke:9.9.6
+    image: ghcr.io/sal0-apps/sal0-karaoke:9.9.7
     container_name: karaoke-app
     ports:
       - "7885:7860"

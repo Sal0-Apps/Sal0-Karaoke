@@ -1,6 +1,6 @@
 # Manual do Sal0 Karaokê
 
-Este manual descreve os controles disponíveis na distribuição 9.9.6. Para instalar o servidor, consulte [DEPLOYMENT.md](DEPLOYMENT.md). Para configurar o aparelho, consulte o [guia Android](android/README.md).
+Este manual descreve os controles disponíveis na distribuição 9.9.7. Para instalar o servidor, consulte [DEPLOYMENT.md](DEPLOYMENT.md). Para configurar o aparelho, consulte o [guia Android](android/README.md).
 
 ## 1. Primeiro acesso e navegação
 
@@ -182,7 +182,7 @@ A fila não é histórico: trabalhos encerrados saem dela. Os arquivos concluíd
 
 ## 8. Progresso e pausa por etapa
 
-O número maior e a barra são o **progresso total**. O indicador menor representa a **etapa atual**, incluindo transcrição, separação de backing vocals e renderização do MP4 de áudio quando há informação disponível. As novas etapas também enviam avisos ao Telegram; backing vocals e vídeo de áudio informam marcos de progresso de 25%. A aplicação da letra sincronizada informa a etapa concluída. A tradução informa início e resultado, pois o LibreTranslate não oferece percentual interno contínuo. Downloads, carregamento de modelo e certas operações podem não fornecer um percentual contínuo.
+O número maior e a barra são o **progresso total**. O indicador menor representa a **etapa atual**, incluindo transcrição, separação de backing vocals e renderização do MP4 de áudio quando há informação disponível. O percentual da separação de backing vocals acompanha o percentual da inferência exibido nos logs. O Telegram envia um aviso ao iniciar cada etapa, sem mensagens repetidas de porcentagem. A aplicação da letra sincronizada informa a etapa concluída. A tradução informa início e resultado, pois o LibreTranslate não oferece percentual interno contínuo. Downloads, carregamento de modelo e certas operações podem não fornecer um percentual contínuo.
 
 O total combina etapas com pesos; não mede diretamente tempo restante. Um avanço de 50% não significa que falta metade do tempo. CPU, duração, modelo, disco, rede e complexidade do áudio alteram a duração.
 
@@ -323,11 +323,11 @@ O retorno do Google ocorre no próprio computador. O servidor continua em HTTP e
 ### Playlists e publicação padrão de todas as contas
 
 1. Abra **Playlist de cada usuário**, após conectar o canal.
-2. Em cada cartão, defina **Playlist de destino** ou **Sem playlist**. Todas as contas começam com o envio marcado, sem precisar liberar cada pessoa individualmente.
+2. Em cada cartão, defina **Playlist de destino** com uma playlist válida. Todas as contas começam com o envio marcado, sem precisar liberar cada pessoa individualmente.
 3. Para o administrador, expanda **Padrões de publicação do administrador** e configure **Playlist padrão do administrador**.
 4. Ajuste o modelo de título. `{title}` é substituído pelo nome da música. Toque em **Salvar playlists** e confira a confirmação.
 
-Nos modos Rápido e Detalhado, **Publicar no YouTube** começa marcado para todos os usuários, inclusive contas novas e configurações antigas. A privacidade automática é **Não listado**. Desmarcar no vídeo impede o envio. Uma conta comum usa a playlist atribuída; o administrador pode escolher outra playlist ou **Sem playlist** para seu vídeo. **Sem playlist** publica no canal sem incluir o vídeo em nenhuma lista. O título e a capa automática são preparados na conclusão. Sem conexão do canal, a opção fica indisponível.
+Nos modos Rápido e Detalhado, com uma playlist definida no perfil, **Publicar no YouTube** começa marcado para todos os usuários, inclusive contas novas e configurações antigas. A privacidade automática é **Não listado**. Desmarcar no vídeo impede o envio. Uma conta comum usa a playlist atribuída; o administrador pode escolher outra playlist válida do canal para seu vídeo. **Uma playlist definida no perfil é obrigatória**. Sem ela, o vídeo não é enviado, mesmo que o administrador selecione um destino para a tarefa. O administrador pode trocar a playlist por vídeo no modo rápido, usando a do perfil como padrão. O título e a capa automática são preparados na conclusão. Sem conexão do canal, a opção fica indisponível.
 
 ### Publicar um resultado já pronto
 

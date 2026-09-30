@@ -70,7 +70,9 @@ class AudioSubtitleVideoTests(unittest.TestCase):
                 self.assertEqual(videos.call_count,0 if has_video else 1)
                 if not has_video:
                     self.assertTrue(any(c.kwargs.get('stage_progress')==50 for c in state.call_args_list))
-                    self.assertTrue(any('100%' in c.args[1] for c in ns['notify_targets'].call_args_list))
+                    self.assertTrue(any(c.kwargs.get('stage_progress')==100 for c in state.call_args_list))
+                    notices = [c for c in ns['notify_targets'].call_args_list if 'Vídeo legendado do áudio' in c.args[1]]
+                    self.assertEqual(len(notices), 1)
                 self.assertEqual(documents.call_args.args[1][0]['public_download_token'],'original.srt-token')
                 self.assertTrue((library/'history'/'original.srt').is_file())
                 self.assertEqual(metadata.call_args.args[2],'original.srt' if has_video else 'video.mp4')
