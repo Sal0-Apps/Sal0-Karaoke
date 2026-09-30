@@ -1,10 +1,11 @@
 """Keep backing vocals without mixing the original lead voice back in."""
 import os
-import re
 import subprocess
 import sys
 import tempfile
 from pathlib import Path
+
+from backing_progress import read_progress_event
 
 import process_manager as pm
 from audio_processor import get_effective_cpu_count
@@ -12,7 +13,7 @@ from audio_processor import get_effective_cpu_count
 BACKING_MODEL_VERSION = "UVR-BVE-4B_SN-44100-2"
 
 
-def run_cancellable(command, env=None, progress_callback=None):
+def run_cancellable(command, env=None, progress_callback=None, stage_callback=None):
     pm.check_cancelled()
     process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                                text=True, env=env)
@@ -20,21 +21,22 @@ def run_cancellable(command, env=None, progress_callback=None):
     try:
         import logging
         logger = logging.getLogger("karaoke")
-        last_progress = -1
-        inference_started = False
+        last_event = None
         for line in process.stdout:
             if pm.cancel_event.is_set():
                 process.terminate()
                 break
-            if "SAL0_BVE_INFERENCE_START" in line:
-                inference_started = True
-            if progress_callback and inference_started:
-                match = re.search(r"(?<!\d)(\d{1,3})%", line)
-                if match:
-                    percent = max(0, min(100, int(match.group(1))))
-                    if percent > last_progress:
-                        progress_callback(percent)
-                        last_progress = percent
+            event = read_progress_event(line.strip())
+            if event and event != last_event:
+                phase, percent = event
+                if (last_event and phase == last_event[0] and percent is not None
+                        and last_event[1] is not None and percent < last_event[1]):
+                    continue
+                if stage_callback:
+                    stage_callback(phase, percent)
+                elif progress_callback and phase == 'inference' and percent is not None:
+                    progress_callback(percent)
+                last_event = event
             if line.strip():
                 logger.info("[Backing vocals] %s", line.strip())
         process.wait()
@@ -84,11 +86,24 @@ def preserve_backing_vocals(vocals, instrumental, cache_dir, gain=1.0, update_ca
                 update_callback("processing", "Separando backing vocals", 56 + round(percent * 0.03),
                                 stage_progress=percent,
                                 stage_detail="Analisando voz principal e vozes de apoio em CPU")
+        def publish_stage(phase, percent):
+            if not update_callback:
+                return
+            stages = {
+                'loading_model': ('Carregando modelo de backing vocals', 56, 'Modelo local; download no primeiro uso'),
+                'preparing_audio': ('Preparando áudio de backing vocals', 56, 'Preparando as bandas de áudio'),
+                'preparing_windows': ('Preparando blocos de backing vocals', 56, 'Organizando os blocos que serão analisados'),
+                'inference': ('Separando backing vocals', 56 + round((percent or 0) * 0.03), 'Analisando a voz em CPU; o percentual avança após cada bloco concluído'),
+                'reconstructing': ('Gerando faixas de backing vocals', 59, 'Reconstruindo e salvando as duas faixas; esta operação não fornece percentual contínuo'),
+                'complete': ('Separação de backing vocals concluída', 59, 'As duas faixas foram geradas e verificadas'),
+            }
+            step, progress, detail = stages[phase]
+            update_callback('processing', step, progress, stage_progress=percent, stage_detail=detail)
         with tempfile.TemporaryDirectory(dir=cache_dir, prefix="backing-") as folder:
             run_cancellable([
                 sys.executable, str(Path(__file__).with_name("backing_vocals_runner.py")),
                 vocals, folder, "/data/output/models/backing_vocals",
-            ], env=env, progress_callback=inference_progress)
+            ], env=env, progress_callback=inference_progress, stage_callback=publish_stage)
             pm.check_cancelled()
             # Only commit complete stem pairs; cancellation cannot create a valid cache marker.
             os.replace(os.path.join(folder, "lead_vocals.wav"), lead)

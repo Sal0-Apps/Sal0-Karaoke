@@ -31,7 +31,7 @@ O resultado oferece prévia do vídeo e downloads separados de MP4, SRT original
 
 ## Progresso e avisos das etapas
 
-Backing vocals e renderização do MP4 de áudio exibem porcentagem interna e progresso geral. A porcentagem da separação de backing vocals acompanha diretamente a inferência registrada nos logs. O Telegram envia apenas um aviso no início de cada etapa, sem mensagens de avanço de porcentagem. A letra sincronizada aplicada e a tradução também recebem avisos; no LibreTranslate, só há informação de início e término, não porcentagem interna contínua. As demais etapas, fila e entrega continuam funcionando como antes.
+Backing vocals e renderização do MP4 de áudio exibem porcentagem interna e progresso geral. O backing-vocal distingue preparação do áudio, preparação dos blocos, análise da voz e geração das faixas. A porcentagem corresponde à subetapa identificada, sem confundir as barras rápidas de preparação com a inferência. A análise começa em 0% mesmo após uma preparação em 100% e avança após cada bloco concluído; reconstrução e salvamento ficam sem porcentagem contínua. O Telegram envia apenas um aviso no início de cada etapa, sem mensagens de avanço de porcentagem. A letra sincronizada aplicada e a tradução também recebem avisos; no LibreTranslate, só há informação de início e término, não porcentagem interna contínua. As demais etapas, fila e entrega continuam funcionando como antes.
 
 ## Instalação e validação
 

@@ -2,6 +2,8 @@
 import argparse
 import os
 
+from backing_progress import emit_progress, vr_progress
+
 BVE_MODEL = "UVR-BVE-4B_SN-44100-2.pth"
 
 
@@ -23,17 +25,19 @@ def separate_backing(vocals_path, output_dir, model_dir):
                    "enable_tta": False, "enable_post_process": False,
                    "post_process_threshold": 0.2, "high_end_process": False},
     )
+    emit_progress("loading_model", None)
     separator.load_model(model_filename=BVE_MODEL)
     if not separator.model_instance.is_bv_model:
         raise RuntimeError("O modelo carregado não é um separador de backing vocals.")
     # BVE targets the backing voices in its primary 'Vocals' stem; its
     # complementary 'Instrumental' stem is the lead voice when fed vocals only.
-    print("SAL0_BVE_INFERENCE_START", flush=True)
-    separator.separate(vocals_path, {"Vocals": "backing_vocals", "Instrumental": "lead_vocals"})
+    with vr_progress(separator.model_instance):
+        separator.separate(vocals_path, {"Vocals": "backing_vocals", "Instrumental": "lead_vocals"})
     for filename in ("backing_vocals.wav", "lead_vocals.wav"):
         path = os.path.join(output_dir, filename)
         if not os.path.isfile(path) or os.path.getsize(path) <= 44:
             raise RuntimeError(f"O separador não produziu {filename}.")
+    emit_progress("complete", 100)
 
 
 if __name__ == "__main__":

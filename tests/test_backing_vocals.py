@@ -1,4 +1,5 @@
 import math
+import json
 import os
 import struct
 import sys
@@ -69,12 +70,22 @@ class BackingVocalsTests(unittest.TestCase):
             self.assertFalse((Path(folder) / "backing_model_version.txt").exists())
             self.assertFalse((Path(folder) / "instrumental_with_backing.wav").exists())
 
-    def test_inference_progress_is_forwarded_and_never_regresses(self):
-        callback = Mock()
-        backing.run_cancellable([sys.executable, '-c',
-            "print('Downloading model: 100%'); print('SAL0_BVE_INFERENCE_START'); print('Inference: 25%', end='\\r'); print('Inference: 75%', end='\\r'); print('Inference: 50%'); print('Inference: 100%')"],
-            progress_callback=callback)
-        self.assertEqual([call.args[0] for call in callback.call_args_list], [25, 75, 100])
+    def test_inference_progress_ignores_preparation_bars_and_allows_phase_reset(self):
+        callback, stages = Mock(), Mock()
+        events = [('preparing_audio',25),('preparing_audio',100),
+                  ('preparing_windows',0),('preparing_windows',100),
+                  ('inference',0),('inference',25),('inference',75),
+                  ('inference',50),('inference',100),('inference',100),('reconstructing',None)]
+        script = "print('Downloading model: 100%'); print('100%|4/4'); print('100%|55/55'); print('0%|0/55')\n"
+        for phase, percent in events:
+            line = 'SAL0_BVE_PROGRESS ' + json.dumps({'phase':phase,'percent':percent})
+            script += 'print(' + repr(line) + ')\n'
+        backing.run_cancellable([sys.executable,'-c',script], progress_callback=callback)
+        self.assertEqual([call.args[0] for call in callback.call_args_list], [0,25,75,100])
+        backing.run_cancellable([sys.executable,'-c',script], stage_callback=stages)
+        self.assertIn(('preparing_windows',100), [c.args for c in stages.call_args_list])
+        self.assertIn(('inference',0), [c.args for c in stages.call_args_list])
+        self.assertEqual(stages.call_args.args, ('reconstructing',None))
 
     def test_stage_percentage_matches_inference_logs_before_separate_mix_stage(self):
         callback = Mock()
@@ -94,6 +105,24 @@ class BackingVocalsTests(unittest.TestCase):
         self.assertEqual(callback.call_args_list[-2].args[1], "Misturando backing vocals")
         self.assertEqual(callback.call_args_list[-2].kwargs["stage_progress"], 0)
         self.assertEqual(callback.call_args_list[-1].kwargs["stage_progress"], 100)
+
+    def test_preparation_one_hundred_does_not_hold_inference_at_one_hundred(self):
+        callback = Mock()
+        with tempfile.TemporaryDirectory() as folder:
+            def infer(command, **kwargs):
+                for phase,percent in [('preparing_audio',100),('preparing_windows',100),
+                                      ('inference',0),('inference',50),('inference',100),('reconstructing',None)]:
+                    kwargs['stage_callback'](phase,percent)
+                for name in ('lead_vocals.wav','backing_vocals.wav'):
+                    tone(Path(command[3])/name,800)
+            with patch.object(backing,'run_cancellable',side_effect=infer), patch.object(backing,'mix_backing',
+                    side_effect=lambda original,voices,output,gain:tone(Path(output),800)):
+                backing.preserve_backing_vocals('voices.wav','music.wav',folder,update_callback=callback)
+        analysis = [c.kwargs['stage_progress'] for c in callback.call_args_list
+                    if c.args[1]=='Separando backing vocals']
+        self.assertEqual(analysis,[0,0,50,100])
+        reconstruction = next(c for c in callback.call_args_list if c.args[1]=='Gerando faixas de backing vocals')
+        self.assertIsNone(reconstruction.kwargs['stage_progress'])
 
     def test_gain_outside_the_supported_range_is_rejected(self):
         for gain in (-1, 1.1, float("nan")):
