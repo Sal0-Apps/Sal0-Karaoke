@@ -3686,6 +3686,7 @@ class EditSegmentModel(BaseModel):
     end: float
     text: str
     words: list[EditWordModel] = None
+    synced_line: bool = False
 
 class ContinueProcessModel(BaseModel):
     segments: list[EditSegmentModel]
@@ -3785,6 +3786,10 @@ def continue_process(data: ContinueProcessModel, current_user: dict = Depends(ge
     updated_segments = []
     for s in data.segments:
         seg_text = s.text.strip()
+        if s.synced_line:
+            updated_segments.append({"start": s.start, "end": s.end, "text": seg_text,
+                                     "words": [], "synced_line": True})
+            continue
         words_list = seg_text.split()
 
         orig_words = []

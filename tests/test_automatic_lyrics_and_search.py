@@ -94,6 +94,18 @@ class AutomaticLyricsTests(unittest.TestCase):
                 generate_ass_karaoke(segments, str(path), subtitle_mode=mode, show_instrumental=False)
                 self.assertIn("{\\kf300}Primeiro verso", path.read_text())
 
+    def test_manual_review_keeps_synced_verse_animation_and_no_word_clocks(self):
+        resume = load_function('continue_process', ContinueProcessModel=object,
+            require_task_control=Mock(), segments_to_edit=[{'text':'original'}], correction_event=Mock())
+        resume(SimpleNamespace(segments=[SimpleNamespace(text='Edited verse', start=10, end=13,
+            words=[], synced_line=True)]), {})
+        revised = resume.__globals__['segments_to_edit']
+        self.assertEqual(revised, [{'start':10, 'end':13, 'text':'Edited verse', 'words':[], 'synced_line':True}])
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / 'reviewed.ass'
+            generate_ass_karaoke(revised, str(path), show_instrumental=False)
+            self.assertIn('{\\kf300}Edited verse', path.read_text())
+
     def test_ffmpeg_displays_progressive_highlight_within_synced_verse(self):
         segments = parse_lrc('[00:00]First synchronized verse\n[00:01]Second verse', 2)
         with tempfile.TemporaryDirectory() as folder:
