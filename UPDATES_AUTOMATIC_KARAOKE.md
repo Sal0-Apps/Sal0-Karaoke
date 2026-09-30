@@ -47,9 +47,9 @@ O app envia primeiro como privado, aplica a capa e a playlist e só então solic
 O servidor pode continuar em HTTP. O administrador autoriza uma vez em um computador com navegador, usando o fluxo OAuth oficial para aplicativos de computador:
 
 1. No Google Cloud, habilite **YouTube Data API v3**, configure o consentimento e crie um cliente OAuth do tipo **Aplicativo para computador**. Baixe seu JSON. Se o projeto estiver em teste, adicione a conta aos usuários de teste.
-2. No Karaokê, abra **Ajustes → Publicar no YouTube → Conectar sem HTTPS** e baixe `youtube_desktop_oauth.py`. O mesmo programa também está anexado à release.
-3. Em um computador com Python 3, execute o programa e escolha o JSON do Google. No Windows, pode abrir o arquivo `.py`; pelo terminal: `python youtube_desktop_oauth.py client_secret.json`. O navegador precisa estar nesse mesmo computador. O programa recebe o retorno apenas em `127.0.0.1`, com porta temporária, estado único e PKCE.
-4. Autorize o canal no navegador. Salve `youtube-autorizacao.json` quando o programa pedir e importe esse arquivo no painel do Karaokê. O servidor valida a permissão e consulta o canal no Google antes de guardar a conexão.
+2. No Karaokê, abra **Ajustes → Publicar no YouTube → Conectar meu canal**. No Windows, baixe **Sal0-YouTube-Conectar.exe** e abra com dois cliques. Não precisa instalar Python. Em Linux/macOS, use a alternativa Python do painel.
+3. No navegador do mesmo computador, escolha o JSON do Google, clique em **Preparar conexão** e depois **Abrir Google e autorizar**. Após permitir o acesso, volte à aba do assistente e clique em **Baixar autorização**. O retorno usa apenas `127.0.0.1`, porta temporária, estado único e PKCE.
+4. No Karaokê, escolha **youtube-autorizacao.json** e clique em **Conectar meu canal**. O servidor valida a permissão e consulta o canal no Google antes de guardar a conexão.
 5. Confira o nome do canal, defina privacidade e playlists por usuário. Não são necessárias variáveis `YOUTUBE_CLIENT_ID`, `YOUTUBE_CLIENT_SECRET` ou `YOUTUBE_REDIRECT_URI` no Compose para este método.
 
 O arquivo de autorização dá acesso ao canal: guarde-o como uma senha e importe somente no seu servidor, pela sua rede de confiança. Os tokens e o cliente de computador ficam em `/data/youtube/token.json`, com permissão 0600. A renovação funciona sem um endereço de retorno HTTPS. A conexão real depende das credenciais do administrador; os testes usam respostas simuladas do Google.

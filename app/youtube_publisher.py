@@ -487,8 +487,13 @@ def install_routes(app, get_current_user, require_admin, resolve_video, check_ad
         return guarded(lambda: publisher.quick_options(user))
 
     @app.get('/api/admin/youtube/desktop-helper')
-    def desktop_helper(user=Depends(admin)):
+    def desktop_helper(platform: str = "python", user=Depends(admin)):
         from fastapi.responses import FileResponse
+        if platform == 'windows':
+            executable = Path(__file__).with_name('Sal0-YouTube-Conectar.exe')
+            if not executable.is_file():
+                raise HTTPException(status_code=404, detail='Assistente Windows indisponível nesta instalação. Use a alternativa Python.')
+            return FileResponse(executable, media_type='application/octet-stream', filename=executable.name, headers={'Cache-Control': 'no-store'})
         return FileResponse(Path(__file__).with_name('youtube_desktop_oauth.py'),
             media_type='text/x-python', filename='youtube_desktop_oauth.py', headers={'Cache-Control': 'no-store'})
 

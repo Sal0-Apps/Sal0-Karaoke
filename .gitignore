@@ -67,3 +67,6 @@ Thumbs.db
 /android/*.keystore
 /android/*.jks
 /android/*.apk
+
+# Autorizador Windows gerado apenas na CI
+/app/Sal0-YouTube-Conectar.exe

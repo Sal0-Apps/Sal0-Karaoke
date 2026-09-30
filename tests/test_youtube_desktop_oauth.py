@@ -91,3 +91,37 @@ class DesktopAuthorizationTests(unittest.TestCase):
         with patch('youtube_publisher.requests.post') as request:
             with self.assertRaises(PublicationError): self.publisher.import_desktop_authorization({'format': 'wrong'})
             request.assert_not_called()
+
+class BrowserWizardTests(unittest.TestCase):
+    def test_local_wizard_rejects_foreign_origins_and_exports_only_after_authorization(self):
+        from youtube_desktop_oauth import create_browser_wizard
+        import threading
+        def authorize(client, opener):
+            self.assertEqual(client['client_id'], 'desktop-client')
+            opener('https://accounts.google.com/o/oauth2/v2/auth?state=example')
+            return {'format': 'sal0-youtube-desktop-v1', 'refresh_token': 'private-refresh'}
+        server, prefix = create_browser_wizard(authorize)
+        thread = threading.Thread(target=server.serve_forever, daemon=True); thread.start()
+        self.addCleanup(server.server_close); self.addCleanup(server.shutdown)
+        def request(method, path, body=None, headers=None):
+            connection = http.client.HTTPConnection('127.0.0.1', server.server_port, timeout=3)
+            connection.request(method, path, body=body, headers=headers or {})
+            response = connection.getresponse(); data = response.read(); code=response.status
+            self.assertEqual(response.getheader('Cache-Control'), 'no-store')
+            connection.close(); return code, data
+        self.assertEqual(request('GET', prefix + '/download')[0], 404)
+        config = json.dumps({'installed': {'client_id': 'desktop-client', 'client_secret': 'secret'}})
+        self.assertEqual(request('POST', prefix + '/start', config, {'Origin':'https://attacker.example'})[0], 403)
+        self.assertEqual(request('GET', prefix, headers={'Host':'attacker.example'})[0], 403)
+        self.assertEqual(request('POST', prefix + '/start', '{}')[0], 400)
+        self.assertEqual(request('POST', prefix + '/start', config)[0], 202)
+        import time
+        deadline = time.monotonic() + 3
+        while True:
+            code, body = request('GET', prefix + '/status')
+            if json.loads(body).get('ready') or time.monotonic() >= deadline: break
+            time.sleep(.01)
+        self.assertEqual(code, 200); self.assertNotIn(b'private-refresh', body)
+        code, body = request('GET', prefix + '/download')
+        self.assertEqual(code, 200); self.assertEqual(json.loads(body)['refresh_token'], 'private-refresh')
+        self.assertEqual(request('GET', '/status')[0], 404)

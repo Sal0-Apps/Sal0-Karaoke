@@ -902,7 +902,11 @@
             gap: 1rem;
             align-items: stretch;
         }
-        .settings-grid > .card { height: 100%; margin: 0; }
+        .settings-grid > .card { height: 100%; margin: 0; min-width: 0; }
+        .youtube-auth-steps { padding-left: 1.4rem; line-height: 1.6; }
+        .youtube-auth-steps a { color: #69d8ff; text-decoration: underline; }
+        .youtube-auth-steps li { margin-bottom: .8rem; overflow-wrap: anywhere; }
+        #youtubePublisherSection,
         #modelManagerSection,
         #youtubeToolsSection,
         #translationToolsSection,
@@ -2166,14 +2170,20 @@
                     <button type="button" id="ytPublishConnect" class="btn-secondary">Conectar canal</button>
                     <button type="button" id="ytPublishRefresh" class="btn-secondary">Atualizar painel</button>
                 </div>
-                <details style="margin:.7rem 0"><summary>Conectar sem HTTPS (uma vez, no computador)</summary>
-                    <p class="compact-note">Crie um cliente OAuth “Aplicativo para computador” no Google Cloud. Baixe seu JSON e execute o autorizador abaixo no mesmo computador em que abrirá o navegador.</p>
-                    <button type="button" id="ytDesktopHelper" class="btn-secondary">Baixar autorizador para computador</button>
-                    <p class="compact-note">O programa abre a autorização do Google e salva um arquivo. Importá-lo aqui conecta o canal ao servidor HTTP. Requer Python 3 no computador; não funciona executado no servidor sem navegador.</p>
-                    <label for="ytDesktopAuthorization" class="label">Arquivo de autorização gerado pelo programa</label>
+                <details id="ytConnectionGuide" style="margin:.7rem 0" open><summary>Conectar meu canal · configuração gratuita</summary>
+                    <p class="compact-note">Faça uma vez no computador. Seu servidor continua em HTTP. Não precisa contratar serviços nem cadastrar cobrança.</p>
+                    <ol class="youtube-auth-steps">
+                        <li><strong>Prepare o Google.</strong> <a href="https://console.cloud.google.com/apis/library/youtube.googleapis.com" target="_blank" rel="noopener noreferrer">Abra a YouTube Data API v3</a>, crie um projeto e clique em Ativar. Em <a href="https://console.cloud.google.com/auth/overview" target="_blank" rel="noopener noreferrer">Google Auth Platform</a>, configure o nome do app e seu e-mail. Escolha Público externo e adicione sua conta em Usuários de teste.</li>
+                        <li><strong>Baixe a credencial.</strong> Em Clientes, crie um cliente do tipo <strong>Aplicativo para computador</strong> e baixe o JSON.</li>
+                        <li><strong>Autorize no navegador.</strong> Baixe e abra o assistente abaixo no computador. Ele abre uma página com botões para escolher o JSON e autorizar sua conta Google. No Windows, dê dois cliques no executável; não precisa instalar Python. Em Linux ou macOS, use a alternativa Python abaixo. Mantenha o assistente aberto até terminar.</li>
+                        <li><strong>Conecte aqui.</strong> Escolha o arquivo <strong>youtube-autorizacao.json</strong> baixado pelo assistente e clique em Conectar meu canal.</li>
+                    </ol>
+                    <button type="button" id="ytDesktopHelper" class="btn-secondary">1. Baixar assistente para Windows</button>
+                    <details><summary>Uso Linux ou macOS</summary><p class="compact-note">Instale Python 3 gratuito e abra o arquivo abaixo no computador com navegador.</p><button type="button" id="ytDesktopPythonHelper" class="btn-secondary">Baixar alternativa Python</button></details>
+                    <label for="ytDesktopAuthorization" class="label">2. Escolher youtube-autorizacao.json</label>
                     <input type="file" id="ytDesktopAuthorization" accept=".json,application/json" class="input-text">
-                    <button type="button" id="ytDesktopImport" class="btn-secondary">Importar autorização</button>
-                    <p class="compact-note">Esse arquivo dá acesso ao canal. Use somente no seu servidor e guarde-o como uma senha.</p>
+                    <button type="button" id="ytDesktopImport" class="btn-secondary">3. Conectar meu canal</button>
+                    <p class="compact-note">O arquivo permite acesso ao canal. Guarde como uma senha. A API tem uma cota de uso; ao atingir o limite, aguarde a renovação. Não há compra automática de cota.</p>
                 </details>
                 <label for="ytPublishVideo" class="label">Vídeo finalizado</label>
                 <select id="ytPublishVideo" class="select-input"><option value="">Escolha um vídeo…</option></select>
@@ -2593,7 +2603,7 @@
                     <li><strong>Diagnóstico:</strong> o administrador pode baixar os logs em Ajustes. Revise dados pessoais e credenciais antes de compartilhar.</li>
                 </ul>
             </details>
-            <p class="compact-note">Versão do servidor: 9.9.1. A transcrição é local; fontes, modelos e integrações podem acessar serviços externos. Use conteúdo autorizado.</p>
+            <p class="compact-note">Versão do servidor: 9.9.2. A transcrição é local; fontes, modelos e integrações podem acessar serviços externos. Use conteúdo autorizado.</p>
         </div>
     </div>
 
@@ -6637,6 +6647,7 @@
                 ytElement('ytPublishChannel').textContent = status.connected ? 'Canal conectado: ' + status.channel_title
                     : (status.configured ? 'Conecte pelo computador e importe a autorização abaixo. Seu servidor pode continuar em HTTP.' : 'Configure o cliente OAuth do YouTube no servidor para conectar o canal.');
                 ytElement('ytPublishConnect').style.display = status.web_configured ? '' : 'none';
+                ytElement('ytConnectionGuide').open = !status.connected;
                 renderYoutubePublicationJobs(status.jobs || []);
                 if (!full) return;
                 ytElement('ytPublishPrivacy').value = status.settings.privacy;
@@ -6661,15 +6672,17 @@
             } catch (error) { ytMessage(error.message); }
         }
         document.addEventListener('DOMContentLoaded', () => {
-            ytElement('ytDesktopHelper').onclick = async () => {
+            const downloadYoutubeHelper = async (windows) => {
                 try {
-                    const response = await authFetch('/api/admin/youtube/desktop-helper');
+                    const response = await authFetch('/api/admin/youtube/desktop-helper' + (windows ? '?platform=windows' : ''));
                     if (!response.ok) throw new Error('Não foi possível baixar o autorizador.');
                     const url = URL.createObjectURL(await response.blob());
-                    const link = document.createElement('a'); link.href = url; link.download = 'youtube_desktop_oauth.py'; link.click();
+                    const link = document.createElement('a'); link.href = url; link.download = windows ? 'Sal0-YouTube-Conectar.exe' : 'youtube_desktop_oauth.py'; link.click();
                     setTimeout(() => URL.revokeObjectURL(url), 10000);
                 } catch (error) { ytMessage(error.message); }
             };
+            ytElement('ytDesktopHelper').onclick = () => downloadYoutubeHelper(true);
+            ytElement('ytDesktopPythonHelper').onclick = () => downloadYoutubeHelper(false);
             ytElement('ytDesktopImport').onclick = async () => {
                 const file = ytElement('ytDesktopAuthorization').files[0];
                 if (!file || file.size > 32768) { ytMessage('Escolha o JSON de autorização gerado pelo programa (até 32 KB).'); return; }
