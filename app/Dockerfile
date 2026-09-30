@@ -45,6 +45,7 @@ RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir --upgrade --pre "yt-dlp[default]"
 
 # Copiar script auxiliar e pré-baixar os modelos (Whisper Medium e Demucs htdemucs_ft)
+RUN python -c "from audio_separator.separator import Separator"
 COPY download_models.py .
 RUN python download_models.py && rm download_models.py
 

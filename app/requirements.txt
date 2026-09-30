@@ -18,3 +18,6 @@ safetensors>=0.4.3,<1
 # CPU-only backing vocal separation; keep Torch/Torchvision versions aligned.
 torchvision==0.21.0
 audio-separator[cpu]==0.47.0
+
+# audio-separator imports audioread even when Librosa does not require it.
+audioread==3.1.0

@@ -65,7 +65,7 @@ jobs:
         run: |
           docker run --rm -v "$GITHUB_WORKSPACE:/validation:ro" --workdir /validation --entrypoint python "${{ env.IMAGE_TAG }}:${{ env.VERSION_TAG }}" -m unittest discover -s tests -v
 
-      - name: Validate CPU backing vocal runtime and app routes
+      - name: Validate CPU BVE inference, output stems and app routes
         timeout-minutes: 15
         run: docker run --rm --entrypoint python "${{ env.IMAGE_TAG }}:${{ env.VERSION_TAG }}" smoke_backing_runtime.py
 
