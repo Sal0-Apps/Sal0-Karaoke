@@ -1,6 +1,6 @@
 # Manual do Sal0 Karaokê
 
-Este manual descreve os controles disponíveis na distribuição 9.9.9. Para instalar o servidor, consulte [DEPLOYMENT.md](DEPLOYMENT.md). Para configurar o aparelho, consulte o [guia Android](android/README.md).
+Este manual descreve os controles disponíveis na distribuição 9.9.10. Para instalar o servidor, consulte [DEPLOYMENT.md](DEPLOYMENT.md). Para configurar o aparelho, consulte o [guia Android](android/README.md).
 
 ## 1. Primeiro acesso e navegação
 
@@ -182,7 +182,7 @@ A fila não é histórico: trabalhos encerrados saem dela. Os arquivos concluíd
 
 ## 8. Progresso e pausa por etapa
 
-O número maior e a barra são o **progresso total**. O indicador menor representa a **etapa atual**, incluindo transcrição, separação de backing vocals e renderização do MP4 de áudio quando há informação disponível. O percentual da separação de backing vocals acompanha o percentual da inferência exibido nos logs. O Telegram envia um aviso ao iniciar cada etapa, sem mensagens repetidas de porcentagem. A análise da voz para animar letras sincronizadas avisa no início da etapa. A tradução informa início e resultado, pois o LibreTranslate não oferece percentual interno contínuo. Downloads, carregamento de modelo e certas operações podem não fornecer um percentual contínuo.
+O número maior e a barra são o **progresso total**. O indicador menor representa a **etapa atual**, incluindo transcrição, separação de backing vocals e renderização do MP4 de áudio quando há informação disponível. O backing-vocal distingue preparação do áudio, preparação dos blocos, análise da voz e geração das faixas. Cada subetapa mostra sua própria porcentagem quando ela existe; 100% da preparação não significa conclusão da análise. A análise começa em 0% e avança somente após concluir cada bloco. A reconstrução e o salvamento das faixas ficam sem estimativa percentual até sua conclusão. O Telegram envia um aviso ao iniciar cada etapa, sem mensagens repetidas de porcentagem. A análise da voz para animar letras sincronizadas avisa no início da etapa. A tradução informa início e resultado, pois o LibreTranslate não oferece percentual interno contínuo. Downloads, carregamento de modelo e certas operações podem não fornecer um percentual contínuo.
 
 O total combina etapas com pesos; não mede diretamente tempo restante. Um avanço de 50% não significa que falta metade do tempo. CPU, duração, modelo, disco, rede e complexidade do áudio alteram a duração.
 
@@ -295,6 +295,7 @@ Consulte [android/README.md](android/README.md) para instalação, assinatura e 
 | APK mostra erro HTTPS | Certificado válido e nome do domínio; o aplicativo não ignora erros de certificado |
 | Link do YouTube falha | Disponibilidade e autorização da mídia, internet do servidor e atualização do mecanismo |
 | Demucs demora | O processamento em CPU pode ser longo; confira carga, RAM, disco e logs antes de cancelar |
+| Backing-vocal parece parado em 0% | O primeiro bloco de análise em CPU pode demorar. Confira a subetapa e os registros mais recentes; o aviso de NNPACK incompatível não é, sozinho, uma falha fatal |
 | Whisper parece parado | Carregamento/download do modelo, duração do áudio e etapa atual; o percentual pode não mudar continuamente |
 | Tradução falha | Baixe o original; em Ajustes teste o LibreTranslate, confira endereço, chave, idioma PT-BR, limite de upload e tempo de resposta |
 | Fila não avança | Pausa administrativa, revisão aguardando ou envio ao Telegram ainda em andamento |

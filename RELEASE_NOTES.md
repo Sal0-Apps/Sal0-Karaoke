@@ -1,8 +1,8 @@
-# 9.9.9
+# 9.9.10
 
-- Letra sincronizada controla o texto completo e os tempos de exibição dos versos. O Whisper fornece somente os tempos da animação dentro desses intervalos.
-- Preservadas as pausas e durações das palavras reconhecidas, sem mover os versos ou distribuir tempos uniformemente. Palavras não reconhecidas continuam visíveis sem animação inventada.
-- A revisão mantém os versos e limita a animação aos seus horários. Caches acústicos e de revisão separados; resultados antigos devem ser refeitos para aplicar a mudança.
-- Processamento local e gratuito, com progresso e um aviso no início da etapa no Telegram.
-- Mantidos busca no YouTube, backing vocals, MP4 para áudio no modo SRT, fila, Biblioteca, Android, playlist por perfil, escolha de playlist pelo administrador e privacidade Não listado.
-- Manual, ajuda e documentação completa atualizados.
+- Corrigido o progresso do backing-vocal: o app distingue preparação do áudio, preparação dos blocos, análise da voz e geração das faixas.
+- A análise tem seu próprio percentual de 0 a 100%, atualizado após cada bloco concluído. As barras rápidas de preparação não são tratadas como conclusão da separação.
+- Reconstrução e salvamento mostram a subetapa sem inventar uma porcentagem. Os registros identificam as barras, e o Telegram mantém somente o aviso inicial.
+- Testes cobrem a sequência de barras do problema, falhas durante a análise e inferência real em CPU com identificação das subetapas.
+- Mantidos os tempos dos versos da letra sincronizada, animação pelo Whisper, busca no YouTube, MP4 para áudio no modo SRT, playlists por perfil, privacidade Não listado, fila, Biblioteca e Android.
+- Documentação completa e instruções de diagnóstico atualizadas.

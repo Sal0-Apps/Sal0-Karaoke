@@ -79,7 +79,7 @@ Transcrição, tradução e sincronização são estimativas de modelos. A letra
 - Entradas por arquivo, link ou Biblioteca com opções próprias para cada envio.
 - Reordenação de itens aguardando e remoção individual.
 - Cancelamento do processo atual.
-- Progresso total em destaque, acompanhado pelo avanço da etapa atual, incluindo backing vocals e MP4 do modo SRT.
+- Progresso total em destaque, acompanhado pelo avanço da etapa atual, incluindo preparação e análise separadas no backing-vocal e MP4 do modo SRT. Barras de preparação concluídas não antecipam a conclusão da inferência.
 - Um aviso no Telegram ao iniciar cada etapa, sem mensagens repetidas de porcentagem; os arquivos finais continuam sendo entregues.
 - Pausa administrativa ao fim de uma etapa, com salvamento dos resultados intermediários.
 - Retomada após reiniciar, desde que o mesmo volume e os arquivos da tarefa sejam preservados.
@@ -123,14 +123,14 @@ Em **Playlist de cada usuário**, a administração define uma playlist válida 
 
 ## Início rápido com Docker
 
-A versão de distribuição desta documentação é **9.9.9**. O título e o rodapé da página mostram apenas o nome da aplicação. A versão do servidor pode ser consultada no Manual; a versão do APK aparece nas configurações nativas.
+A versão de distribuição desta documentação é **9.9.10**. O título e o rodapé da página mostram apenas o nome da aplicação. A versão do servidor pode ser consultada no Manual; a versão do APK aparece nas configurações nativas.
 
 Crie um arquivo `compose.yaml`:
 
 ```yaml
 services:
   karaoke-app:
-    image: ghcr.io/sal0-apps/sal0-karaoke:9.9.9
+    image: ghcr.io/sal0-apps/sal0-karaoke:9.9.10
     container_name: karaoke-app
     ports:
       - "7885:7860"
