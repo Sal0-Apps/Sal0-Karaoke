@@ -1559,7 +1559,7 @@
                 <button type="button" id="btnCreatorAdvanced" class="creator-mode-btn" role="tab" aria-selected="false" title="Controle completo da transcrição, legenda e visual">
                     <span class="creator-mode-icon">🎛️</span><span class="creator-mode-title">Detalhado</span><span class="creator-mode-hint">Todas as opções</span>
                 </button>
-                <button type="button" id="btnCreatorSubtitle" class="creator-mode-btn" role="tab" aria-selected="false" title="Transcreve mídias e gera somente arquivos SRT">
+                <button type="button" id="btnCreatorSubtitle" class="creator-mode-btn" role="tab" aria-selected="false" title="Gera SRT e, para áudio, vídeo legendado">
                     <span class="creator-mode-icon">▤</span><span class="creator-mode-title">Gerar SRT</span><span class="creator-mode-hint">Original + tradução opcional</span>
                 </button>
             </div>
@@ -1680,7 +1680,7 @@
                         <div>
                             <span class="easy-kicker">Gerar SRT</span>
                             <span class="card-title">Transcreva a mídia inteira e baixe as legendas</span>
-                            <p class="easy-intro">Aceita áudio ou vídeo em formatos compatíveis com FFmpeg. A mídia é normalizada para MP3 e o único resultado é o SRT original, acompanhado de uma tradução opcional quando ela for concluída.</p>
+                            <p class="easy-intro">Aceita áudio ou vídeo em formatos compatíveis com FFmpeg. Você recebe o SRT original e a tradução opcional. Se enviar apenas áudio, também recebe um vídeo MP4 com fundo simples, áudio original e legendas na tela.</p>
                         </div>
                     </div>
 
@@ -2544,7 +2544,7 @@
                 <summary>1. Criar o primeiro karaokê</summary>
                 <ol>
                     <li>Na aba <strong>Criar</strong>, escolha <strong>Rápido</strong>. Durante outro trabalho, toque antes em <strong>Adicionar novo processo</strong>.</li>
-                    <li>Cole um link, selecione um áudio/vídeo ou use a Biblioteca. Use apenas mídias que você tem autorização para processar.</li>
+                    <li>Busque no YouTube e escolha uma miniatura, cole um link, selecione um áudio/vídeo ou use a Biblioteca. Use apenas mídias que você tem autorização para processar.</li>
                     <li>Escolha o fundo: <strong>Surpresa</strong>, vídeo original, arquivo, Biblioteca ou link. No fundo surpresa, vale a coleção configurada pelo administrador.</li>
                     <li>Toque em <strong>Criar meu karaokê</strong>. O perfil global define transcrição, legenda e visual.</li>
                     <li>Acompanhe o progresso em <strong>Criar</strong>. Ao concluir, visualize ou baixe o MP4; a cópia fica em <strong>Biblioteca → Resultados</strong>.</li>
@@ -2556,20 +2556,22 @@
                     <li>Escolha <strong>Detalhado</strong>, a mídia, o perfil da voz e o modelo Whisper.</li>
                     <li>Abra <strong>Letra</strong> para buscar ou colar uma letra-guia. O texto manual tem prioridade; se não houver letra, a transcrição usa o Whisper.</li>
                     <li>Defina o fundo e a animação: sílabas, palavras, linhas ou frase estática.</li>
+                    <li>Em <strong>Vozes de apoio</strong>, mantenha ou desative os backing vocals e ajuste seu volume. A opção usa uma segunda separação local da voz principal.</li>
+                    <li>A sincronização automática só usa tempos de versos quando existe uma letra LRC compatível com a gravação. Sem ela, o processo usa Whisper.</li>
                     <li>Em <strong>Mais ajustes</strong>, altere cor, tamanho, posição, limites dos versos, prévia da próxima frase, VAD e fonte da transcrição. Você também pode salvar um perfil e habilitar somente a remoção de vocais.</li>
                     <li>Ative a revisão para corrigir texto e tempos antes de finalizar. Em canto, o VAD pode cortar notas sustentadas; use com cuidado.</li>
                 </ol>
             </details>
             <details>
-                <summary>3. Gerar somente legendas SRT</summary>
+                <summary>3. Gerar legendas SRT e vídeo para áudio</summary>
                 <ol>
-                    <li>Escolha <strong>Gerar SRT</strong> e envie áudio/vídeo, cole um link ou escolha um original da Biblioteca.</li>
+                    <li>Escolha <strong>Gerar SRT</strong> e envie áudio/vídeo, cole um link, busque no YouTube ou escolha um original da Biblioteca.</li>
                     <li>Como administrador, configure <strong>Ajustes → Tradução de SRT · LibreTranslate</strong>: salve o endereço e a chave opcional, depois toque em <strong>Testar e atualizar idiomas</strong>.</li>
                     <li>Em <strong>Segundo SRT traduzido</strong>, o padrão é <strong>detecção automática → Português (Brasil)</strong>. A tradução depende desse LibreTranslate. Você também pode escolher outro destino ou <strong>Não traduzir</strong>.</li>
                     <li>Ajuste modelo, leitura da fala, VAD e revisão se necessário. Toque em <strong>Gerar arquivos SRT</strong>.</li>
                     <li>Baixe o <strong>SRT original</strong> e, se gerado, o <strong>SRT traduzido</strong> no Karaokê. Ambos também são enviados por tentativa de anexo ao Telegram configurado, com os links de download. Se a tradução falhar, a entrega do original continua.</li>
                 </ol>
-                <p>Este modo usa o áudio completo normalizado para MP3, sem Demucs nem fundo. As legendas respeitam os tempos das falas e não preenchem silêncios. O SRT traduzido mantém os mesmos tempos. Não há abertura de capa neste modo nem limite fixo de duração; disco, memória e servidor continuam sendo limites.</p>
+                <p>Este modo usa o áudio completo normalizado para MP3, sem Demucs. Entradas de áudio também geram MP4 com fundo simples e legendas na tela; o vídeo e os arquivos SRT são enviados ao Telegram configurado. Entradas com vídeo continuam gerando apenas os arquivos SRT. As legendas respeitam os tempos das falas e não preenchem silêncios. O SRT traduzido mantém os mesmos tempos. Não há abertura de capa neste modo nem limite fixo de duração; disco, memória e servidor continuam sendo limites.</p>
             </details>
             <details>
                 <summary>4. Adicionar e organizar a fila</summary>
@@ -2634,7 +2636,18 @@
                     <li><strong>Diagnóstico:</strong> o administrador pode baixar os logs em Ajustes. Revise dados pessoais e credenciais antes de compartilhar.</li>
                 </ul>
             </details>
-            <p class="compact-note">Versão do servidor: 9.9.3. A transcrição é local; fontes, modelos e integrações podem acessar serviços externos. Use conteúdo autorizado.</p>
+            <details>
+                <summary>10. Conectar e publicar no YouTube</summary>
+                <ol>
+                    <li>Em <strong>Ajustes → Publicar no YouTube → Conexão do canal</strong>, abra o guia de autorização. Habilite a YouTube Data API v3 no projeto Google, adicione sua conta como usuário de teste e baixe uma credencial de aplicativo para computador.</li>
+                    <li>Abra o assistente no computador, escolha a credencial e autorize no navegador do Google. Baixe <strong>youtube-autorizacao.json</strong>, importe no Karaokê e toque em <strong>Conectar meu canal</strong>. Confira a confirmação com o nome do canal. O servidor pode continuar em HTTP; não exige serviço pago.</li>
+                    <li>Em <strong>Playlist de cada usuário</strong>, defina permissão, playlist ou <strong>Sem playlist</strong> e a marcação padrão. Para o administrador, abra <strong>Título e privacidade usados no modo rápido → Playlist padrão do administrador</strong>. Salve e confira a confirmação.</li>
+                    <li>No modo Rápido ou Detalhado, marque <strong>Publicar no YouTube</strong> somente quando quiser enviar esse vídeo. Desmarcado, não há publicação. Sem playlist, o vídeo vai ao canal sem inclusão em lista.</li>
+                    <li>Use <strong>Publicar um vídeo já pronto</strong> para revisar título, capa, playlist e privacidade de um resultado existente. Acompanhe erros e links no histórico de publicações.</li>
+                </ol>
+                <p>A API tem cota gratuita e pode limitar projetos sem auditoria a vídeos privados. Guarde a autorização como uma senha. Backing vocals e vídeo do modo SRT mostram porcentagem da etapa e avisam o avanço no Telegram; o LibreTranslate informa apenas início e término.</p>
+            </details>
+            <p class="compact-note">Versão do servidor: 9.9.4. A transcrição é local; fontes, modelos e integrações podem acessar serviços externos. Use conteúdo autorizado.</p>
         </div>
     </div>
 
@@ -2771,6 +2784,8 @@
                 [['downloading youtube'], 'Baixando mídia'],
                 [['converting media to mp3', 'extracting audio', 'extraindo áudio', 'using normalized mp3'], 'Preparando áudio'],
                 [['searching lyrics'], 'Buscando letra'],
+                [['backing vocals'], 'Preservando vozes de apoio'],
+                [['using synced lyrics'], 'Aplicando letra sincronizada'],
                 [['separating', 'demucs', 'vocais'], 'Separando vocais do instrumental'],
                 [['transcribing', 'whisper'], 'Transcrevendo áudio com Whisper'],
                 [['translating', 'traduz'], 'Traduzindo o SRT'],
@@ -4451,7 +4466,7 @@
                     title: audioFiles.length > 1 ? `${audioFiles.length} vídeos` : (audioFiles[0]?.name || youtubeUrl || libraryVideo),
                     lyrics: `SRT · ${(document.getElementById('subtitleTranslationLanguage')?.selectedOptions?.[0]?.textContent || 'Português')}`,
                     model: document.getElementById('subtitleWhisperModel')?.selectedOptions?.[0]?.textContent || 'Large V3 Turbo',
-                    background: 'Somente arquivos SRT',
+                    background: 'SRT e vídeo automático para áudio',
                 });
                 updateTimelineUI('Uploading');
                 try {
@@ -6394,18 +6409,27 @@
 
                     if (data.status === "done" && data.result_available_to_current_user && data.original_filename && !data.original_filename.includes("Baixando")) {
                         if (downloadBox) downloadBox.style.display = "block";
-                        const subtitleResult = data.result_kind === 'subtitles';
+                        const subtitleResult = ['subtitles', 'subtitle_video'].includes(data.result_kind);
+                        const subtitleVideo = data.result_kind === 'subtitle_video';
                         if (subtitleResult) {
-                            if (downloadResultTitle) downloadResultTitle.textContent = 'Legendas prontas!';
-                            if (downloadResultDescription) downloadResultDescription.textContent = 'Baixe o SRT original e, quando disponível, a tradução opcional.';
-                            if (resultVideoPreview) {
+                            if (downloadResultTitle) downloadResultTitle.textContent = subtitleVideo ? 'Vídeo e legendas prontos!' : 'Legendas prontas!';
+                            if (downloadResultDescription) downloadResultDescription.textContent = subtitleVideo ? 'Assista ao vídeo ou baixe o MP4 e os arquivos SRT separadamente.' : 'Baixe o SRT original e, quando disponível, a tradução opcional.';
+                            if (resultVideoPreview && !subtitleVideo) {
                                 resultVideoPreview.pause();
                                 resultVideoPreview.removeAttribute('src');
                                 resultVideoPreview.removeAttribute('poster');
                                 resultVideoPreview.load();
                                 resultVideoPreview.style.display = 'none';
                             }
-                            if (btnDownloadResult) btnDownloadResult.style.display = 'none';
+                            if (subtitleVideo && resultVideoPreview) {
+                                resultVideoPreview.style.display = '';
+                                resultVideoPreview.removeAttribute('poster');
+                                if (statusChanged || !resultVideoPreview.getAttribute('src')) {
+                                    resultVideoPreview.src = `/api/download?inline=true&token=${encodeURIComponent(authToken)}&t=${Date.now()}`;
+                                    resultVideoPreview.load();
+                                }
+                            }
+                            if (btnDownloadResult) btnDownloadResult.style.display = subtitleVideo ? '' : 'none';
                             if (btnDownloadSubtitles) btnDownloadSubtitles.style.display = 'none';
                             if (btnDownloadOriginalSubtitles) btnDownloadOriginalSubtitles.style.display = data.original_subtitle_filename ? '' : 'none';
                             if (btnDownloadTranslatedSubtitles) btnDownloadTranslatedSubtitles.style.display = data.translated_subtitle_filename ? '' : 'none';
@@ -6466,7 +6490,7 @@
         // existing metadata, lyric lookup and creation flows in every mode.
         document.addEventListener('DOMContentLoaded', () => {
             const sources = ['easyYoutubeUrl', 'youtubeUrl', 'bgYoutubeUrl',
-                'easyBgYoutubeUrl', 'libAudioYoutubeUrl', 'libBgYoutubeUrl'];
+                'easyBgYoutubeUrl', 'libAudioYoutubeUrl', 'libBgYoutubeUrl', 'subtitleYoutubeUrl'];
             for (const sourceId of sources) {
                 const source = document.getElementById(sourceId);
                 if (!source) continue;

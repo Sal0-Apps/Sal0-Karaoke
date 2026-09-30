@@ -36,7 +36,7 @@ class SubtitleTranslationModeTests(unittest.TestCase):
         self.assertNotIn('id="subtitleTextPosition"', subtitle_form)
         self.assertIn('Gerar arquivos SRT', subtitle_form)
 
-    def test_subtitle_pipeline_returns_only_srt_and_normalizes_media_to_mp3(self):
+    def test_subtitle_pipeline_preserves_srt_and_creates_video_for_audio(self):
         tree = ast.parse(MAIN)
         function = next(
             node for node in tree.body
@@ -46,11 +46,12 @@ class SubtitleTranslationModeTests(unittest.TestCase):
         self.assertNotIn("separate_vocals", source)
         self.assertNotIn("render_karaoke_video", source)
         self.assertNotIn("generate_ass_karaoke", source)
-        self.assertNotIn("final_karaoke.mp4", source)
+        self.assertIn("final_karaoke.mp4", source)
+        self.assertIn("if not media_has_motion_video(input_media_path)", source)
         self.assertIn("extract_audio_mp3(input_media_path, normalized_mp3)", source)
         self.assertIn("final_subtitles_original.srt", source)
         self.assertIn("final_subtitles_translated.srt", source)
-        self.assertIn('result_kind="subtitles"', source)
+        self.assertIn('result_kind=result_kind', source)
         self.assertIn("def extract_audio_mp3", AUDIO_PROCESSOR)
         self.assertIn('"-map", "0:a:0"', AUDIO_PROCESSOR)
         self.assertIn('"-codec:a", "libmp3lame"', AUDIO_PROCESSOR)

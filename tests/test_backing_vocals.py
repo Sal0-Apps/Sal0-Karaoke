@@ -6,7 +6,7 @@ import tempfile
 import unittest
 import wave
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import patch, Mock
 
 ROOT = Path(__file__).parents[1]
 sys.path.insert(0, str(ROOT / "app"))
@@ -68,6 +68,13 @@ class BackingVocalsTests(unittest.TestCase):
                 self.assertEqual(runner.call_args.kwargs["env"]["CUDA_VISIBLE_DEVICES"], "-1")
             self.assertFalse((Path(folder) / "backing_model_version.txt").exists())
             self.assertFalse((Path(folder) / "instrumental_with_backing.wav").exists())
+
+    def test_inference_progress_is_forwarded_and_never_regresses(self):
+        callback = Mock()
+        backing.run_cancellable([sys.executable, '-c',
+            "print('Downloading model: 100%'); print('SAL0_BVE_INFERENCE_START'); print('Inference: 25%'); print('Inference: 75%'); print('Inference: 50%'); print('Inference: 100%')"],
+            progress_callback=callback)
+        self.assertEqual([call.args[0] for call in callback.call_args_list], [25, 75, 100])
 
     def test_gain_outside_the_supported_range_is_rejected(self):
         for gain in (-1, 1.1, float("nan")):

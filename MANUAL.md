@@ -1,6 +1,6 @@
 # Manual do Sal0 Karaokê
 
-Este manual descreve os controles disponíveis na distribuição 9.9.2. Para instalar o servidor, consulte [DEPLOYMENT.md](DEPLOYMENT.md). Para configurar o aparelho, consulte o [guia Android](android/README.md).
+Este manual descreve os controles disponíveis na distribuição 9.9.4. Para instalar o servidor, consulte [DEPLOYMENT.md](DEPLOYMENT.md). Para configurar o aparelho, consulte o [guia Android](android/README.md).
 
 ## 1. Primeiro acesso e navegação
 
@@ -22,7 +22,7 @@ Os três modos aceitam arquivo de áudio/vídeo, link autorizado do YouTube ou o
 | --- | --- | --- |
 | Arquivo | Toque no seletor ou arraste para a área de envio | Áudio: MP3, WAV, FLAC, M4A, AAC, OGG, Opus. Vídeo: MP4, MKV, AVI, MOV, WebM, M4V |
 | Vários arquivos | Selecione mais de um no mesmo envio | Cada arquivo vira um trabalho; todos recebem os ajustes desse envio |
-| Link | Cole uma URL no campo do modo escolhido | O servidor tenta identificar o título; o download ocorre quando a tarefa é preparada/processada |
+| YouTube | Cole uma URL ou busque por nome e selecione a miniatura do resultado | O servidor tenta identificar o título; o download ocorre quando a tarefa é preparada/processada |
 | Biblioteca | Escolha um item no seletor | Reutiliza um original já armazenado e evita outro upload |
 
 Para guardar uma mídia sem criar um trabalho, use os formulários da **Biblioteca**. A área de criação prepara trabalhos; a Biblioteca armazena e organiza arquivos.
@@ -34,14 +34,14 @@ O seletor lista extensões comuns, mas o codec interno precisa ser decodificáve
 Use este modo quando quiser selecionar a música e aproveitar o perfil global preparado pelo administrador.
 
 1. Em **Criar**, escolha **Rápido**.
-2. Informe uma única fonte: arquivo(s), URL ou original da Biblioteca.
+2. Informe uma única fonte: busque uma música no YouTube e escolha a miniatura, cole uma URL, envie arquivo(s) ou escolha um original da Biblioteca. Buscar e colar link têm o mesmo destaque.
 3. Escolha o fundo, se desejar:
    - **Surpresa:** usa a seleção/coleção configurada pelo administrador;
    - **Vídeo original:** reaproveita a imagem do clipe quando a entrada é vídeo;
    - **Escolher fundo:** envia uma imagem ou vídeo;
    - **Da Biblioteca:** usa um fundo já salvo;
    - **Link de fundo:** solicita outro vídeo como fundo.
-4. Confira os indicadores do perfil apresentado.
+4. Confira os indicadores do perfil apresentado. Em **Personalizar**, ajuste fundo, vozes de apoio e sincronização, se desejar. A opção de publicação no YouTube aparece quando liberada; confira a playlist e marque somente se quiser enviar esse vídeo.
 5. Toque em **Criar meu karaokê** e acompanhe a aba Criar.
 6. Se o perfil exigir revisão, corrija as legendas quando o editor aparecer.
 7. Ao concluir, visualize ou baixe o resultado.
@@ -73,6 +73,12 @@ Modelos maiores tendem a consumir mais RAM e tempo. Large V3 Turbo, Large V3, Me
 
 A letra-guia orienta o reconhecimento, mas não garante que a gravação tenha os mesmos versos, repetições ou arranjos. Letras e traduções podem ter direitos próprios; verifique autorização antes de copiar ou publicar.
 
+### Letra sincronizada e vozes de apoio
+
+A sincronização automática usa os tempos de versos de uma letra LRC somente quando ela existe e corresponde à gravação: artista, título, versão e duração precisam ser compatíveis, com diferença de duração de até dois segundos. O destaque é por verso. Sem LRC compatível, o processo continua com Whisper; escolher sempre Whisper mantém o caminho de reconhecimento acústico.
+
+**Preservar backing vocals** separa a voz principal das vozes de apoio localmente com o modelo UVR-BVE, depois soma as vozes de apoio ao instrumental do Demucs. Ajuste seu volume de 0 a 100% ou desative a opção para a música. Ela está disponível nos modos Rápido e Detalhado, inclusive na personalização do rápido. O modelo é baixado no primeiro uso, fica no volume persistente e aumenta o tempo de processamento. A qualidade depende da gravação; a separação pode deixar vazamentos ou perder harmonias. O modo SRT mantém o áudio completo e não usa esta separação.
+
 ### Fundo e legenda
 
 Escolha **Vídeo original**, **Imagem / Vídeo** ou **Cor sólida** como modo de fundo. Para imagem/vídeo, envie um arquivo, use a Biblioteca ou um link. O áudio do fundo não é usado como trilha do karaokê.
@@ -101,16 +107,18 @@ Em **Perfil de Ajustes**, dê um nome à configuração e toque em **Salvar Perf
 
 ## 5. Gerar SRT original e tradução opcional
 
-Este modo cria arquivos de legenda e preserva a fala. Ele não separa vocais, não oferece fundo e não renderiza outro vídeo.
+Este modo cria arquivos de legenda e preserva o áudio completo, incluindo as vozes. Se a entrada não tiver vídeo, cria também um MP4 legendado com fundo simples. Se a entrada já contiver vídeo, continua entregando somente os SRTs. A identificação usa os fluxos da mídia, não só a extensão; capa incorporada em áudio não conta como vídeo.
 
 1. Escolha **Gerar SRT**.
-2. Envie áudio/vídeo, cole um link autorizado ou selecione um original.
+2. Envie áudio/vídeo, cole um link autorizado, busque no YouTube e selecione a miniatura, ou escolha um original da Biblioteca.
 3. Em **Segundo SRT traduzido**, o padrão é **Português (Brasil)**, com detecção automática do idioma de origem pelo LibreTranslate. Também é possível selecionar português, inglês, espanhol ou **Não traduzir**.
 4. Configure modelo Whisper, leitura da fala e VAD. Para fala, o filtro pode ajudar a ignorar silêncio; para canto, avalie desligá-lo.
 5. Habilite a revisão se quiser corrigir o original antes da tradução.
 6. Decida se a mídia de entrada deve ser salva na Biblioteca.
 7. Toque em **Gerar arquivos SRT**.
-8. Baixe o **SRT original** e o **SRT traduzido**, quando disponível.
+8. Baixe o **SRT original** e o **SRT traduzido**, quando disponível. Para entrada somente de áudio, assista à prévia e baixe também o **MP4**.
+
+O vídeo automático usa resolução 1280×720, fundo escuro e legendas visíveis na tela. Ele utiliza a tradução concluída, ou o SRT original se não houver tradução. Não adiciona abertura de capa nem desloca os tempos. O MP4 e cada SRT ficam salvos separadamente na Biblioteca e recebem tentativas individuais de envio ao Telegram. Não é necessário escolher um fundo ou marcar uma opção extra.
 
 O servidor extrai/normaliza o áudio completo para MP3 e transcreve o idioma detectado. O SRT respeita os tempos das falas, priorizando os timestamps por palavra do Whisper. Pausas de pelo menos 600 ms separam blocos: a legenda não é antecipada para preencher silêncio inicial, intervalos ou o fim da mídia. A tradução preserva esses mesmos tempos.
 
@@ -174,7 +182,7 @@ A fila não é histórico: trabalhos encerrados saem dela. Os arquivos concluíd
 
 ## 8. Progresso e pausa por etapa
 
-O número maior e a barra são o **progresso total**. O indicador menor representa a **etapa atual**, incluindo transcrição quando há informação disponível. Downloads, carregamento de modelo e certas operações podem não fornecer um percentual contínuo.
+O número maior e a barra são o **progresso total**. O indicador menor representa a **etapa atual**, incluindo transcrição, separação de backing vocals e renderização do MP4 de áudio quando há informação disponível. As novas etapas também enviam avisos ao Telegram; backing vocals e vídeo de áudio informam marcos de progresso de 25%. A aplicação da letra sincronizada informa a etapa concluída. A tradução informa início e resultado, pois o LibreTranslate não oferece percentual interno contínuo. Downloads, carregamento de modelo e certas operações podem não fornecer um percentual contínuo.
 
 O total combina etapas com pesos; não mede diretamente tempo restante. Um avanço de 50% não significa que falta metade do tempo. CPU, duração, modelo, disco, rede e complexidade do áudio alteram a duração.
 
@@ -229,7 +237,7 @@ Cada conta pode ter uma configuração própria. O bot administrativo também po
 
 - início e etapas intermediárias;
 - resultado da busca de letra-guia quando aplicável;
-- MP4 ou SRT, por tentativa de anexo;
+- MP4 e/ou SRT, por tentativa de anexo; no SRT de áudio, vídeo e legendas são enviados separadamente;
 - tempo total de processamento acumulado pelo trabalho;
 - links local e externo disponíveis.
 
@@ -298,6 +306,34 @@ Consulte [android/README.md](android/README.md) para instalação, assinatura e 
 
 A instalação prioriza processamento local, mas pode acessar serviços externos para fontes, modelos, letras, importação e Telegram. Consulte [PRIVACY.md](PRIVACY.md) e processe apenas material autorizado.
 
-## YouTube e publicação por usuário (9.9.2)
+## YouTube e publicação por usuário
 
-O modo rápido e o modo completo permitem pesquisar vídeos por nome e publicar o resultado quando a opção estiver marcada. O administrador conecta o canal em Configurações, define a privacidade e atribui uma playlist para cada usuário. Pode também deixar a publicação marcada por padrão individualmente. Desmarcar impede qualquer envio. Consulte [o guia das novas funções](UPDATES_AUTOMATIC_KARAOKE.md) para configurar OAuth, backing vocals e letras sincronizadas.
+Os três modos e as entradas do YouTube na Biblioteca permitem pesquisar por nome, com miniaturas, título, canal e duração. A seleção preenche o link; a busca não inicia um processamento ou publicação sozinha.
+
+### Conectar o canal em HTTP, gratuitamente
+
+1. No Google Cloud, habilite **YouTube Data API v3** no mesmo projeto da credencial. Configure o público e, se estiver em teste, adicione sua conta em **Usuários de teste**.
+2. Crie um cliente OAuth do tipo **Aplicativo para computador** e baixe seu JSON.
+3. No Karaokê, abra **Ajustes → Publicar no YouTube → Conexão do canal** e o guia **Ainda não tenho o arquivo de autorização**. Baixe o assistente Windows; em Linux/macOS, use a alternativa Python indicada.
+4. Abra o assistente no computador, escolha o JSON, prepare a conexão e autorize no navegador do Google. Mantenha o assistente aberto e baixe **youtube-autorizacao.json** ao concluir.
+5. Importe esse arquivo no Karaokê e toque em **Conectar meu canal**. Aguarde a confirmação **Canal conectado**, com o nome do canal. **Verificar conexão e atualizar playlists** confere o acesso e carrega as playlists.
+
+O retorno do Google ocorre no próprio computador. O servidor continua em HTTP e não precisa de variáveis OAuth no Compose para este método. Guarde o JSON de autorização como uma senha. Se aparecer `access_denied`, confira o usuário de teste; se o painel pedir a API, ative-a no projeto correto. Erros de conexão e carregamento aparecem na própria seção, sem esconder a configuração dos usuários.
+
+### Playlists, permissões e padrão do administrador
+
+1. Abra **Playlist de cada usuário**, após conectar o canal.
+2. Marque **Liberar publicação pelos usuários** quando quiser permitir que contas comuns publiquem.
+3. Em cada cartão, defina a permissão individual, **Playlist de destino** ou **Sem playlist**, e se **Publicar no YouTube** começa marcado.
+4. Para o administrador, expanda **Título e privacidade usados no modo rápido** e configure **Playlist padrão do administrador**. Essa opção fica neste grupo, não nos cartões das contas comuns.
+5. Ajuste privacidade e modelo de título. `{title}` é substituído pelo nome da música. Toque em **Salvar playlists e permissões** e confira a confirmação.
+
+No modo Rápido ou Detalhado, a publicação é opcional por vídeo. Desmarcada, nenhum envio ocorre, mesmo que haja playlist padrão. Uma conta comum usa a playlist atribuída; o administrador pode escolher outra playlist ou **Sem playlist** para seu vídeo. **Sem playlist** publica no canal sem incluir o vídeo em nenhuma lista. O título e a capa automática são preparados na conclusão.
+
+### Publicar um resultado já pronto
+
+Expanda **Publicar um vídeo já pronto**, escolha o resultado, confira título, privacidade e playlist, e revise a capa. A capa automática usa um frame do vídeo; trocar por JPEG/PNG é opcional. Toque em **Publicar vídeo selecionado** e acompanhe o histórico de publicações. Isso também permite publicar manualmente um MP4 gerado no modo SRT; o modo SRT não tem a opção de publicação automática por tarefa.
+
+O envio começa privado, aplica capa e playlist e então solicita a privacidade escolhida. Falhas aparecem no histórico e podem ser retomadas. Projetos de API sem auditoria podem ficar limitados a privado; miniaturas personalizadas dependem da permissão do canal. A API tem cota: ao atingir o limite, aguarde sua renovação. O aplicativo não compra cota automaticamente. Credenciais em modo de teste podem exigir nova autorização quando expirarem.
+
+Consulte também [o guia de busca, sincronização, backing vocals e publicação](UPDATES_AUTOMATIC_KARAOKE.md).
