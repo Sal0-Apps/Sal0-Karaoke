@@ -27,12 +27,16 @@ class PublicationRouteTests(unittest.TestCase):
         self.client = TestClient(self.app)
 
     def test_ordinary_user_cannot_manage_channel_or_other_results(self):
-        for path in ('status', 'playlists'):
+        for path in ('status', 'playlists', 'desktop-helper'):
             self.assertEqual(self.client.get('/api/admin/youtube/' + path).status_code, 403)
         for path in ('connect', 'settings', 'cover', 'jobs/id/retry'):
             self.assertEqual(self.client.post('/api/admin/youtube/' + path, json={}).status_code, 403)
         self.assertEqual(self.client.post('/api/admin/youtube/publish', data={
             'owner_key': 'other', 'filename': 'video.mp4', 'title': 'Title'}).status_code, 403)
+
+    def test_regular_user_cannot_import_authorization(self):
+        response = self.client.post('/api/admin/youtube/import-authorization', files={'authorization': ('authorization.json', b'{}', 'application/json')})
+        self.assertEqual(response.status_code, 403)
 
     def test_user_options_only_expose_assigned_playlist_without_secrets(self):
         self.publisher.save('token.json', {'refresh_token': 'secret', 'channel_id': 'channel', 'channel_title': 'Canal'})

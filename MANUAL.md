@@ -1,6 +1,6 @@
 # Manual do Sal0 Karaokê
 
-Este manual descreve os controles disponíveis na distribuição 9.9.0. Para instalar o servidor, consulte [DEPLOYMENT.md](DEPLOYMENT.md). Para configurar o aparelho, consulte o [guia Android](android/README.md).
+Este manual descreve os controles disponíveis na distribuição 9.9.1. Para instalar o servidor, consulte [DEPLOYMENT.md](DEPLOYMENT.md). Para configurar o aparelho, consulte o [guia Android](android/README.md).
 
 ## 1. Primeiro acesso e navegação
 
@@ -298,6 +298,6 @@ Consulte [android/README.md](android/README.md) para instalação, assinatura e 
 
 A instalação prioriza processamento local, mas pode acessar serviços externos para fontes, modelos, letras, importação e Telegram. Consulte [PRIVACY.md](PRIVACY.md) e processe apenas material autorizado.
 
-## YouTube e publicação por usuário (9.9.0)
+## YouTube e publicação por usuário (9.9.1)
 
 O modo rápido e o modo completo permitem pesquisar vídeos por nome e publicar o resultado quando a opção estiver marcada. O administrador conecta o canal em Configurações, define a privacidade e atribui uma playlist para cada usuário. Pode também deixar a publicação marcada por padrão individualmente. Desmarcar impede qualquer envio. Consulte [o guia das novas funções](UPDATES_AUTOMATIC_KARAOKE.md) para configurar OAuth, backing vocals e letras sincronizadas.
