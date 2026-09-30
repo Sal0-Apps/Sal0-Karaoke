@@ -6,7 +6,7 @@ const browser=await chromium.launch({headless:true});const page=await browser.ne
 const errors=[];page.on('pageerror',e=>errors.push(e.message));
 let connected=false,failImport=true,failPlaylists=false,saved=null,srtDone=false,srtRendering=false;
 await page.route('**/*',async route=>{
- const request=route.request(),u=new URL(request.url());if(u.hostname==='i.ytimg.com')return route.fulfill({contentType:'image/png',body:Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jvXkAAAAASUVORK5CYII=','base64')});if(u.hostname!=='karaoke.test')return route.abort();
+ const request=route.request(),u=new URL(request.url());if(u.hostname==='i.ytimg.com')return route.fulfill({contentType:'image/png',body:Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGMQkFD/DwAB2gFPHkSsgQAAAABJRU5ErkJggg==','base64')});if(u.hostname!=='karaoke.test')return route.abort();
  if(u.pathname==='/')return route.fulfill({contentType:'text/html',body:HTML});
  let data={},status=200;
  if(u.pathname==='/api/auth_status')data={status:'authenticated',username:'owner',role:'admin'};
