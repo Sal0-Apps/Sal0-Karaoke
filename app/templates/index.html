@@ -1518,8 +1518,8 @@
                         <div class="easy-hero-icon"><img src="/favicon.png" alt=""></div>
                         <div>
                             <span class="easy-kicker">Modo Rápido</span>
-                            <span class="card-title">Cole, escolha e cante</span>
-                            <p class="easy-intro">Use um link, arquivo ou item da Biblioteca. Se não escolher o fundo, o Sal0 prepara uma surpresa da coleção do administrador.</p>
+                            <span class="card-title">Busque, escolha e cante</span>
+                            <p class="easy-intro">Busque no YouTube ou use um link, arquivo ou item da Biblioteca. Se não escolher o fundo, o Sal0 prepara uma surpresa da coleção do administrador.</p>
                         </div>
                     </div>
 
@@ -1530,6 +1530,11 @@
                                 <div id="easyAudioYoutubeBox" class="quick-choice-card is-active">
                                     <span class="quick-choice-label">▶️ Link do YouTube</span>
                                     <input type="url" id="easyYoutubeUrl" class="input-text" placeholder="Cole o link e pronto">
+                                    <label for="easyLyricsTiming" class="compact-note">Sincronização</label>
+                                    <select id="easyLyricsTiming" class="select-input">
+                                        <option value="auto">Usar letra sincronizada se disponível</option>
+                                        <option value="acoustic">Palavras pelo áudio (Whisper)</option>
+                                    </select>
                                     <div id="easyYoutubeTitleBadge" class="youtube-identification" aria-live="polite"><span>▶️</span><span id="easyYoutubeTitleText"></span></div>
                                 </div>
                                 <label id="easyAudioUploadBox" class="quick-choice-card quick-file-choice" for="easyAudioFile">
@@ -1542,6 +1547,13 @@
                                     <span class="quick-choice-label">📚 Minha Biblioteca</span>
                                     <select id="easyLibraryAudio" class="select-input"><option value="">Escolha uma música...</option></select>
                                 </div>
+                            </div>
+                        <div class="form-group" style="margin-top:.6rem">
+                                <label for="easyKeepBackingVocals" class="compact-note">Voz de apoio (backing vocal)</label>
+                                <select id="easyKeepBackingVocals" class="select-input"><option value="true">Manter backing vocals; remover voz principal</option><option value="false">Remover todas as vozes</option></select>
+                                <label for="easyBackingVolume" class="compact-note">Volume dos backing vocals (%)</label>
+                                <input id="easyBackingVolume" type="number" min="0" max="100" value="100" class="input-text">
+                                <p class="compact-note">Separação por IA local. Pode levar mais tempo e deixar resíduos dependendo da gravação.</p>
                             </div>
                         </section>
 
@@ -1579,6 +1591,15 @@
                         </section>
                     </div>
 
+<div id="easyYoutubePublication" style="display:none;margin:1rem 0">
+                    <label style="display:flex;gap:.5rem;align-items:center"><input type="checkbox" id="easyYoutubePublish" value="true"> Publicar no YouTube ao concluir</label>
+                    <label for="easyYoutubePlaylist" class="compact-note">Playlist de publicação</label>
+                    <select id="easyYoutubePlaylist" class="select-input"></select>
+                    <label for="easyYoutubeTitle" class="compact-note">Título no YouTube (opcional)</label>
+                    <input id="easyYoutubeTitle" class="input-text" maxlength="100" placeholder="Usar o título automático da música">
+                    <p id="easyYoutubePublicationNote" class="compact-note"></p>
+                    <p class="compact-note">Desmarcado: o vídeo não é publicado. A capa é criada automaticamente com o título.</p>
+                </div>
                     <div class="easy-summary">
                         <span id="easySummaryModel">🤖 Large V3 Turbo</span>
                         <span id="easySummaryFont">🔤 Letra 50</span>
@@ -1748,6 +1769,12 @@
                                     <option value="manual">Manual</option>
                                 </select>
                             </div>
+                            <label for="lyricsTiming" class="compact-note">Sincronização automática</label>
+                            <select id="lyricsTiming" name="lyrics_timing" class="select-input">
+                                <option value="auto">Usar tempos somente de uma letra sincronizada disponível</option>
+                                <option value="acoustic">Sempre pelo áudio — palavras com Whisper</option>
+                            </select>
+                            <p class="compact-note">Só usamos sincronização pronta quando a letra fornece tempos compatíveis. Sem ela, transcrevemos o áudio com Whisper. Os versos sincronizados destacam a linha inteira. Para destacar palavras, escolha Whisper. Versões diferentes podem exigir revisão.</p>
                             <p id="lyricsModeHint" style="font-size: 0.7rem; color: var(--text-muted); margin: 0.35rem 0 0.45rem;">A letra é uma guia. Texto manual sempre tem prioridade.</p>
                             <textarea id="lyricsText" name="lyrics_text" placeholder="Cole ou edite a letra aqui..." class="input-text" style="height: 72px; resize: vertical; background: var(--input-bg); border: 1px solid var(--glass-border);"></textarea>
                             <div id="lyricsBadge" style="display: none; margin-top: 0.35rem; background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.3); color: #34d399; padding: 0.3rem 0.55rem; border-radius: 7px; font-size: 0.7rem; font-weight: 600;"></div>
@@ -1933,6 +1960,13 @@
                             </div>
 
                             <div class="form-group">
+                                <label for="keepBackingVocals" class="label">Backing vocals</label>
+                                <select id="keepBackingVocals" name="keep_backing_vocals" class="select-input"><option value="true">Manter; remover apenas a voz principal</option><option value="false">Remover todas as vozes</option></select>
+                                <label for="backingVocalsVolume" class="compact-note">Volume das vozes de apoio (%)</label>
+                                <input id="backingVocalsVolume" name="backing_vocals_volume" type="number" min="0" max="100" value="100" class="input-text">
+                                <p class="compact-note">Modelo local de IA; a separação varia conforme a música e adiciona uma etapa em CPU.</p>
+                            </div>
+                            <div class="form-group">
                                 <span class="label">Modo Apenas Remover Vocais</span>
                                 <select id="onlyRemoveVocals" name="only_remove_vocals" class="select-input">
                                     <option value="false" selected>Não (Karaokê Completo)</option>
@@ -1944,12 +1978,22 @@
 
                     </div>
 
+            <div id="fullYoutubePublication" style="display:none;margin:1rem 0">
+                    <label style="display:flex;gap:.5rem;align-items:center"><input type="checkbox" id="fullYoutubePublish" name="youtube_publish" value="true"> Publicar no YouTube ao concluir</label>
+                    <label for="fullYoutubePlaylist" class="compact-note">Playlist de publicação</label>
+                    <select id="fullYoutubePlaylist" name="youtube_playlist_id" class="select-input"></select>
+                    <label for="fullYoutubeTitle" class="compact-note">Título no YouTube (opcional)</label>
+                    <input id="fullYoutubeTitle" name="youtube_title" class="input-text" maxlength="100" placeholder="Usar o título automático da música">
+                    <p id="fullYoutubePublicationNote" class="compact-note"></p>
+                    <p class="compact-note">Desmarcado: o vídeo não é publicado. A capa é criada automaticamente com o título.</p>
+                </div>
+
                     <!-- Botão Submeter -->
                     <div style="margin-top: 1.5rem;">
                         <button type="submit" id="btnSubmit" class="btn-primary">🎬 Criar Karaokê</button>
                     </div>
                 </div>
-            </form>
+</form>
 
             <div class="card" id="queueCard" style="display: none;">
                 <div class="card-header">
@@ -2074,6 +2118,40 @@
         <!-- ============================================================= -->
         <div id="settingsTabContent" style="display: none;">
             <div class="settings-grid">
+
+            <div class="card" id="youtubePublisherSection" style="display:none">
+                <div class="card-header"><span class="card-title">📤 Publicar no YouTube · Administrador</span></div>
+                <p id="ytPublishChannel" class="compact-note">Verificando conexão do canal…</p>
+                <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:.7rem">
+                    <button type="button" id="ytPublishConnect" class="btn-secondary">Conectar canal</button>
+                    <button type="button" id="ytPublishRefresh" class="btn-secondary">Atualizar painel</button>
+                </div>
+                <label for="ytPublishVideo" class="label">Vídeo finalizado</label>
+                <select id="ytPublishVideo" class="select-input"><option value="">Escolha um vídeo…</option></select>
+                <label for="ytPublishTitle" class="label">Título no YouTube</label>
+                <input id="ytPublishTitle" class="input-text" maxlength="100" placeholder="Título do vídeo">
+                <div class="two-col" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(180px,100%),1fr));gap:.6rem;margin-top:.6rem">
+                    <div><label for="ytPublishPrivacy" class="label">Privacidade</label><select id="ytPublishPrivacy" class="select-input"><option value="private">Privado</option><option value="unlisted">Não listado</option><option value="public">Público</option></select></div>
+                    <div><label for="ytPublishPlaylist" class="label">Playlist</label><select id="ytPublishPlaylist" class="select-input"><option value="">Sem playlist</option></select></div>
+                </div>
+                <label for="ytPublishCover" class="label">Capa (opcional: JPEG ou PNG até 2 MB)</label>
+                <input id="ytPublishCover" type="file" accept="image/jpeg,image/png" class="input-text">
+                <button type="button" id="ytPublishPreview" class="btn-secondary" style="margin:.6rem 0">Preparar título e capa</button>
+                <img id="ytPublishCoverPreview" alt="Capa definida para a publicação" style="display:none;width:100%;max-width:480px;aspect-ratio:16/9;object-fit:contain;border-radius:12px">
+                <p class="compact-note">Sem uma imagem escolhida, a capa é criada com o título sobre o vídeo. O envio começa privado e aplica capa, playlist e a privacidade escolhida.</p>
+                <button type="button" id="ytPublishSubmit" class="btn-primary" disabled>Publicar vídeo selecionado</button>
+                <p id="ytPublishMessage" class="compact-note" role="status"></p>
+                <hr style="border:0;border-top:1px solid var(--glass-border);margin:1rem 0">
+                <label for="ytPublishTemplate" class="label">Título para publicação automática</label>
+                <input id="ytPublishTemplate" class="input-text" maxlength="100" value="{title} | Karaokê">
+                <p class="compact-note">{title} é substituído pelo nome da música. As publicações usam a privacidade acima e uma capa com o título. A playlist dos usuários é definida individualmente abaixo.</p>
+                <label style="display:flex;gap:.5rem;align-items:center;margin:.6rem 0"><input type="checkbox" id="ytUsersCanPublish"> Permitir publicação pelos usuários</label>
+                <p class="compact-note">Defina a playlist de cada conta e se “Publicar no YouTube” começa marcado. O usuário sempre pode desmarcar para criar sem publicar.</p>
+                <div id="ytUserAssignments" style="display:grid;gap:.8rem"></div>
+                <button type="button" id="ytPublishSave" class="btn-secondary">Salvar opções de publicação</button>
+                <p class="compact-note">Projetos de API sem auditoria do YouTube podem permitir apenas vídeos privados. O canal também precisa permitir capas personalizadas.</p>
+                <div id="ytPublishJobs" style="display:grid;gap:.5rem;margin-top:1rem"></div>
+            </div>
 
             <!-- Gerenciador de Modelos Whisper -->
             <div class="card" id="modelManagerSection">
@@ -2466,7 +2544,7 @@
                     <li><strong>Diagnóstico:</strong> o administrador pode baixar os logs em Ajustes. Revise dados pessoais e credenciais antes de compartilhar.</li>
                 </ul>
             </details>
-            <p class="compact-note">Versão do servidor: 9.8.0. A transcrição é local; fontes, modelos e integrações podem acessar serviços externos. Use conteúdo autorizado.</p>
+            <p class="compact-note">Versão do servidor: 9.9.0. A transcrição é local; fontes, modelos e integrações podem acessar serviços externos. Use conteúdo autorizado.</p>
         </div>
     </div>
 
@@ -2525,7 +2603,7 @@
         function applyRoleUI() {
             const admin = currentUser?.role === 'admin';
             document.querySelector('.settings-grid')?.classList.toggle('user-settings', !admin);
-            ['modelManagerSection', 'youtubeToolsSection', 'translationToolsSection', 'easyModeSettingsSection', 'externalUrlSection', 'userManagementSection', 'logsSection'].forEach(id => {
+            ['youtubePublisherSection', 'modelManagerSection', 'youtubeToolsSection', 'translationToolsSection', 'easyModeSettingsSection', 'externalUrlSection', 'userManagementSection', 'logsSection'].forEach(id => {
                 const element = document.getElementById(id);
                 if (element) element.style.display = admin ? '' : 'none';
             });
@@ -3146,6 +3224,9 @@
             setValue('keepFirstLineVisible', profile.keep_first_line_visible);
             setValue('saveToLibrary', profile.save_to_library);
             setValue('onlyRemoveVocals', profile.only_remove_vocals);
+            setValue('keepBackingVocals', profile.keep_backing_vocals ?? true);
+            setValue('backingVocalsVolume', profile.backing_vocals_volume ?? 100);
+            setValue('lyricsTiming', profile.lyrics_timing || 'auto');
 
             const description = document.getElementById('profileDescription');
             if (description) description.textContent = profile.description || 'Perfil personalizado por você.';
@@ -4132,6 +4213,12 @@
                 const button = document.getElementById('easySubmitBtn');
                 const formData = new FormData();
                 formData.set('easy_mode', 'true');
+                formData.set('youtube_publish', String(document.getElementById('easyYoutubePublish').checked));
+                formData.set('youtube_playlist_id', document.getElementById('easyYoutubePlaylist').value);
+                formData.set('youtube_title', document.getElementById('easyYoutubeTitle').value.trim());
+                formData.set('lyrics_timing', document.getElementById('easyLyricsTiming')?.value || 'auto');
+                formData.set('keep_backing_vocals', document.getElementById('easyKeepBackingVocals')?.value || 'true');
+                formData.set('backing_vocals_volume', document.getElementById('easyBackingVolume')?.value || '100');
                 formData.set('app_base_url', window.location.origin);
                 let audioFiles = [];
 
@@ -4992,7 +5079,9 @@
                     updateLyricsBadge(lyricsText.value);
                     if (lyricsSearchQuery) lyricsSearchQuery.value = `${payload.track_name} — ${payload.artist_name}`;
                     if (lyricsSearchResults) lyricsSearchResults.replaceChildren();
-                    setLyricsSearchStatus('Letra salva localmente. Você pode revisar quando quiser.');
+                    setLyricsSearchStatus(result.has_synced_lyrics
+                        ? 'Letra com sincronização disponível. Os tempos serão usados se a gravação for compatível.'
+                        : 'Letra sem sincronização pronta. Os tempos serão obtidos pelo Whisper.');
                     return true;
                 } catch (error) {
                     if (error.name === 'AbortError') return false;
@@ -5260,6 +5349,9 @@
                         show_next_line_preview: getBool('showNextLinePreview', false),
                         keep_first_line_visible: getBool('keepFirstLineVisible', false),
                         save_to_library: getBool('saveToLibrary', true),
+                        keep_backing_vocals: getBool('keepBackingVocals', true),
+                        backing_vocals_volume: Number(document.getElementById('backingVocalsVolume')?.value || 100),
+                        lyrics_timing: document.getElementById('lyricsTiming')?.value || 'auto',
                         only_remove_vocals: getBool('onlyRemoveVocals', false)
                     };
 
@@ -5465,6 +5557,7 @@
 
             await fetchEasyModeConfig();
             const initialLoads = [
+                loadYoutubePublicationOptions(),
                 fetchTelegramConfig(),
                 fetchProfiles(),
                 loadLibrary(),
@@ -5485,7 +5578,7 @@
                 })(),
             ];
             if (currentUser?.role === 'admin') {
-                initialLoads.push(fetchExternalUrlConfig(), fetchUsers(), fetchModelsStatus(), fetchYoutubeToolsStatus(), fetchTranslationSettings());
+                initialLoads.push(loadYoutubePublisher(), fetchExternalUrlConfig(), fetchUsers(), fetchModelsStatus(), fetchYoutubeToolsStatus(), fetchTranslationSettings());
             }
             await Promise.allSettled(initialLoads);
         });
@@ -6250,6 +6343,301 @@
                 statusRequestInFlight = false;
             }
         }
+    </script>
+
+    <script>
+        // Search text is separate from the URL field; selecting a result uses the
+        // existing metadata, lyric lookup and creation flows in every mode.
+        document.addEventListener('DOMContentLoaded', () => {
+            const sources = ['easyYoutubeUrl', 'youtubeUrl', 'bgYoutubeUrl',
+                'easyBgYoutubeUrl', 'libAudioYoutubeUrl', 'libBgYoutubeUrl'];
+            for (const sourceId of sources) {
+                const source = document.getElementById(sourceId);
+                if (!source) continue;
+                const panel = document.createElement('div');
+                panel.className = 'youtube-search-panel';
+                panel.style.cssText = 'margin:0 0 .65rem;min-width:0';
+                const label = document.createElement('label');
+                const query = document.createElement('input');
+                query.id = sourceId + 'Search';
+                query.type = 'search';
+                query.maxLength = 160;
+                query.className = 'input-text';
+                query.placeholder = 'Artista - nome da música';
+                query.autocomplete = 'off';
+                label.htmlFor = query.id;
+                label.textContent = 'Buscar no YouTube';
+                label.className = 'compact-note';
+                const button = document.createElement('button');
+                button.type = 'button';
+                button.className = 'btn-secondary';
+                button.textContent = 'Buscar';
+                const controls = document.createElement('div');
+                controls.style.cssText = 'display:flex;gap:.5rem;min-width:0';
+                query.style.cssText = 'min-width:0;flex:1';
+                controls.append(query, button);
+                const status = document.createElement('p');
+                status.className = 'compact-note';
+                status.setAttribute('role', 'status');
+                status.textContent = 'Digite para pesquisar automaticamente. Só a busca é enviada ao YouTube.';
+                const results = document.createElement('div');
+                results.style.cssText = 'display:grid;gap:.4rem;max-height:260px;overflow:auto';
+                panel.append(label, controls, status, results);
+                source.before(panel);
+                let timer, controller, revision = 0;
+                async function search() {
+                    clearTimeout(timer);
+                    controller?.abort();
+                    const request = ++revision;
+                    const text = query.value.trim();
+                    results.replaceChildren();
+                    if (text.length < 2) {
+                        status.textContent = 'Informe pelo menos dois caracteres.';
+                        return;
+                    }
+                    controller = new AbortController();
+                    status.textContent = 'Buscando vídeos…';
+                    try {
+                        const response = await authFetch('/api/youtube/search', {
+                            method: 'POST', headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ query: text }), signal: controller.signal
+                        });
+                        const payload = await response.json();
+                        if (request !== revision) return;
+                        if (!response.ok) throw new Error(payload.detail || 'Busca indisponível.');
+                        const items = payload.results || [];
+                        status.textContent = items.length ? 'Escolha a versão que deseja cantar.' : 'Nenhum vídeo encontrado. Tente outro nome ou cole o link.';
+                        for (const video of items) {
+                            const choice = document.createElement('button');
+                            choice.type = 'button';
+                            choice.className = 'btn-secondary';
+                            choice.style.cssText = 'text-align:left;white-space:normal;overflow-wrap:anywhere;width:100%';
+                            const seconds = Number(video.duration);
+                            const duration = Number.isFinite(seconds) && seconds > 0
+                                ? ` · ${Math.floor(seconds / 60)}:${String(Math.floor(seconds % 60)).padStart(2, '0')}` : '';
+                            choice.textContent = video.title + ' — ' + video.uploader + duration;
+                            choice.addEventListener('click', () => {
+                                if (!/^https:\/\/www\.youtube\.com\/watch\?v=[A-Za-z0-9_-]{11}$/.test(video.url)) return;
+                                source.value = video.url;
+                                source.dispatchEvent(new Event('focus'));
+                                source.dispatchEvent(new Event('input', { bubbles: true }));
+                                source.dispatchEvent(new Event('change', { bubbles: true }));
+                                results.replaceChildren();
+                                status.textContent = 'Selecionado: ' + video.title;
+                            });
+                            results.append(choice);
+                        }
+                    } catch (error) {
+                        if (request !== revision || error.name === 'AbortError') return;
+                        status.textContent = error.message + ' Você também pode colar o link.';
+                    }
+                }
+                query.addEventListener('input', () => {
+                    clearTimeout(timer);
+                    controller?.abort();
+                    revision++;
+                    results.replaceChildren();
+                    if (query.value.trim().length < 2) {
+                        status.textContent = 'Digite o artista e o nome da música.';
+                        return;
+                    }
+                    timer = setTimeout(search, 900);
+                });
+                query.addEventListener('keydown', event => {
+                    if (event.key === 'Enter') { event.preventDefault(); search(); }
+                });
+                button.addEventListener('click', search);
+            }
+        });
+    </script>
+
+    <script>
+        let youtubePublishVideos = [];
+        let youtubeCoverObjectUrl = null;
+        let youtubePreviewRevision = 0;
+        let youtubePreviewReady = false;
+        const ytElement = id => document.getElementById(id);
+        function ytMessage(message) { const el = ytElement('ytPublishMessage'); if (el) el.textContent = message; }
+        async function ytRequest(path, options = {}) {
+            const response = await authFetch('/api/admin/youtube/' + path, options);
+            const result = await response.json();
+            if (!response.ok) throw new Error(typeof result.detail === 'string' ? result.detail : 'Revise os dados da publicação.');
+            return result;
+        }
+        function youtubeSelectedVideo() {
+            const index = ytElement('ytPublishVideo').value;
+            return index === '' ? null : youtubePublishVideos[Number(index)];
+        }
+        function resetYoutubeCover() {
+            youtubePreviewRevision++;
+            youtubePreviewReady = false;
+            ytElement('ytPublishSubmit').disabled = true;
+            ytElement('ytPublishCoverPreview').style.display = 'none';
+            if (youtubeCoverObjectUrl) URL.revokeObjectURL(youtubeCoverObjectUrl);
+            youtubeCoverObjectUrl = null;
+        }
+        function renderYoutubePublicationJobs(jobs) {
+            const container = ytElement('ytPublishJobs');
+            container.replaceChildren();
+            for (const job of [...jobs].reverse()) {
+                const row = document.createElement('div');
+                const text = document.createElement('p');
+                const labels = { queued: 'Na fila', uploading: 'Enviando', finalizing: 'Aplicando capa e playlist', done: 'Concluído', error: 'Precisa de atenção' };
+                text.textContent = `${job.title} · ${labels[job.status] || job.status} · ${job.progress || 0}% · ${job.actual_privacy || job.privacy}`;
+                row.append(text);
+                if (job.error) { const error = document.createElement('p'); error.className = 'compact-note'; error.textContent = job.error; row.append(error); }
+                if (/^[A-Za-z0-9_-]{11}$/.test(job.video_id || '')) {
+                    const link = document.createElement('a');
+                    link.href = 'https://www.youtube.com/watch?v=' + job.video_id;
+                    link.target = '_blank'; link.rel = 'noopener noreferrer'; link.textContent = 'Abrir vídeo'; row.append(link);
+                }
+                if (job.status === 'error') {
+                    const retry = document.createElement('button'); retry.type = 'button'; retry.className = 'btn-secondary'; retry.textContent = 'Retomar mesma publicação';
+                    retry.onclick = async () => { try { await ytRequest('jobs/' + encodeURIComponent(job.id) + '/retry', { method: 'POST' }); await loadYoutubePublisher(false); } catch (error) { ytMessage(error.message); } };
+                    row.append(retry);
+                }
+                container.append(row);
+            }
+        }
+        async function loadYoutubePublicationOptions() {
+            try {
+                const response = await authFetch('/api/youtube/publication-options');
+                if (!response.ok) throw new Error('Não foi possível carregar opções de publicação.');
+                const options = await response.json();
+                for (const prefix of ['easy', 'full']) {
+                    const container = ytElement(prefix + 'YoutubePublication');
+                    container.style.display = options.enabled ? 'block' : 'none';
+                    const checkbox = ytElement(prefix + 'YoutubePublish');
+                    checkbox.checked = options.enabled && options.default_publish;
+                    const select = ytElement(prefix + 'YoutubePlaylist');
+                    select.replaceChildren();
+                    if (options.allow_no_playlist) select.add(new Option('Sem playlist', ''));
+                    for (const playlist of options.playlists || []) select.add(new Option(playlist.title, playlist.id));
+                    select.value = options.playlist_id || '';
+                    ytElement(prefix + 'YoutubePublicationNote').textContent = `Canal: ${options.channel_title} · Privacidade: ${options.privacy}. Playlist definida pelo administrador para sua conta.`;
+                }
+            } catch (error) { console.warn(error.message); }
+        }
+        async function renderYoutubeUserAssignments(assignments, playlists) {
+            const response = await authFetch('/api/users');
+            if (!response.ok) throw new Error('Não foi possível carregar os usuários.');
+            const users = await response.json();
+            const container = ytElement('ytUserAssignments'); container.replaceChildren();
+            for (const user of users.filter(user => user.role !== 'admin')) {
+                const assignment = assignments[user.username] || {};
+                const row = document.createElement('div'); row.dataset.username = user.username;
+                const label = document.createElement('label'); label.textContent = user.username; row.append(label);
+                const select = document.createElement('select'); select.className = 'select-input'; select.dataset.field = 'playlist';
+                select.add(new Option('Não permitir publicação', '__disabled__'));
+                select.add(new Option('Publicar sem playlist', ''));
+                playlists.forEach(playlist => select.add(new Option(playlist.title, playlist.id)));
+                select.value = assignment.enabled ? assignment.playlist_id || '' : '__disabled__'; row.append(select);
+                const defaultLabel = document.createElement('label'); defaultLabel.style.display = 'flex'; defaultLabel.style.gap = '.5rem';
+                const checkbox = document.createElement('input'); checkbox.type = 'checkbox'; checkbox.dataset.field = 'default'; checkbox.checked = !!assignment.default_publish;
+                defaultLabel.append(checkbox, document.createTextNode('Publicar marcado por padrão')); row.append(defaultLabel); container.append(row);
+            }
+        }
+        function readYoutubeUserAssignments() {
+            const assignments = Object.create(null);
+            for (const row of ytElement('ytUserAssignments').children) {
+                const playlist = row.querySelector('[data-field="playlist"]').value;
+                assignments[row.dataset.username] = { enabled: playlist !== '__disabled__', playlist_id: playlist === '__disabled__' ? '' : playlist,
+                    default_publish: row.querySelector('[data-field="default"]').checked };
+            }
+            return assignments;
+        }
+        async function loadYoutubePublisher(full = true) {
+            if (currentUser?.role !== 'admin') return;
+            try {
+                const status = await ytRequest('status');
+                ytElement('ytPublishChannel').textContent = status.connected ? 'Canal conectado: ' + status.channel_title
+                    : (status.configured ? 'Conecte o canal para habilitar os envios.' : 'Configure o cliente OAuth do YouTube no servidor para conectar o canal.');
+                renderYoutubePublicationJobs(status.jobs || []);
+                if (!full) return;
+                ytElement('ytPublishPrivacy').value = status.settings.privacy;
+                ytElement('ytPublishTemplate').value = status.settings.title_template;
+                ytElement('ytUsersCanPublish').checked = status.settings.users_can_publish;
+                const playlistSelect = ytElement('ytPublishPlaylist');
+                playlistSelect.replaceChildren(new Option('Sem playlist', ''));
+                if (status.connected) {
+                    const result = await ytRequest('playlists');
+                    for (const playlist of result.playlists || []) playlistSelect.add(new Option(playlist.title, playlist.id));
+                    playlistSelect.value = status.settings.playlist_id || '';
+                }
+                await renderYoutubeUserAssignments(status.settings.user_assignments || [], Array.from(playlistSelect.options).filter(option => option.value).map(option => ({id: option.value, title: option.text})));
+                const response = await authFetch('/api/admin/results');
+                const results = await response.json();
+                if (!response.ok) throw new Error('Não foi possível carregar os vídeos finalizados.');
+                youtubePublishVideos = (results.results || []).filter(video => video.kind === 'video' && /\.mp4$/i.test(video.filename));
+                const select = ytElement('ytPublishVideo');
+                select.replaceChildren(new Option('Escolha um vídeo…', ''));
+                youtubePublishVideos.forEach((video, index) => select.add(new Option(video.filename + ' · ' + video.owner, String(index))));
+                resetYoutubeCover();
+            } catch (error) { ytMessage(error.message); }
+        }
+        document.addEventListener('DOMContentLoaded', () => {
+            ytElement('ytPublishConnect').onclick = async () => {
+                try { const result = await ytRequest('connect', { method: 'POST' }); window.location.assign(result.url); }
+                catch (error) { ytMessage(error.message); }
+            };
+            ytElement('ytPublishRefresh').onclick = () => loadYoutubePublisher();
+            ytElement('ytPublishVideo').onchange = () => {
+                const video = youtubeSelectedVideo();
+                ytElement('ytPublishTitle').value = video ? video.filename.replace(/\.mp4$/i, '').slice(0, 100) : '';
+                ytElement('ytPublishCover').value = '';
+                resetYoutubeCover();
+            };
+            ytElement('ytPublishTitle').oninput = resetYoutubeCover;
+            ytElement('ytPublishCover').onchange = resetYoutubeCover;
+            ytElement('ytPublishPreview').onclick = async () => {
+                const video = youtubeSelectedVideo(), title = ytElement('ytPublishTitle').value.trim();
+                if (!video || !title) { ytMessage('Escolha um vídeo e defina o título.'); return; }
+                resetYoutubeCover();
+                const revision = youtubePreviewRevision;
+                const file = ytElement('ytPublishCover').files[0];
+                try {
+                    let blob;
+                    if (file) {
+                        if (file.size > 2 * 1024 * 1024 || !['image/jpeg', 'image/png'].includes(file.type)) throw new Error('Use JPEG ou PNG de até 2 MB.');
+                        blob = file;
+                    } else {
+                        const response = await authFetch('/api/admin/youtube/cover', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ owner_key: video.owner_key, filename: video.filename, title }) });
+                        if (!response.ok) throw new Error('Não foi possível preparar a capa.');
+                        blob = await response.blob();
+                    }
+                    if (revision !== youtubePreviewRevision) return;
+                    youtubeCoverObjectUrl = URL.createObjectURL(blob);
+                    const image = ytElement('ytPublishCoverPreview'); image.src = youtubeCoverObjectUrl; image.style.display = 'block';
+                    youtubePreviewReady = true;
+                    ytElement('ytPublishSubmit').disabled = false;
+                    ytMessage('Título e capa preparados. Revise a playlist e a privacidade antes de publicar.');
+                } catch (error) { ytMessage(error.message); }
+            };
+            ytElement('ytPublishSubmit').onclick = async () => {
+                const video = youtubeSelectedVideo();
+                if (!video || !youtubePreviewReady) return;
+                const form = new FormData();
+                form.set('owner_key', video.owner_key); form.set('filename', video.filename);
+                form.set('title', ytElement('ytPublishTitle').value.trim());
+                form.set('privacy', ytElement('ytPublishPrivacy').value); form.set('playlist_id', ytElement('ytPublishPlaylist').value);
+                const file = ytElement('ytPublishCover').files[0]; if (file) form.set('cover', file);
+                const button = ytElement('ytPublishSubmit'); button.disabled = true;
+                try { await ytRequest('publish', { method: 'POST', body: form }); ytMessage('Publicação na fila. O painel acompanha o envio.'); await loadYoutubePublisher(false); }
+                catch (error) { ytMessage(error.message); button.disabled = false; }
+            };
+            ytElement('ytPublishSave').onclick = async () => {
+                try {
+                    await ytRequest('settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
+                        privacy: ytElement('ytPublishPrivacy').value, playlist_id: ytElement('ytPublishPlaylist').value,
+                        title_template: ytElement('ytPublishTemplate').value, users_can_publish: ytElement('ytUsersCanPublish').checked, user_assignments: readYoutubeUserAssignments() }) });
+                    ytMessage('Permissões, playlists e padrões de cada usuário salvos.'); await loadYoutubePublicationOptions();
+                } catch (error) { ytMessage(error.message); }
+            };
+            setInterval(() => {
+                if (!document.hidden && currentUser?.role === 'admin' && ytElement('settingsTabContent')?.style.display !== 'none') loadYoutubePublisher(false);
+            }, 5000);
+        });
     </script>
 </body>
 </html>

@@ -2,6 +2,8 @@ name: Build, Publish and Release
 
 on:
   push:
+    branches: [main]
+    paths: [VERSION]
     tags:
       - 'v*'
   workflow_dispatch: # Dispara quando tags começando com v são criadas, ex: v1.0
@@ -23,7 +25,7 @@ jobs:
 
       - name: Validate subtitle and easy-mode rules
         run: |
-          python -m pip install requests==2.32.3
+          python -m pip install requests==2.32.3 fastapi==0.111.0 python-multipart==0.0.9 httpx==0.28.1
           python -m unittest discover -s tests -v
 
       - name: Log in to the Container registry
@@ -38,53 +40,63 @@ jobs:
           IMAGE_LOWER=$(echo "ghcr.io/${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
           echo "IMAGE_TAG=$IMAGE_LOWER" >> $GITHUB_ENV
 
-      - name: Set up tag version
+      - name: Set up release version
         run: |
-          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
-            # Extrair versão limpa da tag (ex: v1.0 -> 1.0)
-            VERSION_TAG=$(echo "${{ github.ref_name }}" | sed 's/^v//')
-            echo "VERSION_TAG=$VERSION_TAG" >> $GITHUB_ENV
-            echo "IS_TAG=true" >> $GITHUB_ENV
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            VERSION_TAG="${GITHUB_REF_NAME#v}"
           else
-            echo "VERSION_TAG=latest" >> $GITHUB_ENV
-            echo "IS_TAG=false" >> $GITHUB_ENV
+            VERSION_TAG=$(cat VERSION)
           fi
+          [[ "$VERSION_TAG" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          IFS=. read -r MAJOR MINOR PATCH <<< "$VERSION_TAG"
+          VERSION_CODE=$((10#$MAJOR * 10000 + 10#$MINOR * 100 + 10#$PATCH))
+          echo "VERSION_TAG=$VERSION_TAG" >> "$GITHUB_ENV"
+          echo "VERSION_CODE=$VERSION_CODE" >> "$GITHUB_ENV"
 
-      - name: Build and push Docker image
+      - name: Build Docker image
         uses: docker/build-push-action@v5
         with:
           context: ./app
           file: ./app/Dockerfile
-          push: true
-          # Se for uma tag, publica tanto a tag da versão quanto latest. Caso contrário, apenas latest.
+          push: false
+          load: true
+          # Publica a versão validada e o alias latest.
           tags: |
             ${{ env.IMAGE_TAG }}:latest
-            ${{ env.IS_TAG == 'true' && format('{0}:{1}', env.IMAGE_TAG, env.VERSION_TAG) || '' }}
+            ${{ env.IMAGE_TAG }}:${{ env.VERSION_TAG }}
+
+      - name: Validate CPU backing vocal runtime and app routes
+        timeout-minutes: 15
+        run: docker run --rm --entrypoint python "${{ env.IMAGE_TAG }}:${{ env.VERSION_TAG }}" smoke_backing_runtime.py
 
       - name: Set up Java for Android build
-        if: startsWith(github.ref, 'refs/tags/v')
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
 
       - name: Set up Gradle
-        if: startsWith(github.ref, 'refs/tags/v')
         uses: gradle/actions/setup-gradle@v4
 
       - name: Build Android APK
-        if: startsWith(github.ref, 'refs/tags/v')
         working-directory: android
         run: |
-          gradle --no-daemon :app:testDebugUnitTest :app:lintRelease :app:assembleRelease -PVERSION_NAME=${{ env.VERSION_TAG }} -PVERSION_CODE=90800
+          gradle --no-daemon :app:testDebugUnitTest :app:lintRelease :app:assembleRelease -PVERSION_NAME=${{ env.VERSION_TAG }} -PVERSION_CODE=${{ env.VERSION_CODE }}
           test -f app/build/outputs/apk/release/app-release.apk
           mv app/build/outputs/apk/release/app-release.apk app/build/outputs/apk/release/Sal0-Karaoke-v${{ env.VERSION_TAG }}.apk
 
+      - name: Push validated Docker image
+        run: |
+          docker push "${{ env.IMAGE_TAG }}:${{ env.VERSION_TAG }}"
+          docker push "${{ env.IMAGE_TAG }}:latest"
+
       - name: Create GitHub Release
-        if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: v${{ env.VERSION_TAG }}
+          target_commitish: ${{ github.sha }}
           name: Sal0 Karaoke v${{ env.VERSION_TAG }}
+          body_path: RELEASE_NOTES.md
           generate_release_notes: true
           draft: false
           prerelease: false
