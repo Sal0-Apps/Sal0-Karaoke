@@ -14,7 +14,7 @@ await page.route('**/*',async route=>{
  if(u.pathname==='/api/youtube/search')data={results:[{title:'Artist - Song',uploader:'Channel',duration:180,url:'https://www.youtube.com/watch?v=abcdefghijk'}]};
  if(u.pathname==='/api/youtube-metadata')data={title:'Artist - Song'};
  if(u.pathname==='/api/easy-mode')data={enabled:true,whisper_model:'medium',background_mode:'random_library',random_backgrounds:[],lyrics_mode:'auto'};
- if(u.pathname==='/api/youtube/publication-options')data={enabled:connected,playlists:[{id:'PL-one',title:'Playlist Alice'},{id:'PL-two',title:'Playlist Bob'}],default_publish:saved?.default_publish ?? true,playlist_id:saved?.playlist_id || '',privacy:'unlisted',channel_title:'Canal teste'};
+ if(u.pathname==='/api/youtube/publication-options')data={enabled:connected,can_publish:!!saved?.playlist_id,can_choose_playlist:true,playlists:[{id:'PL-one',title:'Playlist Alice'},{id:'PL-two',title:'Playlist Bob'}],default_publish:saved?.default_publish ?? true,playlist_id:saved?.playlist_id || '',privacy:'unlisted',channel_title:'Canal teste'};
  if(u.pathname==='/api/users')data=[{username:'owner',role:'admin'},{username:'alice',role:'user'},{username:'bob',role:'user'}];
  if(u.pathname==='/api/admin/results')data={results:[]};
  if(u.pathname==='/api/library')data={audio:[],backgrounds:[],history:[],videos:[],photos:[]};
@@ -60,6 +60,9 @@ assert.equal(saved.default_publish,true);assert.equal(saved.playlist_id,'PL-two'
 await page.waitForFunction(()=>document.getElementById('easyYoutubePublish').checked && document.getElementById('easyYoutubePlaylist').value==='PL-two');
 assert(await page.locator('#fullYoutubePublish').isChecked());
 assert.equal(await page.locator('#fullYoutubePlaylist').inputValue(),'PL-two');
+await page.locator('#easyYoutubePlaylist').selectOption('PL-one');
+assert.equal(await page.locator('#easyYoutubePlaylist').inputValue(),'PL-one');
+assert.equal(await page.locator('#easyYoutubePlaylist option[value=""]').count(),0);
 assert.equal(saved.privacy,'unlisted');assert.equal(saved.user_assignments.bob.playlist_id,'PL-two');
 assert.equal(saved.user_assignments.bob.enabled,true);assert.equal(saved.user_assignments.bob.default_publish,true);
 for(const width of [360,390,768,1440]){

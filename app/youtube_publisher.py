@@ -259,15 +259,25 @@ class YouTubePublisher:
                     'users_can_publish': True,
                     'user_assignments': validated})
 
+    def validate_profile_playlist(self, user, playlist_id=''):
+        settings = self.settings(user.get('username'))
+        admin = user.get('role') == 'admin'
+        assigned = settings['playlist_id'] if admin else settings['user_assignments'].get(user.get('username'), {}).get('playlist_id', '')
+        if not assigned:
+            raise PublicationError('Defina uma playlist no perfil antes de publicar no YouTube.')
+        selected = playlist_id or assigned
+        if not isinstance(selected, str) or not re.fullmatch(r'[A-Za-z0-9_-]{1,128}', selected):
+            raise PublicationError('Identificador de playlist inválido.')
+        if not admin and selected != assigned:
+            raise PublicationError('Use a playlist atribuída à sua conta pelo administrador.')
+        return selected
+
     def publication_options(self, user, requested=False, playlist_id='', title=''):
         # Every account starts checked in the UI; each video still submits its own choice.
         if not requested:
             return None
         settings = self.settings(user.get('username'))
-        if user.get('role') != 'admin':
-            assignment = settings['user_assignments'].get(user.get('username'), {})
-            if playlist_id != assignment.get('playlist_id', ''):
-                raise PublicationError('Use a playlist atribuída à sua conta pelo administrador.')
+        playlist_id = self.validate_profile_playlist(user, playlist_id)
         token = self.read('token.json')
         if not token.get('channel_id') or not token.get('refresh_token'):
             raise PublicationError('O administrador precisa conectar o canal do YouTube.')
@@ -286,8 +296,8 @@ class YouTubePublisher:
         playlist_id = settings['playlist_id'] if admin else assignment.get('playlist_id', '')
         playlists = self.playlists() if enabled and admin else ([{'id': playlist_id,
             'title': assignment.get('playlist_title', playlist_id)}] if enabled and playlist_id else [])
-        return {'enabled': enabled, 'playlists': playlists, 'allow_no_playlist': admin or not playlist_id,
-                'playlist_id': playlist_id, 'default_publish': enabled,
+        return {'enabled': enabled, 'playlists': playlists, 'allow_no_playlist': False, 'can_choose_playlist': admin, 'can_publish': bool(enabled and playlist_id and any(p['id'] == playlist_id for p in playlists)),
+                'playlist_id': playlist_id, 'default_publish': bool(enabled and playlist_id and any(p['id'] == playlist_id for p in playlists)),
                 'privacy': settings['privacy'], 'channel_title': token.get('channel_title', ''),
                 'title_template': settings['title_template']}
 
@@ -305,6 +315,7 @@ class YouTubePublisher:
             raise PublicationError('O canal conectado mudou. Revise as opções antes de publicar.')
         if playlist_id and not re.fullmatch(r'[A-Za-z0-9_-]{1,128}', playlist_id):
             raise PublicationError('Identificador de playlist inválido.')
+        playlist_id = self.validate_profile_playlist(requester or {'role':'admin'}, playlist_id)
         digest = hashlib.sha256(json.dumps([token['channel_id'], playlist_id, privacy,
             (requester or {}).get('username', '')], ensure_ascii=False).encode())
         with video.open('rb') as source:
@@ -425,16 +436,23 @@ class YouTubePublisher:
         return video_id
 
     def publish(self, job):
+        if not job.get('playlist_id'):
+            raise PublicationError('Publicação bloqueada: o vídeo precisa de uma playlist.')
         requester = job.get('requester')
         if requester:
             user = self.user_lookup(requester['username']) if hasattr(self, 'user_lookup') else requester
             if not user:
                 raise PublicationError('A conta que solicitou a publicação não está mais disponível.')
             self.publication_options(user, True, job['playlist_id'], job['title'])
+            profile_playlist = self.validate_profile_playlist(user)
+        if not requester:
+            self.validate_profile_playlist({'role':'admin'}, job['playlist_id'])
+            profile_playlist = self.validate_profile_playlist({'role':'admin'})
         if self.token()['channel_id'] != job['channel_id']:
             raise PublicationError('O canal conectado mudou. A publicação foi interrompida.')
         if job['playlist_id'] and not job.get('playlist_done'):
-            if job['playlist_id'] not in {p['id'] for p in self.playlists()}:
+            available_playlists = {p['id'] for p in self.playlists()}
+            if profile_playlist not in available_playlists or job['playlist_id'] not in available_playlists:
                 raise PublicationError('A playlist não pertence ao canal conectado.')
         video_id = self.upload_video(job)
         if not job.get('thumbnail_done'):
@@ -574,7 +592,7 @@ def install_routes(app, get_current_user, require_admin, resolve_video, check_ad
                 cover: UploadFile = File(None), user=Depends(admin)):
         video = resolve_video(owner_key, filename, user)
         data = cover.file.read(2 * 1024 * 1024 + 1) if cover else None
-        return guarded(lambda: publisher.enqueue(video, title, privacy, playlist_id, data))
+        return guarded(lambda: publisher.enqueue(video, title, privacy, playlist_id, data, requester=user))
 
     @app.post('/api/admin/youtube/cover')
     def preview_cover(options: dict, user=Depends(admin)):

@@ -26,6 +26,7 @@ class PublisherTests(unittest.TestCase):
         self.token = {'access_token': 'server-only-secret', 'refresh_token': 'server-only-refresh',
                       'channel_id': 'channel-one', 'channel_title': 'Canal', 'expires_at': time.time() + 3600}
         self.publisher.save('token.json', self.token)
+        self.publisher.save('settings.json', {'defaults':{'playlist_id':'playlist-one'}})
         self.video = Path(self.folder.name) / 'song.mp4'
         self.video.write_bytes(b'mp4-video-fixture')
         self.cover = Path(self.folder.name) / 'cover.jpg'
@@ -135,7 +136,7 @@ class PublisherTests(unittest.TestCase):
                 'default_publish':False, 'playlist_id':''})
             restored = YouTubePublisher(self.folder.name)
             with patch.object(restored, 'playlists', return_value=playlists):
-                self.assertTrue(restored.quick_options(admin)['default_publish'])
+                self.assertFalse(restored.quick_options(admin)['default_publish'])
                 self.assertEqual(restored.quick_options(admin)['playlist_id'], '')
                 self.assertEqual(restored.quick_options(admin)['privacy'], 'unlisted')
 
@@ -153,27 +154,49 @@ class PublisherTests(unittest.TestCase):
         self.assertTrue(self.publisher.quick_options(alice)['default_publish'])
         self.assertEqual(self.publisher.publication_options(alice, True, 'playlist-one')['privacy'], 'unlisted')
         bob = {'username':'bob', 'role':'user'}
-        self.assertTrue(self.publisher.quick_options(bob)['default_publish'])
+        self.assertFalse(self.publisher.quick_options(bob)['default_publish'])
         self.assertEqual(self.publisher.quick_options(bob)['playlist_id'], '')
         self.assertIsNone(self.publisher.publication_options(bob, False))
-        self.assertEqual(self.publisher.publication_options(bob, True)['playlist_id'], '')
+        with self.assertRaises(PublicationError): self.publisher.publication_options(bob, True)
+
+    def test_admin_uses_profile_playlist_by_default_and_can_override_per_video(self):
+        admin = {'username':'admin', 'role':'admin'}
+        self.assertEqual(self.publisher.publication_options(admin, True)['playlist_id'], 'playlist-one')
+        alternate = self.publisher.publication_options(admin, True, 'playlist-two')
+        self.assertEqual(alternate['playlist_id'], 'playlist-two')
+        with patch.object(self.publisher, 'start'):
+            queued = self.publisher.enqueue(self.video, 'Title', playlist_id=alternate['playlist_id'], thumbnail=self.cover.read_bytes(), requester=admin)
+        self.assertEqual(queued['playlist_id'], 'playlist-two')
+        self.assertEqual(self.publisher.settings('admin')['playlist_id'], 'playlist-one')
+        self.publisher.save('settings.json', {})
+        with self.assertRaises(PublicationError): self.publisher.publication_options(admin, True, 'playlist-two')
+        with patch.object(self.publisher, 'upload_video') as upload:
+            with self.assertRaises(PublicationError): self.publisher.publish(self.job)
+            upload.assert_not_called()
+        with self.assertRaises(PublicationError): self.publisher.enqueue(self.video, 'Title', playlist_id='playlist-two')
+
+    def test_legacy_job_without_playlist_never_uploads(self):
+        self.job['playlist_id'] = ''
+        with patch.object(self.publisher, 'upload_video') as upload:
+            with self.assertRaises(PublicationError): self.publisher.publish(self.job)
+            upload.assert_not_called()
 
     def test_user_can_only_publish_to_own_assigned_playlist(self):
         self.configure_user()
         user = {'username': 'alice', 'role': 'user'}
-        for playlist in ('other-playlist', ''):
+        for playlist in ('other-playlist',):
             with self.assertRaises(PublicationError): self.publisher.publication_options(user, True, playlist)
         with self.assertRaises(PublicationError):
             self.publisher.publication_options({'username': 'bob', 'role': 'user'}, True, 'playlist-one')
 
-    def test_no_playlist_still_preselects_publication_for_every_user(self):
+    def test_missing_profile_playlist_blocks_publication(self):
         self.configure_user('', False)
         user = {'username': 'alice', 'role': 'user'}
         options = self.publisher.quick_options(user)
         self.assertTrue(options['enabled'])
-        self.assertTrue(options['allow_no_playlist'])
-        self.assertTrue(options['default_publish'])
-        self.assertEqual(self.publisher.publication_options(user, True)['playlist_id'], '')
+        self.assertFalse(options['allow_no_playlist'])
+        self.assertFalse(options['default_publish'])
+        with self.assertRaises(PublicationError): self.publisher.publication_options(user, True)
 
     def test_revoking_assignment_blocks_queued_job_before_upload(self):
         self.configure_user()
@@ -222,9 +245,9 @@ class PublisherTests(unittest.TestCase):
     def test_identical_media_with_distinct_user_or_playlist_has_distinct_publication(self):
         self.publisher.save('jobs.json', [])
         with patch.object(self.publisher, 'start'):
-            first = self.publisher.enqueue(self.video, 'Title', playlist_id='playlist-one', thumbnail=self.cover.read_bytes(), requester={'username': 'alice'})
-            second = self.publisher.enqueue(self.video, 'Title', playlist_id='playlist-two', thumbnail=self.cover.read_bytes(), requester={'username': 'alice'})
-            third = self.publisher.enqueue(self.video, 'Title', playlist_id='playlist-one', thumbnail=self.cover.read_bytes(), requester={'username': 'bob'})
+            first = self.publisher.enqueue(self.video, 'Title', playlist_id='playlist-one', thumbnail=self.cover.read_bytes(), requester={'username': 'alice', 'role':'admin'})
+            second = self.publisher.enqueue(self.video, 'Title', playlist_id='playlist-two', thumbnail=self.cover.read_bytes(), requester={'username': 'alice', 'role':'admin'})
+            third = self.publisher.enqueue(self.video, 'Title', playlist_id='playlist-one', thumbnail=self.cover.read_bytes(), requester={'username': 'bob', 'role':'admin'})
         self.assertEqual(len({first['id'], second['id'], third['id']}), 3)
 
     def test_title_privacy_and_playlist_are_validated_before_enqueue(self):
