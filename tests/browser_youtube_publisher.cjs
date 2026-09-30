@@ -50,6 +50,7 @@ const bob=page.locator('.yt-user-row').filter({hasText:'bob'});
 await bob.locator('[data-field="enabled"]').check();
 await bob.locator('[data-field="playlist"]').selectOption('PL-two');
 await bob.locator('[data-field="default"]').check();
+await page.locator('.yt-defaults summary').click();
 await page.locator('#ytDefaultPrivacy').selectOption('unlisted');
 await page.locator('#ytPublishSave').click();
 await page.waitForFunction(()=>document.getElementById('ytUsersMessage').dataset.kind==='success');
