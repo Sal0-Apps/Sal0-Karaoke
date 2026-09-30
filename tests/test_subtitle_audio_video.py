@@ -50,11 +50,14 @@ class AudioSubtitleVideoTests(unittest.TestCase):
                 (cache/'subtitle_segments_original.json').write_text(json.dumps([{'start':0,'end':1,'text':'Hello'}]))
                 (cache/'subtitle_info_original.json').write_text(json.dumps({'language':'en','cache_signature':{'whisper_model':'medium','enable_vad':True,'transcription_preset':'standard'}}))
                 def save_srt(path,*args):shutil.copy2(path,library/'history'/'original.srt');return 'original.srt'
-                def render(audio,subtitles,destination,*args,**kwargs):Path(destination).write_bytes(b'video')
+                def render(audio,subtitles,destination,*args,**kwargs):
+                    kwargs['progress_callback'](50);kwargs['progress_callback'](100)
+                    Path(destination).write_bytes(b'video')
                 def save_video(path,*args):shutil.copy2(path,library/'history'/'video.mp4');return 'video.mp4'
                 state=Mock();documents=Mock();videos=Mock();metadata=Mock()
                 ns={'os':os,'json':json,'shutil':shutil,'logger':logging.getLogger('test'),
                     'get_file_duration':lambda path:1,'stage_checkpoint':lambda *args:{},'save_stage_checkpoint':Mock(),
+                    'notify_targets':Mock(),'telegram_notice':lambda *parts:' '.join(parts),'telegram_escape':str,
                     'update_state':state,'cover_full_media_timeline':lambda segments,duration:segments,
                     'write_srt':lambda segments,path:Path(path).write_text('1\n00:00:00,000 --> 00:00:01,000\nHello\n'),
                     'save_srt_result':save_srt,'create_public_download':lambda owner,name:name+'-token',
@@ -65,6 +68,9 @@ class AudioSubtitleVideoTests(unittest.TestCase):
                     ns['run_subtitle_srt_pipeline']('source', 'song','medium',True,'standard',False,'original',{'username':'owner'},str(cache),str(output),str(library),[])
                 self.assertEqual(state.call_args.kwargs['result_kind'],'subtitles' if has_video else 'subtitle_video')
                 self.assertEqual(videos.call_count,0 if has_video else 1)
+                if not has_video:
+                    self.assertTrue(any(c.kwargs.get('stage_progress')==50 for c in state.call_args_list))
+                    self.assertTrue(any('100%' in c.args[1] for c in ns['notify_targets'].call_args_list))
                 self.assertEqual(documents.call_args.args[1][0]['public_download_token'],'original.srt-token')
                 self.assertTrue((library/'history'/'original.srt').is_file())
                 self.assertEqual(metadata.call_args.args[2],'original.srt' if has_video else 'video.mp4')

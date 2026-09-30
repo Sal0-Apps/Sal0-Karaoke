@@ -2544,7 +2544,7 @@
                 <summary>1. Criar o primeiro karaokê</summary>
                 <ol>
                     <li>Na aba <strong>Criar</strong>, escolha <strong>Rápido</strong>. Durante outro trabalho, toque antes em <strong>Adicionar novo processo</strong>.</li>
-                    <li>Cole um link, selecione um áudio/vídeo ou use a Biblioteca. Use apenas mídias que você tem autorização para processar.</li>
+                    <li>Busque no YouTube e escolha uma miniatura, cole um link, selecione um áudio/vídeo ou use a Biblioteca. Use apenas mídias que você tem autorização para processar.</li>
                     <li>Escolha o fundo: <strong>Surpresa</strong>, vídeo original, arquivo, Biblioteca ou link. No fundo surpresa, vale a coleção configurada pelo administrador.</li>
                     <li>Toque em <strong>Criar meu karaokê</strong>. O perfil global define transcrição, legenda e visual.</li>
                     <li>Acompanhe o progresso em <strong>Criar</strong>. Ao concluir, visualize ou baixe o MP4; a cópia fica em <strong>Biblioteca → Resultados</strong>.</li>
@@ -2556,6 +2556,8 @@
                     <li>Escolha <strong>Detalhado</strong>, a mídia, o perfil da voz e o modelo Whisper.</li>
                     <li>Abra <strong>Letra</strong> para buscar ou colar uma letra-guia. O texto manual tem prioridade; se não houver letra, a transcrição usa o Whisper.</li>
                     <li>Defina o fundo e a animação: sílabas, palavras, linhas ou frase estática.</li>
+                    <li>Em <strong>Vozes de apoio</strong>, mantenha ou desative os backing vocals e ajuste seu volume. A opção usa uma segunda separação local da voz principal.</li>
+                    <li>A sincronização automática só usa tempos de versos quando existe uma letra LRC compatível com a gravação. Sem ela, o processo usa Whisper.</li>
                     <li>Em <strong>Mais ajustes</strong>, altere cor, tamanho, posição, limites dos versos, prévia da próxima frase, VAD e fonte da transcrição. Você também pode salvar um perfil e habilitar somente a remoção de vocais.</li>
                     <li>Ative a revisão para corrigir texto e tempos antes de finalizar. Em canto, o VAD pode cortar notas sustentadas; use com cuidado.</li>
                 </ol>
@@ -2633,6 +2635,17 @@
                     <li><strong>Memória ou lentidão:</strong> confira espaço e RAM; um modelo menor pode ajudar na transcrição, com possível perda de qualidade. O Demucs usa CPU e pode levar mais tempo que o vídeo.</li>
                     <li><strong>Diagnóstico:</strong> o administrador pode baixar os logs em Ajustes. Revise dados pessoais e credenciais antes de compartilhar.</li>
                 </ul>
+            </details>
+            <details>
+                <summary>10. Conectar e publicar no YouTube</summary>
+                <ol>
+                    <li>Em <strong>Ajustes → Publicar no YouTube → Conexão do canal</strong>, abra o guia de autorização. Habilite a YouTube Data API v3 no projeto Google, adicione sua conta como usuário de teste e baixe uma credencial de aplicativo para computador.</li>
+                    <li>Abra o assistente no computador, escolha a credencial e autorize no navegador do Google. Baixe <strong>youtube-autorizacao.json</strong>, importe no Karaokê e toque em <strong>Conectar meu canal</strong>. Confira a confirmação com o nome do canal. O servidor pode continuar em HTTP; não exige serviço pago.</li>
+                    <li>Em <strong>Playlist de cada usuário</strong>, defina permissão, playlist ou <strong>Sem playlist</strong> e a marcação padrão. Para o administrador, abra <strong>Título e privacidade usados no modo rápido → Playlist padrão do administrador</strong>. Salve e confira a confirmação.</li>
+                    <li>No modo Rápido ou Detalhado, marque <strong>Publicar no YouTube</strong> somente quando quiser enviar esse vídeo. Desmarcado, não há publicação. Sem playlist, o vídeo vai ao canal sem inclusão em lista.</li>
+                    <li>Use <strong>Publicar um vídeo já pronto</strong> para revisar título, capa, playlist e privacidade de um resultado existente. Acompanhe erros e links no histórico de publicações.</li>
+                </ol>
+                <p>A API tem cota gratuita e pode limitar projetos sem auditoria a vídeos privados. Guarde a autorização como uma senha. Backing vocals e vídeo do modo SRT mostram porcentagem da etapa e avisam o avanço no Telegram; o LibreTranslate informa apenas início e término.</p>
             </details>
             <p class="compact-note">Versão do servidor: 9.9.4. A transcrição é local; fontes, modelos e integrações podem acessar serviços externos. Use conteúdo autorizado.</p>
         </div>
@@ -2771,6 +2784,8 @@
                 [['downloading youtube'], 'Baixando mídia'],
                 [['converting media to mp3', 'extracting audio', 'extraindo áudio', 'using normalized mp3'], 'Preparando áudio'],
                 [['searching lyrics'], 'Buscando letra'],
+                [['backing vocals'], 'Preservando vozes de apoio'],
+                [['using synced lyrics'], 'Aplicando letra sincronizada'],
                 [['separating', 'demucs', 'vocais'], 'Separando vocais do instrumental'],
                 [['transcribing', 'whisper'], 'Transcrevendo áudio com Whisper'],
                 [['translating', 'traduz'], 'Traduzindo o SRT'],

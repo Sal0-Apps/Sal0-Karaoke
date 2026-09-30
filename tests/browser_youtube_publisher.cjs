@@ -4,13 +4,13 @@ for(const match of HTML.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/g)) new Fu
 (async()=>{
 const browser=await chromium.launch({headless:true});const page=await browser.newPage();
 const errors=[];page.on('pageerror',e=>errors.push(e.message));
-let connected=false,failImport=true,failPlaylists=false,saved=null,srtDone=false;
+let connected=false,failImport=true,failPlaylists=false,saved=null,srtDone=false,srtRendering=false;
 await page.route('**/*',async route=>{
- const request=route.request(),u=new URL(request.url());if(u.hostname!=='karaoke.test')return route.abort();
+ const request=route.request(),u=new URL(request.url());if(u.hostname==='i.ytimg.com')return route.fulfill({contentType:'image/png',body:Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jvXkAAAAASUVORK5CYII=','base64')});if(u.hostname!=='karaoke.test')return route.abort();
  if(u.pathname==='/')return route.fulfill({contentType:'text/html',body:HTML});
  let data={},status=200;
  if(u.pathname==='/api/auth_status')data={status:'authenticated',username:'owner',role:'admin'};
- if(u.pathname==='/api/status')data=srtDone ? {status:'done',progress:100,result_available_to_current_user:true,owned_by_current_user:true,owner_username:'owner',original_filename:'song.mp3',result_kind:'subtitle_video',original_subtitle_filename:'original.srt',subtitle_filename:'original.srt'} : {status:'idle',progress:0,result_available_to_current_user:false};
+ if(u.pathname==='/api/status')data=srtRendering ? {status:'processing',step:'Rendering subtitle video',progress:97,stage_progress:50,stage_detail:'Criando MP4 com o áudio original e as legendas',owned_by_current_user:true,owner_username:'owner',original_filename:'song.mp3'} : srtDone ? {status:'done',progress:100,result_available_to_current_user:true,owned_by_current_user:true,owner_username:'owner',original_filename:'song.mp3',result_kind:'subtitle_video',original_subtitle_filename:'original.srt',subtitle_filename:'original.srt'} : {status:'idle',progress:0,result_available_to_current_user:false};
  if(u.pathname==='/api/youtube/search')data={results:[{title:'Artist - Song',uploader:'Channel',duration:180,url:'https://www.youtube.com/watch?v=abcdefghijk'}]};
  if(u.pathname==='/api/youtube-metadata')data={title:'Artist - Song'};
  if(u.pathname==='/api/easy-mode')data={enabled:true,whisper_model:'medium',background_mode:'random_library',random_backgrounds:[],lyrics_mode:'auto'};
@@ -76,7 +76,10 @@ await page.locator('#subtitleYoutubeUrlSearch').fill('Artist Song');
 const result=page.locator('#subtitleYoutubeUrlSearch').locator('xpath=ancestor::div[contains(@class,"youtube-search-panel")]').locator('.youtube-search-result');
 await result.waitFor();assert.equal(await result.locator('img').getAttribute('src'),'https://i.ytimg.com/vi/abcdefghijk/mqdefault.jpg');
 await result.click();assert.equal(await page.locator('#subtitleYoutubeUrl').inputValue(),'https://www.youtube.com/watch?v=abcdefghijk');
-srtDone=true;
+srtRendering=true;
+await page.waitForFunction(()=>document.getElementById('stageProgressText').textContent.includes('50% da etapa atual'));
+assert.equal(await page.locator('#progressPercent').innerText(),'97%');
+srtRendering=false;srtDone=true;
 await page.waitForFunction(()=>document.getElementById('downloadResultTitle').textContent==='Vídeo e legendas prontos!');
 assert(await page.locator('#btnDownloadResult').isVisible());assert(await page.locator('#btnDownloadOriginalSubtitles').isVisible());
 assert(await page.locator('#resultVideoPreview').isVisible());

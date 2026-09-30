@@ -1,5 +1,6 @@
 """Keep backing vocals without mixing the original lead voice back in."""
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -11,7 +12,7 @@ from audio_processor import get_effective_cpu_count
 BACKING_MODEL_VERSION = "UVR-BVE-4B_SN-44100-2"
 
 
-def run_cancellable(command, env=None):
+def run_cancellable(command, env=None, progress_callback=None):
     pm.check_cancelled()
     process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                                text=True, env=env)
@@ -19,10 +20,21 @@ def run_cancellable(command, env=None):
     try:
         import logging
         logger = logging.getLogger("karaoke")
+        last_progress = -1
+        inference_started = False
         for line in process.stdout:
             if pm.cancel_event.is_set():
                 process.terminate()
                 break
+            if "SAL0_BVE_INFERENCE_START" in line:
+                inference_started = True
+            if progress_callback and inference_started:
+                match = re.search(r"(?<!\d)(\d{1,3})%", line)
+                if match:
+                    percent = max(0, min(100, int(match.group(1))))
+                    if percent > last_progress:
+                        progress_callback(percent)
+                        last_progress = percent
             if line.strip():
                 logger.info("[Backing vocals] %s", line.strip())
         process.wait()
@@ -67,16 +79,24 @@ def preserve_backing_vocals(vocals, instrumental, cache_dir, gain=1.0, update_ca
         for key in ("OMP_NUM_THREADS", "MKL_NUM_THREADS", "OPENBLAS_NUM_THREADS"):
             env[key] = threads
         env["TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD"] = "1"
+        def inference_progress(percent):
+            if update_callback:
+                update_callback("processing", "Separando backing vocals", 56 + round(percent * 0.03),
+                                stage_progress=round(percent * 0.9),
+                                stage_detail="Analisando voz principal e vozes de apoio em CPU")
         with tempfile.TemporaryDirectory(dir=cache_dir, prefix="backing-") as folder:
             run_cancellable([
                 sys.executable, str(Path(__file__).with_name("backing_vocals_runner.py")),
                 vocals, folder, "/data/output/models/backing_vocals",
-            ], env=env)
+            ], env=env, progress_callback=inference_progress)
             pm.check_cancelled()
             # Only commit complete stem pairs; cancellation cannot create a valid cache marker.
             os.replace(os.path.join(folder, "lead_vocals.wav"), lead)
             os.replace(os.path.join(folder, "backing_vocals.wav"), backing)
             Path(marker).write_text(BACKING_MODEL_VERSION)
+    if update_callback:
+        update_callback("processing", "Misturando backing vocals", 59, stage_progress=90,
+                        stage_detail="Aplicando o volume das vozes de apoio ao instrumental")
     with tempfile.TemporaryDirectory(dir=cache_dir, prefix="backing-mix-") as folder:
         mixed = os.path.join(folder, "mixed.wav")
         mix_backing(instrumental, backing, mixed, gain)

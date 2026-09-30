@@ -1,6 +1,6 @@
 # Busca no YouTube, letras sincronizadas, backing vocals e publicação
 
-Esta atualização permite pesquisar pelo nome da música nas entradas do YouTube. A busca automática começa depois de uma pausa na digitação e apresenta até seis vídeos com título, canal e duração. Ao escolher um vídeo, o app preenche o link e mantém o fluxo normal de criação. A pesquisa não baixa os vídeos automaticamente.
+Esta atualização permite pesquisar pelo nome da música nas entradas do YouTube. A busca automática começa depois de uma pausa na digitação e apresenta até seis vídeos com miniatura, título, canal e duração. Está disponível nos modos Rápido, Detalhado e Gerar SRT, além das entradas da Biblioteca. Ao escolher um vídeo, o app preenche o link e mantém o fluxo normal de criação. A pesquisa não baixa os vídeos automaticamente.
 
 ## Letra sincronizada somente quando disponível
 
@@ -22,6 +22,16 @@ O fluxo é local e usa CPU:
 O modelo é baixado no primeiro uso e fica em `/data/output/models/backing_vocals`. Depois do download, a separação funciona sem enviar áudio a serviços externos. A busca de músicas e letras precisa de internet. A etapa adicional aumenta o tempo de processamento e pode apresentar vazamento da voz principal ou perdas de harmonias. Qualidade varia com a gravação, especialmente em duetos, uníssonos e vozes sobrepostas.
 
 As faixas intermediárias são reaproveitadas apenas quando completas. Alterações no volume, no modo de sincronização ou na preservação das vozes invalidam os resultados posteriores, evitando reutilizar um vídeo com opções anteriores. Uma falha no modelo interrompe a tarefa com erro; o app não declara que preservou backing vocals usando somente o instrumental.
+
+## SRT e vídeo automático para áudio
+
+O modo Gerar SRT mantém a transcrição do áudio completo e a tradução opcional do LibreTranslate. Quando o arquivo de entrada só contém áudio, gera também um MP4 com fundo escuro, áudio completo e legendas na tela. Usa o SRT traduzido quando disponível, ou o original. A detecção consulta os fluxos reais da mídia, evitando confundir capas incorporadas com vídeo. Entradas com vídeo continuam recebendo os SRTs sem renderização adicional.
+
+O resultado oferece prévia do vídeo e downloads separados de MP4, SRT original e tradução concluída. Esses arquivos são salvos na Biblioteca e têm envios individuais ao Telegram. Não há abertura de capa no MP4 do modo SRT, mantendo os tempos da mídia.
+
+## Progresso e avisos das etapas
+
+Backing vocals e renderização do MP4 de áudio exibem porcentagem interna e progresso geral. O Telegram informa início e avanço em marcos de 25%, evitando uma mensagem por frame. A letra sincronizada aplicada e a tradução também recebem avisos; no LibreTranslate, só há informação de início e término, não porcentagem interna contínua. As demais etapas, fila e entrega continuam funcionando como antes.
 
 ## Instalação e validação
 
@@ -60,7 +70,7 @@ A conexão web com HTTPS continua opcional para quem já tem domínio e cliente 
 
 A escolha da música e o botão Criar são os dois passos principais. Buscar por nome e colar um link têm o mesmo destaque. Arquivos e Biblioteca têm seletores próprios. Fundo, vozes e sincronização ficam em Personalizar, fechado inicialmente. A pesquisa de qualquer entrada do YouTube mostra miniaturas dos vídeos. O layout empilha os campos no celular e usa duas colunas no desktop.
 
-As miniaturas dos Resultados, do player final e da publicação automática são extraídas da abertura do próprio vídeo, que já contém a capa gerada. Não há uma segunda sobreposição de título. Uma capa personalizada continua opcional para publicações administrativas manuais.
+As miniaturas dos Resultados, do player final e da publicação automática são extraídas do próprio vídeo; nos karaokês, a abertura já contém a capa gerada. O vídeo automático do modo SRT usa seu próprio frame, sem abertura extra. Não há uma segunda sobreposição de título. Uma capa personalizada continua opcional para publicações administrativas manuais.
 
 `KARAOKE_CPU_THREADS` permite limitar explicitamente os workers em servidores compartilhados, respeitando também a afinidade disponível. Sem essa variável, o comportamento anterior permanece. O diretório `/data` preserva contas, modelos, músicas, resultados e a conexão do canal.
 

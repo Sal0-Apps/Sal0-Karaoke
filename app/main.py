@@ -4864,7 +4864,7 @@ def run_subtitle_srt_pipeline(
                 "Transcrição com Whisper",
                 f"🎵 <b>{telegram_escape(orig_name)}</b>",
                 "🎧 O áudio completo será usado para gerar o SRT.",
-                "📊 Etapa atual: transcrição",
+                "📊 Progresso geral inicial: <b>45%</b> · etapa atual: <b>0%</b>",
             ),
         )
         def publish_subtitle_whisper_progress(percent: int, elapsed: float, total: float):
@@ -4988,6 +4988,10 @@ def run_subtitle_srt_pipeline(
                 stage_detail="O SRT original já está seguro na Biblioteca",
             )
 
+            notify_targets(telegram_targets, telegram_notice("🌍", "Tradução do SRT",
+                f"🎵 <b>{telegram_escape(orig_name)}</b>",
+                "📊 Progresso geral: <b>80%</b>",
+                "Aguardando o LibreTranslate; a API não informa a porcentagem interna."))
             def translation_progress(completed: int, total: int):
                 percent = round((completed / max(total, 1)) * 100)
                 update_state(
@@ -5010,6 +5014,9 @@ def run_subtitle_srt_pipeline(
                 library_dir,
                 translation_language,
             )
+            notify_targets(telegram_targets, telegram_notice("🌍", "SRT traduzido concluído",
+                f"🎵 <b>{telegram_escape(orig_name)}</b>",
+                "📊 Progresso geral: <b>95%</b> · etapa atual: <b>100%</b>"))
         except InterruptedError:
             raise
         except Exception as exc:
@@ -5043,12 +5050,25 @@ def run_subtitle_srt_pipeline(
     final_video = os.path.join(output_dir, "final_karaoke.mp4")
     if not media_has_motion_video(input_media_path):
         pm.check_cancelled()
-        update_state("processing", "Rendering subtitle video", 96,
-                     stage_detail="Criando MP4 com o áudio original e as legendas")
+        notify_targets(telegram_targets, telegram_notice("🎬", "Vídeo legendado do áudio",
+            f"🎵 <b>{telegram_escape(orig_name)}</b>",
+            "📊 Progresso geral: <b>96%</b> · etapa atual: <b>0%</b>"))
+        notified_render_percent = -1
+        def publish_subtitle_video_progress(percent):
+            nonlocal notified_render_percent
+            update_state("processing", "Rendering subtitle video", 96 + min(2, int(percent * 2 / 100)),
+                         stage_progress=percent, stage_detail="Criando MP4 com o áudio original e as legendas")
+            milestone = int(percent // 25) * 25
+            if milestone >= 25 and milestone > notified_render_percent:
+                notified_render_percent = milestone
+                notify_targets(telegram_targets, telegram_notice("🎬", "Vídeo legendado do áudio",
+                    f"🎵 <b>{telegram_escape(orig_name)}</b>",
+                    f"📊 Etapa atual: <b>{percent}%</b>"))
+        publish_subtitle_video_progress(0)
         render_audio_subtitle_video(normalized_mp3,
             final_translated_srt if translated_filename else final_original_srt,
             final_video, media_duration,
-            progress_callback=lambda percent: update_state("processing", "Rendering subtitle video", 96 + min(2, int(percent * 2 / 100))))
+            progress_callback=publish_subtitle_video_progress)
         video_history_filename = save_video_to_history(final_video, orig_name, library_dir)
         if not video_history_filename:
             raise RuntimeError("Não foi possível salvar o vídeo legendado na Biblioteca.")
@@ -5356,9 +5376,14 @@ def run_pipeline(
             except Exception as clear_error:
                 logger.warning("Não foi possível limpar a letra automática anterior: %s", clear_error)
 
-            update_state("processing", "Searching lyrics online", 10, original_filename=orig_name)
+            update_state("processing", "Searching lyrics online", 10, original_filename=orig_name,
+                         stage_progress=0, stage_detail="Consultando letras; aguardando resposta do provedor")
+            notify_targets(telegram_targets, telegram_notice("🔎", "Busca de letra",
+                f"🎵 <b>{telegram_escape(orig_name)}</b>", "📊 Progresso geral: <b>10%</b>"))
             media_duration = get_file_duration(input_audio_path)
             auto_lyrics, auto_match = find_lyrics_automatically(orig_name, media_duration)
+            update_state("processing", "Searching lyrics online", 10,
+                         stage_progress=100, stage_detail="Consulta de letra concluída")
             if lyrics_timing == "auto" and auto_match and recording_matches(orig_name, auto_match, media_duration):
                 synced_segments = parse_lrc(auto_match.get("synced_lyrics"), media_duration)
             if auto_lyrics:
@@ -5539,9 +5564,20 @@ def run_pipeline(
             pm.check_cancelled()
             save_stage_checkpoint(cache_dir, "vocals_separated", "vocais separados pelo Demucs", 55)
             if keep_backing_vocals and backing_vocals_volume > 0:
+                notified_backing_percent = -1
+                def publish_backing_progress(status, step, progress, **details):
+                    nonlocal notified_backing_percent
+                    update_state(status, step, progress, **details)
+                    percent = details.get("stage_progress", 0)
+                    milestone = int(percent // 25) * 25
+                    if milestone > notified_backing_percent:
+                        notified_backing_percent = milestone
+                        notify_targets(telegram_targets, telegram_notice("🎤", "Preservando backing vocals",
+                            f"🎵 <b>{telegram_escape(orig_name)}</b>",
+                            f"📊 Progresso geral: <b>{progress}%</b> · etapa atual: <b>{percent}%</b>"))
                 vocals_wav, instrumental_wav = preserve_backing_vocals(
                     vocals_wav, instrumental_wav, cache_dir,
-                    gain=backing_vocals_volume / 100, update_callback=update_state,
+                    gain=backing_vocals_volume / 100, update_callback=publish_backing_progress,
                 )
             vocal_source = "lead" if keep_backing_vocals and backing_vocals_volume > 0 else "all"
 
@@ -5630,6 +5666,9 @@ def run_pipeline(
             # Passo 3: Transcrever vocais com Whisper selecionado
             segments = synced_segments or None
             if synced_segments:
+                notify_targets(telegram_targets, telegram_notice("📖", "Letra sincronizada aplicada",
+                    f"🎵 <b>{telegram_escape(orig_name)}</b>",
+                    "📊 Progresso geral: <b>74%</b> · etapa atual: <b>100%</b>"))
                 update_state("processing", "Using synced lyrics", 74, stage_progress=100,
                              stage_detail="Letra sincronizada por versos; sem transcrição adicional")
             segments_cache_file = os.path.join(cache_dir, "transcribed_segments.json")

@@ -27,9 +27,9 @@ Dentro da aplicação, o botão **Manual** abre tutoriais curtos, organizados em
 | --- | --- | --- | --- |
 | Rápido | Criar karaokê com o perfil preparado pelo administrador | Música e fundo opcional | MP4 com instrumental e legenda, conforme o perfil global |
 | Detalhado | Controlar reconhecimento, versos, visual e revisão | Fonte, perfil, modelo Whisper, letra-guia, fundo e ajustes avançados | MP4 de karaokê; a opção de somente remover vocais gera vídeo instrumental sem legenda |
-| Gerar SRT | Legendar áudio ou vídeo preservando a fala | Fonte, modelo, leitura da fala, VAD, revisão e idioma da tradução opcional | SRT original e, quando solicitado e gerado, SRT traduzido |
+| Gerar SRT | Legendar áudio ou vídeo preservando a fala | Fonte, modelo, leitura da fala, VAD, revisão e idioma da tradução opcional | SRT original, tradução opcional e MP4 legendado automático para entradas somente de áudio |
 
-**Gerar SRT** normaliza o áudio para MP3, não chama o Demucs e não renderiza um novo vídeo. A tradução depende exclusivamente de uma instância LibreTranslate configurada pelo administrador, com padrão de detecção automática → português do Brasil (`pt-BR`). O SRT original é salvo antes da tradução. O Karaokê continua entregando os arquivos gerados pela interface, Biblioteca e Telegram configurado, com os links de download. Se o LibreTranslate falhar, o original continua disponível e sua entrega ao Telegram ainda é tentada. Não há limite fixo de duração imposto pelo modo, mas os recursos do servidor limitam a operação.
+**Gerar SRT** normaliza o áudio para MP3 e preserva a faixa completa, sem Demucs. Quando a entrada contém somente áudio, também cria um MP4 com fundo simples e as legendas na tela, usando a tradução quando ela for gerada ou o SRT original. A detecção verifica os fluxos da mídia: uma capa incorporada em MP3 não conta como vídeo. Entradas que já contêm vídeo continuam gerando os arquivos SRT. A tradução depende exclusivamente de uma instância LibreTranslate configurada pelo administrador, com padrão de detecção automática → português do Brasil (`pt-BR`). O SRT original é salvo antes da tradução. O Karaokê continua entregando os arquivos gerados pela interface, Biblioteca e Telegram configurado, com os links de download. Se o LibreTranslate falhar, o original continua disponível e sua entrega ao Telegram ainda é tentada. Não há limite fixo de duração imposto pelo modo, mas os recursos do servidor limitam a operação.
 
 ### Configurar e manter a tradução
 
@@ -46,12 +46,14 @@ O container `libretranslate/libretranslate:latest` pode ser atualizado separadam
 - Envio de um ou vários arquivos, com seleção no aparelho ou arrastar e soltar.
 - Áudio: MP3, WAV, FLAC, M4A, AAC, OGG e Opus.
 - Vídeo: MP4, MKV, AVI, MOV, WebM e M4V.
-- Importação opcional por link autorizado do YouTube e reutilização de originais da Biblioteca.
+- Importação por link autorizado, busca automática no YouTube com miniaturas nos três modos e na Biblioteca, e reutilização de originais já salvos.
 - Identificação do título de links antes do processamento, quando o provedor responde.
 - Fundos com vídeo original, cor sólida, imagem, vídeo, arquivo da Biblioteca ou link.
 - Fundo surpresa escolhido da coleção preparada pelo administrador.
 - Separação local de fontes com Demucs e transcrição com Faster-Whisper.
 - Busca opcional de letra-guia, edição manual e aviso quando a busca não encontra resultado.
+- Uso automático de letra LRC sincronizada somente quando compatível com título, artista, versão e duração; sem ela, o Whisper continua disponível.
+- Separação inteligente de backing vocals, com volume ajustável, preservando as vozes de apoio no instrumental sem remixar a voz principal.
 - Perfis de voz, modelos Whisper e opção de transcrever o original ou os vocais separados.
 
 A extensão reconhecida pelo seletor não garante que todo codec seja reproduzido pelo navegador. O servidor depende de FFmpeg e dos decodificadores instalados.
@@ -77,7 +79,8 @@ Transcrição, tradução e sincronização são estimativas de modelos. A letra
 - Entradas por arquivo, link ou Biblioteca com opções próprias para cada envio.
 - Reordenação de itens aguardando e remoção individual.
 - Cancelamento do processo atual.
-- Progresso total em destaque, acompanhado pelo avanço da etapa atual.
+- Progresso total em destaque, acompanhado pelo avanço da etapa atual, incluindo backing vocals e MP4 do modo SRT.
+- Avisos de novas etapas no Telegram; separação das vozes de apoio e renderização do vídeo de áudio informam o avanço em marcos de 25%.
 - Pausa administrativa ao fim de uma etapa, com salvamento dos resultados intermediários.
 - Retomada após reiniciar, desde que o mesmo volume e os arquivos da tarefa sejam preservados.
 - Conclusão da tentativa de entrega ao Telegram antes do início do próximo trabalho.
@@ -106,22 +109,28 @@ Novos vídeos incluem uma capa em uma abertura silenciosa adicional de três seg
 
 Refazer um karaokê pelo cache reaproveita apenas insumos compatíveis, não a renderização ou os checkpoints da tarefa anterior. A retomada de uma tarefa pausada continua preservando suas etapas concluídas.
 
-Cada conta pode configurar seu bot e destinatário. As mensagens intermediárias informam as etapas e a situação da letra-guia. A conclusão informa o tempo de processamento e os links local/externo disponíveis, além de tentar anexar o vídeo ou os arquivos SRT.
+Cada conta pode configurar seu bot e destinatário. As mensagens intermediárias informam as etapas e a situação da letra-guia. A conclusão informa o tempo de processamento e os links local/externo disponíveis, além de tentar anexar o vídeo e/ou os arquivos SRT. No modo SRT com entrada somente de áudio, o MP4 e cada SRT são enviados separadamente.
 
 Quando o vídeo excede o limite adotado pelo envio, o servidor tenta criar uma prévia compactada apenas para o Telegram. O original salvo permanece intacto. Falhas de rede, limites da API e erros de compressão podem impedir o anexo; o envio direto não é garantido para toda mídia.
 
 No Android, **Configurações do app** fica na faixa inferior, inclusive quando o servidor está offline. Ela permite alterar Wi-Fi e endereços de conexão. Os recursos de criação e Telegram são configurados na aba **Ajustes** da página. Os downloads vão para a pasta **Downloads**, com tratamento de nomes UTF-8 e sufixos para evitar sobrescritas.
 
+## Publicação no YouTube
+
+O administrador conecta o canal em **Ajustes → Publicar no YouTube**, verifica a confirmação com o nome do canal e carrega as playlists. A autorização gratuita usa um assistente no computador e o navegador do Google; o servidor pode continuar em HTTP. Não exige serviço pago nem contratação de HTTPS. Consulte o [tutorial de conexão](UPDATES_AUTOMATIC_KARAOKE.md#conectar-o-canal-sem-https-no-servidor).
+
+Em **Playlist de cada usuário**, a administração define quem pode publicar, a playlist de destino ou **Sem playlist**, e se a publicação começa marcada. A playlist padrão do administrador fica em **Título e privacidade usados no modo rápido**. Ao criar, a opção de publicar permanece opcional; desmarcada, o vídeo não é enviado. Título, capa automática e privacidade ficam definidos antes da publicação. Vídeos prontos também podem ser publicados pelo painel administrativo. O [manual](MANUAL.md#youtube-e-publicação-por-usuário) explica permissões, configuração e falhas comuns.
+
 ## Início rápido com Docker
 
-A versão de distribuição desta documentação é **9.9.2**. O título e o rodapé da página mostram apenas o nome da aplicação. A versão do servidor pode ser consultada no Manual; a versão do APK aparece nas configurações nativas.
+A versão de distribuição desta documentação é **9.9.4**. O título e o rodapé da página mostram apenas o nome da aplicação. A versão do servidor pode ser consultada no Manual; a versão do APK aparece nas configurações nativas.
 
 Crie um arquivo `compose.yaml`:
 
 ```yaml
 services:
   karaoke-app:
-    image: ghcr.io/sal0-apps/sal0-karaoke:9.9.2
+    image: ghcr.io/sal0-apps/sal0-karaoke:9.9.4
     container_name: karaoke-app
     ports:
       - "7885:7860"

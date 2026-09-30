@@ -28,6 +28,7 @@ def separate_backing(vocals_path, output_dir, model_dir):
         raise RuntimeError("O modelo carregado não é um separador de backing vocals.")
     # BVE targets the backing voices in its primary 'Vocals' stem; its
     # complementary 'Instrumental' stem is the lead voice when fed vocals only.
+    print("SAL0_BVE_INFERENCE_START", flush=True)
     separator.separate(vocals_path, {"Vocals": "backing_vocals", "Instrumental": "lead_vocals"})
     for filename in ("backing_vocals.wav", "lead_vocals.wav"):
         path = os.path.join(output_dir, filename)
