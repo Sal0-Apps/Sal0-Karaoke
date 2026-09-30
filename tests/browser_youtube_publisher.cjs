@@ -46,7 +46,7 @@ await page.waitForFunction(()=>document.getElementById('ytPublishChannel').textC
 await page.waitForFunction(()=>document.querySelectorAll('#yt-user-playlist-0 option').length===3);
 assert(await page.locator('#ytPublishChannel').isVisible());
 assert.equal(await page.locator('#yt-user-playlist-0').inputValue(),'PL-one');
-const bob=page.locator('.yt-user-row').filter({hasText:'bob'});
+const bob=page.locator('.yt-user-row[data-username="bob"]');
 await bob.locator('[data-field="enabled"]').check();
 await bob.locator('[data-field="playlist"]').selectOption('PL-two');
 await bob.locator('[data-field="default"]').check();
