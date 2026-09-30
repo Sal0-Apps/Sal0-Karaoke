@@ -1,7 +1,7 @@
 """Use provider timestamps only for a confidently matched recording.
 
-LRC timestamps describe lines, not words. Their visual sweep follows the
-provided verse interval without claiming acoustic word or syllable timings.
+LRC timestamps describe lines, not words. Production animation obtains word
+clocks from the recording instead of dividing the provider verse interval.
 """
 import math
 import re
@@ -77,3 +77,21 @@ def parse_lrc(text, duration):
         if lyric and end > start:
             segments.append({"start": start, "end": end, "text": lyric, "words": [], "synced_line": True})
     return segments if len(segments) >= 2 else []
+
+
+def require_acoustic_word_timing(segments):
+    """Reject stale verse-only results rather than render an artificial sweep."""
+    if not segments:
+        raise ValueError("Não foi possível medir os tempos das palavras cantadas.")
+    for segment in segments:
+        words = segment.get("words") or []
+        if not words:
+            raise ValueError("A letra não tem tempos de palavras medidos na voz. Tente outro modelo Whisper ou revise a gravação.")
+        for word in words:
+            try:
+                start, end = float(word["start"]), float(word["end"])
+            except (KeyError, TypeError, ValueError):
+                raise ValueError("Tempos de palavras inválidos na sincronização da animação.") from None
+            if not math.isfinite(start) or not math.isfinite(end) or start < 0 or end <= start:
+                raise ValueError("Tempos de palavras inválidos na sincronização da animação.")
+    return segments

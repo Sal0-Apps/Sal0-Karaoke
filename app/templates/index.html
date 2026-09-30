@@ -1837,7 +1837,7 @@
                                 <option value="auto">Usar tempos somente de uma letra sincronizada disponível</option>
                                 <option value="acoustic">Sempre pelo áudio — palavras com Whisper</option>
                             </select>
-                            <p class="compact-note">Só usamos sincronização pronta quando a letra fornece tempos compatíveis. Sem ela, transcrevemos o áudio com Whisper. Os versos sincronizados destacam a linha inteira. Para destacar palavras, escolha Whisper. Versões diferentes podem exigir revisão.</p>
+                            <p class="compact-note">Só usamos sincronização pronta quando a letra fornece tempos compatíveis. Sem ela, transcrevemos o áudio com Whisper. Mesmo com letra sincronizada, analisamos a voz com Whisper para animar cada palavra no tempo do canto. Versões diferentes podem exigir revisão.</p>
                             <p id="lyricsModeHint" style="font-size: 0.7rem; color: var(--text-muted); margin: 0.35rem 0 0.45rem;">A letra é uma guia. Texto manual sempre tem prioridade.</p>
                             <textarea id="lyricsText" name="lyrics_text" placeholder="Cole ou edite a letra aqui..." class="input-text" style="height: 72px; resize: vertical; background: var(--input-bg); border: 1px solid var(--glass-border);"></textarea>
                             <div id="lyricsBadge" style="display: none; margin-top: 0.35rem; background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.3); color: #34d399; padding: 0.3rem 0.55rem; border-radius: 7px; font-size: 0.7rem; font-weight: 600;"></div>
@@ -2557,7 +2557,7 @@
                     <li>Abra <strong>Letra</strong> para buscar ou colar uma letra-guia. O texto manual tem prioridade; se não houver letra, a transcrição usa o Whisper.</li>
                     <li>Defina o fundo e a animação: sílabas, palavras, linhas ou frase estática.</li>
                     <li>Em <strong>Vozes de apoio</strong>, mantenha ou desative os backing vocals e ajuste seu volume. A opção usa uma segunda separação local da voz principal.</li>
-                    <li>A sincronização automática só usa tempos de versos quando existe uma letra LRC compatível com a gravação. O destaque avança durante cada verso também nas letras já sincronizadas. Sem LRC, o processo usa Whisper e os tempos das palavras reconhecidas.</li>
+                    <li>A sincronização automática só usa tempos de versos quando existe uma letra LRC compatível com a gravação. Mesmo com letra já sincronizada, o destaque usa os tempos das palavras reconhecidas na voz, respeitando pausas e durações. Sem LRC, o processo usa Whisper e os tempos das palavras reconhecidas.</li>
                     <li>Em <strong>Mais ajustes</strong>, altere cor, tamanho, posição, limites dos versos, prévia da próxima frase, VAD e fonte da transcrição. Você também pode salvar um perfil e habilitar somente a remoção de vocais.</li>
                     <li>Ative a revisão para corrigir texto e tempos antes de finalizar. Em canto, o VAD pode cortar notas sustentadas; use com cuidado.</li>
                 </ol>
@@ -2647,7 +2647,7 @@
                 </ol>
                 <p>A API tem cota gratuita e pode limitar projetos sem auditoria a vídeos privados. Guarde a autorização como uma senha. Backing vocals e vídeo do modo SRT mostram porcentagem da etapa e avisam o avanço no Telegram; o LibreTranslate informa apenas início e término.</p>
             </details>
-            <p class="compact-note">Versão do servidor: 9.9.7. A transcrição é local; fontes, modelos e integrações podem acessar serviços externos. Use conteúdo autorizado.</p>
+            <p class="compact-note">Versão do servidor: 9.9.8. A transcrição é local; fontes, modelos e integrações podem acessar serviços externos. Use conteúdo autorizado.</p>
         </div>
     </div>
 

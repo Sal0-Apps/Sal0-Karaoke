@@ -44,7 +44,7 @@ from video_renderer import render_karaoke_video, check_has_video
 from subtitle_video import media_has_motion_video, render_audio_subtitle_video
 from reprocess_cache import copy_reusable_inputs
 from media_covers import video_thumbnail
-from lyrics_sync import recording_matches, parse_lrc
+from lyrics_sync import recording_matches, parse_lrc, require_acoustic_word_timing
 from backing_vocals import preserve_backing_vocals
 
 # Configurar logs
@@ -2261,7 +2261,7 @@ def download_bg_youtube_preset(
 
 
 LRCLIB_API_URL = "https://lrclib.net/api"
-LRCLIB_USER_AGENT = "Sal0-Karaoke/9.9.7 (+https://github.com/Sal0-Apps/Sal0-Karaoke)"
+LRCLIB_USER_AGENT = "Sal0-Karaoke/9.9.8 (+https://github.com/Sal0-Apps/Sal0-Karaoke)"
 LYRICS_OVH_API_URL = "https://api.lyrics.ovh/v1"
 LYRICS_PROVIDER_TIMEOUT = (3.05, 6)
 MUSIXMATCH_API_URL = "https://apic-desktop.musixmatch.com/ws/1.1"
@@ -2732,7 +2732,7 @@ def download_diagnostic_logs(current_user: dict = Depends(get_current_user)):
     with state_lock:
         current_state = dict(state)
     report = "\n".join([
-"Sal0 Karaokê v9.9.7 — diagnóstico ao vivo",
+"Sal0 Karaokê v9.9.8 — diagnóstico ao vivo",
         f"Gerado em: {time.strftime('%Y-%m-%d %H:%M:%S')}",
         "",
         "=== ESTADO ATUAL ===",
@@ -5482,7 +5482,7 @@ def run_pipeline(
 
         # Provider availability can change between retries. Never reuse subtitles
         # created from different line clocks, even with the same display options.
-        clock_hash = hashlib.sha256(json.dumps(synced_segments, sort_keys=True).encode()).hexdigest()
+        clock_hash = hashlib.sha256(json.dumps({"animation_timing_version": 2, "lyrics": synced_segments}, sort_keys=True).encode()).hexdigest()
         if cached_meta.get("lyrics_clock_hash") != clock_hash:
             checkpoints = load_stage_checkpoints(cache_dir)
             for stage in ("transcription_reviewed", "subtitles_generated", "video_rendered"):
@@ -5653,17 +5653,16 @@ def run_pipeline(
                 return
 
             # Passo 3: Transcrever vocais com Whisper selecionado
-            segments = synced_segments or None
+            # LRC clocks describe verses, not the sung duration of each word.
+            # Always obtain word clocks from this recording, including synced lyrics.
+            segments = None
             if synced_segments:
-                notify_targets(telegram_targets, telegram_notice("📖", "Letra sincronizada aplicada",
-                    f"🎵 <b>{telegram_escape(orig_name)}</b>",
-                    "📊 Progresso geral: <b>74%</b> · etapa atual: <b>100%</b>"))
-                update_state("processing", "Using synced lyrics", 74, stage_progress=100,
-                             stage_detail="Letra sincronizada por versos; sem transcrição adicional")
+                lyrics_text = "\n".join(segment["text"] for segment in synced_segments)
             segments_cache_file = os.path.join(cache_dir, "transcribed_segments.json")
             lyrics_hint_hash = hashlib.sha256((lyrics_text or "").strip().encode("utf-8")).hexdigest()
 
-            if (not synced_segments and os.path.exists(segments_cache_file) and
+            if (os.path.exists(segments_cache_file) and
+                cached_meta.get("animation_timing_version") == 2 and
                 cached_meta.get("vocal_source", "all") == vocal_source and
                 cached_meta.get("transcribe_source") == transcribe_source and
                 cached_meta.get("whisper_model") == whisper_model and
@@ -5698,9 +5697,9 @@ def run_pipeline(
                     telegram_targets,
                     telegram_notice(
                         "✍️",
-                        "Transcrição com Whisper",
+                        "Sincronização da animação pela voz" if synced_segments else "Transcrição com Whisper",
                         f"🤖 Modelo: <b>{telegram_escape(whisper_model)}</b>",
-                        "🎤 Convertendo a voz em texto sincronizado.",
+                        "🎤 Medindo os tempos das palavras cantadas na gravação.",
                         "📊 Progresso geral inicial: <b>65%</b>",
                     ),
                 )
@@ -5756,6 +5755,7 @@ def run_pipeline(
                     with open(segments_cache_file, "w", encoding="utf-8") as f:
                         import json
                         json.dump(segments, f, indent=4)
+                    cached_meta["animation_timing_version"] = 2
                     cached_meta["vocal_source"] = vocal_source
                     cached_meta["transcribe_source"] = transcribe_source
                     cached_meta["whisper_model"] = whisper_model
@@ -5774,11 +5774,14 @@ def run_pipeline(
             save_stage_checkpoint(cache_dir, "transcription_ready", "transcrição do Whisper concluída", 74)
 
             # A letra corrige apenas a grafia; os tempos continuam vindo do áudio.
-            if not synced_segments and lyrics_text and lyrics_text.strip():
+            if lyrics_text and lyrics_text.strip():
                 logger.info("Aplicando letra guia de forma conservadora, sem criar timestamps...")
                 segments = align_lyrics(lyrics_text, segments)
 
             pm.check_cancelled()
+
+            if synced_segments:
+                require_acoustic_word_timing(segments)
 
             # --- NOVO: Passo de Pausa e Correção de Legendas (se ativado pelo usuário) ---
             review_checkpoint = stage_checkpoint(cache_dir, "transcription_reviewed")
@@ -5848,7 +5851,7 @@ def run_pipeline(
                     font_size=font_size,
                     text_color_hex=text_color,
                     text_position=text_position,
-                    subtitle_mode=subtitle_mode,
+                    subtitle_mode="syllable" if synced_segments else subtitle_mode,
                     words_per_line=words_per_line,
                     max_chars_line=max_chars_line,
                     break_on_punctuation=break_on_punctuation,
