@@ -23,13 +23,6 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Validate subtitle and easy-mode rules
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y ffmpeg
-          python -m pip install requests==2.32.3 fastapi==0.111.0 python-multipart==0.0.9 httpx==0.28.1
-          python -m unittest discover -s tests -v
-
       - name: Log in to the Container registry
         uses: docker/login-action@v3
         with:
@@ -66,6 +59,11 @@ jobs:
           tags: |
             ${{ env.IMAGE_TAG }}:latest
             ${{ env.IMAGE_TAG }}:${{ env.VERSION_TAG }}
+
+      - name: Validate application rules in the built image
+        timeout-minutes: 10
+        run: |
+          docker run --rm -v "$GITHUB_WORKSPACE:/validation:ro" --workdir /validation --entrypoint python "${{ env.IMAGE_TAG }}:${{ env.VERSION_TAG }}" -m unittest discover -s tests -v
 
       - name: Validate CPU backing vocal runtime and app routes
         timeout-minutes: 15
