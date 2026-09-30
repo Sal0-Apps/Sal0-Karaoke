@@ -95,3 +95,43 @@ def require_acoustic_word_timing(segments):
             if not math.isfinite(start) or not math.isfinite(end) or start < 0 or end <= start:
                 raise ValueError("Tempos de palavras inválidos na sincronização da animação.")
     return segments
+
+
+def anchor_synced_animation(synced_segments, acoustic_segments):
+    """Keep every provider verse/text intact; match animation clocks only in its window."""
+    acoustic_words = [word for segment in acoustic_segments for word in segment.get('words', [])]
+    result = []
+    def key(text):
+        value = unicodedata.normalize('NFKD', str(text)).casefold()
+        value = ''.join(char for char in value if not unicodedata.combining(char))
+        return ''.join(re.findall(r'\w+', value))
+    for verse in synced_segments:
+        start, end = float(verse['start']), float(verse['end'])
+        tokens = str(verse['text']).split()
+        candidates = []
+        for word in acoustic_words:
+            try:
+                w_start, w_end = float(word['start']), float(word['end'])
+            except (KeyError, TypeError, ValueError):
+                continue
+            if (math.isfinite(w_start) and math.isfinite(w_end) and w_end > w_start
+                    and start <= (w_start + w_end) / 2 < end and key(word.get('word', ''))):
+                candidates.append(word)
+        matcher = SequenceMatcher(None, [key(token) for token in tokens],
+                                  [key(word['word']) for word in candidates], autojunk=False)
+        clocks = {}
+        for block in matcher.get_matching_blocks():
+            for offset in range(block.size):
+                index = block.a + offset
+                word = candidates[block.b + offset]
+                clocks[index] = (max(start, float(word['start'])), min(end, float(word['end'])))
+        animation_words, matched_words = [], []
+        for index, token in enumerate(tokens):
+            word = {'word': token + (' ' if index < len(tokens) - 1 else '')}
+            if index in clocks:
+                word['start'], word['end'] = clocks[index]
+                matched_words.append(dict(word))
+            animation_words.append(word)
+        result.append({**verse, 'words': matched_words, 'animation_words': animation_words,
+                       'synced_line': True, 'acoustic_animation': True})
+    return result

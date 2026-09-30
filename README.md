@@ -52,7 +52,7 @@ O container `libretranslate/libretranslate:latest` pode ser atualizado separadam
 - Fundo surpresa escolhido da coleção preparada pelo administrador.
 - Separação local de fontes com Demucs e transcrição com Faster-Whisper.
 - Busca opcional de letra-guia, edição manual e aviso quando a busca não encontra resultado.
-- Uso automático de letra LRC sincronizada somente quando compatível com título, artista, versão e duração; sem ela, o Whisper continua disponível. Mesmo com letra já sincronizada, o Whisper analisa a voz e fornece os tempos das palavras para o destaque acompanhar o canto e suas pausas. A letra pronta orienta a grafia; não se distribuem tempos uniformemente entre versos.
+- Uso automático de letra LRC sincronizada somente quando compatível com título, artista, versão e duração. O texto e os horários de exibição dos versos seguem a letra sincronizada; o Whisper fornece apenas os tempos de animação das palavras reconhecidas dentro de cada verso. Pausas e durações não são redistribuídas. Sem LRC, continua o caminho acústico do Whisper.
 - Separação inteligente de backing vocals, com volume ajustável, preservando as vozes de apoio no instrumental sem remixar a voz principal.
 - Perfis de voz, modelos Whisper e opção de transcrever o original ou os vocais separados.
 
@@ -123,14 +123,14 @@ Em **Playlist de cada usuário**, a administração define uma playlist válida 
 
 ## Início rápido com Docker
 
-A versão de distribuição desta documentação é **9.9.8**. O título e o rodapé da página mostram apenas o nome da aplicação. A versão do servidor pode ser consultada no Manual; a versão do APK aparece nas configurações nativas.
+A versão de distribuição desta documentação é **9.9.9**. O título e o rodapé da página mostram apenas o nome da aplicação. A versão do servidor pode ser consultada no Manual; a versão do APK aparece nas configurações nativas.
 
 Crie um arquivo `compose.yaml`:
 
 ```yaml
 services:
   karaoke-app:
-    image: ghcr.io/sal0-apps/sal0-karaoke:9.9.8
+    image: ghcr.io/sal0-apps/sal0-karaoke:9.9.9
     container_name: karaoke-app
     ports:
       - "7885:7860"

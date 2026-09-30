@@ -58,7 +58,7 @@ def split_and_wrap_segments(
 
     for segment_index, segment in enumerate(segments):
         words = segment.get("words", [])
-        if not words:
+        if not words or segment.get("synced_line"):
             passthrough_segments.append(segment)
             continue
         for word_index, word_info in enumerate(words):
@@ -256,7 +256,8 @@ def generate_ass_karaoke(
     for idx in range(len(segments) - 1):
         curr = segments[idx]
         nxt = segments[idx + 1]
-        if "Instrumental" not in nxt["text"] and "Instrumental" not in curr["text"]:
+        if (not curr.get("synced_line") and "Instrumental" not in nxt["text"]
+                and "Instrumental" not in curr["text"]):
             gap = nxt["start"] - curr["end"]
             if gap > 0:
                 curr["end"] = nxt["start"]
@@ -328,21 +329,28 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         end_time_str = format_time(seg["end"])
 
         # 1. Linha ativa (Default)
-        if seg.get("synced_line") and not seg.get("words"):
+        if seg.get("synced_line") and not seg.get("words") and not seg.get("acoustic_animation"):
             # LRC gives the verse clock. Animate the full verse within that clock,
             # without inventing word timestamps or changing its start/end.
             duration_cs = max(1, round((seg["end"] - seg["start"]) * 100))
             text = f"{{\\kf{duration_cs}}}{seg['text']}"
             line = f"Dialogue: 0,{start_time_str},{end_time_str},Default,,0,0,0,,{text}\n"
-        elif subtitle_mode in {"phrase", "line"} or not seg.get("words"):
+        elif not seg.get("acoustic_animation") and (subtitle_mode in {"phrase", "line"} or not seg.get("words")):
             line = f"Dialogue: 0,{start_time_str},{end_time_str},Default,,0,0,0,,{seg['text']}\n"
         else:
             # Modo Karaoke (segue sílabas)
             karaoke_text = ""
             current_ref_cs = 0
 
-            for word_info in seg["words"]:
+            animation_words = seg["animation_words"] if seg.get("acoustic_animation") else seg["words"]
+            for word_info in animation_words:
                 word_text = word_info["word"]
+                if "start" not in word_info or "end" not in word_info:
+                    # Unrecognized words stay visible in a fixed dim color;
+                    # never assign invented clocks to the original lyric text.
+                    karaoke_text += (f"{{\\kf0\\1c{ass_dimmed_color}\\2c{ass_dimmed_color}}}{word_text}"
+                                     f"{{\\1c{ass_primary_color}\\2c{ass_secondary_color}}}")
+                    continue
                 w_start = word_info["start"]
                 w_end = word_info["end"]
                 word_start_cs = max(0, int(round((w_start - seg["start"]) * 100)))

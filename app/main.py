@@ -44,7 +44,7 @@ from video_renderer import render_karaoke_video, check_has_video
 from subtitle_video import media_has_motion_video, render_audio_subtitle_video
 from reprocess_cache import copy_reusable_inputs
 from media_covers import video_thumbnail
-from lyrics_sync import recording_matches, parse_lrc, require_acoustic_word_timing
+from lyrics_sync import recording_matches, parse_lrc, require_acoustic_word_timing, anchor_synced_animation
 from backing_vocals import preserve_backing_vocals
 
 # Configurar logs
@@ -2261,7 +2261,7 @@ def download_bg_youtube_preset(
 
 
 LRCLIB_API_URL = "https://lrclib.net/api"
-LRCLIB_USER_AGENT = "Sal0-Karaoke/9.9.8 (+https://github.com/Sal0-Apps/Sal0-Karaoke)"
+LRCLIB_USER_AGENT = "Sal0-Karaoke/9.9.9 (+https://github.com/Sal0-Apps/Sal0-Karaoke)"
 LYRICS_OVH_API_URL = "https://api.lyrics.ovh/v1"
 LYRICS_PROVIDER_TIMEOUT = (3.05, 6)
 MUSIXMATCH_API_URL = "https://apic-desktop.musixmatch.com/ws/1.1"
@@ -2732,7 +2732,7 @@ def download_diagnostic_logs(current_user: dict = Depends(get_current_user)):
     with state_lock:
         current_state = dict(state)
     report = "\n".join([
-"Sal0 Karaokê v9.9.8 — diagnóstico ao vivo",
+"Sal0 Karaokê v9.9.9 — diagnóstico ao vivo",
         f"Gerado em: {time.strftime('%Y-%m-%d %H:%M:%S')}",
         "",
         "=== ESTADO ATUAL ===",
@@ -3687,6 +3687,7 @@ class EditSegmentModel(BaseModel):
     text: str
     words: list[EditWordModel] = None
     synced_line: bool = False
+    acoustic_animation: bool = False
 
 class ContinueProcessModel(BaseModel):
     segments: list[EditSegmentModel]
@@ -3787,6 +3788,12 @@ def continue_process(data: ContinueProcessModel, current_user: dict = Depends(ge
     for s in data.segments:
         seg_text = s.text.strip()
         if s.synced_line:
+            if getattr(s, "acoustic_animation", False):
+                source = {"start": s.start, "end": s.end, "text": seg_text}
+                acoustic = [{"words": [{"word": w.word, "start": w.start, "end": w.end}
+                                        for w in (s.words or [])]}]
+                updated_segments.extend(anchor_synced_animation([source], acoustic))
+                continue
             updated_segments.append({"start": s.start, "end": s.end, "text": seg_text,
                                      "words": [], "synced_line": True})
             continue
@@ -5482,7 +5489,7 @@ def run_pipeline(
 
         # Provider availability can change between retries. Never reuse subtitles
         # created from different line clocks, even with the same display options.
-        clock_hash = hashlib.sha256(json.dumps({"animation_timing_version": 2, "lyrics": synced_segments}, sort_keys=True).encode()).hexdigest()
+        clock_hash = hashlib.sha256(json.dumps({"animation_timing_version": 3, "lyrics": synced_segments}, sort_keys=True).encode()).hexdigest()
         if cached_meta.get("lyrics_clock_hash") != clock_hash:
             checkpoints = load_stage_checkpoints(cache_dir)
             for stage in ("transcription_reviewed", "subtitles_generated", "video_rendered"):
@@ -5658,11 +5665,11 @@ def run_pipeline(
             segments = None
             if synced_segments:
                 lyrics_text = "\n".join(segment["text"] for segment in synced_segments)
-            segments_cache_file = os.path.join(cache_dir, "transcribed_segments.json")
+            segments_cache_file = os.path.join(cache_dir, "synced_acoustic_segments.json" if synced_segments else "transcribed_segments.json")
             lyrics_hint_hash = hashlib.sha256((lyrics_text or "").strip().encode("utf-8")).hexdigest()
 
             if (os.path.exists(segments_cache_file) and
-                cached_meta.get("animation_timing_version") == 2 and
+                cached_meta.get("animation_timing_version") == 3 and
                 cached_meta.get("vocal_source", "all") == vocal_source and
                 cached_meta.get("transcribe_source") == transcribe_source and
                 cached_meta.get("whisper_model") == whisper_model and
@@ -5755,7 +5762,7 @@ def run_pipeline(
                     with open(segments_cache_file, "w", encoding="utf-8") as f:
                         import json
                         json.dump(segments, f, indent=4)
-                    cached_meta["animation_timing_version"] = 2
+                    cached_meta["animation_timing_version"] = 3
                     cached_meta["vocal_source"] = vocal_source
                     cached_meta["transcribe_source"] = transcribe_source
                     cached_meta["whisper_model"] = whisper_model
@@ -5782,6 +5789,11 @@ def run_pipeline(
 
             if synced_segments:
                 require_acoustic_word_timing(segments)
+                segments = anchor_synced_animation(synced_segments, segments)
+                matched = sum(len(segment["words"]) for segment in segments)
+                total = sum(len(segment["animation_words"]) for segment in segments)
+                update_state("processing", "Synced verse animation", 74, stage_progress=100,
+                             stage_detail=f"Versos nos tempos da letra; {matched}/{total} palavras com animação medida na voz")
 
             # --- NOVO: Passo de Pausa e Correção de Legendas (se ativado pelo usuário) ---
             review_checkpoint = stage_checkpoint(cache_dir, "transcription_reviewed")
@@ -5821,12 +5833,18 @@ def run_pipeline(
                 segments = segments_to_edit
 
                 # Salvar os segmentos corrigidos também no cache, para não perder o trabalho se refazer!
-                with open(segments_cache_file, "w", encoding="utf-8") as f:
+                reviewed_cache_file = os.path.join(cache_dir, "reviewed_synced_segments.json") if synced_segments else segments_cache_file
+                with open(reviewed_cache_file, "w", encoding="utf-8") as f:
                     import json
                     json.dump(segments, f, indent=4)
 
                 save_stage_checkpoint(cache_dir, "transcription_reviewed", "revisão das legendas concluída", 78)
             elif review_checkpoint:
+                reviewed_cache_file = os.path.join(cache_dir, "reviewed_synced_segments.json")
+                if synced_segments and os.path.isfile(reviewed_cache_file):
+                    with open(reviewed_cache_file, encoding="utf-8") as f:
+                        segments = json.load(f)
+
                 update_state("processing", "Using reviewed subtitle checkpoint", 78)
 
             pm.check_cancelled()
