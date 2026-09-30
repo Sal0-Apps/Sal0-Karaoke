@@ -1,8 +1,9 @@
-# 9.9.7
+# 9.9.8
 
-- Modo rápido mostra a playlist do perfil como destino padrão; o administrador pode escolher outra playlist do canal para cada vídeo.
-- Publicação exige uma playlist definida no perfil. Sem ela, a interface bloqueia o envio e o servidor impede uploads, inclusive em tarefas antigas ou chamadas diretas.
-- Contas comuns continuam usando apenas sua playlist atribuída; o envio vem marcado quando a conta está pronta para publicar. Desmarcar cria somente o resultado local.
-- Progresso da separação de backing vocals acompanha o percentual dos logs; Telegram avisa uma vez ao iniciar a etapa, sem marcos repetidos de porcentagem.
-- Mantida a privacidade padrão Não listado, as letras sincronizadas animadas, busca no YouTube, MP4 para áudio no modo SRT, backing vocals, fila e Telegram.
-- Documentação completa atualizada, preservando os recursos anteriores.
+- Letras já sincronizadas também passam pela análise acústica do Whisper: a animação usa os tempos das palavras cantadas, com pausas e durações diferentes, em vez de um avanço uniforme entre versos.
+- A letra pronta orienta a grafia e a divisão dos versos, sem redistribuir os tempos da voz; a revisão continua disponível para erros de reconhecimento.
+- O cache antigo da animação por versos é invalidado ao refazer o vídeo. Vídeos já salvos permanecem como foram gerados.
+- Processo local e gratuito, com progresso e um aviso no início da etapa no Telegram.
+- Mantidos o destino padrão de playlist por perfil, a escolha de playlist pelo administrador no modo rápido, o bloqueio sem playlist no perfil e a privacidade Não listado.
+- Mantidos busca no YouTube, backing vocals, MP4 para áudio no modo SRT, fila, Biblioteca, Android e entregas pelo Telegram.
+- Manual, ajuda e documentação completa atualizados.
