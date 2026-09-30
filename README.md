@@ -119,18 +119,18 @@ No Android, **Configurações do app** fica na faixa inferior, inclusive quando 
 
 O administrador conecta o canal em **Ajustes → Publicar no YouTube**, verifica a confirmação com o nome do canal e carrega as playlists. A autorização gratuita usa um assistente no computador e o navegador do Google; o servidor pode continuar em HTTP. Não exige serviço pago nem contratação de HTTPS. Consulte o [tutorial de conexão](UPDATES_AUTOMATIC_KARAOKE.md#conectar-o-canal-sem-https-no-servidor).
 
-Em **Playlist de cada usuário**, a administração define quem pode publicar, a playlist de destino ou **Sem playlist**, e se a publicação começa marcada. A playlist padrão do administrador fica em **Título e privacidade usados no modo rápido**. Ao criar, a opção de publicar permanece opcional; desmarcada, o vídeo não é enviado. Título, capa automática e privacidade ficam definidos antes da publicação. Vídeos prontos também podem ser publicados pelo painel administrativo. O [manual](MANUAL.md#youtube-e-publicação-por-usuário) explica permissões, configuração e falhas comuns.
+Em **Playlist de cada usuário**, a administração define a playlist de cada conta ou **Sem playlist**. A playlist do administrador fica em **Padrões de publicação do administrador**. Com o canal conectado, **Publicar no YouTube** começa marcado para todos os usuários, inclusive contas novas e configurações antigas, e a publicação automática usa **Não listado**. O envio continua opcional por vídeo: desmarcado, nada é publicado. Título e capa automática ficam definidos antes da publicação. Vídeos prontos também podem ser publicados pelo painel administrativo, com outra privacidade escolhida explicitamente. O [manual](MANUAL.md#youtube-e-publicação-por-usuário) explica configuração e falhas comuns.
 
 ## Início rápido com Docker
 
-A versão de distribuição desta documentação é **9.9.5**. O título e o rodapé da página mostram apenas o nome da aplicação. A versão do servidor pode ser consultada no Manual; a versão do APK aparece nas configurações nativas.
+A versão de distribuição desta documentação é **9.9.6**. O título e o rodapé da página mostram apenas o nome da aplicação. A versão do servidor pode ser consultada no Manual; a versão do APK aparece nas configurações nativas.
 
 Crie um arquivo `compose.yaml`:
 
 ```yaml
 services:
   karaoke-app:
-    image: ghcr.io/sal0-apps/sal0-karaoke:9.9.5
+    image: ghcr.io/sal0-apps/sal0-karaoke:9.9.6
     container_name: karaoke-app
     ports:
       - "7885:7860"
