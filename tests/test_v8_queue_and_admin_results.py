@@ -87,14 +87,14 @@ class VersionEightQueueTests(unittest.TestCase):
         self.assertNotIn('#ec4899', form)
 
     def test_release_metadata_is_9_9_4(self):
-        self.assertIn("Versão do servidor: 9.9.4", HTML)
+        self.assertIn("Versão do servidor: 9.9.5", HTML)
         self.assertIn("<title>Sal0 Karaokê</title>", HTML)
         self.assertEqual(HTML.split("<footer>")[1].split("</footer>")[0].strip(), "Sal0 Karaokê")
-        self.assertIn('.orElse("9.9.4")', ANDROID_BUILD)
-        self.assertIn('.orElse("90904")', ANDROID_BUILD)
+        self.assertIn('.orElse("9.9.5")', ANDROID_BUILD)
+        self.assertIn('.orElse("90905")', ANDROID_BUILD)
         self.assertIn("-PVERSION_CODE=${{ env.VERSION_CODE }}", WORKFLOW)
         self.assertIn("sal0-karaoke:9.9.0", COMPOSE)  # Existing sample; personal Compose is delivered separately.
-        self.assertIn('org.opencontainers.image.version="9.9.4"', DOCKERFILE)
+        self.assertIn('org.opencontainers.image.version="9.9.5"', DOCKERFILE)
 
     def test_generated_icon_is_committed_for_web_and_android(self):
         self.assertTrue((ROOT / "app" / "templates" / "app-icon-v8.png").is_file())

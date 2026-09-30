@@ -328,7 +328,13 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         end_time_str = format_time(seg["end"])
 
         # 1. Linha ativa (Default)
-        if subtitle_mode in {"phrase", "line"} or not seg.get("words"):
+        if seg.get("synced_line") and not seg.get("words"):
+            # LRC gives the verse clock. Animate the full verse within that clock,
+            # without inventing word timestamps or changing its start/end.
+            duration_cs = max(1, round((seg["end"] - seg["start"]) * 100))
+            text = f"{{\\kf{duration_cs}}}{seg['text']}"
+            line = f"Dialogue: 0,{start_time_str},{end_time_str},Default,,0,0,0,,{text}\n"
+        elif subtitle_mode in {"phrase", "line"} or not seg.get("words"):
             line = f"Dialogue: 0,{start_time_str},{end_time_str},Default,,0,0,0,,{seg['text']}\n"
         else:
             # Modo Karaoke (segue sílabas)

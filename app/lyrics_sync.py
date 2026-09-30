@@ -1,7 +1,7 @@
 """Use provider timestamps only for a confidently matched recording.
 
-LRC timestamps describe lines, not words. Never fabricate word timings from
-them; word highlighting remains the responsibility of the acoustic pipeline.
+LRC timestamps describe lines, not words. Their visual sweep follows the
+provided verse interval without claiming acoustic word or syllable timings.
 """
 import math
 import re
@@ -75,5 +75,5 @@ def parse_lrc(text, duration):
         # LRC has no reliable sung end. Cap display to preserve long instrumental gaps.
         end = min(end, start + 12)
         if lyric and end > start:
-            segments.append({"start": start, "end": end, "text": lyric, "words": []})
+            segments.append({"start": start, "end": end, "text": lyric, "words": [], "synced_line": True})
     return segments if len(segments) >= 2 else []
