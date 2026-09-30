@@ -41,6 +41,7 @@ from subtitle_translator import (
 from karaoke_generator import generate_ass_karaoke
 import libretranslate_client
 from video_renderer import render_karaoke_video, check_has_video
+from subtitle_video import media_has_motion_video, render_audio_subtitle_video
 from reprocess_cache import copy_reusable_inputs
 from media_covers import video_thumbnail
 from lyrics_sync import recording_matches, parse_lrc
@@ -2260,7 +2261,7 @@ def download_bg_youtube_preset(
 
 
 LRCLIB_API_URL = "https://lrclib.net/api"
-LRCLIB_USER_AGENT = "Sal0-Karaoke/9.9.3 (+https://github.com/Sal0-Apps/Sal0-Karaoke)"
+LRCLIB_USER_AGENT = "Sal0-Karaoke/9.9.4 (+https://github.com/Sal0-Apps/Sal0-Karaoke)"
 LYRICS_OVH_API_URL = "https://api.lyrics.ovh/v1"
 LYRICS_PROVIDER_TIMEOUT = (3.05, 6)
 MUSIXMATCH_API_URL = "https://apic-desktop.musixmatch.com/ws/1.1"
@@ -2731,7 +2732,7 @@ def download_diagnostic_logs(current_user: dict = Depends(get_current_user)):
     with state_lock:
         current_state = dict(state)
     report = "\n".join([
-"Sal0 Karaokê v9.9.3 — diagnóstico ao vivo",
+"Sal0 Karaokê v9.9.4 — diagnóstico ao vivo",
         f"Gerado em: {time.strftime('%Y-%m-%d %H:%M:%S')}",
         "",
         "=== ESTADO ATUAL ===",
@@ -4806,7 +4807,7 @@ def run_subtitle_srt_pipeline(
     telegram_external_url: str = "",
     processing_elapsed_callback=None,
 ):
-    """Transcreve qualquer mídia por MP3 e retorna somente SRT original/traduzido."""
+    """Transcreve mídia; áudio sem vídeo também recebe MP4 legendado."""
     import process_manager as pm
 
     os.makedirs(output_dir, exist_ok=True)
@@ -5037,16 +5038,32 @@ def run_subtitle_srt_pipeline(
     primary_subtitle = translated_filename or original_filename
     public_token = create_public_download(owner_user, original_filename)
     translated_public_token = create_public_download(owner_user, translated_filename) if translated_filename else None
+    original_public_token = public_token
+    video_history_filename = None
+    final_video = os.path.join(output_dir, "final_karaoke.mp4")
+    if not media_has_motion_video(input_media_path):
+        pm.check_cancelled()
+        update_state("processing", "Rendering subtitle video", 96,
+                     stage_detail="Criando MP4 com o áudio original e as legendas")
+        render_audio_subtitle_video(normalized_mp3,
+            final_translated_srt if translated_filename else final_original_srt,
+            final_video, media_duration,
+            progress_callback=lambda percent: update_state("processing", "Rendering subtitle video", 96 + min(2, int(percent * 2 / 100))))
+        video_history_filename = save_video_to_history(final_video, orig_name, library_dir)
+        if not video_history_filename:
+            raise RuntimeError("Não foi possível salvar o vídeo legendado na Biblioteca.")
+        public_token = create_public_download(owner_user, video_history_filename)
+    result_kind = "subtitle_video" if video_history_filename else "subtitles"
     save_result_metadata(
         output_dir,
         orig_name,
-        original_filename,
+        video_history_filename or original_filename,
         subtitle_filename=primary_subtitle,
         subtitle_language=translation_language,
         original_subtitle_filename=original_filename,
         translated_subtitle_filename=translated_filename,
         translation_error=translation_error,
-        result_kind="subtitles",
+        result_kind=result_kind,
     )
     total_processing_seconds = (
         processing_elapsed_callback() if processing_elapsed_callback else 0
@@ -5055,7 +5072,7 @@ def run_subtitle_srt_pipeline(
     telegram_documents = [{
         "path": os.path.join(library_dir, "history", original_filename),
         "label": f"SRT original de {orig_name}",
-        "public_download_token": public_token,
+        "public_download_token": original_public_token,
     }]
     if translated_filename:
         telegram_documents.append({
@@ -5069,6 +5086,9 @@ def run_subtitle_srt_pipeline(
         99,
         stage_detail="Aguardando a confirmação de entrega antes de iniciar o próximo item",
     )
+    if video_history_filename:
+        send_video_to_targets(telegram_targets, final_video, orig_name, video_history_filename,
+                              public_token, telegram_base_url, telegram_external_url, total_processing_seconds)
     send_documents_to_targets(
         telegram_targets,
         telegram_documents,
@@ -5080,14 +5100,14 @@ def run_subtitle_srt_pipeline(
         "done",
         "SRT ready",
         100,
-        result_file=final_original_srt,
-        history_filename=original_filename,
+        result_file=final_video if video_history_filename else final_original_srt,
+        history_filename=video_history_filename or original_filename,
         subtitle_filename=primary_subtitle,
         original_subtitle_filename=original_filename,
         translated_subtitle_filename=translated_filename or "",
         subtitle_language=translation_language,
         translation_error=translation_error,
-        result_kind="subtitles",
+        result_kind=result_kind,
         public_download_token=public_token,
     )
     logger.info("%s concluído(s) e encaminhado(s) ao Telegram.", completion)

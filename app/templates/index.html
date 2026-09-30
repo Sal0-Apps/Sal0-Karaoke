@@ -1559,7 +1559,7 @@
                 <button type="button" id="btnCreatorAdvanced" class="creator-mode-btn" role="tab" aria-selected="false" title="Controle completo da transcrição, legenda e visual">
                     <span class="creator-mode-icon">🎛️</span><span class="creator-mode-title">Detalhado</span><span class="creator-mode-hint">Todas as opções</span>
                 </button>
-                <button type="button" id="btnCreatorSubtitle" class="creator-mode-btn" role="tab" aria-selected="false" title="Transcreve mídias e gera somente arquivos SRT">
+                <button type="button" id="btnCreatorSubtitle" class="creator-mode-btn" role="tab" aria-selected="false" title="Gera SRT e, para áudio, vídeo legendado">
                     <span class="creator-mode-icon">▤</span><span class="creator-mode-title">Gerar SRT</span><span class="creator-mode-hint">Original + tradução opcional</span>
                 </button>
             </div>
@@ -1680,7 +1680,7 @@
                         <div>
                             <span class="easy-kicker">Gerar SRT</span>
                             <span class="card-title">Transcreva a mídia inteira e baixe as legendas</span>
-                            <p class="easy-intro">Aceita áudio ou vídeo em formatos compatíveis com FFmpeg. A mídia é normalizada para MP3 e o único resultado é o SRT original, acompanhado de uma tradução opcional quando ela for concluída.</p>
+                            <p class="easy-intro">Aceita áudio ou vídeo em formatos compatíveis com FFmpeg. Você recebe o SRT original e a tradução opcional. Se enviar apenas áudio, também recebe um vídeo MP4 com fundo simples, áudio original e legendas na tela.</p>
                         </div>
                     </div>
 
@@ -2561,15 +2561,15 @@
                 </ol>
             </details>
             <details>
-                <summary>3. Gerar somente legendas SRT</summary>
+                <summary>3. Gerar legendas SRT e vídeo para áudio</summary>
                 <ol>
-                    <li>Escolha <strong>Gerar SRT</strong> e envie áudio/vídeo, cole um link ou escolha um original da Biblioteca.</li>
+                    <li>Escolha <strong>Gerar SRT</strong> e envie áudio/vídeo, cole um link, busque no YouTube ou escolha um original da Biblioteca.</li>
                     <li>Como administrador, configure <strong>Ajustes → Tradução de SRT · LibreTranslate</strong>: salve o endereço e a chave opcional, depois toque em <strong>Testar e atualizar idiomas</strong>.</li>
                     <li>Em <strong>Segundo SRT traduzido</strong>, o padrão é <strong>detecção automática → Português (Brasil)</strong>. A tradução depende desse LibreTranslate. Você também pode escolher outro destino ou <strong>Não traduzir</strong>.</li>
                     <li>Ajuste modelo, leitura da fala, VAD e revisão se necessário. Toque em <strong>Gerar arquivos SRT</strong>.</li>
                     <li>Baixe o <strong>SRT original</strong> e, se gerado, o <strong>SRT traduzido</strong> no Karaokê. Ambos também são enviados por tentativa de anexo ao Telegram configurado, com os links de download. Se a tradução falhar, a entrega do original continua.</li>
                 </ol>
-                <p>Este modo usa o áudio completo normalizado para MP3, sem Demucs nem fundo. As legendas respeitam os tempos das falas e não preenchem silêncios. O SRT traduzido mantém os mesmos tempos. Não há abertura de capa neste modo nem limite fixo de duração; disco, memória e servidor continuam sendo limites.</p>
+                <p>Este modo usa o áudio completo normalizado para MP3, sem Demucs. Entradas de áudio também geram MP4 com fundo simples e legendas na tela; o vídeo e os arquivos SRT são enviados ao Telegram configurado. Entradas com vídeo continuam gerando apenas os arquivos SRT. As legendas respeitam os tempos das falas e não preenchem silêncios. O SRT traduzido mantém os mesmos tempos. Não há abertura de capa neste modo nem limite fixo de duração; disco, memória e servidor continuam sendo limites.</p>
             </details>
             <details>
                 <summary>4. Adicionar e organizar a fila</summary>
@@ -2634,7 +2634,7 @@
                     <li><strong>Diagnóstico:</strong> o administrador pode baixar os logs em Ajustes. Revise dados pessoais e credenciais antes de compartilhar.</li>
                 </ul>
             </details>
-            <p class="compact-note">Versão do servidor: 9.9.3. A transcrição é local; fontes, modelos e integrações podem acessar serviços externos. Use conteúdo autorizado.</p>
+            <p class="compact-note">Versão do servidor: 9.9.4. A transcrição é local; fontes, modelos e integrações podem acessar serviços externos. Use conteúdo autorizado.</p>
         </div>
     </div>
 
@@ -4451,7 +4451,7 @@
                     title: audioFiles.length > 1 ? `${audioFiles.length} vídeos` : (audioFiles[0]?.name || youtubeUrl || libraryVideo),
                     lyrics: `SRT · ${(document.getElementById('subtitleTranslationLanguage')?.selectedOptions?.[0]?.textContent || 'Português')}`,
                     model: document.getElementById('subtitleWhisperModel')?.selectedOptions?.[0]?.textContent || 'Large V3 Turbo',
-                    background: 'Somente arquivos SRT',
+                    background: 'SRT e vídeo automático para áudio',
                 });
                 updateTimelineUI('Uploading');
                 try {
@@ -6394,18 +6394,27 @@
 
                     if (data.status === "done" && data.result_available_to_current_user && data.original_filename && !data.original_filename.includes("Baixando")) {
                         if (downloadBox) downloadBox.style.display = "block";
-                        const subtitleResult = data.result_kind === 'subtitles';
+                        const subtitleResult = ['subtitles', 'subtitle_video'].includes(data.result_kind);
+                        const subtitleVideo = data.result_kind === 'subtitle_video';
                         if (subtitleResult) {
-                            if (downloadResultTitle) downloadResultTitle.textContent = 'Legendas prontas!';
-                            if (downloadResultDescription) downloadResultDescription.textContent = 'Baixe o SRT original e, quando disponível, a tradução opcional.';
-                            if (resultVideoPreview) {
+                            if (downloadResultTitle) downloadResultTitle.textContent = subtitleVideo ? 'Vídeo e legendas prontos!' : 'Legendas prontas!';
+                            if (downloadResultDescription) downloadResultDescription.textContent = subtitleVideo ? 'Assista ao vídeo ou baixe o MP4 e os arquivos SRT separadamente.' : 'Baixe o SRT original e, quando disponível, a tradução opcional.';
+                            if (resultVideoPreview && !subtitleVideo) {
                                 resultVideoPreview.pause();
                                 resultVideoPreview.removeAttribute('src');
                                 resultVideoPreview.removeAttribute('poster');
                                 resultVideoPreview.load();
                                 resultVideoPreview.style.display = 'none';
                             }
-                            if (btnDownloadResult) btnDownloadResult.style.display = 'none';
+                            if (subtitleVideo && resultVideoPreview) {
+                                resultVideoPreview.style.display = '';
+                                resultVideoPreview.removeAttribute('poster');
+                                if (statusChanged || !resultVideoPreview.getAttribute('src')) {
+                                    resultVideoPreview.src = `/api/download?inline=true&token=${encodeURIComponent(authToken)}&t=${Date.now()}`;
+                                    resultVideoPreview.load();
+                                }
+                            }
+                            if (btnDownloadResult) btnDownloadResult.style.display = subtitleVideo ? '' : 'none';
                             if (btnDownloadSubtitles) btnDownloadSubtitles.style.display = 'none';
                             if (btnDownloadOriginalSubtitles) btnDownloadOriginalSubtitles.style.display = data.original_subtitle_filename ? '' : 'none';
                             if (btnDownloadTranslatedSubtitles) btnDownloadTranslatedSubtitles.style.display = data.translated_subtitle_filename ? '' : 'none';
@@ -6466,7 +6475,7 @@
         // existing metadata, lyric lookup and creation flows in every mode.
         document.addEventListener('DOMContentLoaded', () => {
             const sources = ['easyYoutubeUrl', 'youtubeUrl', 'bgYoutubeUrl',
-                'easyBgYoutubeUrl', 'libAudioYoutubeUrl', 'libBgYoutubeUrl'];
+                'easyBgYoutubeUrl', 'libAudioYoutubeUrl', 'libBgYoutubeUrl', 'subtitleYoutubeUrl'];
             for (const sourceId of sources) {
                 const source = document.getElementById(sourceId);
                 if (!source) continue;
