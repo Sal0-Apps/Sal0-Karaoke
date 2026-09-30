@@ -1,0 +1,36 @@
+name: Validate YouTube administration
+on:
+  pull_request:
+    paths:
+      - 'app/templates/index.html'
+      - 'app/youtube_publisher.py'
+      - 'tests/**'
+      - '.github/workflows/validate-youtube-ui.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: |
+          python -m pip install requests==2.32.3
+          python -m compileall -q app
+          python -m unittest discover -s tests -p test_youtube_connection_feedback.py -v
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: |
+          npm install --prefix /tmp/sal0-ui playwright@1.51.1
+          /tmp/sal0-ui/node_modules/.bin/playwright install --with-deps chromium
+          NODE_PATH=/tmp/sal0-ui/node_modules node tests/browser_youtube_publisher.cjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: youtube-admin-layout
+          path: youtube-admin-*.png
+          if-no-files-found: ignore

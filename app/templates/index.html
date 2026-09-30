@@ -903,6 +903,24 @@
             align-items: stretch;
         }
         .settings-grid > .card { height: 100%; margin: 0; min-width: 0; }
+
+        #youtubePublisherSection .yt-panel { min-width: 0; border: 1px solid var(--glass-border); border-radius: 14px; padding: clamp(16px, 2vw, 24px); margin-top: 16px; }
+        #youtubePublisherSection h3 { font-size: 1.12rem; margin: 0 0 12px; }
+        #youtubePublisherSection summary { font-weight: 700; cursor: pointer; min-height: 44px; display: flex; align-items: center; }
+        .yt-status { padding: 12px; border-radius: 10px; background: var(--input-bg); line-height: 1.5; overflow-wrap: anywhere; }
+        .yt-status[data-kind="success"] { border: 1px solid #4ade80; color: #bbf7d0; }
+        .yt-status[data-kind="error"] { border: 1px solid #fb7185; color: #fecdd3; }
+        .yt-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+        .yt-fields, .yt-user-controls { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 16px; }
+        .yt-wide { grid-column: 1 / -1; }
+        .yt-user-list { display: grid; gap: 16px; margin: 16px 0; }
+        .yt-user-row { background: var(--input-bg); border: 1px solid var(--glass-border); border-radius: 12px; padding: 16px; min-width: 0; }
+        .yt-user-row h4 { margin: 0 0 12px; font-size: 1.08rem; overflow-wrap: anywhere; }
+        .yt-check { display: flex; align-items: center; gap: 12px; min-height: 44px; line-height: 1.4; }
+        .yt-check input { flex: 0 0 auto; width: 20px; height: 20px; }
+        .yt-defaults { margin: 16px 0; }
+        #youtubePublisherSection button, #youtubePublisherSection select, #youtubePublisherSection input[type="file"] { min-height: 44px; }
+        @media(max-width:640px) { .yt-fields, .yt-user-controls { grid-template-columns:minmax(0,1fr); } .yt-actions > button { width:100%; } }
         .youtube-auth-steps { padding-left: 1.4rem; line-height: 1.6; }
         .youtube-auth-steps a { color: #69d8ff; text-decoration: underline; }
         .youtube-auth-steps li { margin-bottom: .8rem; overflow-wrap: anywhere; }
@@ -2164,13 +2182,12 @@
             <div class="settings-grid">
 
             <div class="card" id="youtubePublisherSection" style="display:none">
-                <div class="card-header"><span class="card-title">📤 Publicar no YouTube · Administrador</span></div>
-                <p id="ytPublishChannel" class="compact-note">Verificando conexão do canal…</p>
-                <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:.7rem">
-                    <button type="button" id="ytPublishConnect" class="btn-secondary">Conectar canal</button>
-                    <button type="button" id="ytPublishRefresh" class="btn-secondary">Atualizar painel</button>
-                </div>
-                <details id="ytConnectionGuide" style="margin:.7rem 0" open><summary>Conectar meu canal · configuração gratuita</summary>
+                <div class="card-header"><span class="card-title">YouTube · Administração</span></div>
+                <section class="yt-panel" aria-labelledby="ytConnectionHeading">
+                    <h3 id="ytConnectionHeading">1. Conexão do canal</h3>
+                    <p id="ytPublishChannel" class="yt-status" role="status">Verificando conexão do canal…</p>
+                    <div class="yt-actions"><button type="button" id="ytPublishConnect" class="btn-secondary">Conectar pelo Google</button><button type="button" id="ytPublishRefresh" class="btn-secondary">Verificar conexão e atualizar playlists</button></div>
+                <details id="ytConnectionGuide" style="margin:.7rem 0"><summary>Ainda não tenho o arquivo de autorização</summary>
                     <p class="compact-note">Faça uma vez no computador. Seu servidor continua em HTTP. Não precisa contratar serviços nem cadastrar cobrança.</p>
                     <ol class="youtube-auth-steps">
                         <li><strong>Prepare o Google.</strong> <a href="https://console.cloud.google.com/apis/library/youtube.googleapis.com" target="_blank" rel="noopener noreferrer">Abra a YouTube Data API v3</a>, crie um projeto e clique em Ativar. Em <a href="https://console.cloud.google.com/auth/overview" target="_blank" rel="noopener noreferrer">Google Auth Platform</a>, configure o nome do app e seu e-mail. Escolha Público externo e adicione sua conta em Usuários de teste.</li>
@@ -2180,11 +2197,31 @@
                     </ol>
                     <button type="button" id="ytDesktopHelper" class="btn-secondary">1. Baixar assistente para Windows</button>
                     <details><summary>Uso Linux ou macOS</summary><p class="compact-note">Instale Python 3 gratuito e abra o arquivo abaixo no computador com navegador.</p><button type="button" id="ytDesktopPythonHelper" class="btn-secondary">Baixar alternativa Python</button></details>
-                    <label for="ytDesktopAuthorization" class="label">2. Escolher youtube-autorizacao.json</label>
-                    <input type="file" id="ytDesktopAuthorization" accept=".json,application/json" class="input-text">
-                    <button type="button" id="ytDesktopImport" class="btn-secondary">3. Conectar meu canal</button>
-                    <p class="compact-note">O arquivo permite acesso ao canal. Guarde como uma senha. A API tem uma cota de uso; ao atingir o limite, aguarde a renovação. Não há compra automática de cota.</p>
                 </details>
+                    <label for="ytDesktopAuthorization" class="label">Arquivo de autorização do assistente</label>
+                    <input type="file" id="ytDesktopAuthorization" accept=".json,application/json" class="input-text">
+                    <button type="button" id="ytDesktopImport" class="btn-secondary">Conectar meu canal</button>
+                    <p class="compact-note">O arquivo permite acesso ao canal. Guarde como uma senha. A API tem uma cota de uso; ao atingir o limite, aguarde a renovação. Não há compra automática de cota.</p>
+                    <p id="ytConnectionMessage" class="yt-status" role="status" aria-live="polite" hidden></p>
+
+                </section>
+                <section class="yt-panel" aria-labelledby="ytUsersHeading">
+                    <h3 id="ytUsersHeading">2. Playlist de cada usuário</h3>
+                    <p class="compact-note">Escolha quem pode publicar, o destino dos vídeos de cada pessoa e se a publicação começa marcada no modo rápido.</p>
+                    <p id="ytPlaylistStatus" class="yt-status" role="status"></p>
+                    <label class="yt-check"><input type="checkbox" id="ytUsersCanPublish"> Liberar publicação pelos usuários</label>
+                    <div id="ytUserAssignments" class="yt-user-list"></div>
+                    <details class="yt-defaults"><summary>Título e privacidade usados no modo rápido</summary>
+                        <div class="yt-fields">
+                            <div><label for="ytDefaultPrivacy" class="label">Privacidade padrão</label><select id="ytDefaultPrivacy" class="select-input"><option value="private">Privado</option><option value="unlisted">Não listado</option><option value="public">Público</option></select></div>
+                            <div><label for="ytDefaultPlaylist" class="label">Playlist padrão do administrador</label><select id="ytDefaultPlaylist" class="select-input"><option value="">Sem playlist</option></select></div>
+                            <div class="yt-wide"><label for="ytPublishTemplate" class="label">Modelo de título</label><input id="ytPublishTemplate" class="input-text" maxlength="100" value="{title} | Karaokê"><p class="compact-note">{title} será substituído pelo nome da música.</p></div>
+                        </div>
+                    </details>
+                    <button type="button" id="ytPublishSave" class="btn-primary">Salvar playlists e permissões</button>
+                    <p id="ytUsersMessage" class="yt-status" role="status" aria-live="polite" hidden></p>
+                </section>
+                <details class="yt-panel" id="ytManualPublication"><summary>3. Publicar um vídeo já pronto</summary>
                 <label for="ytPublishVideo" class="label">Vídeo finalizado</label>
                 <select id="ytPublishVideo" class="select-input"><option value="">Escolha um vídeo…</option></select>
                 <label for="ytPublishTitle" class="label">Título no YouTube</label>
@@ -2200,16 +2237,10 @@
                 <p class="compact-note">A capa automática é a mesma que aparece na abertura do vídeo. O envio começa privado e aplica capa, playlist e a privacidade escolhida.</p>
                 <button type="button" id="ytPublishSubmit" class="btn-primary" disabled>Publicar vídeo selecionado</button>
                 <p id="ytPublishMessage" class="compact-note" role="status"></p>
-                <hr style="border:0;border-top:1px solid var(--glass-border);margin:1rem 0">
-                <label for="ytPublishTemplate" class="label">Título para publicação automática</label>
-                <input id="ytPublishTemplate" class="input-text" maxlength="100" value="{title} | Karaokê">
-                <p class="compact-note">{title} é substituído pelo nome da música. As publicações usam a privacidade acima e uma capa com o título. A playlist dos usuários é definida individualmente abaixo.</p>
-                <label style="display:flex;gap:.5rem;align-items:center;margin:.6rem 0"><input type="checkbox" id="ytUsersCanPublish"> Permitir publicação pelos usuários</label>
-                <p class="compact-note">Defina a playlist de cada conta e se “Publicar no YouTube” começa marcado. O usuário sempre pode desmarcar para criar sem publicar.</p>
-                <div id="ytUserAssignments" style="display:grid;gap:.8rem"></div>
-                <button type="button" id="ytPublishSave" class="btn-secondary">Salvar opções de publicação</button>
-                <p class="compact-note">Projetos de API sem auditoria do YouTube podem permitir apenas vídeos privados. O canal também precisa permitir capas personalizadas.</p>
-                <div id="ytPublishJobs" style="display:grid;gap:.5rem;margin-top:1rem"></div>
+
+                </details>
+                <details class="yt-panel"><summary>Histórico de publicações</summary><div id="ytPublishJobs"></div></details>
+                <p class="compact-note">Projetos de API sem auditoria podem ficar restritos a vídeos privados. Capas personalizadas dependem da permissão do canal.</p>
             </div>
 
             <!-- Gerenciador de Modelos Whisper -->
@@ -2603,7 +2634,7 @@
                     <li><strong>Diagnóstico:</strong> o administrador pode baixar os logs em Ajustes. Revise dados pessoais e credenciais antes de compartilhar.</li>
                 </ul>
             </details>
-            <p class="compact-note">Versão do servidor: 9.9.2. A transcrição é local; fontes, modelos e integrações podem acessar serviços externos. Use conteúdo autorizado.</p>
+            <p class="compact-note">Versão do servidor: 9.9.3. A transcrição é local; fontes, modelos e integrações podem acessar serviços externos. Use conteúdo autorizado.</p>
         </div>
     </div>
 
@@ -6547,15 +6578,24 @@
 
     <script>
         let youtubePublishVideos = [];
+        let youtubeChannelConnected = false;
+        let youtubePlaylistsAvailable = false;
+        let youtubeSettingsBusy = false;
         let youtubeCoverObjectUrl = null;
         let youtubePreviewRevision = 0;
         let youtubePreviewReady = false;
         const ytElement = id => document.getElementById(id);
         function ytMessage(message) { const el = ytElement('ytPublishMessage'); if (el) el.textContent = message; }
+        function ytNotice(id, message, kind = 'info') {
+            const el = ytElement(id); if (!el) return;
+            el.textContent = message; el.dataset.kind = kind; el.hidden = !message;
+        }
         async function ytRequest(path, options = {}) {
             const response = await authFetch('/api/admin/youtube/' + path, options);
-            const result = await response.json();
-            if (!response.ok) throw new Error(typeof result.detail === 'string' ? result.detail : 'Revise os dados da publicação.');
+            let result;
+            try { result = await response.json(); }
+            catch { throw new Error('O servidor não retornou uma resposta válida. Verifique a conexão e tente novamente.'); }
+            if (!response.ok) throw new Error(typeof result.detail === 'string' ? result.detail : 'Não foi possível concluir a solicitação (HTTP ' + response.status + ').');
             return result;
         }
         function youtubeSelectedVideo() {
@@ -6614,62 +6654,85 @@
         }
         async function renderYoutubeUserAssignments(assignments, playlists) {
             const response = await authFetch('/api/users');
-            if (!response.ok) throw new Error('Não foi possível carregar os usuários.');
+            if (!response.ok) throw new Error('Não foi possível carregar os usuários. Clique em Verificar conexão e atualizar playlists para tentar novamente.');
             const users = await response.json();
+            if (!Array.isArray(users)) throw new Error('O servidor retornou uma lista de usuários inválida.');
             const container = ytElement('ytUserAssignments'); container.replaceChildren();
-            for (const user of users.filter(user => user.role !== 'admin')) {
+            for (const [index, user] of users.filter(user => user.role !== 'admin').entries()) {
                 const assignment = assignments[user.username] || {};
-                const row = document.createElement('div'); row.dataset.username = user.username;
-                const label = document.createElement('label'); label.textContent = user.username; row.append(label);
-                const select = document.createElement('select'); select.className = 'select-input'; select.dataset.field = 'playlist';
-                select.add(new Option('Não permitir publicação', '__disabled__'));
-                select.add(new Option('Publicar sem playlist', ''));
+                const row = document.createElement('div'); row.className = 'yt-user-row'; row.dataset.username = user.username;
+                const heading = document.createElement('h4'); heading.textContent = user.username; row.append(heading);
+                const controls = document.createElement('div'); controls.className = 'yt-user-controls';
+                const enabledLabel = document.createElement('label'); enabledLabel.className = 'yt-check';
+                const enabled = document.createElement('input'); enabled.type = 'checkbox'; enabled.dataset.field = 'enabled'; enabled.checked = !!assignment.enabled;
+                enabled.disabled = !youtubeChannelConnected;
+                enabledLabel.append(enabled, document.createTextNode('Permitir que este usuário publique')); controls.append(enabledLabel);
+                const playlistBox = document.createElement('div');
+                const label = document.createElement('label'); label.className = 'label'; label.htmlFor = 'yt-user-playlist-' + index; label.textContent = 'Playlist de destino';
+                const select = document.createElement('select'); select.id = label.htmlFor; select.className = 'select-input'; select.dataset.field = 'playlist';
+                select.add(new Option('Sem playlist — publicar somente no canal', ''));
                 playlists.forEach(playlist => select.add(new Option(playlist.title, playlist.id)));
-                select.value = assignment.enabled ? assignment.playlist_id || '' : '__disabled__'; row.append(select);
-                const defaultLabel = document.createElement('label'); defaultLabel.style.display = 'flex'; defaultLabel.style.gap = '.5rem';
+                if (assignment.playlist_id && !playlists.some(p => p.id === assignment.playlist_id)) select.add(new Option((assignment.playlist_title || assignment.playlist_id) + ' · destino salvo', assignment.playlist_id));
+                select.value = assignment.playlist_id || '';
+                playlistBox.append(label, select); controls.append(playlistBox);
+                const defaultLabel = document.createElement('label'); defaultLabel.className = 'yt-check yt-wide';
                 const checkbox = document.createElement('input'); checkbox.type = 'checkbox'; checkbox.dataset.field = 'default'; checkbox.checked = !!assignment.default_publish;
-                defaultLabel.append(checkbox, document.createTextNode('Publicar marcado por padrão')); row.append(defaultLabel); container.append(row);
+                defaultLabel.append(checkbox, document.createTextNode('Deixar “Publicar no YouTube” marcado no modo rápido'));
+                controls.append(defaultLabel); row.append(controls);
+                const sync = () => { select.disabled = !enabled.checked || !youtubePlaylistsAvailable; checkbox.disabled = !enabled.checked || !youtubeChannelConnected; };
+                enabled.onchange = sync; sync(); container.append(row);
+            }
+            if (!container.children.length) {
+                const empty = document.createElement('p'); empty.className = 'compact-note'; empty.textContent = 'Não há contas de usuário. Cadastre uma em Gerenciar usuários para definir a playlist dela.'; container.append(empty);
             }
         }
         function readYoutubeUserAssignments() {
             const assignments = Object.create(null);
-            for (const row of ytElement('ytUserAssignments').children) {
+            for (const row of ytElement('ytUserAssignments').querySelectorAll('[data-username]')) {
                 const playlist = row.querySelector('[data-field="playlist"]').value;
-                assignments[row.dataset.username] = { enabled: playlist !== '__disabled__', playlist_id: playlist === '__disabled__' ? '' : playlist,
+                assignments[row.dataset.username] = { enabled: row.querySelector('[data-field="enabled"]').checked, playlist_id: playlist,
                     default_publish: row.querySelector('[data-field="default"]').checked };
             }
             return assignments;
         }
         async function loadYoutubePublisher(full = true) {
-            if (currentUser?.role !== 'admin') return;
+            if (currentUser?.role !== 'admin' || youtubeSettingsBusy) return;
             try {
                 const status = await ytRequest('status');
-                ytElement('ytPublishChannel').textContent = status.connected ? 'Canal conectado: ' + status.channel_title
-                    : (status.configured ? 'Conecte pelo computador e importe a autorização abaixo. Seu servidor pode continuar em HTTP.' : 'Configure o cliente OAuth do YouTube no servidor para conectar o canal.');
+                youtubeChannelConnected = !!status.connected;
+                ytNotice('ytPublishChannel', status.connected ? '✓ Canal conectado: ' + status.channel_title : 'Canal não conectado. Importe a autorização para concluir.', status.connected ? 'success' : 'info');
                 ytElement('ytPublishConnect').style.display = status.web_configured ? '' : 'none';
-                ytElement('ytConnectionGuide').open = !status.connected;
                 renderYoutubePublicationJobs(status.jobs || []);
                 if (!full) return;
+                if (status.connected) ytElement('ytConnectionGuide').open = false;
+                ytElement('ytDefaultPrivacy').value = status.settings.privacy;
                 ytElement('ytPublishPrivacy').value = status.settings.privacy;
                 ytElement('ytPublishTemplate').value = status.settings.title_template;
                 ytElement('ytUsersCanPublish').checked = status.settings.users_can_publish;
-                const playlistSelect = ytElement('ytPublishPlaylist');
-                playlistSelect.replaceChildren(new Option('Sem playlist', ''));
+                ytElement('ytUsersCanPublish').disabled = !status.connected;
+                let playlists = []; youtubePlaylistsAvailable = false;
                 if (status.connected) {
-                    const result = await ytRequest('playlists');
-                    for (const playlist of result.playlists || []) playlistSelect.add(new Option(playlist.title, playlist.id));
-                    playlistSelect.value = status.settings.playlist_id || '';
+                    try {
+                        const result = await ytRequest('playlists'); playlists = result.playlists || []; youtubePlaylistsAvailable = true;
+                        ytNotice('ytPlaylistStatus', playlists.length ? playlists.length + ' playlists disponíveis. Escolha uma para cada usuário abaixo.' : 'Este canal ainda não possui playlists. Você pode publicar sem playlist ou criar uma no YouTube.', 'info');
+                    } catch (error) { ytNotice('ytPlaylistStatus', 'Canal conectado, mas as playlists não carregaram: ' + error.message, 'error'); }
+                } else { ytNotice('ytPlaylistStatus', 'Conecte o canal primeiro. Depois as playlists aparecerão aqui.', 'info'); }
+                for (const id of ['ytPublishPlaylist', 'ytDefaultPlaylist']) {
+                    const select = ytElement(id); select.replaceChildren(new Option('Sem playlist', ''));
+                    playlists.forEach(playlist => select.add(new Option(playlist.title, playlist.id)));
+                    if (status.settings.playlist_id && !playlists.some(p => p.id === status.settings.playlist_id)) select.add(new Option('Destino salvo · ' + status.settings.playlist_id, status.settings.playlist_id));
+                    select.value = status.settings.playlist_id || ''; select.disabled = !youtubePlaylistsAvailable;
                 }
-                await renderYoutubeUserAssignments(status.settings.user_assignments || [], Array.from(playlistSelect.options).filter(option => option.value).map(option => ({id: option.value, title: option.text})));
+                await renderYoutubeUserAssignments(status.settings.user_assignments || {}, playlists);
+                ytElement('ytPublishSave').disabled = !status.connected || !youtubePlaylistsAvailable;
                 const response = await authFetch('/api/admin/results');
-                const results = await response.json();
                 if (!response.ok) throw new Error('Não foi possível carregar os vídeos finalizados.');
+                const results = await response.json();
                 youtubePublishVideos = (results.results || []).filter(video => video.kind === 'video' && /\.mp4$/i.test(video.filename));
-                const select = ytElement('ytPublishVideo');
-                select.replaceChildren(new Option('Escolha um vídeo…', ''));
+                const select = ytElement('ytPublishVideo'); select.replaceChildren(new Option('Escolha um vídeo…', ''));
                 youtubePublishVideos.forEach((video, index) => select.add(new Option(video.filename + ' · ' + video.owner, String(index))));
                 resetYoutubeCover();
-            } catch (error) { ytMessage(error.message); }
+            } catch (error) { ytNotice('ytPublishChannel', 'Não foi possível atualizar o painel: ' + error.message, 'error'); }
         }
         document.addEventListener('DOMContentLoaded', () => {
             const downloadYoutubeHelper = async (windows) => {
@@ -6684,14 +6747,23 @@
             ytElement('ytDesktopHelper').onclick = () => downloadYoutubeHelper(true);
             ytElement('ytDesktopPythonHelper').onclick = () => downloadYoutubeHelper(false);
             ytElement('ytDesktopImport').onclick = async () => {
-                const file = ytElement('ytDesktopAuthorization').files[0];
-                if (!file || file.size > 32768) { ytMessage('Escolha o JSON de autorização gerado pelo programa (até 32 KB).'); return; }
+                const file = ytElement('ytDesktopAuthorization').files[0], button = ytElement('ytDesktopImport');
+                if (!file || file.size > 32768) { ytNotice('ytConnectionMessage', 'Escolha youtube-autorizacao.json gerado pelo assistente (até 32 KB).', 'error'); return; }
                 const form = new FormData(); form.set('authorization', file);
+                button.disabled = true; button.textContent = 'Conectando…'; youtubeSettingsBusy = true;
+                ytNotice('ytConnectionMessage', 'Validando autorização e consultando seu canal no Google. Aguarde…');
                 try {
                     const result = await ytRequest('import-authorization', {method: 'POST', body: form});
-                    ytElement('ytDesktopAuthorization').value = ''; ytMessage('Canal conectado: ' + result.channel_title);
+                    ytElement('ytDesktopAuthorization').value = '';
+                    ytNotice('ytPublishChannel', '✓ Canal conectado: ' + result.channel_title, 'success');
+                    ytNotice('ytConnectionMessage', 'Conexão concluída: ' + result.channel_title, 'success');
+                    youtubeSettingsBusy = false;
                     await loadYoutubePublisher(); await loadYoutubePublicationOptions();
-                } catch (error) { ytMessage(error.message); }
+                    ytElement('ytPublishChannel').scrollIntoView({behavior:'smooth', block:'center'});
+                } catch (error) {
+                    ytNotice('ytConnectionMessage', 'Não foi possível conectar: ' + error.message, 'error');
+                    ytElement('ytConnectionMessage').scrollIntoView({behavior:'smooth', block:'center'});
+                } finally { youtubeSettingsBusy = false; button.disabled = false; button.textContent = 'Conectar meu canal'; }
             };
             ytElement('ytPublishConnect').onclick = async () => {
                 try { const result = await ytRequest('connect', { method: 'POST' }); window.location.assign(result.url); }
@@ -6745,12 +6817,15 @@
                 catch (error) { ytMessage(error.message); button.disabled = false; }
             };
             ytElement('ytPublishSave').onclick = async () => {
+                const button = ytElement('ytPublishSave'); button.disabled = true; button.textContent = 'Salvando…'; youtubeSettingsBusy = true;
+                ytNotice('ytUsersMessage', 'Salvando playlists e permissões…');
                 try {
                     await ytRequest('settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
-                        privacy: ytElement('ytPublishPrivacy').value, playlist_id: ytElement('ytPublishPlaylist').value,
+                        privacy: ytElement('ytDefaultPrivacy').value, playlist_id: ytElement('ytDefaultPlaylist').value,
                         title_template: ytElement('ytPublishTemplate').value, users_can_publish: ytElement('ytUsersCanPublish').checked, user_assignments: readYoutubeUserAssignments() }) });
-                    ytMessage('Permissões, playlists e padrões de cada usuário salvos.'); await loadYoutubePublicationOptions();
-                } catch (error) { ytMessage(error.message); }
+                    ytNotice('ytUsersMessage', '✓ Playlists e permissões salvas.', 'success'); await loadYoutubePublicationOptions();
+                } catch (error) { ytNotice('ytUsersMessage', 'Não foi possível salvar: ' + error.message, 'error'); }
+                finally { youtubeSettingsBusy = false; button.disabled = !youtubeChannelConnected || !youtubePlaylistsAvailable; button.textContent = 'Salvar playlists e permissões'; }
             };
             setInterval(() => {
                 if (!document.hidden && currentUser?.role === 'admin' && ytElement('settingsTabContent')?.style.display !== 'none') loadYoutubePublisher(false);

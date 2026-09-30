@@ -116,6 +116,27 @@ class YouTubePublisher:
             self.save('token.json', token)
         return token['channel_title']
 
+    def confirm_channel(self, access_token):
+        response = requests.get(API + '/channels', params={'part': 'snippet', 'mine': 'true'},
+            headers={'Authorization': 'Bearer ' + access_token}, timeout=30)
+        if response.status_code != 200:
+            reason = ''
+            try:
+                reason = response.json().get('error', {}).get('errors', [{}])[0].get('reason', '')
+            except (ValueError, TypeError, AttributeError, IndexError):
+                pass
+            if reason in {'accessNotConfigured', 'serviceDisabled'}:
+                raise PublicationError('Ative a YouTube Data API v3 no mesmo projeto Google da credencial e tente conectar novamente.')
+            if reason in {'insufficientPermissions', 'forbidden'}:
+                raise PublicationError('O Google negou a consulta do canal. Autorize novamente usando a conta do canal e permita o acesso solicitado.')
+            if reason == 'quotaExceeded':
+                raise PublicationError('A cota diária da API do YouTube foi atingida. Aguarde a renovação e tente novamente.')
+            raise PublicationError(f'O Google não confirmou o canal (HTTP {response.status_code}). Confira se a YouTube Data API v3 está ativa no projeto da credencial.')
+        items = response.json().get('items', [])
+        if not items:
+            raise PublicationError('A conta autorizada não possui um canal disponível. Abra o YouTube com essa conta, crie ou selecione seu canal e autorize novamente.')
+        return items[0]
+
     def import_desktop_authorization(self, data):
         if not isinstance(data, dict) or data.get('format') != 'sal0-youtube-desktop-v1':
             raise PublicationError('Use o arquivo gerado pelo autorizador para computador do Sal0.')
@@ -128,13 +149,19 @@ class YouTubePublisher:
         if response.status_code != 200:
             raise PublicationError('O Google recusou a autorização. Gere um novo arquivo no computador.')
         token = response.json()
-        if not isinstance(token.get('access_token'), str) or SCOPE not in str(token.get('scope', '')).split():
-            raise PublicationError('A autorização não permite gerenciar vídeos e playlists. Use o autorizador do Sal0.')
-        channel = requests.get(API + '/channels', params={'part': 'snippet', 'mine': 'true'},
-            headers={'Authorization': 'Bearer ' + token['access_token']}, timeout=30)
-        if channel.status_code != 200 or not channel.json().get('items'):
-            raise PublicationError('Não foi possível confirmar o canal dessa autorização.')
-        item = channel.json()['items'][0]
+        if not isinstance(token.get('access_token'), str) or not token['access_token']:
+            raise PublicationError('O Google não retornou uma autorização válida. Gere um novo arquivo no assistente.')
+        # Refresh replies can omit scope. Confirm it with Google rather than rejecting
+        # a valid connection or trusting the imported file.
+        scopes = token.get('scope')
+        if scopes is None:
+            info = requests.get('https://oauth2.googleapis.com/tokeninfo', params={'access_token': token['access_token']}, timeout=30)
+            if info.status_code != 200:
+                raise PublicationError('Não foi possível validar as permissões no Google. Tente novamente.')
+            scopes = info.json().get('scope', '')
+        if SCOPE not in str(scopes).split():
+            raise PublicationError('A autorização não permite gerenciar vídeos e playlists. Gere um novo arquivo no assistente e permita o acesso solicitado.')
+        item = self.confirm_channel(token['access_token'])
         token.update(refresh_token=data['refresh_token'], channel_id=item['id'],
             channel_title=item['snippet']['title'], expires_at=time.time() + token.get('expires_in', 3600),
             desktop_client={key: data[key] for key in ('client_id', 'client_secret')})
