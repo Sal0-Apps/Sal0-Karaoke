@@ -43,6 +43,8 @@ import libretranslate_client
 from video_renderer import render_karaoke_video, check_has_video
 from reprocess_cache import copy_reusable_inputs
 from media_covers import video_thumbnail
+from lyrics_sync import recording_matches, parse_lrc
+from backing_vocals import preserve_backing_vocals
 
 # Configurar logs
 logging.basicConfig(
@@ -1806,6 +1808,52 @@ class YouTubePresetModel(BaseModel):
     youtube_url: str
 
 
+class YouTubeSearchRequest(BaseModel):
+    query: str = Field(min_length=2, max_length=160)
+
+
+@app.post("/api/youtube/search")
+def search_youtube(data: YouTubeSearchRequest, current_user: dict = Depends(get_current_user)):
+    """Search videos without downloading media or accepting arbitrary URLs."""
+    query = data.query.strip()
+    if len(query) < 2:
+        raise HTTPException(status_code=400, detail="Informe o artista e o nome da música.")
+    try:
+        with yt_dlp_operation_lock:
+            yt_dlp = load_yt_dlp()
+            options = {
+                **youtube_download_options(),
+                "extract_flat": True,
+                "skip_download": True,
+                "socket_timeout": 15,
+                "retries": 1,
+                "extractor_retries": 1,
+                "playlistend": 6,
+            }
+            with yt_dlp.YoutubeDL(options) as ydl:
+                info = ydl.extract_info(f"ytsearch6:{query}", download=False)
+        results = []
+        for entry in (info or {}).get("entries", []) or []:
+            if not isinstance(entry, dict):
+                continue
+            video_id = str(entry.get("id") or "")
+            if not re.fullmatch(r"[A-Za-z0-9_-]{11}", video_id) or entry.get("is_live"):
+                continue
+            results.append({
+                "id": video_id,
+                "title": str(entry.get("title") or "Vídeo sem título"),
+                "uploader": str(entry.get("channel") or entry.get("uploader") or ""),
+                "duration": entry.get("duration"),
+                "url": f"https://www.youtube.com/watch?v={video_id}",
+            })
+        return {"results": results}
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.info("YouTube search unavailable: %s", type(exc).__name__)
+        raise HTTPException(status_code=502, detail="A busca no YouTube não respondeu. Tente novamente ou cole o link.")
+
+
 @app.post("/api/youtube/metadata")
 def get_youtube_metadata(
     data: YouTubePresetModel,
@@ -2212,7 +2260,7 @@ def download_bg_youtube_preset(
 
 
 LRCLIB_API_URL = "https://lrclib.net/api"
-LRCLIB_USER_AGENT = "Sal0-Karaoke/9.8.0 (+https://github.com/Sal0-Apps/Sal0-Karaoke)"
+LRCLIB_USER_AGENT = "Sal0-Karaoke/9.9.0 (+https://github.com/Sal0-Apps/Sal0-Karaoke)"
 LYRICS_OVH_API_URL = "https://api.lyrics.ovh/v1"
 LYRICS_PROVIDER_TIMEOUT = (3.05, 6)
 MUSIXMATCH_API_URL = "https://apic-desktop.musixmatch.com/ws/1.1"
@@ -2335,7 +2383,9 @@ def _search_lrclib(query: str) -> list[dict]:
             "duration": item.get("duration"),
             "instrumental": bool(item.get("instrumental")),
             "has_lyrics": bool(lyrics_text),
-            "lyrics_text": lyrics_text
+            "lyrics_text": lyrics_text,
+            "synced_lyrics": str(item.get("syncedLyrics") or ""),
+            "has_synced_lyrics": bool(item.get("syncedLyrics")),
         })
     return results
 
@@ -2491,7 +2541,7 @@ def search_lyrics_providers(query: str) -> list[dict]:
     return results
 
 
-def find_lyrics_automatically(query: str) -> tuple[str, dict | None]:
+def find_lyrics_automatically(query: str, duration: float | None = None) -> tuple[str, dict | None]:
     """Busca a melhor letra disponível sem tornar a internet obrigatória ao pipeline."""
     query = (query or "").strip()
     if len(query) < 2:
@@ -2514,18 +2564,23 @@ def find_lyrics_automatically(query: str) -> tuple[str, dict | None]:
             str(item.get("artist_name") or "")
         ]).lower()
         score = difflib.SequenceMatcher(None, query_normalized, candidate_name).ratio()
+        if item.get("synced_lyrics") and recording_matches(query, item, duration):
+            score += 1.0
         if score > best_score:
             best_match = (lyrics_text, item)
             best_score = score
 
-    if not best_match:
+    if not best_match or best_score < 0.45:
         logger.info("Nenhuma letra online encontrada para a música selecionada.")
         return "", None
 
     lyrics_text, record = best_match
     return lyrics_text, {
         "track_name": record.get("track_name") or "Faixa sem título",
-        "artist_name": record.get("artist_name") or "Artista desconhecido"
+        "artist_name": record.get("artist_name") or "Artista desconhecido",
+        "synced_lyrics": record.get("synced_lyrics") or "",
+        "duration": record.get("duration"),
+        "provider": record.get("provider"),
     }
 
 
@@ -2538,7 +2593,7 @@ def search_lyrics_online(data: LyricsSearchRequest, current_user: dict = Depends
 
     provider_results = search_lyrics_providers(query)
     results = [
-        {key: value for key, value in item.items() if key != "lyrics_text"}
+        {key: value for key, value in item.items() if key not in {"lyrics_text", "synced_lyrics"}}
         for item in provider_results
     ]
     return {
@@ -2676,7 +2731,7 @@ def download_diagnostic_logs(current_user: dict = Depends(get_current_user)):
     with state_lock:
         current_state = dict(state)
     report = "\n".join([
-"Sal0 Karaokê v9.8.0 — diagnóstico ao vivo",
+"Sal0 Karaokê v9.9.0 — diagnóstico ao vivo",
         f"Gerado em: {time.strftime('%Y-%m-%d %H:%M:%S')}",
         "",
         "=== ESTADO ATUAL ===",
@@ -2716,6 +2771,9 @@ class ProfileModel(BaseModel):
     enable_vad: bool = False
     transcription_preset: str = "karaoke"
     save_to_library: bool = True
+    keep_backing_vocals: bool = True
+    backing_vocals_volume: int = Field(default=100, ge=0, le=100)
+    lyrics_timing: str = "auto"
     only_remove_vocals: bool = False
 
 BUILTIN_PROFILES = {
@@ -2824,6 +2882,9 @@ PROFILE_DEFAULT_FIELDS = {
     "transcription_preset": "karaoke",
     "save_to_library": True,
     "only_remove_vocals": False,
+    "keep_backing_vocals": True,
+    "backing_vocals_volume": 100,
+    "lyrics_timing": "auto",
     "description": "Perfil personalizado por você.",
     "_builtin": False,
 }
@@ -2905,6 +2966,9 @@ def save_profile(profile: ProfileModel, current_user: dict = Depends(get_current
         "enable_vad": profile.enable_vad,
         "transcription_preset": profile.transcription_preset,
         "save_to_library": profile.save_to_library,
+        "keep_backing_vocals": profile.keep_backing_vocals,
+        "backing_vocals_volume": profile.backing_vocals_volume,
+        "lyrics_timing": profile.lyrics_timing,
         "only_remove_vocals": profile.only_remove_vocals
     }
     try:
@@ -3895,6 +3959,12 @@ def process_karaoke(
     show_next_line_preview: bool = Form(False),
     lyrics_text: str = Form(None),
     lyrics_mode: str = Form("auto"),
+    youtube_publish: bool = Form(False),
+    youtube_playlist_id: str = Form(""),
+    youtube_title: str = Form(""),
+    lyrics_timing: str = Form("auto"),
+    keep_backing_vocals: bool = Form(True),
+    backing_vocals_volume: int = Form(100),
     enable_correction: bool = Form(False),
     keep_first_line_visible: bool = Form(False),
     pause_for_editing: bool = Form(False),
@@ -3912,6 +3982,14 @@ def process_karaoke(
     """
     Recebe os arquivos enviados, valida a concorrência e inicia o pipeline em segundo plano.
     """
+    try:
+        publication_options = youtube_publisher.publication_options(
+            current_user, youtube_publish, youtube_playlist_id, youtube_title)
+    except Exception as error:
+        from youtube_publisher import PublicationError
+        if isinstance(error, PublicationError):
+            raise HTTPException(status_code=400, detail=str(error))
+        raise
     ensure_processing_queue_access(current_user)
     ensure_processing_queue_capacity(current_user.get("username"))
     translation_language = normalize_translation_language(translation_language)
@@ -3999,6 +4077,10 @@ def process_karaoke(
         else:
             background_mode = "original"
 
+    if not 0 <= backing_vocals_volume <= 100:
+        raise HTTPException(status_code=400, detail="Volume dos backing vocals deve estar entre 0 e 100%.")
+    if lyrics_timing not in {"auto", "acoustic"}:
+        raise HTTPException(status_code=400, detail="Modo de sincronização inválido.")
     lyrics_mode = (lyrics_mode or "auto").strip().lower()
     if lyrics_mode not in {"auto", "manual"}:
         raise HTTPException(status_code=400, detail="Modo de letra inválido.")
@@ -4386,6 +4468,10 @@ def process_karaoke(
         "show_next_line_preview": show_next_line_preview,
         "lyrics_text": lyrics_text,
         "lyrics_mode": lyrics_mode,
+        "youtube_publish_options": publication_options,
+        "lyrics_timing": lyrics_timing,
+        "keep_backing_vocals": keep_backing_vocals,
+        "backing_vocals_volume": backing_vocals_volume,
         "enable_correction": enable_correction,
         "keep_first_line_visible": keep_first_line_visible,
         "youtube_url": youtube_url,
@@ -5025,6 +5111,10 @@ def run_pipeline(
     show_next_line_preview: bool = False,
     lyrics_text: str = None,
     lyrics_mode: str = "auto",
+    youtube_publish_options: dict = None,
+    lyrics_timing: str = "auto",
+    keep_backing_vocals: bool = True,
+    backing_vocals_volume: int = 100,
     enable_correction: bool = False,
     keep_first_line_visible: bool = False,
     youtube_url: str = None,
@@ -5119,6 +5209,20 @@ def run_pipeline(
                     cached_meta = json.load(f)
             except Exception:
                 pass
+
+        output_options = {"lyrics_timing": lyrics_timing,
+                          "keep_backing_vocals": keep_backing_vocals,
+                          "backing_vocals_volume": backing_vocals_volume}
+        if cached_meta.get("vocal_output_options") != output_options:
+            checkpoints = load_stage_checkpoints(cache_dir)
+            completed = checkpoints.get("completed_stages", {})
+            for stage in ("transcription_ready", "transcription_reviewed", "subtitles_generated", "video_rendered"):
+                completed.pop(stage, None)
+            with open(os.path.join(cache_dir, "stage_checkpoints.json"), "w", encoding="utf-8") as f:
+                json.dump(checkpoints, f, indent=4)
+            cached_meta["vocal_output_options"] = output_options
+            with open(cache_meta_file, "w", encoding="utf-8") as f:
+                json.dump(cached_meta, f, indent=4)
 
         # Se for link do YouTube, realiza o download agora em background (se já não estiver no cache)
         if youtube_url and youtube_url.strip():
@@ -5220,6 +5324,7 @@ def run_pipeline(
 
         # Busca automática de letra: sempre usa a identidade da mídia atual.
         # O texto anterior é descartado para nunca orientar outra música.
+        synced_segments = []
         lyrics_text = (lyrics_text or "").strip() if lyrics_mode == "manual" else ""
         if lyrics_mode == "auto":
             cached_meta["lyrics_text"] = ""
@@ -5232,17 +5337,22 @@ def run_pipeline(
                 logger.warning("Não foi possível limpar a letra automática anterior: %s", clear_error)
 
             update_state("processing", "Searching lyrics online", 10, original_filename=orig_name)
-            auto_lyrics, auto_match = find_lyrics_automatically(orig_name)
+            media_duration = get_file_duration(input_audio_path)
+            auto_lyrics, auto_match = find_lyrics_automatically(orig_name, media_duration)
+            if lyrics_timing == "auto" and auto_match and recording_matches(orig_name, auto_match, media_duration):
+                synced_segments = parse_lrc(auto_match.get("synced_lyrics"), media_duration)
             if auto_lyrics:
                 lyrics_text = auto_lyrics
                 update_process_summary(lyrics="Letra-guia + Whisper")
+                if synced_segments:
+                    update_process_summary(lyrics="Letra sincronizada por versos (LRCLIB)")
                 notify_targets(
                     telegram_targets,
                     telegram_notice(
                         "📖",
-                        "Letra-guia encontrada",
+                        "Letra sincronizada encontrada" if synced_segments else "Letra-guia encontrada",
                         f"🎵 <b>{telegram_escape(orig_name)}</b>",
-                        "✅ A letra será usada para orientar a grafia do Whisper.",
+                        "✅ Sincronização por versos disponível." if synced_segments else "✅ A letra será usada para orientar a grafia do Whisper.",
                     ),
                 )
                 cached_meta["lyrics_text"] = auto_lyrics
@@ -5306,6 +5416,10 @@ def run_pipeline(
                 "original_converted.wav",
                 "vocals.wav",
                 "instrumental.wav",
+                "lead_vocals.wav",
+                "backing_vocals.wav",
+                "instrumental_with_backing.wav",
+                "backing_model_version.txt",
                 "transcribed_segments.json",
                 "karaoke.ass",
                 "stage_checkpoints.json",
@@ -5323,6 +5437,20 @@ def run_pipeline(
                 json.dump(cached_meta, cm_f, indent=4)
         else:
             logger.info(f"Reaproveitando cache de áudio válido para '{orig_name}' (audio_hash={new_audio_hash}).")
+
+        # Provider availability can change between retries. Never reuse subtitles
+        # created from different line clocks, even with the same display options.
+        clock_hash = hashlib.sha256(json.dumps(synced_segments, sort_keys=True).encode()).hexdigest()
+        if cached_meta.get("lyrics_clock_hash") != clock_hash:
+            checkpoints = load_stage_checkpoints(cache_dir)
+            for stage in ("transcription_reviewed", "subtitles_generated", "video_rendered"):
+                checkpoints.get("completed_stages", {}).pop(stage, None)
+            with open(os.path.join(cache_dir, "stage_checkpoints.json"), "w", encoding="utf-8") as f:
+                json.dump(checkpoints, f, indent=4)
+        cached_meta["lyrics_clock_hash"] = clock_hash
+        cached_meta["vocal_output_options"] = output_options
+        with open(cache_meta_file, "w", encoding="utf-8") as f:
+            json.dump(cached_meta, f, indent=4)
 
         save_stage_checkpoint(cache_dir, "input_ready", "entrada preparada", 10)
 
@@ -5390,6 +5518,13 @@ def run_pipeline(
 
             pm.check_cancelled()
             save_stage_checkpoint(cache_dir, "vocals_separated", "vocais separados pelo Demucs", 55)
+            if keep_backing_vocals and backing_vocals_volume > 0:
+                vocals_wav, instrumental_wav = preserve_backing_vocals(
+                    vocals_wav, instrumental_wav, cache_dir,
+                    gain=backing_vocals_volume / 100, update_callback=update_state,
+                )
+            vocal_source = "lead" if keep_backing_vocals and backing_vocals_volume > 0 else "all"
+
 
             def publish_render_progress(percent: int):
                 update_state(
@@ -5435,6 +5570,14 @@ def run_pipeline(
                 history_filename = save_video_to_history(final_mp4_path, orig_name, library_dir)
                 public_token = create_public_download(owner_user, history_filename)
                 save_result_metadata(output_dir, orig_name, history_filename)
+                if youtube_publish_options:
+                    try:
+                        youtube_publisher.enqueue_automatic(
+                            os.path.join(library_dir, "history", history_filename), orig_name, youtube_publish_options)
+                    except Exception as publish_error:
+                        logger.warning("Vídeo criado, mas publicação automática não entrou na fila: %s", type(publish_error).__name__)
+                        update_process_summary(youtube="Publicação pendente: abra o painel do YouTube")
+
                 total_processing_seconds = persist_total_processing_seconds()
                 update_state("processing", "Cleaning temporary files", 98)
                 logger.info("Pipeline concluído: Vocais removidos do vídeo original com sucesso.")
@@ -5465,11 +5608,15 @@ def run_pipeline(
                 return
 
             # Passo 3: Transcrever vocais com Whisper selecionado
-            segments = None
+            segments = synced_segments or None
+            if synced_segments:
+                update_state("processing", "Using synced lyrics", 74, stage_progress=100,
+                             stage_detail="Letra sincronizada por versos; sem transcrição adicional")
             segments_cache_file = os.path.join(cache_dir, "transcribed_segments.json")
             lyrics_hint_hash = hashlib.sha256((lyrics_text or "").strip().encode("utf-8")).hexdigest()
 
-            if (os.path.exists(segments_cache_file) and
+            if (not synced_segments and os.path.exists(segments_cache_file) and
+                cached_meta.get("vocal_source", "all") == vocal_source and
                 cached_meta.get("transcribe_source") == transcribe_source and
                 cached_meta.get("whisper_model") == whisper_model and
                 cached_meta.get("enable_vad") == enable_vad and
@@ -5561,6 +5708,7 @@ def run_pipeline(
                     with open(segments_cache_file, "w", encoding="utf-8") as f:
                         import json
                         json.dump(segments, f, indent=4)
+                    cached_meta["vocal_source"] = vocal_source
                     cached_meta["transcribe_source"] = transcribe_source
                     cached_meta["whisper_model"] = whisper_model
                     cached_meta["enable_vad"] = enable_vad
@@ -5578,7 +5726,7 @@ def run_pipeline(
             save_stage_checkpoint(cache_dir, "transcription_ready", "transcrição do Whisper concluída", 74)
 
             # A letra corrige apenas a grafia; os tempos continuam vindo do áudio.
-            if lyrics_text and lyrics_text.strip():
+            if not synced_segments and lyrics_text and lyrics_text.strip():
                 logger.info("Aplicando letra guia de forma conservadora, sem criar timestamps...")
                 segments = align_lyrics(lyrics_text, segments)
 
@@ -5701,6 +5849,13 @@ def run_pipeline(
             history_filename = save_video_to_history(final_mp4_path, orig_name, library_dir)
             public_token = create_public_download(owner_user, history_filename)
             save_result_metadata(output_dir, orig_name, history_filename)
+            if youtube_publish_options:
+                try:
+                    youtube_publisher.enqueue_automatic(
+                        os.path.join(library_dir, "history", history_filename), orig_name, youtube_publish_options)
+                except Exception as publish_error:
+                    logger.warning("Vídeo criado, mas publicação automática não entrou na fila: %s", type(publish_error).__name__)
+                    update_process_summary(youtube="Publicação pendente: abra o painel do YouTube")
             total_processing_seconds = persist_total_processing_seconds()
 
             # Passo 6: Limpar arquivos temporários (não removemos os uploads do cache)
@@ -5837,3 +5992,30 @@ def download_subtitles(
             )
         raise HTTPException(status_code=404, detail="A legenda SRT solicitada não foi gerada nesta conta.")
     return attachment_file_response(subtitle_path, subtitle_filename, "application/x-subrip")
+
+
+# The publisher uses the existing admin authorization and profile-aware history.
+from youtube_publisher import install_routes as install_youtube_publisher
+
+
+def resolve_youtube_publication_video(owner_key, filename, user):
+    owner = admin_result_owner(owner_key, user)
+    if not filename or filename != os.path.basename(filename) or "\\" in filename:
+        raise HTTPException(status_code=400, detail="Nome de vídeo inválido.")
+    history = Path(get_user_paths(owner)["library"]) / "history"
+    target = (history / filename).resolve()
+    if not target.is_relative_to(history.resolve()) or not target.is_file() or target.suffix.lower() != ".mp4":
+        raise HTTPException(status_code=404, detail="Vídeo finalizado não encontrado.")
+    return str(target)
+
+
+def check_youtube_oauth_admin(username):
+    user = user_from_username(username)
+    if not user:
+        raise HTTPException(status_code=403, detail="Administrador não encontrado.")
+    require_admin(user)
+
+
+from pathlib import Path
+youtube_publisher = install_youtube_publisher(
+    app, get_current_user, require_admin, resolve_youtube_publication_video, check_youtube_oauth_admin, user_from_username)

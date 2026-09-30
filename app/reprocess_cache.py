@@ -10,7 +10,8 @@ def copy_reusable_inputs(source, destination):
     não passam por esta função. Checkpoints, ASS e resultados não são copiados.
     """
     allowed = {'cache_meta.json', 'original_converted.wav', 'vocals.wav',
-               'instrumental.wav', 'transcribed_segments.json'}
+               'instrumental.wav', 'transcribed_segments.json', 'lead_vocals.wav',
+               'backing_vocals.wav', 'backing_model_version.txt'}
     os.makedirs(destination, exist_ok=True)
     for name in os.listdir(source):
         path = os.path.join(source, name)

@@ -1,11 +1,15 @@
 services:
   karaoke-app:
-    image: ghcr.io/sal0-apps/sal0-karaoke:9.8.0
+    image: ghcr.io/sal0-apps/sal0-karaoke:9.9.0
     container_name: karaoke-app
     ports:
       - "7885:7860"
     volumes:
       - ./data:/data
+    environment:
+      YOUTUBE_CLIENT_ID: ${YOUTUBE_CLIENT_ID:-}
+      YOUTUBE_CLIENT_SECRET: ${YOUTUBE_CLIENT_SECRET:-}
+      YOUTUBE_REDIRECT_URI: ${YOUTUBE_REDIRECT_URI:-}
     restart: unless-stopped
 
 x-casaos:
