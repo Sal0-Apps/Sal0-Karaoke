@@ -6,7 +6,7 @@ Esta atualização permite pesquisar pelo nome da música nas entradas do YouTub
 
 No modo de letra automática, o app preserva os tempos LRC fornecidos pela LRCLIB. Esses tempos só são utilizados quando artista, título, indicação de versão e duração são compatíveis com a mídia selecionada. A duração precisa diferir em no máximo dois segundos. A correspondência é conservadora, mas não garante que uma gravação com introdução diferente tenha os mesmos tempos.
 
-LRC informa tempos de versos. O app destaca o verso inteiro e não distribui tempos artificiais entre palavras. Sem uma letra sincronizada compatível, ele segue com a transcrição acústica já existente do Whisper. A opção de sempre usar Whisper permite manter o destaque de palavras. Letras manuais continuam usando o caminho acústico.
+LRC informa tempos de versos. O app anima o destaque progressivamente durante cada verso, incluindo letras já sincronizadas, e não distribui tempos artificiais entre palavras. A animação respeita o intervalo LRC; ela não equivale a um alinhamento acústico de palavras ou sílabas. Sem uma letra sincronizada compatível, ele segue com a transcrição acústica já existente do Whisper. A opção de sempre usar Whisper permite manter o destaque de palavras. Letras manuais continuam usando o caminho acústico.
 
 ## Preservar backing vocals
 

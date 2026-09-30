@@ -1,9 +1,7 @@
-# 9.9.4
+# 9.9.5
 
-- Modo SRT agora usa a busca automática do YouTube com miniaturas e seleção de resultados.
-- Arquivos somente de áudio também geram um MP4 com fundo simples, áudio original e legendas na tela.
-- SRT original e tradução opcional continuam disponíveis separadamente; o MP4 e os SRTs são enviados ao Telegram e salvos na Biblioteca.
-- Mídias com vídeo continuam no fluxo de geração de SRT sem conversão extra.
-- Detecção de vídeo usa os fluxos reais da mídia; capas incorporadas de arquivos MP3 não contam como vídeo.
+- Letras LRC já sincronizadas agora recebem animação progressiva do destaque durante cada verso, preservando os tempos originais.
+- O destaque por palavra continua usando os tempos do Whisper; a animação de LRC não inventa tempos de palavras ou sílabas.
+- README, manual completo e tutoriais do aplicativo incluem o comportamento, mantendo a documentação dos recursos existentes.
 
-- Novas etapas de backing vocals, letra sincronizada, tradução e vídeo de áudio exibem progresso e avisos no Telegram. Backing vocals e renderização informam a porcentagem da etapa.
+A versão mantém os modos Rápido, Detalhado e SRT, busca no YouTube com miniaturas, backing vocals locais, publicação opcional com playlists por usuário, fila, Biblioteca e Telegram. Entradas somente de áudio no modo SRT recebem MP4 legendado e SRTs separados. As novas etapas mostram progresso e avisos no Telegram, conforme a informação disponível.

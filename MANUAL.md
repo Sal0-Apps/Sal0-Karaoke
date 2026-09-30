@@ -1,6 +1,6 @@
 # Manual do Sal0 Karaokê
 
-Este manual descreve os controles disponíveis na distribuição 9.9.4. Para instalar o servidor, consulte [DEPLOYMENT.md](DEPLOYMENT.md). Para configurar o aparelho, consulte o [guia Android](android/README.md).
+Este manual descreve os controles disponíveis na distribuição 9.9.5. Para instalar o servidor, consulte [DEPLOYMENT.md](DEPLOYMENT.md). Para configurar o aparelho, consulte o [guia Android](android/README.md).
 
 ## 1. Primeiro acesso e navegação
 
@@ -75,7 +75,7 @@ A letra-guia orienta o reconhecimento, mas não garante que a gravação tenha o
 
 ### Letra sincronizada e vozes de apoio
 
-A sincronização automática usa os tempos de versos de uma letra LRC somente quando ela existe e corresponde à gravação: artista, título, versão e duração precisam ser compatíveis, com diferença de duração de até dois segundos. O destaque é por verso. Sem LRC compatível, o processo continua com Whisper; escolher sempre Whisper mantém o caminho de reconhecimento acústico.
+A sincronização automática usa os tempos de versos de uma letra LRC somente quando ela existe e corresponde à gravação: artista, título, versão e duração precisam ser compatíveis, com diferença de duração de até dois segundos. O destaque avança progressivamente ao longo de cada verso, incluindo letras já sincronizadas, sem deslocar seus tempos. O LRC comum não informa o ritmo individual das palavras ou sílabas: a animação percorre o intervalo do verso, enquanto o caminho Whisper utiliza os tempos das palavras reconhecidas. Sem LRC compatível, o processo continua com Whisper; escolher sempre Whisper mantém o caminho de reconhecimento acústico.
 
 **Preservar backing vocals** separa a voz principal das vozes de apoio localmente com o modelo UVR-BVE, depois soma as vozes de apoio ao instrumental do Demucs. Ajuste seu volume de 0 a 100% ou desative a opção para a música. Ela está disponível nos modos Rápido e Detalhado, inclusive na personalização do rápido. O modelo é baixado no primeiro uso, fica no volume persistente e aumenta o tempo de processamento. A qualidade depende da gravação; a separação pode deixar vazamentos ou perder harmonias. O modo SRT mantém o áudio completo e não usa esta separação.
 

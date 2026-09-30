@@ -14,6 +14,7 @@ sys.path.insert(0, str(ROOT / "app"))
 from lyrics_sync import parse_lrc, recording_matches
 from karaoke_generator import generate_ass_karaoke
 import tempfile
+import subprocess
 
 
 class HTTPError(Exception):
@@ -73,7 +74,7 @@ class AutomaticLyricsTests(unittest.TestCase):
         lookup = load_function("find_lyrics_automatically", search_lyrics_providers=lambda _: [])
         self.assertEqual(lookup("Artista - Canção", 180), ("", None))
 
-    def test_synced_lines_render_without_invented_word_clocks(self):
+    def test_synced_lines_animate_without_invented_word_clocks(self):
         segments = parse_lrc(self.record["synced_lyrics"], 180)
         with tempfile.TemporaryDirectory() as folder:
             path = str(Path(folder) / "karaoke.ass")
@@ -81,7 +82,41 @@ class AutomaticLyricsTests(unittest.TestCase):
             output = Path(path).read_text()
         self.assertIn("0:00:10.00,0:00:13.00", output)
         self.assertIn("Primeiro verso", output)
-        self.assertNotIn("\\kf", output)
+        self.assertIn("{\\kf300}Primeiro verso", output)
+        self.assertIn("{\\kf400}Segundo verso", output)
+        self.assertTrue(all(not s["words"] for s in segments))
+
+    def test_synced_line_animation_survives_every_display_mode(self):
+        segments = parse_lrc(self.record["synced_lyrics"], 180)
+        for mode in ('syllable', 'word', 'line', 'phrase'):
+            with self.subTest(mode=mode), tempfile.TemporaryDirectory() as folder:
+                path = Path(folder) / 'karaoke.ass'
+                generate_ass_karaoke(segments, str(path), subtitle_mode=mode, show_instrumental=False)
+                self.assertIn("{\\kf300}Primeiro verso", path.read_text())
+
+    def test_manual_review_keeps_synced_verse_animation_and_no_word_clocks(self):
+        resume = load_function('continue_process', ContinueProcessModel=object,
+            require_task_control=Mock(), segments_to_edit=[{'text':'original'}], correction_event=Mock())
+        resume(SimpleNamespace(segments=[SimpleNamespace(text='Edited verse', start=10, end=13,
+            words=[], synced_line=True)]), {})
+        revised = resume.__globals__['segments_to_edit']
+        self.assertEqual(revised, [{'start':10, 'end':13, 'text':'Edited verse', 'words':[], 'synced_line':True}])
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / 'reviewed.ass'
+            generate_ass_karaoke(revised, str(path), show_instrumental=False)
+            self.assertIn('{\\kf300}Edited verse', path.read_text())
+
+    def test_ffmpeg_displays_progressive_highlight_within_synced_verse(self):
+        segments = parse_lrc('[00:00]First synchronized verse\n[00:01]Second verse', 2)
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / 'karaoke.ass'
+            generate_ass_karaoke(segments, str(path), show_instrumental=False)
+            def white_pixels(time):
+                raw = subprocess.check_output(['ffmpeg', '-v', 'error', '-f', 'lavfi', '-i',
+                    'color=c=black:s=1280x720:r=25:d=2', '-vf', 'ass='+str(path), '-ss', str(time),
+                    '-frames:v', '1', '-f', 'rawvideo', '-pix_fmt', 'rgb24', '-'])
+                return sum(min(raw[i:i+3]) > 220 for i in range(0, len(raw), 3))
+            self.assertGreater(white_pixels(.8), white_pixels(.2))
 
 
 class YouTubeSearchTests(unittest.TestCase):
