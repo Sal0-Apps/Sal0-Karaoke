@@ -1,6 +1,6 @@
 # Manual do Sal0 Karaokê
 
-Este manual descreve os controles disponíveis na distribuição 9.9.8. Para instalar o servidor, consulte [DEPLOYMENT.md](DEPLOYMENT.md). Para configurar o aparelho, consulte o [guia Android](android/README.md).
+Este manual descreve os controles disponíveis na distribuição 9.9.9. Para instalar o servidor, consulte [DEPLOYMENT.md](DEPLOYMENT.md). Para configurar o aparelho, consulte o [guia Android](android/README.md).
 
 ## 1. Primeiro acesso e navegação
 
@@ -75,7 +75,7 @@ A letra-guia orienta o reconhecimento, mas não garante que a gravação tenha o
 
 ### Letra sincronizada e vozes de apoio
 
-A sincronização automática só aproveita uma letra LRC quando ela existe e corresponde à gravação: artista, título, versão e duração precisam ser compatíveis, com diferença de duração de até dois segundos. Mesmo com essa letra pronta, o app analisa a voz com Whisper e usa os tempos das palavras reconhecidas para animar o destaque, incluindo pausas e durações diferentes. A letra serve como guia de grafia e divisão dos versos; os tempos acústicos têm prioridade sobre o intervalo LRC. Não há distribuição uniforme de palavras dentro do verso. Letras sincronizadas também usam a animação por palavras, independentemente do estilo estático do perfil. A análise adicional leva tempo; o reconhecimento pode omitir ou interpretar palavras incorretamente, sobretudo em gravações difíceis, e a revisão continua disponível. Sem LRC compatível, permanece o caminho de transcrição do Whisper. Resultados antigos precisam ser refeitos para ganhar a nova animação.
+A sincronização automática só aproveita uma letra LRC quando ela existe e corresponde à gravação: artista, título, versão e duração precisam ser compatíveis, com diferença de duração de até dois segundos. O texto completo e os tempos de início e fim dos versos seguem essa letra sincronizada. O Whisper analisa a gravação apenas para obter a animação das palavras dentro de cada intervalo: não move os versos nem redistribui os tempos das palavras uniformemente. Mesmo com animação, pausas e trechos instrumentais continuam seguindo os versos da letra pronta. Palavras que o Whisper não reconhece permanecem visíveis sem destaque animado, em cor discreta, sem receber tempos inventados. Letras sincronizadas também usam essa animação quando o perfil escolhe um estilo estático. A etapa permanece local e gratuita e apresenta quantas palavras ganharam animação. A revisão preserva os tempos acústicos e a letra; se você alterar manualmente os tempos do verso, a animação fica limitada ao novo intervalo. Sem LRC compatível, permanece a transcrição acústica comum. Refazer um vídeo invalida o cache antigo; arquivos já salvos não mudam automaticamente.
 
 **Preservar backing vocals** separa a voz principal das vozes de apoio localmente com o modelo UVR-BVE, depois soma as vozes de apoio ao instrumental do Demucs. Ajuste seu volume de 0 a 100% ou desative a opção para a música. Ela está disponível nos modos Rápido e Detalhado, inclusive na personalização do rápido. O modelo é baixado no primeiro uso, fica no volume persistente e aumenta o tempo de processamento. A qualidade depende da gravação; a separação pode deixar vazamentos ou perder harmonias. O modo SRT mantém o áudio completo e não usa esta separação.
 

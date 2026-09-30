@@ -30,6 +30,7 @@ jobs:
           python -m unittest discover -s tests -p "test_subtitle*.py" -v
           python -m unittest discover -s tests -p test_backing_vocals.py -v
           python -m unittest discover -s tests -p test_automatic_lyrics_and_search.py -v
+          python -m unittest discover -s tests -p test_synced_acoustic_animation.py -v
       - uses: actions/setup-node@v4
         with:
           node-version: '20'

@@ -4,7 +4,7 @@ O APK acessa o servidor Sal0 Karaokê. Demucs, Whisper, tradução e renderizaç
 
 ## Instalar
 
-1. Baixe o APK na [Release da versão](https://github.com/Sal0-Apps/Sal0-Karaoke/releases/tag/v9.9.8).
+1. Baixe o APK na [Release da versão](https://github.com/Sal0-Apps/Sal0-Karaoke/releases/tag/v9.9.9).
 2. No Android, permita a instalação pela origem que abriu o arquivo, se o sistema solicitar.
 3. Instale e abra o Sal0 Karaokê.
 4. Configure a conexão e entre com a conta da instalação.
@@ -76,7 +76,7 @@ A configuração atual utiliza JDK 17, Android SDK Platform 36, Android Gradle P
 No diretório `android`, com SDK e ferramentas configurados:
 
 ```bash
-gradle --no-daemon :app:testDebugUnitTest :app:lintRelease :app:assembleRelease -PVERSION_NAME=9.9.8 -PVERSION_CODE=90908
+gradle --no-daemon :app:testDebugUnitTest :app:lintRelease :app:assembleRelease -PVERSION_NAME=9.9.9 -PVERSION_CODE=90909
 ```
 
 O APK de saída fica em `app/build/outputs/apk/release/app-release.apk`.
@@ -95,7 +95,7 @@ Carregue os valores por um cofre de segredos ou ambiente protegido. Não inclua 
 Com essas variáveis definidas, o auxiliar PowerShell pode ser usado:
 
 ```powershell
-.\build-release.ps1 -VersionName 9.9.8 -VersionCode 90908
+.\build-release.ps1 -VersionName 9.9.9 -VersionCode 90909
 ```
 
 Ele executa testes, lint e build e copia o resultado para `android/Sal0-Karaoke-Android.apk`, ignorado pelo Git.
