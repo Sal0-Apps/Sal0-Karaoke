@@ -12,7 +12,7 @@ from pathlib import Path
 from urllib.parse import urlencode, urlparse
 
 import requests
-from media_covers import create_video_cover
+from media_covers import video_thumbnail
 
 API = 'https://www.googleapis.com/youtube/v3'
 UPLOAD = 'https://www.googleapis.com/upload/youtube/v3'
@@ -116,13 +116,41 @@ class YouTubePublisher:
             self.save('token.json', token)
         return token['channel_title']
 
+    def import_desktop_authorization(self, data):
+        if not isinstance(data, dict) or data.get('format') != 'sal0-youtube-desktop-v1':
+            raise PublicationError('Use o arquivo gerado pelo autorizador para computador do Sal0.')
+        keys = ('client_id', 'client_secret', 'refresh_token')
+        if any(not isinstance(data.get(key), str) or not 1 <= len(data[key]) <= 4096 for key in keys):
+            raise PublicationError('Arquivo de autorização inválido.')
+        # Never trust tokens or channel identities supplied by the upload.
+        response = requests.post('https://oauth2.googleapis.com/token', data={
+            **{key: data[key] for key in keys}, 'grant_type': 'refresh_token'}, timeout=30)
+        if response.status_code != 200:
+            raise PublicationError('O Google recusou a autorização. Gere um novo arquivo no computador.')
+        token = response.json()
+        if not isinstance(token.get('access_token'), str) or SCOPE not in str(token.get('scope', '')).split():
+            raise PublicationError('A autorização não permite gerenciar vídeos e playlists. Use o autorizador do Sal0.')
+        channel = requests.get(API + '/channels', params={'part': 'snippet', 'mine': 'true'},
+            headers={'Authorization': 'Bearer ' + token['access_token']}, timeout=30)
+        if channel.status_code != 200 or not channel.json().get('items'):
+            raise PublicationError('Não foi possível confirmar o canal dessa autorização.')
+        item = channel.json()['items'][0]
+        token.update(refresh_token=data['refresh_token'], channel_id=item['id'],
+            channel_title=item['snippet']['title'], expires_at=time.time() + token.get('expires_in', 3600),
+            desktop_client={key: data[key] for key in ('client_id', 'client_secret')})
+        with self.lock:
+            if any(j.get('status') in {'queued', 'uploading', 'finalizing'} for j in self.read('jobs.json', [])):
+                raise PublicationError('Aguarde os envios pendentes antes de trocar a conexão do canal.')
+            self.save('token.json', token)
+        return token['channel_title']
+
     def token(self):
         with self.lock:
             token = self.read('token.json')
             if not token.get('refresh_token'):
                 raise PublicationError('Conecte o canal do YouTube no painel administrativo.')
             if token.get('expires_at', 0) <= time.time() + 60:
-                config = self.client_config()
+                config = token.get('desktop_client') or self.client_config()
                 response = requests.post('https://oauth2.googleapis.com/token', data={
                     'client_id': config['client_id'], 'client_secret': config['client_secret'],
                     'refresh_token': token['refresh_token'], 'grant_type': 'refresh_token'}, timeout=30)
@@ -251,7 +279,8 @@ class YouTubePublisher:
             raise PublicationError('O canal conectado mudou. Revise as opções antes de publicar.')
         if playlist_id and not re.fullmatch(r'[A-Za-z0-9_-]{1,128}', playlist_id):
             raise PublicationError('Identificador de playlist inválido.')
-        digest = hashlib.sha256(token['channel_id'].encode())
+        digest = hashlib.sha256(json.dumps([token['channel_id'], playlist_id, privacy,
+            (requester or {}).get('username', '')], ensure_ascii=False).encode())
         with video.open('rb') as source:
             for block in iter(lambda: source.read(1024 * 1024), b''):
                 digest.update(block)
@@ -272,8 +301,8 @@ class YouTubePublisher:
                 cover = folder / (job_id + ('.png' if data.startswith(b'\x89PNG') else '.jpg'))
                 cover.write_bytes(data)
             else:
-                create_video_cover(str(video), title, str(cover),
-                    lambda cmd: subprocess.run(cmd, check=True, timeout=60, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
+                import shutil
+                shutil.copyfile(video_thumbnail(video, cover=True), cover)
             job = {'id': job_id, 'identity': identity, 'video': str(video), 'thumbnail': str(cover),
                    'title': title, 'privacy': privacy, 'playlist_id': playlist_id, 'channel_id': token['channel_id'],
                    'status': 'queued', 'progress': 0, 'created_at': time.time(), 'requester': requester}
@@ -457,10 +486,27 @@ def install_routes(app, get_current_user, require_admin, resolve_video, check_ad
     def quick_options(user=Depends(get_current_user)):
         return guarded(lambda: publisher.quick_options(user))
 
+    @app.get('/api/admin/youtube/desktop-helper')
+    def desktop_helper(user=Depends(admin)):
+        from fastapi.responses import FileResponse
+        return FileResponse(Path(__file__).with_name('youtube_desktop_oauth.py'),
+            media_type='text/x-python', filename='youtube_desktop_oauth.py', headers={'Cache-Control': 'no-store'})
+
+    @app.post('/api/admin/youtube/import-authorization')
+    def import_authorization(authorization: UploadFile = File(...), user=Depends(admin)):
+        raw = authorization.file.read(32769)
+        if len(raw) > 32768:
+            raise HTTPException(400, 'O arquivo de autorização deve ter até 32 KB.')
+        try:
+            data = json.loads(raw)
+        except (ValueError, UnicodeDecodeError):
+            raise HTTPException(400, 'Escolha um arquivo JSON de autorização válido.')
+        return guarded(lambda: {'channel_title': publisher.import_desktop_authorization(data)})
+
     @app.get('/api/admin/youtube/status')
     def status(user=Depends(admin)):
         token = publisher.read('token.json')
-        return {'configured': all(os.environ.get(k) for k in ('YOUTUBE_CLIENT_ID', 'YOUTUBE_CLIENT_SECRET', 'YOUTUBE_REDIRECT_URI')),
+        return {'configured': True, 'web_configured': all(os.environ.get(k) for k in ('YOUTUBE_CLIENT_ID', 'YOUTUBE_CLIENT_SECRET', 'YOUTUBE_REDIRECT_URI')),
                 'connected': bool(token.get('refresh_token')), 'channel_title': token.get('channel_title', ''),
                 'settings': publisher.settings(user['username']),
                 'jobs': [publisher.public_job(j) for j in publisher.read('jobs.json', [])][-30:]}
@@ -504,19 +550,7 @@ def install_routes(app, get_current_user, require_admin, resolve_video, check_ad
         from fastapi.responses import FileResponse
         video = resolve_video(options.get('owner_key', ''), options.get('filename', ''), user)
         title = str(options.get('title') or Path(video).stem)[:100]
-        stat = Path(video).stat()
-        identity = hashlib.sha256(f'{video}:{stat.st_mtime_ns}:{title}'.encode()).hexdigest()
-        folder = publisher.root / 'previews'
-        folder.mkdir(parents=True, exist_ok=True)
-        cover = folder / (identity + '.jpg')
-        if not cover.is_file():
-            # Different HTTP requests never render to the same temporary file.
-            import tempfile
-            with tempfile.TemporaryDirectory(dir=folder) as temporary:
-                temporary_cover = Path(temporary) / 'cover.jpg'
-                create_video_cover(video, title, temporary_cover,
-                    lambda cmd: subprocess.run(cmd, check=True, timeout=60, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
-                os.replace(temporary_cover, cover)
+        cover = video_thumbnail(video, cover=True)
         return FileResponse(cover, media_type='image/jpeg', headers={'Cache-Control': 'no-store'})
 
     @app.post('/api/admin/youtube/jobs/{job_id}/retry')

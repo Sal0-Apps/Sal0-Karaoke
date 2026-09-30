@@ -179,6 +179,14 @@ class PublisherTests(unittest.TestCase):
         self.assertEqual(first['id'], second['id'])
         self.assertEqual(len(self.publisher.read('jobs.json', [])), 1)
 
+    def test_identical_media_with_distinct_user_or_playlist_has_distinct_publication(self):
+        self.publisher.save('jobs.json', [])
+        with patch.object(self.publisher, 'start'):
+            first = self.publisher.enqueue(self.video, 'Title', playlist_id='playlist-one', thumbnail=self.cover.read_bytes(), requester={'username': 'alice'})
+            second = self.publisher.enqueue(self.video, 'Title', playlist_id='playlist-two', thumbnail=self.cover.read_bytes(), requester={'username': 'alice'})
+            third = self.publisher.enqueue(self.video, 'Title', playlist_id='playlist-one', thumbnail=self.cover.read_bytes(), requester={'username': 'bob'})
+        self.assertEqual(len({first['id'], second['id'], third['id']}), 3)
+
     def test_title_privacy_and_playlist_are_validated_before_enqueue(self):
         for title, privacy in [('', 'private'), ('x' * 101, 'private'), ('A < B', 'private'), ('Música', 'invalid')]:
             with self.assertRaises(PublicationError): self.publisher.enqueue(self.video, title, privacy)

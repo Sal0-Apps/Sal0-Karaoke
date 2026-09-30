@@ -1,12 +1,12 @@
-# Sal0 Karaokê 9.9.0
+# Sal0 Karaokê 9.9.1
 
-- Pesquisa automática no YouTube, incluindo o modo rápido.
-- Tempos de letras sincronizadas usados somente quando uma letra compatível os fornece; Whisper continua como alternativa.
-- Separação de voz principal e backing vocals em CPU, com volume ajustável.
-- Publicação opcional ao concluir, com título, capa automática, playlist e privacidade.
-- Administrador atribui uma playlist para cada usuário e pode deixar a publicação marcada por padrão. Desmarcar impede o envio.
-- OAuth do canal gerenciado pelo administrador e fila retomável de uploads.
+- Conexão do YouTube sem HTTPS no servidor: autorização uma vez em um computador e importação pelo administrador.
+- Modo rápido com dois passos, opções extras recolhidas e fontes de música claras.
+- Busca por nome e link com o mesmo destaque; miniaturas em todas as pesquisas do YouTube.
+- Miniaturas automáticas dos resultados e publicações extraídas da capa de abertura do vídeo.
+- Layout adaptado a celular e desktop; autorização e playlists por usuário preservadas.
+- Limite explícito de workers com `KARAOKE_CPU_THREADS`.
 
-A publicação exige configurar as credenciais OAuth do Google e conectar o canal. Veja [o guia de configuração](https://github.com/Sal0-Apps/Sal0-Karaoke/blob/main/UPDATES_AUTOMATIC_KARAOKE.md). A qualidade da separação de backing vocals varia por gravação.
+[Guia de autorização e configuração](https://github.com/Sal0-Apps/Sal0-Karaoke/blob/main/UPDATES_AUTOMATIC_KARAOKE.md). O programa para autorizar o canal em um computador está anexado. Requer Python 3 nesse computador, com navegador.
 
-Imagem: `ghcr.io/sal0-apps/sal0-karaoke:9.9.0`. APK Android anexado à release.
+Imagem: `ghcr.io/sal0-apps/sal0-karaoke:9.9.1` e `latest`. APK Android anexado.

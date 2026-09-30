@@ -2260,7 +2260,7 @@ def download_bg_youtube_preset(
 
 
 LRCLIB_API_URL = "https://lrclib.net/api"
-LRCLIB_USER_AGENT = "Sal0-Karaoke/9.9.0 (+https://github.com/Sal0-Apps/Sal0-Karaoke)"
+LRCLIB_USER_AGENT = "Sal0-Karaoke/9.9.1 (+https://github.com/Sal0-Apps/Sal0-Karaoke)"
 LYRICS_OVH_API_URL = "https://api.lyrics.ovh/v1"
 LYRICS_PROVIDER_TIMEOUT = (3.05, 6)
 MUSIXMATCH_API_URL = "https://apic-desktop.musixmatch.com/ws/1.1"
@@ -2731,7 +2731,7 @@ def download_diagnostic_logs(current_user: dict = Depends(get_current_user)):
     with state_lock:
         current_state = dict(state)
     report = "\n".join([
-"Sal0 Karaokê v9.9.0 — diagnóstico ao vivo",
+"Sal0 Karaokê v9.9.1 — diagnóstico ao vivo",
         f"Gerado em: {time.strftime('%Y-%m-%d %H:%M:%S')}",
         "",
         "=== ESTADO ATUAL ===",
@@ -3288,7 +3288,7 @@ def get_library_thumbnail(section: str, filename: str, owner: str = "",
     if os.path.splitext(filename)[1].lower() not in {".mp4", ".mkv", ".mov", ".avi", ".webm", ".m4v"}:
         raise HTTPException(status_code=400, detail="A miniatura requer um vídeo.")
     try:
-        thumbnail = video_thumbnail(resolved[0])
+        thumbnail = video_thumbnail(resolved[0], cover=section == "history")
     except (OSError, subprocess.SubprocessError):
         raise HTTPException(status_code=503, detail="Miniatura temporariamente indisponível.") from None
     return FileResponse(thumbnail, media_type="image/jpeg", headers={"Cache-Control": "private, no-cache"})
@@ -5928,6 +5928,18 @@ def run_pipeline(
                 processing_lock.release()
             except RuntimeError:
                 pass
+
+@app.get("/api/result/thumbnail")
+def result_thumbnail(current_user: dict = Depends(get_current_user)):
+    video = os.path.join(get_user_paths(current_user)["output"], "final_karaoke.mp4")
+    if not os.path.isfile(video):
+        raise HTTPException(status_code=404, detail="Crie um vídeo primeiro.")
+    try:
+        cover = video_thumbnail(video, cover=True)
+    except (OSError, subprocess.SubprocessError):
+        raise HTTPException(status_code=503, detail="Capa temporariamente indisponível.")
+    return FileResponse(cover, media_type="image/jpeg", headers={"Cache-Control": "private, no-cache"})
+
 
 @app.get("/api/download")
 def download_file(

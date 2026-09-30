@@ -101,6 +101,8 @@ jobs:
           draft: false
           prerelease: false
           fail_on_unmatched_files: true
-          files: android/app/build/outputs/apk/release/Sal0-Karaoke-v${{ env.VERSION_TAG }}.apk
+          files: |
+            android/app/build/outputs/apk/release/Sal0-Karaoke-v${{ env.VERSION_TAG }}.apk
+            app/youtube_desktop_oauth.py
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -40,16 +40,29 @@ Em Configurações, o painel de publicação permite selecionar um vídeo finali
 O administrador pode permitir publicação por usuários e definir uma playlist para cada conta, incluindo a opção de publicar sem playlist. Também pode deixar “Publicar no YouTube” marcado por padrão individualmente. Essa configuração apenas preseleciona a interface: cada vídeo deve enviar explicitamente a opção de publicação, e o usuário pode desmarcá-la. Desmarcado, não existe envio ao canal nem inclusão em playlist.
 
 O modo rápido e o modo completo mostram a playlist atribuída e um título opcional. A conta comum não pode trocar para outra playlist nem contornar a permissão pela API. O modelo `{title} | Karaokê`, a capa automática e a privacidade administrativa são aplicados na conclusão. As permissões e a atribuição são verificadas novamente antes do envio; alterações podem bloquear tarefas já agendadas. O administrador pode selecionar qualquer playlist do canal ou nenhuma para seus próprios vídeos e pode publicar resultados existentes no painel.
-O app envia primeiro como privado, aplica a capa e a playlist e só então solicita a privacidade escolhida. Erros de capa, playlist ou privacidade aparecem na fila com um botão para retomar a mesma publicação. O identificador do vídeo e a sessão de envio são persistidos. Cópias idênticas de um vídeo no mesmo canal reutilizam a publicação existente para evitar duplicação. O link fica disponível assim que o YouTube confirma o envio.
+O app envia primeiro como privado, aplica a capa e a playlist e só então solicita a privacidade escolhida. Erros de capa, playlist ou privacidade aparecem na fila com um botão para retomar a mesma publicação. O identificador do vídeo e a sessão de envio são persistidos. Cópias idênticas de um vídeo no mesmo canal, usuário, playlist e privacidade reutilizam a publicação existente para evitar duplicação. O link fica disponível assim que o YouTube confirma o envio.
 
-### Conectar o canal uma vez
+### Conectar o canal sem HTTPS no servidor
 
-1. No Google Cloud, habilite **YouTube Data API v3** e configure a tela de consentimento OAuth. Se o aplicativo estiver em teste, adicione sua conta aos usuários de teste.
-2. Crie um cliente OAuth do tipo **Aplicativo da Web**. Cadastre exatamente a URI de retorno usada pelo app, por exemplo `https://karaoke.seudominio.com/api/admin/youtube/callback`.
-3. Defina `YOUTUBE_CLIENT_ID`, `YOUTUBE_CLIENT_SECRET` e `YOUTUBE_REDIRECT_URI` no `.env` do Compose. O arquivo `.env.youtube.example` apresenta o formato sem credenciais reais. Recrie o container após alterar o ambiente.
-4. Acesse **Configurações → Publicar no YouTube → Conectar canal** como administrador e escolha a conta/canal desejado na autorização do Google. Confira o nome do canal mostrado no painel.
+O servidor pode continuar em HTTP. O administrador autoriza uma vez em um computador com navegador, usando o fluxo OAuth oficial para aplicativos de computador:
 
-O retorno exige HTTPS, exceto `localhost`/`127.0.0.1` para desenvolvimento. Um endereço HTTP da rede local no ZimaOS precisa de um endereço HTTPS registrado para esse fluxo. Os tokens ficam no servidor, em arquivos com permissão 0600 em `/data/youtube`, e não são enviados à interface. Conexão OAuth, configuração, publicação de resultados existentes e retomada de tarefas exigem administrador. Usuários autorizados podem solicitar envio dos vídeos que criam; o retorno OAuth valida um estado de uso único, PKCE e o papel atual do administrador.
+1. No Google Cloud, habilite **YouTube Data API v3**, configure o consentimento e crie um cliente OAuth do tipo **Aplicativo para computador**. Baixe seu JSON. Se o projeto estiver em teste, adicione a conta aos usuários de teste.
+2. No Karaokê, abra **Ajustes → Publicar no YouTube → Conectar sem HTTPS** e baixe `youtube_desktop_oauth.py`. O mesmo programa também está anexado à release.
+3. Em um computador com Python 3, execute o programa e escolha o JSON do Google. No Windows, pode abrir o arquivo `.py`; pelo terminal: `python youtube_desktop_oauth.py client_secret.json`. O navegador precisa estar nesse mesmo computador. O programa recebe o retorno apenas em `127.0.0.1`, com porta temporária, estado único e PKCE.
+4. Autorize o canal no navegador. Salve `youtube-autorizacao.json` quando o programa pedir e importe esse arquivo no painel do Karaokê. O servidor valida a permissão e consulta o canal no Google antes de guardar a conexão.
+5. Confira o nome do canal, defina privacidade e playlists por usuário. Não são necessárias variáveis `YOUTUBE_CLIENT_ID`, `YOUTUBE_CLIENT_SECRET` ou `YOUTUBE_REDIRECT_URI` no Compose para este método.
+
+O arquivo de autorização dá acesso ao canal: guarde-o como uma senha e importe somente no seu servidor, pela sua rede de confiança. Os tokens e o cliente de computador ficam em `/data/youtube/token.json`, com permissão 0600. A renovação funciona sem um endereço de retorno HTTPS. A conexão real depende das credenciais do administrador; os testes usam respostas simuladas do Google.
+
+A conexão web com HTTPS continua opcional para quem já tem domínio e cliente do tipo Aplicativo da Web, usando as três variáveis de ambiente e `/api/admin/youtube/callback`. O arquivo `.env.youtube.example` serve apenas para esse método.
+
+### Modo rápido e miniaturas
+
+A escolha da música e o botão Criar são os dois passos principais. Buscar por nome e colar um link têm o mesmo destaque. Arquivos e Biblioteca têm seletores próprios. Fundo, vozes e sincronização ficam em Personalizar, fechado inicialmente. A pesquisa de qualquer entrada do YouTube mostra miniaturas dos vídeos. O layout empilha os campos no celular e usa duas colunas no desktop.
+
+As miniaturas dos Resultados, do player final e da publicação automática são extraídas da abertura do próprio vídeo, que já contém a capa gerada. Não há uma segunda sobreposição de título. Uma capa personalizada continua opcional para publicações administrativas manuais.
+
+`KARAOKE_CPU_THREADS` permite limitar explicitamente os workers em servidores compartilhados, respeitando também a afinidade disponível. Sem essa variável, o comportamento anterior permanece. O diretório `/data` preserva contas, modelos, músicas, resultados e a conexão do canal.
 
 O YouTube pode restringir uploads de projetos de API sem auditoria a **privado**. A permissão do canal para usar miniaturas personalizadas também é necessária. Em contas OAuth em modo de teste, o acesso concedido pode expirar, exigindo reconexão. Essas restrições pertencem ao Google e não podem ser removidas por uma configuração do Karaokê.
 

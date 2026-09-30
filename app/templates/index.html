@@ -1157,6 +1157,36 @@
         }
         .easy-kicker { display: block; color: var(--pink-accent); font-size: 0.68rem; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 0.18rem; }
         .easy-intro { margin-top: 0.28rem; color: var(--text-muted); font-size: 0.82rem; line-height: 1.5; }
+        /* Quick mode keeps only music and creation prominent. */
+        #easyModeForm .easy-grid { grid-template-columns: minmax(0, 1fr); }
+        #easyModeForm [hidden] { display: none !important; }
+        #easyModeForm .quick-source-grid { grid-template-columns: minmax(0, 1fr); }
+        .quick-source-tabs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .5rem; margin-bottom: .9rem; }
+        .quick-source-tabs button { white-space: normal; min-height: 48px; }
+        .quick-source-tabs .is-active { border-color: var(--accent); background: var(--accent-glow); }
+        .quick-youtube-methods { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .8rem; }
+        .quick-youtube-method { min-width: 0; padding: .9rem; border: 1px solid var(--glass-border); border-radius: 12px; }
+        .quick-youtube-method .input-text { margin-top: .6rem; }
+        #easyModeForm .input-text, #easyModeForm .select-input { min-height: 48px; }
+        .youtube-search-panel button { min-height: 44px; }
+        .quick-more-options > summary::after { content: '⌄'; margin-left: auto; font-size: 1.3rem; }
+        .quick-more-options[open] > summary::after { content: '⌃'; }
+        .quick-selection { padding: .65rem 0 0; font-weight: 600; overflow-wrap: anywhere; }
+        .quick-more-options { margin: .9rem 0; padding: .8rem; border: 1px solid var(--glass-border); border-radius: 12px; }
+        .quick-more-options summary, #easyYoutubePublication summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; font-weight: 600; }
+        .quick-extra-audio { display: grid; gap: .5rem; margin: 1rem 0; }
+        .quick-create-action { margin-top: 1rem; }
+        #easyYoutubePublication { padding: .8rem; border: 1px solid var(--glass-border); border-radius: 12px; }
+        .youtube-search-result { display: flex; gap: .75rem; align-items: center; text-align: left; width: 100%; white-space: normal; min-width: 0; }
+        .youtube-search-result img { width: 112px; flex: 0 0 112px; aspect-ratio: 16/9; object-fit: cover; border-radius: 8px; }
+        .youtube-search-result span { min-width: 0; overflow-wrap: anywhere; }
+        .youtube-search-result small { display: block; margin-top: .2rem; opacity: .8; }
+        @media (max-width: 640px) {
+            .quick-youtube-methods { grid-template-columns: minmax(0, 1fr); }
+            .quick-source-tabs { gap: .3rem; }
+            .quick-source-tabs button { padding: .55rem .3rem; font-size: .82rem; }
+            .youtube-search-result img { width: 88px; flex-basis: 88px; }
+        }
         .easy-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
         .easy-step { min-width: 0; padding: 1rem; border: 1px solid var(--glass-border); border-radius: var(--radius-md); background: rgba(0, 0, 0, 0.12); transition: border-color 0.2s ease, transform 0.2s ease; }
         .easy-step:hover { border-color: var(--glass-border-light); transform: translateY(-1px); }
@@ -1209,7 +1239,7 @@
         .result-card { display: flex; flex-direction: column; align-items: stretch; }
         .result-cover { position: relative; width: 100%; aspect-ratio: 16/9; border-radius: 12px;
             overflow: hidden; background: #071522; color: white; display: grid; place-items: center; }
-        .result-cover img { width: 100%; height: 100%; object-fit: cover; position: absolute; opacity: 0.38; }
+        .result-cover img { width: 100%; height: 100%; object-fit: cover; position: absolute; opacity: 1; }
         .result-cover .cover-title { position: relative; padding: 1rem; text-align: center;
             overflow-wrap: anywhere; font-weight: 700; font-size: clamp(0.85rem, 3vw, 1.3rem); }
         .result-card .info { min-width: 0; width: 100%; }
@@ -1516,50 +1546,47 @@
                 <div class="card easy-hero">
                     <div class="easy-hero-head">
                         <div class="easy-hero-icon"><img src="/favicon.png" alt=""></div>
-                        <div>
-                            <span class="easy-kicker">Modo Rápido</span>
-                            <span class="card-title">Busque, escolha e cante</span>
-                            <p class="easy-intro">Busque no YouTube ou use um link, arquivo ou item da Biblioteca. Se não escolher o fundo, o Sal0 prepara uma surpresa da coleção do administrador.</p>
-                        </div>
+                        <div><span class="easy-kicker">Modo Rápido</span><span class="card-title">Sua música, pronta para cantar</span>
+                            <p class="easy-intro">1. Escolha uma música. 2. Toque em “Criar karaokê”. A letra e o fundo ficam por nossa conta.</p></div>
                     </div>
-
                     <div class="easy-grid">
                         <section class="easy-step">
-                            <span class="easy-step-title"><span class="easy-step-number">1</span> 🎵 Escolha a música</span>
+                            <span class="easy-step-title"><span class="easy-step-number">1</span> Escolha a música</span>
+                            <div class="quick-source-tabs" role="group" aria-label="Como escolher a música">
+                                <button type="button" class="btn-secondary is-active" data-quick-source="youtube" aria-pressed="true">Buscar ou colar link</button>
+                                <button type="button" class="btn-secondary" data-quick-source="upload" aria-pressed="false">Enviar arquivo</button>
+                                <button type="button" class="btn-secondary" data-quick-source="library" aria-pressed="false">Minha Biblioteca</button>
+                            </div>
                             <div class="quick-choice-grid quick-source-grid">
                                 <div id="easyAudioYoutubeBox" class="quick-choice-card is-active">
-                                    <span class="quick-choice-label">▶️ Link do YouTube</span>
-                                    <input type="url" id="easyYoutubeUrl" class="input-text" placeholder="Cole o link e pronto">
-                                    <label for="easyLyricsTiming" class="compact-note">Sincronização</label>
-                                    <select id="easyLyricsTiming" class="select-input">
-                                        <option value="auto">Usar letra sincronizada se disponível</option>
-                                        <option value="acoustic">Palavras pelo áudio (Whisper)</option>
-                                    </select>
-                                    <div id="easyYoutubeTitleBadge" class="youtube-identification" aria-live="polite"><span>▶️</span><span id="easyYoutubeTitleText"></span></div>
+                                    <div class="quick-youtube-methods">
+                                        <div id="easyYoutubeSearchHost" class="quick-youtube-method"><strong>Buscar música</strong></div>
+                                        <div class="quick-youtube-method"><label for="easyYoutubeUrl"><strong>Colar link do YouTube</strong></label>
+                                            <input type="url" id="easyYoutubeUrl" class="input-text" placeholder="Cole o link do vídeo aqui">
+                                            <p class="compact-note">Já encontrou o vídeo? Cole o endereço.</p>
+                                            <div id="easyYoutubeTitleBadge" class="youtube-identification" aria-live="polite"><span>▶️</span><span id="easyYoutubeTitleText"></span></div>
+                                        </div>
+                                    </div>
                                 </div>
-                                <label id="easyAudioUploadBox" class="quick-choice-card quick-file-choice" for="easyAudioFile">
-                                    <span class="quick-choice-icon">🎵</span>
-                                    <span class="quick-choice-label" id="easyAudioFileText">Escolher arquivo</span>
-                                    <span class="quick-choice-hint">Clique ou arraste música/vídeo</span>
-                                    <input type="file" id="easyAudioFile" accept=".mp3,.wav,.flac,.m4a,.aac,.ogg,.opus,.mp4,.mkv,.avi,.mov,.webm,.m4v" multiple style="display: none;">
+                                <label id="easyAudioUploadBox" class="quick-choice-card quick-file-choice" for="easyAudioFile" hidden>
+                                    <span class="quick-choice-label" id="easyAudioFileText">Toque para escolher música ou vídeo</span>
+                                    <span class="quick-choice-hint">Você também pode arrastar um arquivo aqui.</span>
+                                    <input type="file" id="easyAudioFile" accept=".mp3,.wav,.flac,.m4a,.aac,.ogg,.opus,.mp4,.mkv,.avi,.mov,.webm,.m4v" multiple style="display:none">
                                 </label>
-                                <div id="easyAudioLibraryBox" class="quick-choice-card">
-                                    <span class="quick-choice-label">📚 Minha Biblioteca</span>
+                                <div id="easyAudioLibraryBox" class="quick-choice-card" hidden>
+                                    <label for="easyLibraryAudio" class="quick-choice-label">Músicas que você já salvou</label>
                                     <select id="easyLibraryAudio" class="select-input"><option value="">Escolha uma música...</option></select>
                                 </div>
                             </div>
-                        <div class="form-group" style="margin-top:.6rem">
-                                <label for="easyKeepBackingVocals" class="compact-note">Voz de apoio (backing vocal)</label>
-                                <select id="easyKeepBackingVocals" class="select-input"><option value="true">Manter backing vocals; remover voz principal</option><option value="false">Remover todas as vozes</option></select>
-                                <label for="easyBackingVolume" class="compact-note">Volume dos backing vocals (%)</label>
-                                <input id="easyBackingVolume" type="number" min="0" max="100" value="100" class="input-text">
-                                <p class="compact-note">Separação por IA local. Pode levar mais tempo e deixar resíduos dependendo da gravação.</p>
-                            </div>
+                            <p id="easySelectedMusic" class="quick-selection" role="status">Busque uma música ou cole o link para começar.</p>
+                            <p id="easyValidationMessage" class="compact-note" role="alert"></p>
                         </section>
-
-                        <section class="easy-step">
-                            <span class="easy-step-title"><span class="easy-step-number">2</span> 🖼️ Fundo <small style="color: var(--text-muted); font-weight: 500;">(opcional)</small></span>
-                            <input type="hidden" id="easyBackgroundType" value="default">
+                    </div>
+                    <details class="quick-more-options" id="easyMoreOptions">
+                        <summary>Personalizar (opcional)</summary>
+                        <p class="compact-note">Você pode criar sem alterar nada aqui.</p>
+                        <span class="easy-step-title">Fundo do vídeo</span>
+<input type="hidden" id="easyBackgroundType" value="default">
                             <div class="quick-background-presets">
                                 <button type="button" id="easyBackgroundDefaultChoice" class="quick-preset is-active">
                                     <span>✨ Surpresa</span>
@@ -1588,26 +1615,39 @@
                                     <p class="compact-note">O áudio do fundo é removido.</p>
                                 </div>
                             </div>
-                        </section>
-                    </div>
 
-<div id="easyYoutubePublication" style="display:none;margin:1rem 0">
-                    <label style="display:flex;gap:.5rem;align-items:center"><input type="checkbox" id="easyYoutubePublish" value="true"> Publicar no YouTube ao concluir</label>
-                    <label for="easyYoutubePlaylist" class="compact-note">Playlist de publicação</label>
-                    <select id="easyYoutubePlaylist" class="select-input"></select>
-                    <label for="easyYoutubeTitle" class="compact-note">Título no YouTube (opcional)</label>
-                    <input id="easyYoutubeTitle" class="input-text" maxlength="100" placeholder="Usar o título automático da música">
-                    <p id="easyYoutubePublicationNote" class="compact-note"></p>
-                    <p class="compact-note">Desmarcado: o vídeo não é publicado. A capa é criada automaticamente com o título.</p>
-                </div>
-                    <div class="easy-summary">
+                        <div class="quick-extra-audio">
+                            <label for="easyLyricsTiming">Como sincronizar a letra</label>
+                            <select id="easyLyricsTiming" class="select-input"><option value="auto">Automático: usar a letra sincronizada quando disponível</option><option value="acoustic">Sincronizar pela voz da gravação</option></select>
+                            <label for="easyKeepBackingVocals">Vozes de apoio</label>
+                            <select id="easyKeepBackingVocals" class="select-input"><option value="true">Manter vozes de apoio; retirar a voz principal</option><option value="false">Retirar todas as vozes</option></select>
+                            <label for="easyBackingVolume">Volume das vozes de apoio (%)</label>
+                            <input id="easyBackingVolume" type="number" min="0" max="100" value="100" class="input-text">
+                            <p class="compact-note">O resultado da separação pode variar conforme a gravação.</p>
+                        </div>
+                        <details><summary>Perfil usado na criação</summary>                    <div class="easy-summary">
                         <span id="easySummaryModel">🤖 Large V3 Turbo</span>
                         <span id="easySummaryFont">🔤 Letra 50</span>
                         <span id="easySummaryPreset">🎙️ Voz difícil</span>
                         <span id="easySummaryLyrics">🔎 Letra automática</span>
                         <span id="easySummaryReview">⚡ Direto para o vídeo</span>
                     </div>
-                    <button type="submit" id="easySubmitBtn" class="btn-primary easy-submit">⚡ Criar meu karaokê</button>
+</details>
+                    </details>
+<div id="easyYoutubePublication" style="display:none;margin:1rem 0">
+                    <label style="display:flex;gap:.5rem;align-items:center"><input type="checkbox" id="easyYoutubePublish" value="true"> Publicar no YouTube ao concluir</label>
+                    <details><summary>Ver playlist e título</summary><label for="easyYoutubePlaylist" class="compact-note">Playlist de publicação</label>
+                    <select id="easyYoutubePlaylist" class="select-input"></select>
+                    <label for="easyYoutubeTitle" class="compact-note">Título no YouTube (opcional)</label>
+                    <input id="easyYoutubeTitle" class="input-text" maxlength="100" placeholder="Usar o título automático da música">
+                    </details><p id="easyYoutubePublicationNote" class="compact-note"></p>
+                    <p class="compact-note">Desmarcado: o vídeo não é publicado. A capa é criada automaticamente com o título.</p>
+                </div>
+
+                    <div class="quick-create-action"><span class="easy-step-title"><span class="easy-step-number">2</span> Crie e aguarde o vídeo</span>
+                        <button type="submit" id="easySubmitBtn" class="btn-primary easy-submit">Criar karaokê</button>
+                        <p class="compact-note">Acompanhe a criação aqui. Quando terminar, é só assistir ou baixar.</p>
+                    </div>
                 </div>
             </form>
 
@@ -2126,6 +2166,15 @@
                     <button type="button" id="ytPublishConnect" class="btn-secondary">Conectar canal</button>
                     <button type="button" id="ytPublishRefresh" class="btn-secondary">Atualizar painel</button>
                 </div>
+                <details style="margin:.7rem 0"><summary>Conectar sem HTTPS (uma vez, no computador)</summary>
+                    <p class="compact-note">Crie um cliente OAuth “Aplicativo para computador” no Google Cloud. Baixe seu JSON e execute o autorizador abaixo no mesmo computador em que abrirá o navegador.</p>
+                    <button type="button" id="ytDesktopHelper" class="btn-secondary">Baixar autorizador para computador</button>
+                    <p class="compact-note">O programa abre a autorização do Google e salva um arquivo. Importá-lo aqui conecta o canal ao servidor HTTP. Requer Python 3 no computador; não funciona executado no servidor sem navegador.</p>
+                    <label for="ytDesktopAuthorization" class="label">Arquivo de autorização gerado pelo programa</label>
+                    <input type="file" id="ytDesktopAuthorization" accept=".json,application/json" class="input-text">
+                    <button type="button" id="ytDesktopImport" class="btn-secondary">Importar autorização</button>
+                    <p class="compact-note">Esse arquivo dá acesso ao canal. Use somente no seu servidor e guarde-o como uma senha.</p>
+                </details>
                 <label for="ytPublishVideo" class="label">Vídeo finalizado</label>
                 <select id="ytPublishVideo" class="select-input"><option value="">Escolha um vídeo…</option></select>
                 <label for="ytPublishTitle" class="label">Título no YouTube</label>
@@ -2134,11 +2183,11 @@
                     <div><label for="ytPublishPrivacy" class="label">Privacidade</label><select id="ytPublishPrivacy" class="select-input"><option value="private">Privado</option><option value="unlisted">Não listado</option><option value="public">Público</option></select></div>
                     <div><label for="ytPublishPlaylist" class="label">Playlist</label><select id="ytPublishPlaylist" class="select-input"><option value="">Sem playlist</option></select></div>
                 </div>
-                <label for="ytPublishCover" class="label">Capa (opcional: JPEG ou PNG até 2 MB)</label>
+                <details><summary>Trocar a capa automática (opcional)</summary><label for="ytPublishCover" class="label">JPEG ou PNG até 2 MB</label>
                 <input id="ytPublishCover" type="file" accept="image/jpeg,image/png" class="input-text">
-                <button type="button" id="ytPublishPreview" class="btn-secondary" style="margin:.6rem 0">Preparar título e capa</button>
+                </details><button type="button" id="ytPublishPreview" class="btn-secondary" style="margin:.6rem 0">Atualizar prévia da capa</button>
                 <img id="ytPublishCoverPreview" alt="Capa definida para a publicação" style="display:none;width:100%;max-width:480px;aspect-ratio:16/9;object-fit:contain;border-radius:12px">
-                <p class="compact-note">Sem uma imagem escolhida, a capa é criada com o título sobre o vídeo. O envio começa privado e aplica capa, playlist e a privacidade escolhida.</p>
+                <p class="compact-note">A capa automática é a mesma que aparece na abertura do vídeo. O envio começa privado e aplica capa, playlist e a privacidade escolhida.</p>
                 <button type="button" id="ytPublishSubmit" class="btn-primary" disabled>Publicar vídeo selecionado</button>
                 <p id="ytPublishMessage" class="compact-note" role="status"></p>
                 <hr style="border:0;border-top:1px solid var(--glass-border);margin:1rem 0">
@@ -2544,7 +2593,7 @@
                     <li><strong>Diagnóstico:</strong> o administrador pode baixar os logs em Ajustes. Revise dados pessoais e credenciais antes de compartilhar.</li>
                 </ul>
             </details>
-            <p class="compact-note">Versão do servidor: 9.9.0. A transcrição é local; fontes, modelos e integrações podem acessar serviços externos. Use conteúdo autorizado.</p>
+            <p class="compact-note">Versão do servidor: 9.9.1. A transcrição é local; fontes, modelos e integrações podem acessar serviços externos. Use conteúdo autorizado.</p>
         </div>
     </div>
 
@@ -2806,9 +2855,29 @@
                 const suffix = item.charAt(0).toUpperCase() + item.slice(1);
                 const box = document.getElementById(`easyAudio${suffix}Box`);
                 box?.classList.toggle('is-active', item === mode);
+                if (box) box.hidden = item !== mode;
             });
         }
 
+        function updateQuickSelection() {
+            const status = document.getElementById('easySelectedMusic');
+            if (!status) return;
+            const input = document.getElementById('easyYoutubeUrl');
+            const files = document.getElementById('easyAudioFile')?.files || [];
+            const title = easyAudioMode === 'youtube' ? (input?.value.trim() ? input.dataset.youtubeTitle || 'Vídeo do YouTube selecionado' : '')
+                : easyAudioMode === 'upload' ? (files.length ? files[0].name + (files.length > 1 ? ` e mais ${files.length - 1}` : '') : '')
+                : (document.getElementById('easyLibraryAudio')?.value ? selectedOptionText('easyLibraryAudio') : '');
+            status.textContent = title ? 'Música escolhida: ' + title : 'Escolha uma música para continuar.';
+            const message = document.getElementById('easyValidationMessage'); if (message) message.textContent = '';
+            document.querySelectorAll('[data-quick-source]').forEach(button => {
+                button.classList.toggle('is-active', button.dataset.quickSource === easyAudioMode);
+                button.setAttribute('aria-pressed', String(button.dataset.quickSource === easyAudioMode));
+            });
+        }
+        function quickValidation(message, field) {
+            document.getElementById('easyValidationMessage').textContent = message;
+            document.getElementById(field)?.focus();
+        }
         function setEasyBackgroundType(type) {
             const input = document.getElementById('easyBackgroundType');
             if (input) input.value = type;
@@ -2994,6 +3063,7 @@
                         const metadata = await fetchYoutubeMetadata(url);
                         if (input.value.trim() !== url) return;
                         input.dataset.youtubeTitle = metadata.title || '';
+                        if (inputId === 'easyYoutubeUrl') updateQuickSelection();
                         setYoutubeIdentification(input, badge, text, `Vídeo: ${metadata.title}`);
                     } catch (error) {
                         if (input.value.trim() !== url) return;
@@ -3899,9 +3969,10 @@
                     if (ext !== 'srt') {
                         const image = document.createElement('img');
                         image.loading = 'lazy';
-                        image.alt = '';
+                        image.alt = 'Capa do vídeo: ' + file;
+                        coverTitle.style.display = 'none';
                         image.src = `/api/library/thumbnail/history/${encodeURIComponent(file)}?token=${encodeURIComponent(authToken)}&${ownerQuery}&v=${item.modified_at || ''}`;
-                        image.onerror = () => image.remove();
+                        image.onerror = () => { image.remove(); coverTitle.style.display = ''; };
                         cover.appendChild(image);
                     } else {
                         cover.setAttribute('role', 'img');
@@ -4120,6 +4191,8 @@
             document.getElementById('btnCreatorEasy')?.addEventListener('click', () => setCreatorMode('easy'));
             document.getElementById('btnCreatorAdvanced')?.addEventListener('click', () => setCreatorMode('advanced'));
             document.getElementById('btnCreatorSubtitle')?.addEventListener('click', () => setCreatorMode('subtitle'));
+            document.querySelectorAll('[data-quick-source]').forEach(button => button.addEventListener('click', () => setEasyAudioMode(button.dataset.quickSource)));
+            setEasyAudioMode('youtube');
             document.getElementById('easyYoutubeUrl')?.addEventListener('focus', () => setEasyAudioMode('youtube'));
             document.getElementById('easyYoutubeUrl')?.addEventListener('input', event => {
                 if (event.target.value.trim()) setEasyAudioMode('youtube');
@@ -4224,15 +4297,15 @@
 
                 if (easyAudioMode === 'upload') {
                     audioFiles = Array.from(document.getElementById('easyAudioFile')?.files || []);
-                    if (!audioFiles.length) { alert('Escolha uma ou mais músicas ou vídeos.'); return; }
+                    if (!audioFiles.length) { quickValidation('Toque em Enviar arquivo e escolha uma música.', 'easyAudioFile'); return; }
                     if (audioFiles.length > 25) { alert('Envie no máximo 25 arquivos por vez.'); return; }
                 } else if (easyAudioMode === 'youtube') {
                     const url = document.getElementById('easyYoutubeUrl')?.value.trim();
-                    if (!url) { alert('Cole o link da música no YouTube.'); return; }
+                    if (!url) { quickValidation('Busque pelo nome ou cole o link da música.', 'easyYoutubeUrlSearch'); return; }
                     formData.set('youtube_url', url);
                 } else {
                     const filename = document.getElementById('easyLibraryAudio')?.value;
-                    if (!filename) { alert('Escolha uma música da biblioteca.'); return; }
+                    if (!filename) { quickValidation('Escolha uma música da sua Biblioteca.', 'easyLibraryAudio'); return; }
                     formData.set('library_audio', filename);
                 }
 
@@ -4286,7 +4359,7 @@
                     clientPreparationInProgress = false;
                     setCreationUiLocked(false);
                     alert('Erro no Modo Rápido: ' + error.message);
-                    if (button) { button.disabled = false; button.textContent = '⚡ Criar meu karaokê'; }
+                    if (button) { button.disabled = false; button.textContent = 'Criar karaokê'; }
                     if (processCard) processCard.style.display = 'none';
                 }
             });
@@ -6287,6 +6360,7 @@
                             if (resultVideoPreview) {
                                 resultVideoPreview.pause();
                                 resultVideoPreview.removeAttribute('src');
+                                resultVideoPreview.removeAttribute('poster');
                                 resultVideoPreview.load();
                                 resultVideoPreview.style.display = 'none';
                             }
@@ -6303,6 +6377,7 @@
                             if (downloadResultDescription) downloadResultDescription.textContent = 'Assista aqui ou abra sua cópia permanente na Biblioteca.';
                             if (resultVideoPreview) resultVideoPreview.style.display = '';
                             if (resultVideoPreview && (statusChanged || !resultVideoPreview.getAttribute('src'))) {
+                                resultVideoPreview.poster = `/api/result/thumbnail?token=${encodeURIComponent(authToken)}&t=${Date.now()}`;
                                 resultVideoPreview.src = `/api/download?inline=true&token=${encodeURIComponent(authToken)}&t=${Date.now()}`;
                                 resultVideoPreview.load();
                             }
@@ -6366,7 +6441,7 @@
                 query.placeholder = 'Artista - nome da música';
                 query.autocomplete = 'off';
                 label.htmlFor = query.id;
-                label.textContent = 'Buscar no YouTube';
+                label.textContent = sourceId === 'easyYoutubeUrl' ? 'Nome da música ou artista' : 'Buscar no YouTube';
                 label.className = 'compact-note';
                 const button = document.createElement('button');
                 button.type = 'button';
@@ -6379,11 +6454,12 @@
                 const status = document.createElement('p');
                 status.className = 'compact-note';
                 status.setAttribute('role', 'status');
-                status.textContent = 'Digite para pesquisar automaticamente. Só a busca é enviada ao YouTube.';
+                status.textContent = 'Digite o nome e escolha o vídeo nos resultados.';
                 const results = document.createElement('div');
                 results.style.cssText = 'display:grid;gap:.4rem;max-height:260px;overflow:auto';
                 panel.append(label, controls, status, results);
-                source.before(panel);
+                const searchHost = sourceId === 'easyYoutubeUrl' ? document.getElementById('easyYoutubeSearchHost') : null;
+                if (searchHost) searchHost.append(panel); else source.before(panel);
                 let timer, controller, revision = 0;
                 async function search() {
                     clearTimeout(timer);
@@ -6410,20 +6486,28 @@
                         for (const video of items) {
                             const choice = document.createElement('button');
                             choice.type = 'button';
-                            choice.className = 'btn-secondary';
+                            choice.className = 'btn-secondary youtube-search-result';
                             choice.style.cssText = 'text-align:left;white-space:normal;overflow-wrap:anywhere;width:100%';
                             const seconds = Number(video.duration);
                             const duration = Number.isFinite(seconds) && seconds > 0
                                 ? ` · ${Math.floor(seconds / 60)}:${String(Math.floor(seconds % 60)).padStart(2, '0')}` : '';
-                            choice.textContent = video.title + ' — ' + video.uploader + duration;
+                            const videoId = new URL(video.url).searchParams.get('v');
+                            if (!/^[A-Za-z0-9_-]{11}$/.test(videoId || '')) continue;
+                            const thumbnail = document.createElement('img'); thumbnail.loading = 'lazy'; thumbnail.alt = ''; thumbnail.referrerPolicy = 'no-referrer';
+                            thumbnail.src = `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg`; thumbnail.onerror = () => thumbnail.remove();
+                            const description = document.createElement('span'); description.textContent = video.title;
+                            const metadata = document.createElement('small'); metadata.textContent = video.uploader + duration + ' · Usar esta música';
+                            description.append(metadata); choice.append(thumbnail, description);
                             choice.addEventListener('click', () => {
                                 if (!/^https:\/\/www\.youtube\.com\/watch\?v=[A-Za-z0-9_-]{11}$/.test(video.url)) return;
                                 source.value = video.url;
+                                source.dataset.youtubeTitle = video.title;
                                 source.dispatchEvent(new Event('focus'));
                                 source.dispatchEvent(new Event('input', { bubbles: true }));
                                 source.dispatchEvent(new Event('change', { bubbles: true }));
                                 results.replaceChildren();
                                 status.textContent = 'Selecionado: ' + video.title;
+                                if (sourceId === 'easyYoutubeUrl') { updateQuickSelection(); document.getElementById('easySubmitBtn')?.focus(); }
                             });
                             results.append(choice);
                         }
@@ -6514,7 +6598,7 @@
                     if (options.allow_no_playlist) select.add(new Option('Sem playlist', ''));
                     for (const playlist of options.playlists || []) select.add(new Option(playlist.title, playlist.id));
                     select.value = options.playlist_id || '';
-                    ytElement(prefix + 'YoutubePublicationNote').textContent = `Canal: ${options.channel_title} · Privacidade: ${options.privacy}. Playlist definida pelo administrador para sua conta.`;
+                    ytElement(prefix + 'YoutubePublicationNote').textContent = `Canal: ${options.channel_title} · ${({'private':'Privado','unlisted':'Não listado','public':'Público'})[options.privacy] || options.privacy} · ${options.playlists?.find(playlist => playlist.id === options.playlist_id)?.title || 'Sem playlist'}.`;
                 }
             } catch (error) { console.warn(error.message); }
         }
@@ -6551,7 +6635,8 @@
             try {
                 const status = await ytRequest('status');
                 ytElement('ytPublishChannel').textContent = status.connected ? 'Canal conectado: ' + status.channel_title
-                    : (status.configured ? 'Conecte o canal para habilitar os envios.' : 'Configure o cliente OAuth do YouTube no servidor para conectar o canal.');
+                    : (status.configured ? 'Conecte pelo computador e importe a autorização abaixo. Seu servidor pode continuar em HTTP.' : 'Configure o cliente OAuth do YouTube no servidor para conectar o canal.');
+                ytElement('ytPublishConnect').style.display = status.web_configured ? '' : 'none';
                 renderYoutubePublicationJobs(status.jobs || []);
                 if (!full) return;
                 ytElement('ytPublishPrivacy').value = status.settings.privacy;
@@ -6576,6 +6661,25 @@
             } catch (error) { ytMessage(error.message); }
         }
         document.addEventListener('DOMContentLoaded', () => {
+            ytElement('ytDesktopHelper').onclick = async () => {
+                try {
+                    const response = await authFetch('/api/admin/youtube/desktop-helper');
+                    if (!response.ok) throw new Error('Não foi possível baixar o autorizador.');
+                    const url = URL.createObjectURL(await response.blob());
+                    const link = document.createElement('a'); link.href = url; link.download = 'youtube_desktop_oauth.py'; link.click();
+                    setTimeout(() => URL.revokeObjectURL(url), 10000);
+                } catch (error) { ytMessage(error.message); }
+            };
+            ytElement('ytDesktopImport').onclick = async () => {
+                const file = ytElement('ytDesktopAuthorization').files[0];
+                if (!file || file.size > 32768) { ytMessage('Escolha o JSON de autorização gerado pelo programa (até 32 KB).'); return; }
+                const form = new FormData(); form.set('authorization', file);
+                try {
+                    const result = await ytRequest('import-authorization', {method: 'POST', body: form});
+                    ytElement('ytDesktopAuthorization').value = ''; ytMessage('Canal conectado: ' + result.channel_title);
+                    await loadYoutubePublisher(); await loadYoutubePublicationOptions();
+                } catch (error) { ytMessage(error.message); }
+            };
             ytElement('ytPublishConnect').onclick = async () => {
                 try { const result = await ytRequest('connect', { method: 'POST' }); window.location.assign(result.url); }
                 catch (error) { ytMessage(error.message); }
@@ -6586,9 +6690,10 @@
                 ytElement('ytPublishTitle').value = video ? video.filename.replace(/\.mp4$/i, '').slice(0, 100) : '';
                 ytElement('ytPublishCover').value = '';
                 resetYoutubeCover();
+                if (video) ytElement('ytPublishPreview').click();
             };
-            ytElement('ytPublishTitle').oninput = resetYoutubeCover;
-            ytElement('ytPublishCover').onchange = resetYoutubeCover;
+            ytElement('ytPublishTitle').oninput = () => { ytElement('ytPublishSubmit').disabled = !youtubePreviewReady || !ytElement('ytPublishTitle').value.trim(); };
+            ytElement('ytPublishCover').onchange = () => ytElement('ytPublishPreview').click();
             ytElement('ytPublishPreview').onclick = async () => {
                 const video = youtubeSelectedVideo(), title = ytElement('ytPublishTitle').value.trim();
                 if (!video || !title) { ytMessage('Escolha um vídeo e defina o título.'); return; }

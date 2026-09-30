@@ -78,12 +78,12 @@ def add_cover_to_command(command, cover_path, duration):
     return command
 
 
-def video_thumbnail(source):
+def video_thumbnail(source, cover=False):
     """Miniatura derivada, privada e invalidada quando o arquivo é substituído."""
     source = Path(source)
     stat = source.stat()
-    identity = hashlib.sha256(str(source.resolve()).encode()).hexdigest()
-    revision = hashlib.sha256(f'{stat.st_size}:{stat.st_mtime_ns}'.encode()).hexdigest()[:16]
+    identity = hashlib.sha256((str(source.resolve()) + (':cover' if cover else ':preview')).encode()).hexdigest()
+    revision = hashlib.sha256(f'v2:{cover}:{stat.st_size}:{stat.st_mtime_ns}'.encode()).hexdigest()[:16]
     destination = THUMBNAIL_ROOT / f'{identity}-{revision}.jpg'
     with thumbnail_lock:
         if destination.is_file():
@@ -92,9 +92,10 @@ def video_thumbnail(source):
         with tempfile.TemporaryDirectory(dir=THUMBNAIL_ROOT) as directory:
             temporary = Path(directory) / 'frame.jpg'
             # Prefere um frame após a abertura; vídeos curtos usam o primeiro.
-            for sample_time in ('3.2', '0'):
+            for sample_time in (('0',) if cover else ('3.2', '0')):
                 subprocess.run(['ffmpeg', '-v', 'error', '-y', '-ss', sample_time, '-i', str(source),
-                                '-vf', 'scale=640:360:force_original_aspect_ratio=decrease,pad=640:360:(ow-iw)/2:(oh-ih)/2',
+                                '-vf', ('scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2' if cover else 'scale=640:360:force_original_aspect_ratio=decrease,pad=640:360:(ow-iw)/2:(oh-ih)/2'),
+                                '-q:v', '3',
                                 '-frames:v', '1', '-threads', '1', str(temporary)],
                                check=True, timeout=30, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
                 if temporary.is_file() and temporary.stat().st_size:

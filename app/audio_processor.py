@@ -29,7 +29,12 @@ def get_effective_cpu_count() -> int:
     if host_count:
         candidates.append(host_count)
 
-    return max(1, min(candidates)) if candidates else 1
+    available = max(1, min(candidates)) if candidates else 1
+    try:
+        configured = int(os.environ.get("KARAOKE_CPU_THREADS", "0"))
+    except ValueError:
+        configured = 0
+    return min(available, configured) if configured > 0 else available
 
 def get_file_duration(file_path: str) -> float:
     """Retorna a duração do arquivo de áudio/vídeo em segundos usando ffprobe."""
