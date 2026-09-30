@@ -3,7 +3,7 @@ name: Build, Publish and Release
 on:
   push:
     branches: [main]
-    paths: [VERSION]
+    paths: [VERSION, '.github/workflows/docker-publish.yml']
     tags:
       - 'v*'
   workflow_dispatch: # Dispara quando tags começando com v são criadas, ex: v1.0
@@ -25,6 +25,8 @@ jobs:
 
       - name: Validate subtitle and easy-mode rules
         run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
           python -m pip install requests==2.32.3 fastapi==0.111.0 python-multipart==0.0.9 httpx==0.28.1
           python -m unittest discover -s tests -v
 
