@@ -2,6 +2,7 @@ import gc
 import os
 import logging
 from faster_whisper import WhisperModel
+from whisper_audio import load_whisper_audio
 from whisperx_align import stabilize_word_timestamps
 
 logger = logging.getLogger("karaoke")
@@ -178,6 +179,8 @@ def transcribe_vocals(
         f"Threads={cpu_threads}, Compute={compute_type}, BeamSize={beam_size}, SileroVAD={enable_vad}"
     )
 
+    audio = load_whisper_audio(vocals_path)
+
     repo_id = resolve_whisper_repo(model_size)
     save_dir = "/data/output/models/whisper"
     os.makedirs(save_dir, exist_ok=True)
@@ -280,7 +283,7 @@ def transcribe_vocals(
         return collected
 
     try:
-        segments, info = model.transcribe(vocals_path, **transcribe_options)
+        segments, info = model.transcribe(audio, **transcribe_options)
         segments = consume_segments(segments, info)
     except Exception as e_vad:
         if not enable_vad:
@@ -288,7 +291,7 @@ def transcribe_vocals(
         logger.warning(f"Transcrição com Silero VAD retornou aviso ({e_vad}). Transcrevendo sem filtro VAD...")
         transcribe_options.pop("vad_filter", None)
         transcribe_options.pop("vad_parameters", None)
-        segments, info = model.transcribe(vocals_path, **transcribe_options)
+        segments, info = model.transcribe(audio, **transcribe_options)
         segments = consume_segments(segments, info)
 
     logger.info(f"Idioma detectado: {info.language} ({info.language_probability:.2%})")
