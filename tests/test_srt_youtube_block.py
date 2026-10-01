@@ -76,7 +76,10 @@ class SrtPublicationBlockTests(unittest.TestCase):
 
     def test_manual_api_resolver_blocks_srt_mp4_and_unknown(self):
         node = next(n for n in TREE.body if isinstance(n, ast.FunctionDef) and n.name == 'resolve_youtube_publication_video')
-        from fastapi import HTTPException
+        class HTTPException(Exception):
+            def __init__(self, status_code, detail):
+                self.status_code = status_code
+                super().__init__(detail)
         scope = {'Path':Path, 'os':os, 'HTTPException':HTTPException,
                  'admin_result_owner':lambda *_:{}, 'get_user_paths':lambda _: {'library':str(self.root / 'library')},
                  'youtube_eligible':youtube_eligible}
