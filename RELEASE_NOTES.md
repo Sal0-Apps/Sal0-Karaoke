@@ -1,8 +1,7 @@
-# 9.9.10
+# 9.9.11
 
-- Corrigido o progresso do backing-vocal: o app distingue preparação do áudio, preparação dos blocos, análise da voz e geração das faixas.
-- A análise tem seu próprio percentual de 0 a 100%, atualizado após cada bloco concluído. As barras rápidas de preparação não são tratadas como conclusão da separação.
-- Reconstrução e salvamento mostram a subetapa sem inventar uma porcentagem. Os registros identificam as barras, e o Telegram mantém somente o aviso inicial.
-- Testes cobrem a sequência de barras do problema, falhas durante a análise e inferência real em CPU com identificação das subetapas.
+- Corrigida a falha `metadata_errors` ao iniciar a transcrição: o áudio é convertido pelo FFmpeg para o formato do Whisper, sem depender da abertura de arquivos pelo PyAV.
+- A mesma conversão atende transcrição, tradução e animação das letras sincronizadas; a tentativa sem VAD reaproveita o áudio convertido.
+- Áudio inválido e cancelamento são tratados antes do carregamento do modelo. As faixas de backing-vocal existentes continuam aproveitáveis pelo cache.
+- A publicação valida leitura de áudio e inferência real do Whisper em CPU dentro da imagem, além dos testes do backing-vocal, interface e Android.
 - Mantidos os tempos dos versos da letra sincronizada, animação pelo Whisper, busca no YouTube, MP4 para áudio no modo SRT, playlists por perfil, privacidade Não listado, fila, Biblioteca e Android.
-- Documentação completa e instruções de diagnóstico atualizadas.

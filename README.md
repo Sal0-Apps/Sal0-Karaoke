@@ -123,14 +123,14 @@ Em **Playlist de cada usuário**, a administração define uma playlist válida 
 
 ## Início rápido com Docker
 
-A versão de distribuição desta documentação é **9.9.10**. O título e o rodapé da página mostram apenas o nome da aplicação. A versão do servidor pode ser consultada no Manual; a versão do APK aparece nas configurações nativas.
+A versão de distribuição desta documentação é **9.9.11**. O título e o rodapé da página mostram apenas o nome da aplicação. A versão do servidor pode ser consultada no Manual; a versão do APK aparece nas configurações nativas.
 
 Crie um arquivo `compose.yaml`:
 
 ```yaml
 services:
   karaoke-app:
-    image: ghcr.io/sal0-apps/sal0-karaoke:9.9.10
+    image: ghcr.io/sal0-apps/sal0-karaoke:9.9.11
     container_name: karaoke-app
     ports:
       - "7885:7860"
@@ -168,3 +168,5 @@ A manutenção é mínima. Não há SLA, garantia de respostas rápidas, revisã
 ## Licença
 
 O código original permanece sob [MIT](LICENSE), permitindo uso, estudo, modificação e redistribuição com preservação dos avisos exigidos. Bibliotecas, modelos, fontes, imagens e executáveis de terceiros mantêm suas próprias condições. Consulte [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
+A leitura de áudio para o Whisper usa o FFmpeg instalado no servidor, com conversão para mono a 16 kHz. Isso evita incompatibilidades de abertura de arquivos no PyAV. Em caso de falha, repita a tarefa usando o cache disponível para aproveitar as faixas já separadas.

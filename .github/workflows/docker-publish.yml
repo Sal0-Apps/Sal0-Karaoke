@@ -95,6 +95,10 @@ jobs:
         timeout-minutes: 15
         run: docker run --rm --entrypoint python "${{ env.IMAGE_TAG }}:${{ env.VERSION_TAG }}" smoke_backing_runtime.py
 
+      - name: Test real Whisper CPU runtime
+        timeout-minutes: 8
+        run: docker run --rm --entrypoint python "${{ env.IMAGE_TAG }}:${{ env.VERSION_TAG }}" smoke_whisper_runtime.py
+
       - name: Set up Java for Android build
         uses: actions/setup-java@v4
         with:

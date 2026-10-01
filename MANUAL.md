@@ -1,6 +1,6 @@
 # Manual do Sal0 Karaokê
 
-Este manual descreve os controles disponíveis na distribuição 9.9.10. Para instalar o servidor, consulte [DEPLOYMENT.md](DEPLOYMENT.md). Para configurar o aparelho, consulte o [guia Android](android/README.md).
+Este manual descreve os controles disponíveis na distribuição 9.9.11. Para instalar o servidor, consulte [DEPLOYMENT.md](DEPLOYMENT.md). Para configurar o aparelho, consulte o [guia Android](android/README.md).
 
 ## 1. Primeiro acesso e navegação
 
@@ -337,3 +337,5 @@ Expanda **Publicar um vídeo já pronto**, escolha o resultado, confira título,
 O envio começa privado, aplica capa e playlist e então solicita a privacidade escolhida. Falhas aparecem no histórico e podem ser retomadas. Projetos de API sem auditoria podem ficar limitados a privado; miniaturas personalizadas dependem da permissão do canal. A API tem cota: ao atingir o limite, aguarde sua renovação. O aplicativo não compra cota automaticamente. Credenciais em modo de teste podem exigir nova autorização quando expirarem.
 
 Consulte também [o guia de busca, sincronização, backing vocals e publicação](UPDATES_AUTOMATIC_KARAOKE.md).
+
+A leitura de áudio para o Whisper usa o FFmpeg instalado no servidor, com conversão para mono a 16 kHz. Isso evita incompatibilidades de abertura de arquivos no PyAV. Em caso de falha, repita a tarefa usando o cache disponível para aproveitar as faixas já separadas.
