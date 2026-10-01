@@ -1,6 +1,6 @@
 # Manual do Sal0 Karaokê
 
-Este manual descreve os controles disponíveis na distribuição 10.1. Para instalar o servidor, consulte [DEPLOYMENT.md](DEPLOYMENT.md). Para configurar o aparelho, consulte o [guia Android](android/README.md).
+Este manual descreve os controles disponíveis na distribuição 10.2. Para instalar o servidor, consulte [DEPLOYMENT.md](DEPLOYMENT.md). Para configurar o aparelho, consulte o [guia Android](android/README.md).
 
 O Sal0 Karaokê é destinado a uma instalação pessoal, acessada pela rede local ou por VPN, como ZeroTier. O repositório aberto disponibiliza o código e os pacotes; o projeto não opera um serviço público de processamento nem coleta centralmente as mídias das instalações. Não é necessário expor a porta do app à internet. O processamento principal é local, mas as integrações escolhidas podem se comunicar com serviços externos.
 
@@ -78,6 +78,8 @@ A letra-guia orienta o reconhecimento, mas não garante que a gravação tenha o
 ### Letra sincronizada e vozes de apoio
 
 A sincronização automática só aproveita uma letra LRC quando ela existe e corresponde à gravação: artista, título, versão e duração precisam ser compatíveis, com diferença de duração de até dois segundos. O texto completo e os tempos de início e fim dos versos seguem essa letra sincronizada. O Whisper analisa a gravação apenas para obter a animação das palavras dentro de cada intervalo: não move os versos nem redistribui os tempos das palavras uniformemente. Mesmo com animação, pausas e trechos instrumentais continuam seguindo os versos da letra pronta. Palavras que o Whisper não reconhece permanecem visíveis sem destaque animado, em cor discreta, sem receber tempos inventados. Letras sincronizadas também usam essa animação quando o perfil escolhe um estilo estático. A etapa permanece local e gratuita e apresenta quantas palavras ganharam animação. A revisão preserva os tempos acústicos e a letra; se você alterar manualmente os tempos do verso, a animação fica limitada ao novo intervalo. Sem LRC compatível, permanece a transcrição acústica comum. Refazer um vídeo invalida o cache antigo; arquivos já salvos não mudam automaticamente.
+
+Antes de aplicar os tempos da letra sincronizada, o app compara o início de vários versos com frases reconhecidas na gravação. Artista, título e duração total iguais não garantem uma introdução ou edição idêntica. Se houver um desvio consistente, a LRC é tratada como incompatível: o texto continua como guia e o vídeo usa os tempos medidos na voz. Nenhum deslocamento é aplicado aos tempos de uma LRC aceita. Quando faltam frases reconhecidas para uma conclusão, a verificação fica inconclusiva; isso não prova que a letra esteja certa ou errada. O resultado da verificação aparece nos registros e no resumo quando há incompatibilidade. A etapa envia um único aviso de início ao Telegram e mostra conclusão percentual. Refazer após esta atualização aproveita as faixas e a transcrição válidas, mas recria as legendas e o vídeo; vídeos antigos já salvos não são alterados.
 
 **Preservar backing vocals** separa a voz principal das vozes de apoio localmente com o modelo UVR-BVE, depois soma as vozes de apoio ao instrumental do Demucs. Ajuste seu volume de 0 a 100% ou desative a opção para a música. Ela está disponível nos modos Rápido e Detalhado, inclusive na personalização do rápido. O modelo é baixado no primeiro uso, fica no volume persistente e aumenta o tempo de processamento. A qualidade depende da gravação; a separação pode deixar vazamentos ou perder harmonias. O modo SRT mantém o áudio completo e não usa esta separação.
 
@@ -340,7 +342,7 @@ O envio começa privado, aplica capa e playlist e então solicita a privacidade 
 
 Consulte também [o guia de busca, sincronização, backing vocals e publicação](UPDATES_AUTOMATIC_KARAOKE.md).
 
-A leitura de áudio para o Whisper usa o FFmpeg instalado no servidor, com conversão para mono a 16 kHz. Isso evita incompatibilidades de abertura de arquivos no PyAV. Em caso de falha, repita a tarefa usando o cache disponível para aproveitar as faixas já separadas.
+A leitura de áudio para o Whisper usa o FFmpeg instalado no servidor, com conversão para mono a 16 kHz. Essa cópia é usada apenas na análise da voz. O karaokê final usa o instrumental estéreo a 44,1 kHz, com vozes de apoio quando ativadas, e é exportado em AAC a 192 kbps; a separação e a compressão podem alterar o som em relação à fonte. Isso evita incompatibilidades de abertura de arquivos no PyAV. Em caso de falha, repita a tarefa usando o cache disponível para aproveitar as faixas já separadas.
 
 Quando um vídeo de fundo decorativo é maior que a música, o início do trecho é escolhido aleatoriamente a cada nova renderização, cabendo a música inteira até o fim do fundo. Vídeos curtos continuam em loop. O vídeo original da música mantém o início e a sincronização. Com letra sincronizada, seu texto e seus tempos controlam os versos; o Whisper serve apenas à animação das palavras.
 

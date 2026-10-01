@@ -6,6 +6,7 @@ clocks from the recording instead of dividing the provider verse interval.
 import math
 import re
 import unicodedata
+from statistics import median
 from difflib import SequenceMatcher
 
 
@@ -95,6 +96,65 @@ def require_acoustic_word_timing(segments):
             if not math.isfinite(start) or not math.isfinite(end) or start < 0 or end <= start:
                 raise ValueError("Tempos de palavras inválidos na sincronização da animação.")
     return segments
+
+
+def assess_synced_timing(synced_segments, acoustic_segments):
+    """Detect a wrong recording clock without moving any provider timestamps.
+
+    Metadata and total duration do not prove that a video has the same intro
+    as the lyric recording. Compare locally repeated, exact phrase prefixes
+    with measured word clocks. Several agreeing verses are required; a single
+    recognition error or an unrecognized verse cannot reject the whole lyric.
+    """
+    def key(text):
+        value = unicodedata.normalize('NFKD', str(text)).casefold()
+        return ''.join(re.findall(r'\w+', ''.join(c for c in value if not unicodedata.combining(c))))
+
+    words = []
+    for segment in acoustic_segments:
+        for word in segment.get('words', []):
+            try:
+                start, end = float(word['start']), float(word['end'])
+            except (KeyError, TypeError, ValueError):
+                continue
+            token = key(word.get('word', ''))
+            if token and math.isfinite(start) and math.isfinite(end) and 0 <= start < end:
+                words.append((token, start, end))
+    words.sort(key=lambda word: word[1])
+    offsets = []
+    for verse in synced_segments:
+        prefix = [key(token) for token in str(verse['text']).split() if key(token)][:3]
+        if len(prefix) < 2:
+            continue
+        start = float(verse['start'])
+        candidates = []
+        for index in range(len(words) - len(prefix) + 1):
+            phrase = words[index:index + len(prefix)]
+            if abs(phrase[0][1] - start) > 12:
+                continue
+            if [word[0] for word in phrase] != prefix:
+                continue
+            if any(phrase[i + 1][1] - phrase[i][2] > .75 for i in range(len(phrase) - 1)):
+                continue
+            candidates.append(phrase[0][1] - start)
+        if candidates:
+            # Repeated choruses must stay near their own occurrence.
+            offsets.append(min(candidates, key=abs))
+
+    result = dict(status='inconclusive', checked_verses=len(offsets),
+                  total_verses=len(synced_segments), median_offset_seconds=None)
+    if len(offsets) < max(3, math.ceil(len(synced_segments) * .15)):
+        return result
+    center = median(offsets)
+    result['median_offset_seconds'] = round(center, 3)
+    later = sum(offset > 1 for offset in offsets) / len(offsets)
+    earlier = sum(offset < -1 for offset in offsets) / len(offsets)
+    far = sum(abs(offset) > 2 for offset in offsets) / len(offsets)
+    if (abs(center) > 1.5 and max(later, earlier) >= .75) or far >= .75:
+        result['status'] = 'incompatible'
+    elif abs(center) <= 1.5 and far <= .25:
+        result['status'] = 'consistent'
+    return result
 
 
 def anchor_synced_animation(synced_segments, acoustic_segments):

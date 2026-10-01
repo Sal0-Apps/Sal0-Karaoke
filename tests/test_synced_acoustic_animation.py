@@ -9,19 +9,21 @@ import tempfile
 import textwrap
 import unittest
 import unicodedata
+import array
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock
 
 ROOT = Path(__file__).parents[1]
 sys.path.insert(0, str(ROOT / 'app'))
-from lyrics_sync import parse_lrc, require_acoustic_word_timing, anchor_synced_animation
+from lyrics_sync import parse_lrc, require_acoustic_word_timing, anchor_synced_animation, assess_synced_timing
 from karaoke_generator import generate_ass_karaoke
+from media_covers import add_cover_to_command
 from test_automatic_lyrics_and_search import load_function
 
 
 class SyncedAcousticAnimationTests(unittest.TestCase):
-    def run_stage(self, cache_version=None):
+    def run_stage(self, cache_version=None, verses=None, voice=None):
         source = (ROOT / 'app/main.py').read_text()
         stage = source[source.index('            segments = None\n', source.index('# Passo 3: Transcrever vocais')):
                        source.index('            # --- NOVO: Passo de Pausa')]
@@ -29,12 +31,15 @@ class SyncedAcousticAnimationTests(unittest.TestCase):
         acoustic = [{'start':10.2,'end':12.5,'text':' Ola mundo', 'words':[
             {'word':' Ola','start':10.2,'end':10.5},
             {'word':' mundo','start':11.6,'end':12.5}]}]
+        lrc = verses if verses is not None else lrc
+        acoustic = voice if voice is not None else acoustic
+        lyric_text = '\n'.join(segment['text'] for segment in lrc)
         with tempfile.TemporaryDirectory() as folder:
             cached = acoustic if cache_version == 3 else lrc
             (Path(folder) / 'synced_acoustic_segments.json').write_text(json.dumps(cached))
             meta = dict(animation_timing_version=cache_version, vocal_source='lead',
                         transcribe_source='vocals', whisper_model='medium', enable_vad=True,
-                        transcription_preset='standard', lyrics_hint_hash=hashlib.sha256('Olá mundo\nOutra linha'.encode()).hexdigest())
+                        transcription_preset='standard', lyrics_hint_hash=hashlib.sha256(lyric_text.encode()).hexdigest())
             transcriber = Mock(return_value=acoustic)
             scope = dict(os=os, hashlib=hashlib, json=json, synced_segments=lrc,
                 lyrics_text='original guide', cache_dir=folder, cached_meta=meta,
@@ -46,6 +51,7 @@ class SyncedAcousticAnimationTests(unittest.TestCase):
                 telegram_notice=lambda *parts: ' '.join(parts), telegram_escape=str,
                 logger=logging.getLogger('test'), is_model_downloaded=lambda _:True,
                 transcribe_vocals=transcriber, save_stage_checkpoint=Mock(),
+                update_process_summary=Mock(), assess_synced_timing=assess_synced_timing,
                 align_lyrics=load_function('align_lyrics', clean_word=load_function('clean_word', unicodedata=unicodedata)), require_acoustic_word_timing=require_acoustic_word_timing, anchor_synced_animation=anchor_synced_animation)
             exec(compile(textwrap.dedent(stage), 'transcription-stage', 'exec'), scope)
         return scope, transcriber
@@ -60,13 +66,116 @@ class SyncedAcousticAnimationTests(unittest.TestCase):
         self.assertEqual([(s['start'], s['end'], s['text']) for s in scope['segments']],
                          [(10,13,'Olá mundo'),(13,17,'Outra linha')])
         notices = scope['notify_targets'].call_args_list
-        self.assertEqual(len(notices), 1)
+        self.assertEqual(len(notices), 2)
         self.assertIn('Sincronização da animação pela voz', notices[0].args[1])
+        self.assertIn('Verificação da letra sincronizada', notices[1].args[1])
 
     def test_current_acoustic_cache_is_reused(self):
         scope, transcriber = self.run_stage(cache_version=3)
         transcriber.assert_not_called()
         self.assertEqual(scope['segments'][0]['words'][1]['start'], 11.6)
+
+    def timing_fixture(self, shifts):
+        verses, voice = [], []
+        for index, shift in enumerate(shifts):
+            start = 7.09 + index * 10
+            tokens = ['Verso', str(index), 'cantado']
+            verses.append(dict(start=start, end=start + 6, text=' '.join(tokens),
+                               words=[], synced_line=True))
+            words = [dict(word=' ' + token, start=start + shift + offset * .4,
+                          end=start + shift + (offset + 1) * .4)
+                     for offset, token in enumerate(tokens)]
+            voice.append(dict(start=words[0]['start'], end=words[-1]['end'],
+                              text=' '.join(tokens), words=words))
+        return verses, voice
+
+    def test_same_duration_can_hide_an_incompatible_video_intro(self):
+        verses, voice = self.timing_fixture([4.13, 2.33, 2.53, 3.28, 3.46, 3.76])
+        assessment = assess_synced_timing(verses, voice)
+        self.assertEqual(assessment['status'], 'incompatible')
+        self.assertEqual(assessment['checked_verses'], 6)
+        self.assertGreater(assessment['median_offset_seconds'], 3)
+        self.assertEqual(verses[0]['start'], 7.09)  # Never shift provider clocks.
+
+    def test_compatible_lyrics_tolerate_small_whisper_error_and_one_outlier(self):
+        verses, voice = self.timing_fixture([.2, -.15, .4, .3, .1, 4])
+        self.assertEqual(assess_synced_timing(verses, voice)['status'], 'consistent')
+        scope, _ = self.run_stage(cache_version=3, verses=verses, voice=voice)
+        self.assertEqual(scope['segments'][0]['start'], 7.09)
+        self.assertTrue(scope['segments'][0]['synced_line'])
+
+    def test_incompatible_clock_is_rejected_in_both_directions(self):
+        for shift in [-3, 4]:
+            verses, voice = self.timing_fixture([shift] * 6)
+            with self.subTest(shift=shift):
+                self.assertEqual(assess_synced_timing(verses, voice)['status'], 'incompatible')
+
+    def test_uncertain_recognition_does_not_move_or_reject_a_verse(self):
+        verses, voice = self.timing_fixture([4] * 6)
+        self.assertEqual(assess_synced_timing(verses, voice[:1])['status'], 'inconclusive')
+        self.assertEqual(assess_synced_timing(verses, [])['status'], 'inconclusive')
+
+    def test_repeated_choruses_are_compared_to_the_nearest_occurrence(self):
+        verses = [dict(start=10 + i * 30, end=15 + i * 30, text='Mesmo verso cantado')
+                  for i in range(6)]
+        voice = [dict(words=[dict(word=token, start=verse['start'] + .2 + j * .4,
+                                 end=verse['start'] + .6 + j * .4)
+                             for j, token in enumerate(verse['text'].split())])
+                 for verse in verses]
+        self.assertEqual(assess_synced_timing(verses, voice)['status'], 'consistent')
+
+    def test_rejected_lrc_reuses_voice_cache_and_renders_the_recording_clock(self):
+        verses, voice = self.timing_fixture([4.13, 2.33, 2.53, 3.28, 3.46, 3.76])
+        scope, transcriber = self.run_stage(cache_version=3, verses=verses, voice=voice)
+        transcriber.assert_not_called()
+        self.assertEqual(scope['synced_segments'], [])
+        self.assertAlmostEqual(scope['segments'][0]['start'], 11.22)
+        self.assertNotIn('synced_line', scope['segments'][0])
+        self.assertEqual(scope['cached_meta']['synced_timing_assessment']['status'], 'incompatible')
+        self.assertEqual(len(scope['notify_targets'].call_args_list), 1)  # One verification notice.
+        scope['update_process_summary'].assert_called_once()
+        with tempfile.TemporaryDirectory() as folder:
+            target = Path(folder) / 'fallback.ass'
+            generate_ass_karaoke(scope['segments'], str(target), show_instrumental=False)
+            output = target.read_text()
+        self.assertIn('0:00:11.22', output)
+        self.assertNotIn('0:00:07.09', output)
+
+    def test_real_cover_shifts_audio_and_animated_lyric_together(self):
+        # All lyric/Whisper clocks are relative to the song, excluding the cover.
+        verses = [dict(start=2, end=3, text='Hello world')]
+        voice = [dict(words=[dict(word='Hello', start=2.2, end=2.5),
+                            dict(word='world', start=2.5, end=2.8)])]
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            target, audio, cover, output = [root / name for name in
+                                          ('lyric.ass', 'voice.wav', 'cover.png', 'result.mp4')]
+            generate_ass_karaoke(anchor_synced_animation(verses, voice), str(target),
+                                 font_size=60, show_instrumental=False)
+            subprocess.run(['ffmpeg', '-v', 'error', '-y', '-f', 'lavfi', '-i',
+                'aevalsrc=if(between(t\\,2.2\\,2.8)\\,0.3*sin(2*PI*440*t)\\,0):s=44100:d=4',
+                '-ac', '2', str(audio)], check=True)
+            subprocess.run(['ffmpeg', '-v', 'error', '-y', '-f', 'lavfi', '-i',
+                'color=red:s=320x180', '-frames:v', '1', '-threads', '1', str(cover)], check=True)
+            command = ['ffmpeg', '-v', 'error', '-y', '-f', 'lavfi', '-i',
+                'color=black:s=320x180:r=25:d=4', '-i', str(audio), '-vf', 'ass=' + str(target),
+                '-map', '0:v:0', '-map', '1:a:0', '-c:v', 'libx264', '-preset', 'ultrafast',
+                '-c:a', 'aac', '-b:a', '192k', '-t', '4', str(output)]
+            subprocess.run(add_cover_to_command(command, cover, 4), check=True)
+            def frame(time):
+                return subprocess.check_output(['ffmpeg', '-v', 'error', '-ss', str(time),
+                    '-i', str(output), '-frames:v', '1', '-f', 'rawvideo', '-pix_fmt', 'rgb24', '-'])
+            before, after = frame(4.9), frame(5.7)
+            self.assertEqual(sum(min(before[i:i+3]) > 220 for i in range(0, len(before), 3)), 0)
+            self.assertGreater(sum(min(after[i:i+3]) > 220 for i in range(0, len(after), 3)), 10)
+            samples = array.array('f', subprocess.check_output(['ffmpeg', '-v', 'error', '-i',
+                str(output), '-vn', '-ac', '1', '-ar', '16000', '-f', 'f32le', '-']))
+            def rms(start, end):
+                chunk = samples[int(start * 16000):int(end * 16000)]
+                return (sum(value * value for value in chunk) / len(chunk)) ** .5
+            self.assertLess(rms(0, 3), .001)  # Silent title opening.
+            self.assertLess(rms(4.8, 5), .001)
+            self.assertGreater(rms(5.3, 5.7), .1)  # Voice clock 2.3 + 3-second cover.
 
     def test_animation_preserves_short_word_long_word_and_silent_gap(self):
         scope, _ = self.run_stage()

@@ -44,7 +44,7 @@ from video_renderer import render_karaoke_video, check_has_video
 from subtitle_video import media_has_motion_video, render_audio_subtitle_video
 from reprocess_cache import copy_reusable_inputs
 from media_covers import video_thumbnail
-from lyrics_sync import recording_matches, parse_lrc, require_acoustic_word_timing, anchor_synced_animation
+from lyrics_sync import recording_matches, parse_lrc, require_acoustic_word_timing, anchor_synced_animation, assess_synced_timing
 from backing_vocals import preserve_backing_vocals
 
 # Configurar logs
@@ -5494,7 +5494,7 @@ def run_pipeline(
 
         # Provider availability can change between retries. Never reuse subtitles
         # created from different line clocks, even with the same display options.
-        clock_hash = hashlib.sha256(json.dumps({"animation_timing_version": 3, "lyrics": synced_segments}, sort_keys=True).encode()).hexdigest()
+        clock_hash = hashlib.sha256(json.dumps({"animation_timing_version": 3, "synced_validation_version": 1, "lyrics": synced_segments}, sort_keys=True).encode()).hexdigest()
         if cached_meta.get("lyrics_clock_hash") != clock_hash:
             checkpoints = load_stage_checkpoints(cache_dir)
             for stage in ("transcription_reviewed", "subtitles_generated", "video_rendered"):
@@ -5794,11 +5794,26 @@ def run_pipeline(
 
             if synced_segments:
                 require_acoustic_word_timing(segments)
-                segments = anchor_synced_animation(synced_segments, segments)
-                matched = sum(len(segment["words"]) for segment in segments)
-                total = sum(len(segment["animation_words"]) for segment in segments)
-                update_state("processing", "Synced verse animation", 74, stage_progress=100,
-                             stage_detail=f"Versos nos tempos da letra; {matched}/{total} palavras com animação medida na voz")
+                update_state("processing", "Checking synced lyric timing", 74, stage_progress=0,
+                             stage_detail="Comparando os tempos da letra com a gravação")
+                notify_targets(telegram_targets, telegram_notice("⏱", "Verificação da letra sincronizada",
+                    "Conferindo se os versos correspondem aos tempos da voz nesta gravação."))
+                assessment = assess_synced_timing(synced_segments, segments)
+                cached_meta["synced_timing_assessment"] = assessment
+                with open(cache_meta_file, "w", encoding="utf-8") as f:
+                    json.dump(cached_meta, f, indent=4)
+                if assessment["status"] == "incompatible":
+                    logger.warning("Letra sincronizada incompatível com a gravação: %s", assessment)
+                    synced_segments = []
+                    update_process_summary(lyrics="Tempos LRC incompatíveis; letra-guia + Whisper")
+                    update_state("processing", "Checking synced lyric timing", 74, stage_progress=100,
+                                 stage_detail="A letra pronta não corresponde aos tempos desta gravação. Usando letra-guia e tempos da voz.")
+                else:
+                    segments = anchor_synced_animation(synced_segments, segments)
+                    matched = sum(len(segment["words"]) for segment in segments)
+                    total = sum(len(segment["animation_words"]) for segment in segments)
+                    update_state("processing", "Synced verse animation", 74, stage_progress=100,
+                                 stage_detail=f"Versos nos tempos da letra; {matched}/{total} palavras com animação medida na voz")
 
             # --- NOVO: Passo de Pausa e Correção de Legendas (se ativado pelo usuário) ---
             review_checkpoint = stage_checkpoint(cache_dir, "transcription_reviewed")
