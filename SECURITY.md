@@ -24,7 +24,8 @@ O projeto está em manutenção mínima. Relatos serão avaliados conforme dispo
 ## Operação segura
 
 - inicialize o administrador em uma rede restrita antes de expor a instalação;
-- mantenha o serviço em rede confiável ou atrás de VPN e HTTPS;
+- use a instalação pessoal em rede local confiável ou por VPN; HTTPS pode complementar essa proteção;
+- não encaminhe a porta 7885 do roteador para a internet;
 - não exponha diretamente a porta do container à Internet sem controles adicionais;
 - proteja `/data/users.json`, `/data/sessions.json`, configurações do Telegram e logs;
 - trate URLs com parâmetro `token` como credenciais;

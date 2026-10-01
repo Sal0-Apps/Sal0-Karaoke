@@ -1,9 +1,8 @@
-# 10.0
+# 10.1
 
-- Vídeos de fundo decorativos mais longos que a música começam em um trecho aleatório a cada nova renderização. O áudio, as legendas e o vídeo original mantêm seus tempos.
-
-- Resultados do modo SRT nunca podem ser enviados ao YouTube, incluindo o MP4 gerado para entradas de áudio.
-- Bloqueio no servidor para publicação automática, manual e retomadas; resultados SRT não aparecem na seleção de vídeos para publicar.
-- Origem dos novos vídeos fica registrada no histórico. Vídeos antigos sem origem confirmada também são bloqueados; o resultado legado mais recente pode ser reconhecido pelos metadados existentes.
-- Downloads, prévia, Biblioteca e envios dos resultados SRT ao Telegram continuam disponíveis.
-- Mantidos o decode corrigido do Whisper, tempos da letra sincronizada, animação por palavras, backing-vocal, busca, playlists por perfil, privacidade Não listado, fila e Android.
+- Mantido o uso pessoal em rede local ou VPN, com esclarecimento desse cenário no README, Manual, instalação, privacidade e textos jurídicos.
+- Atualizados Requests 2.34.2, python-multipart 0.0.32, Jinja2 3.1.6, FastAPI 0.142.2, Starlette 1.7.0, Uvicorn 0.54.0 e Transformers 5.18.0.
+- Adaptada a abertura da interface à API atual de templates do Starlette, preservando o layout e as funções.
+- Esclarecidas pesquisa, importação e publicação no YouTube, as permissões independentes do conteúdo e da plataforma, OAuth, privacidade Não listado e revogação do acesso ao canal.
+- Mantidos todos os recursos de karaokê, SRT, tradução, backing-vocal, letra sincronizada, animação Whisper, fundos aleatórios, fila, Biblioteca, Telegram e Android. Resultados SRT continuam bloqueados no YouTube.
+- Avisos de terceiros atualizados sem declarar resolvidas as pendências de licenças de modelos, imagens e redistribuição.
