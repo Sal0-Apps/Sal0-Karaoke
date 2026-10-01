@@ -2647,7 +2647,7 @@
                 </ol>
                 <p>A API tem cota gratuita e pode limitar projetos sem auditoria a vídeos privados. Guarde a autorização como uma senha. Backing vocals e vídeo do modo SRT mostram porcentagem da etapa e avisam o avanço no Telegram; o LibreTranslate informa apenas início e término.</p>
             </details>
-            <p class="compact-note">Versão do servidor: 9.9.11. A transcrição é local; fontes, modelos e integrações podem acessar serviços externos. Use conteúdo autorizado.</p>
+            <p class="compact-note">Versão do servidor: 10.0. A transcrição é local; fontes, modelos e integrações podem acessar serviços externos. Use conteúdo autorizado.</p>
         </div>
     </div>
 
@@ -6420,7 +6420,7 @@
                         const subtitleVideo = data.result_kind === 'subtitle_video';
                         if (subtitleResult) {
                             if (downloadResultTitle) downloadResultTitle.textContent = subtitleVideo ? 'Vídeo e legendas prontos!' : 'Legendas prontas!';
-                            if (downloadResultDescription) downloadResultDescription.textContent = subtitleVideo ? 'Assista ao vídeo ou baixe o MP4 e os arquivos SRT separadamente.' : 'Baixe o SRT original e, quando disponível, a tradução opcional.';
+                            if (downloadResultDescription) downloadResultDescription.textContent = subtitleVideo ? 'Assista ao vídeo ou baixe o MP4 e os arquivos SRT separadamente. Resultados SRT nunca são enviados ao YouTube.' : 'Baixe o SRT original e, quando disponível, a tradução opcional.';
                             if (resultVideoPreview && !subtitleVideo) {
                                 resultVideoPreview.pause();
                                 resultVideoPreview.removeAttribute('src');
@@ -6752,7 +6752,7 @@
                 const response = await authFetch('/api/admin/results');
                 if (!response.ok) throw new Error('Não foi possível carregar os vídeos finalizados.');
                 const results = await response.json();
-                youtubePublishVideos = (results.results || []).filter(video => video.kind === 'video' && /\.mp4$/i.test(video.filename));
+                youtubePublishVideos = (results.results || []).filter(video => video.youtube_eligible === true && video.kind === 'video' && /\.mp4$/i.test(video.filename));
                 const select = ytElement('ytPublishVideo'); select.replaceChildren(new Option('Escolha um vídeo…', ''));
                 youtubePublishVideos.forEach((video, index) => select.add(new Option(video.filename + ' · ' + video.owner, String(index))));
                 resetYoutubeCover();

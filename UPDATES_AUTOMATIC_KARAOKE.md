@@ -27,7 +27,7 @@ As faixas intermediárias são reaproveitadas apenas quando completas. Alteraç�
 
 O modo Gerar SRT mantém a transcrição do áudio completo e a tradução opcional do LibreTranslate. Quando o arquivo de entrada só contém áudio, gera também um MP4 com fundo escuro, áudio completo e legendas na tela. Usa o SRT traduzido quando disponível, ou o original. A detecção consulta os fluxos reais da mídia, evitando confundir capas incorporadas com vídeo. Entradas com vídeo continuam recebendo os SRTs sem renderização adicional.
 
-O resultado oferece prévia do vídeo e downloads separados de MP4, SRT original e tradução concluída. Esses arquivos são salvos na Biblioteca e têm envios individuais ao Telegram. Não há abertura de capa no MP4 do modo SRT, mantendo os tempos da mídia.
+O resultado oferece prévia do vídeo e downloads separados de MP4, SRT original e tradução concluída. Esses arquivos são salvos na Biblioteca e têm envios individuais ao Telegram. Não há abertura de capa no MP4 do modo SRT, mantendo os tempos da mídia. Nenhum resultado desse modo pode ser publicado no YouTube, incluindo MP4, envios manuais e retomadas.
 
 ## Progresso e avisos das etapas
 
@@ -79,3 +79,5 @@ O YouTube pode restringir uploads de projetos de API sem auditoria a **privado**
 Os testes da publicação usam respostas simuladas: nenhum vídeo foi enviado a um canal real. A conexão OAuth e um envio privado precisam ser conferidos no servidor com as credenciais reais do canal.
 
 Documentação oficial: [Envio de vídeos](https://developers.google.com/youtube/v3/docs/videos/insert), [Envio retomável](https://developers.google.com/youtube/v3/guides/using_resumable_upload_protocol), [Capas](https://developers.google.com/youtube/v3/docs/thumbnails/set), [Playlists](https://developers.google.com/youtube/v3/docs/playlistItems/insert), [OAuth](https://developers.google.com/identity/protocols/oauth2/web-server).
+
+Quando um vídeo de fundo decorativo é maior que a música, o início do trecho é escolhido aleatoriamente a cada nova renderização, cabendo a música inteira até o fim do fundo. Vídeos curtos continuam em loop. O vídeo original da música mantém o início e a sincronização. Com letra sincronizada, seu texto e seus tempos controlam os versos; o Whisper serve apenas à animação das palavras.

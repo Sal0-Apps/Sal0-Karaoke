@@ -13,6 +13,7 @@ from urllib.parse import urlencode, urlparse
 
 import requests
 from media_covers import video_thumbnail
+from result_publication import youtube_eligible
 
 API = 'https://www.googleapis.com/youtube/v3'
 UPLOAD = 'https://www.googleapis.com/upload/youtube/v3'
@@ -304,6 +305,8 @@ class YouTubePublisher:
     def enqueue(self, video, title, privacy='unlisted', playlist_id='', thumbnail=None, channel_id=None, requester=None):
         video = Path(video).resolve()
         title = str(title).strip()
+        if not youtube_eligible(video):
+            raise PublicationError("Resultados do modo SRT nunca podem ser publicados no YouTube. Apenas karaokês com origem confirmada são permitidos.")
         if not video.is_file() or video.suffix.lower() != '.mp4' or not 1 <= len(title) <= 100 or '<' in title or '>' in title:
             raise PublicationError('Vídeo MP4 e título válido de até 100 caracteres são necessários.')
         if privacy not in PRIVACY:
@@ -436,6 +439,8 @@ class YouTubePublisher:
         return video_id
 
     def publish(self, job):
+        if not youtube_eligible(job["video"]):
+            raise PublicationError("Publicação bloqueada: resultados SRT e vídeos sem origem confirmada não podem ir ao YouTube.")
         if not job.get('playlist_id'):
             raise PublicationError('Publicação bloqueada: o vídeo precisa de uma playlist.')
         requester = job.get('requester')

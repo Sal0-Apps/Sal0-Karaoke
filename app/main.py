@@ -1328,7 +1328,9 @@ def karaoke_download_filename(original_name: str) -> str:
     return f"{safe_name} - Karaokê.mp4"
 
 
-def save_video_to_history(video_path: str, orig_name: str, library_dir: str) -> str:
+from result_publication import record_result_kind, result_kind as publication_result_kind, youtube_eligible
+
+def save_video_to_history(video_path: str, orig_name: str, library_dir: str, result_kind: str = "karaoke") -> str:
     """Salva uma cópia permanente no histórico do dono da tarefa."""
     if not video_path or not os.path.exists(video_path):
         return None
@@ -1345,6 +1347,7 @@ def save_video_to_history(video_path: str, orig_name: str, library_dir: str) -> 
             dest_path = os.path.join(lib_history_dir, dest_filename)
             counter += 1
 
+        record_result_kind(dest_path, result_kind)
         shutil.copy2(video_path, dest_path)
         logger.info(f"Vídeo de karaokê '{orig_name}' salvo com sucesso no Histórico: {dest_path}")
         return dest_filename
@@ -2261,7 +2264,7 @@ def download_bg_youtube_preset(
 
 
 LRCLIB_API_URL = "https://lrclib.net/api"
-LRCLIB_USER_AGENT = "Sal0-Karaoke/9.9.11 (+https://github.com/Sal0-Apps/Sal0-Karaoke)"
+LRCLIB_USER_AGENT = "Sal0-Karaoke/10.0 (+https://github.com/Sal0-Apps/Sal0-Karaoke)"
 LYRICS_OVH_API_URL = "https://api.lyrics.ovh/v1"
 LYRICS_PROVIDER_TIMEOUT = (3.05, 6)
 MUSIXMATCH_API_URL = "https://apic-desktop.musixmatch.com/ws/1.1"
@@ -2732,7 +2735,7 @@ def download_diagnostic_logs(current_user: dict = Depends(get_current_user)):
     with state_lock:
         current_state = dict(state)
     report = "\n".join([
-"Sal0 Karaokê v9.9.11 — diagnóstico ao vivo",
+"Sal0 Karaokê v10.0 — diagnóstico ao vivo",
         f"Gerado em: {time.strftime('%Y-%m-%d %H:%M:%S')}",
         "",
         "=== ESTADO ATUAL ===",
@@ -3346,6 +3349,8 @@ def get_admin_results(current_user: dict = Depends(get_current_user)):
                 "owner": owner_label,
                 "filename": filename,
                 "kind": "subtitle" if filename.lower().endswith(".srt") else "video",
+                "result_kind": publication_result_kind(file_path),
+                "youtube_eligible": youtube_eligible(file_path),
                 "size": stat.st_size,
                 "modified_at": stat.st_mtime,
             })
@@ -3996,7 +4001,7 @@ def process_karaoke(
     Recebe os arquivos enviados, valida a concorrência e inicia o pipeline em segundo plano.
     """
     try:
-        publication_options = youtube_publisher.publication_options(
+        publication_options = None if subtitle_only else youtube_publisher.publication_options(
             current_user, youtube_publish, youtube_playlist_id, youtube_title)
     except Exception as error:
         from youtube_publisher import PublicationError
@@ -5073,7 +5078,7 @@ def run_subtitle_srt_pipeline(
             final_translated_srt if translated_filename else final_original_srt,
             final_video, media_duration,
             progress_callback=publish_subtitle_video_progress)
-        video_history_filename = save_video_to_history(final_video, orig_name, library_dir)
+        video_history_filename = save_video_to_history(final_video, orig_name, library_dir, result_kind="subtitle_video")
         if not video_history_filename:
             raise RuntimeError("Não foi possível salvar o vídeo legendado na Biblioteca.")
         public_token = create_public_download(owner_user, video_history_filename)
@@ -6087,6 +6092,8 @@ def resolve_youtube_publication_video(owner_key, filename, user):
     target = (history / filename).resolve()
     if not target.is_relative_to(history.resolve()) or not target.is_file() or target.suffix.lower() != ".mp4":
         raise HTTPException(status_code=404, detail="Vídeo finalizado não encontrado.")
+    if not youtube_eligible(target):
+        raise HTTPException(status_code=400, detail="Resultados do modo SRT nunca podem ser publicados no YouTube. Apenas karaokês com origem confirmada são permitidos.")
     return str(target)
 
 

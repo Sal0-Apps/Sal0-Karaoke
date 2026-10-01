@@ -2,6 +2,7 @@ import os
 import subprocess
 import logging
 import random
+import math
 import tempfile
 from media_covers import create_video_cover, add_cover_to_command
 from audio_processor import get_file_duration
@@ -40,6 +41,21 @@ def get_random_default_background() -> str:
         except Exception as e:
             logger.error(f"Erro ao selecionar imagem de fundo aleatória: {e}")
     return None
+
+def random_background_start(path: str, song_duration: float) -> float:
+    """Pick a full-length excerpt from a longer decorative video."""
+    try:
+        background_duration = get_file_duration(path)
+        if not math.isfinite(background_duration) or not math.isfinite(song_duration):
+            return 0.0
+        available = math.floor(max(0.0, background_duration - song_duration) * 1000) / 1000
+        if available <= 0:
+            return 0.0
+        return min(available, round(random.uniform(0.0, available), 3))
+    except Exception as error:
+        logger.warning("Não foi possível escolher um trecho do fundo: %s", error)
+        return 0.0
+
 
 def run_ffmpeg_with_logging(
     cmd: list[str],
@@ -190,11 +206,13 @@ def render_karaoke_video(
     elif final_bg_image:
         bg_is_video = check_has_video(final_bg_image)
         if bg_is_video:
-            logger.info(f"Configurando vídeo de plano de fundo em loop: {final_bg_image}")
+            background_start = random_background_start(final_bg_image, duration)
+            logger.info(f"Configurando vídeo de plano de fundo em loop: {final_bg_image}; início: {background_start:.3f}s")
             cmd = [
                 "ffmpeg",
                 "-y",
                 "-stream_loop", "-1",
+                *(["-ss", f"{background_start:.3f}"] if background_start > 0 else []),
                 "-i", final_bg_image,
                 "-i", instrumental_path,
                 "-map", "0:v:0",

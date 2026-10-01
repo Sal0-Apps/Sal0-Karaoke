@@ -53,7 +53,8 @@ class AudioSubtitleVideoTests(unittest.TestCase):
                 def render(audio,subtitles,destination,*args,**kwargs):
                     kwargs['progress_callback'](50);kwargs['progress_callback'](100)
                     Path(destination).write_bytes(b'video')
-                def save_video(path,*args):shutil.copy2(path,library/'history'/'video.mp4');return 'video.mp4'
+                def save_video(path,*args,**kwargs):
+                    self.assertEqual(kwargs.get("result_kind"), "subtitle_video");shutil.copy2(path,library/'history'/'video.mp4');return 'video.mp4'
                 state=Mock();documents=Mock();videos=Mock();metadata=Mock()
                 ns={'os':os,'json':json,'shutil':shutil,'logger':logging.getLogger('test'),
                     'get_file_duration':lambda path:1,'stage_checkpoint':lambda *args:{},'save_stage_checkpoint':Mock(),

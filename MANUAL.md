@@ -1,6 +1,6 @@
 # Manual do Sal0 Karaokê
 
-Este manual descreve os controles disponíveis na distribuição 9.9.11. Para instalar o servidor, consulte [DEPLOYMENT.md](DEPLOYMENT.md). Para configurar o aparelho, consulte o [guia Android](android/README.md).
+Este manual descreve os controles disponíveis na distribuição 10.0. Para instalar o servidor, consulte [DEPLOYMENT.md](DEPLOYMENT.md). Para configurar o aparelho, consulte o [guia Android](android/README.md).
 
 ## 1. Primeiro acesso e navegação
 
@@ -332,10 +332,12 @@ Nos modos Rápido e Detalhado, com uma playlist definida no perfil, **Publicar n
 
 ### Publicar um resultado já pronto
 
-Expanda **Publicar um vídeo já pronto**, escolha o resultado, confira título, privacidade e playlist, e revise a capa. A capa automática usa um frame do vídeo; trocar por JPEG/PNG é opcional. Toque em **Publicar vídeo selecionado** e acompanhe o histórico de publicações. Isso também permite publicar manualmente um MP4 gerado no modo SRT; o modo SRT não tem a opção de publicação automática por tarefa.
+Expanda **Publicar um vídeo já pronto**, escolha o resultado, confira título, privacidade e playlist, e revise a capa. A capa automática usa um frame do vídeo; trocar por JPEG/PNG é opcional. Toque em **Publicar vídeo selecionado** e acompanhe o histórico de publicações. Resultados do modo SRT, incluindo o MP4 gerado para áudio, nunca podem ser publicados no YouTube. O bloqueio vale para envio automático, manual e retomadas. Apenas vídeos de karaokê com origem confirmada aparecem na seleção; resultados antigos sem identificação de origem também ficam bloqueados.
 
 O envio começa privado, aplica capa e playlist e então solicita a privacidade escolhida. Falhas aparecem no histórico e podem ser retomadas. Projetos de API sem auditoria podem ficar limitados a privado; miniaturas personalizadas dependem da permissão do canal. A API tem cota: ao atingir o limite, aguarde sua renovação. O aplicativo não compra cota automaticamente. Credenciais em modo de teste podem exigir nova autorização quando expirarem.
 
 Consulte também [o guia de busca, sincronização, backing vocals e publicação](UPDATES_AUTOMATIC_KARAOKE.md).
 
 A leitura de áudio para o Whisper usa o FFmpeg instalado no servidor, com conversão para mono a 16 kHz. Isso evita incompatibilidades de abertura de arquivos no PyAV. Em caso de falha, repita a tarefa usando o cache disponível para aproveitar as faixas já separadas.
+
+Quando um vídeo de fundo decorativo é maior que a música, o início do trecho é escolhido aleatoriamente a cada nova renderização, cabendo a música inteira até o fim do fundo. Vídeos curtos continuam em loop. O vídeo original da música mantém o início e a sincronização. Com letra sincronizada, seu texto e seus tempos controlam os versos; o Whisper serve apenas à animação das palavras.
