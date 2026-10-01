@@ -125,14 +125,14 @@ Em **Playlist de cada usuário**, a administração define uma playlist válida 
 
 ## Início rápido com Docker
 
-A versão de distribuição desta documentação é **10.1**. O título e o rodapé da página mostram apenas o nome da aplicação. A versão do servidor pode ser consultada no Manual; a versão do APK aparece nas configurações nativas.
+A versão de distribuição desta documentação é **10.2**. O título e o rodapé da página mostram apenas o nome da aplicação. A versão do servidor pode ser consultada no Manual; a versão do APK aparece nas configurações nativas.
 
 Crie um arquivo `compose.yaml`:
 
 ```yaml
 services:
   karaoke-app:
-    image: ghcr.io/sal0-apps/sal0-karaoke:10.1
+    image: ghcr.io/sal0-apps/sal0-karaoke:10.2
     container_name: karaoke-app
     ports:
       - "7885:7860"
@@ -192,3 +192,8 @@ A manutenção é mínima. Não há SLA, garantia de respostas rápidas, revisã
 O código original permanece sob [MIT](LICENSE), permitindo uso, estudo, modificação e redistribuição com preservação dos avisos exigidos. Bibliotecas, modelos, fontes, imagens e executáveis de terceiros mantêm suas próprias condições. Consulte [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 Quando um vídeo de fundo decorativo é maior que a música, o início do trecho é escolhido aleatoriamente a cada nova renderização, cabendo a música inteira até o fim do fundo. Vídeos curtos continuam em loop. O vídeo original da música mantém o início e a sincronização. Com letra sincronizada, seu texto e seus tempos controlam os versos; o Whisper serve apenas à animação das palavras.
+
+### Verificação dos tempos da letra sincronizada
+
+
+Antes de aplicar os tempos da letra sincronizada, o app compara o início de vários versos com frases reconhecidas na gravação. Artista, título e duração total iguais não garantem uma introdução ou edição idêntica. Se houver um desvio consistente, a LRC é tratada como incompatível: o texto continua como guia e o vídeo usa os tempos medidos na voz. Nenhum deslocamento é aplicado aos tempos de uma LRC aceita. Quando faltam frases reconhecidas para uma conclusão, a verificação fica inconclusiva; isso não prova que a letra esteja certa ou errada. O resultado da verificação aparece nos registros e no resumo quando há incompatibilidade. A etapa envia um único aviso de início ao Telegram e mostra conclusão percentual. Refazer após esta atualização aproveita as faixas e a transcrição válidas, mas recria as legendas e o vídeo; vídeos antigos já salvos não são alterados.
