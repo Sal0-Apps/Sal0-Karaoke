@@ -2,7 +2,7 @@
 
 Este arquivo identifica dependências diretas e materiais conhecidos do Sal0 Karaokê. Ele não substitui os textos integrais das licenças, não cobre automaticamente todas as dependências transitivas e deve ser regenerado antes de cada nova distribuição binária.
 
-Na revisão de documentação da distribuição 9.5.0, as dependências do processamento e as URLs de modelos/fundos permaneceram iguais. As situações de licença datadas abaixo continuam registradas como confirmadas ou pendentes conforme a revisão original; não representam uma nova verificação integral dos binários publicados.
+A revisão v10.1 atualiza o inventário das dependências diretas. Licenças de código não comprovam automaticamente a licença dos pesos ou imagens; as pendências datadas continuam identificadas e não foram declaradas resolvidas apenas por atualização de textos.
 
 ## Dependências Python diretas
 
@@ -10,6 +10,10 @@ Na revisão de documentação da distribuição 9.5.0, as dependências do proce
 | --- | --- | --- |
 | [PyTorch](https://github.com/pytorch/pytorch) e Torchaudio | inferência e áudio | conjunto de licenças BSD, Apache-2.0, MIT e outras identificadas na distribuição |
 | [Demucs](https://github.com/facebookresearch/demucs) | separação de fontes | MIT |
+| [audio-separator](https://github.com/nomadkaraoke/python-audio-separator) | preservação de backing-vocal em CPU; créditos ao UVR e seus desenvolvedores | MIT para o código; confirmar os pesos exatos separadamente |
+| [Torchvision](https://github.com/pytorch/vision) | dependência da separação | BSD-3-Clause |
+| [Audioread](https://github.com/beetbox/audioread) | leitura auxiliar | MIT |
+| [Starlette](https://github.com/Kludex/starlette) | servidor web usado pelo FastAPI | BSD-3-Clause |
 | [Faster-Whisper](https://github.com/SYSTRAN/faster-whisper) | transcrição | MIT |
 | [FastAPI](https://github.com/fastapi/fastapi) | API HTTP | MIT |
 | [Uvicorn](https://github.com/Kludex/uvicorn) | servidor ASGI | BSD-3-Clause |
@@ -42,6 +46,7 @@ Os pacotes podem trazer NumPy, CTranslate2, Hugging Face Hub, PyAV, Silero VAD e
 | [Systran/faster-whisper-medium](https://huggingface.co/Systran/faster-whisper-medium) | transcrição alternativa | model card MIT |
 | `deepdml/faster-whisper-large-v3-turbo` | transcrição padrão solicitada pelo código | metadados públicos de licença não recuperados na auditoria de 2026-08-31; não confundir com repositórios de nome semelhante |
 | [LibreTranslate](https://github.com/LibreTranslate/LibreTranslate) | serviço independente de tradução de SRT, acessado por HTTP | consulte a licença do serviço e de seus modelos na distribuição utilizada |
+| `UVR-BVE-4B_SN-44100-2.pth` | separação de voz principal/backing-vocal | modelo obtido pelo audio-separator; registrar revisão, origem e condições dos pesos utilizados |
 | `htdemucs_ft` | separação de voz | distribuído pelo projeto Demucs; confirmar a revisão e os arquivos efetivamente incorporados |
 
 Model cards e licenças podem mudar. Registre o hash da revisão de cada peso utilizado em uma imagem publicada.

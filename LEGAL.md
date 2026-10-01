@@ -1,6 +1,8 @@
-# Uso jurídico e publicação pública
+# Uso pessoal, licenças e integrações
 
 > Este documento é uma análise técnica e informativa, não aconselhamento jurídico. Leis, contratos e licenças variam conforme jurisdição e forma de distribuição. Para uma decisão comercial ou institucional, consulte um profissional qualificado.
+
+O Sal0 Karaokê é destinado a uma instalação pessoal, acessada pela rede local ou por VPN, como ZeroTier. O repositório aberto disponibiliza o código e os pacotes; o projeto não opera um serviço público de processamento nem coleta centralmente as mídias das instalações. Não é necessário expor a porta do app à internet. O processamento principal é local, mas as integrações escolhidas podem se comunicar com serviços externos.
 
 ## O que a licença MIT cobre
 
@@ -14,7 +16,11 @@ A [licença MIT](LICENSE) autoriza uso, cópia, modificação e redistribuição
 
 A publicação sob MIT pressupõe que o titular indicado no arquivo `LICENSE` possui ou recebeu autorização para licenciar todas as contribuições originais e os recursos visuais próprios do projeto. O histórico Git não comprova sozinho a origem jurídica de cada contribuição.
 
-## Conclusão da auditoria de publicação
+## Revisões e limites
+
+Em 1º de outubro de 2026, a revisão do código v10.0 e dos 85 commits alcançáveis procurou padrões de tokens GitHub/Telegram, chaves AWS, chaves privadas e segredos OAuth Google, sem encontrar correspondências. Isso não inclui uma inspeção integral dos binários e artefatos antigos. A atualização v10.1 atualiza dependências e textos, mantendo as funções; não encerra automaticamente todas as pendências de licenças.
+
+## Conclusão histórica da auditoria de publicação
 
 A revisão de textos de 12 de setembro de 2026, para a versão 9.5.0, conferiu novamente os 22 commits alcançáveis anteriores à publicação e não encontrou segredos de alta confiança. Ela não encerra as pendências de licenças e dependências registradas abaixo. O título público mantém apenas o nome da aplicação; versões e limitações estão nos documentos de operação e auditoria.
 
@@ -43,13 +49,25 @@ O usuário deve processar somente conteúdo:
 - sob licença que permita o uso pretendido; ou
 - autorizado pelos titulares relevantes.
 
-O software não fornece músicas, vídeos ou letras comerciais e não transforma conteúdo protegido em conteúdo livre.
+O projeto não inclui um catálogo próprio de gravações comerciais. As integrações podem buscar mídias e letras externas, mas isso não transforma conteúdo protegido em conteúdo livre.
 
-## YouTube e outras plataformas
+## Uso do YouTube em uma instalação local
 
-O suporte técnico a URLs não representa autorização da plataforma. Os [Termos de Serviço do YouTube](https://www.youtube.com/static?template=terms) restringem download, reprodução, alteração e uso automatizado, salvo quando o próprio serviço autoriza ou quando existe permissão prévia aplicável. O operador deve revisar os termos vigentes e os direitos do conteúdo antes de usar `yt-dlp`.
+As funções de pesquisa, importação por link e publicação no canal continuam disponíveis e têm papéis diferentes:
 
-O mesmo princípio vale para Telegram, LRCLIB, Lyrics.ovh, Musixmatch, Hugging Face, Google Fonts, Wikimedia Commons, GitHub e outros serviços. APIs não documentadas, limites técnicos e condições de uso podem mudar sem aviso.
+- **Pesquisar** consulta o YouTube para localizar vídeos e exibir título, canal e miniatura. Isso não concede direitos sobre o conteúdo.
+- **Importar por link** usa `yt-dlp` para obter a mídia escolhida. Use somente quando os direitos do conteúdo e as condições do serviço permitirem a obtenção e o processamento. A autorização do titular, por si só, não substitui as permissões exigidas pelo YouTube. Os termos restringem downloads e acesso automatizado; as políticas de API também restringem armazenamento e separação de áudio/vídeo. A presença da função no app não comprova autorização da plataforma. Quando a obtenção pela plataforma não for permitida, use um arquivo disponibilizado por uma fonte autorizada.
+- **Publicar no canal** usa a YouTube Data API com autorização OAuth do administrador. Essa autorização dá ao app acesso ao canal conectado; não licencia músicas, gravações, letras ou fundos. Contas locais autorizadas publicam nesse canal, não em um canal próprio de cada usuário. Confira o título, a capa, a playlist e a privacidade antes de iniciar.
+
+A publicação começa marcada nos modos Rápido e Detalhado quando há canal e playlist válida no perfil. Desmarcar a opção naquela tarefa impede o envio. A privacidade padrão é **Não listado**: quem tiver o link poderá assistir; isso não equivale a privado nem dispensa direitos autorais. O servidor começa o envio como privado, aplica capa e playlist e então solicita a privacidade escolhida. O Google pode manter restrições em projetos sem auditoria.
+
+Resultados do modo **Gerar SRT**, incluindo seus MP4, nunca são publicados no YouTube: o bloqueio vale para envio automático, manual e retomadas. Permanecem disponíveis para download, Biblioteca, prévia e Telegram configurado. Vídeos antigos sem origem confirmada também ficam bloqueados na publicação.
+
+O uso pessoal, a ausência de divulgação, a gratuidade e o acesso por VPN não criam autorização para baixar, transformar ou publicar conteúdo protegido. Regras do serviço e direitos autorais são condições independentes. As funções foram preservadas; este texto não certifica que toda forma de uso esteja autorizada.
+
+Referências: [Termos do YouTube](https://www.youtube.com/static?template=terms), [políticas da API](https://developers.google.com/youtube/terms/developer-policies), [privacidade do Google](https://policies.google.com/privacy) e [permissões da conta Google](https://myaccount.google.com/permissions).
+
+O mesmo cuidado vale para Telegram, LRCLIB, Lyrics.ovh, Musixmatch e demais serviços externos. O provedor Musixmatch usa um endpoint de aplicativo desktop e não demonstra, sozinho, licença contratual para obter ou redistribuir letras. Confirme as condições do provedor antes de utilizar seus resultados.
 
 ## Letras e traduções
 

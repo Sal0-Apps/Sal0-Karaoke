@@ -1,6 +1,6 @@
 # Estado do projeto
 
-O Sal0 Karaokê está em manutenção mínima. A distribuição descrita pela documentação atual é a **9.5.0**, com restauração do acesso às configurações de conexão do Android e atualização dos manuais.
+O Sal0 Karaokê é um projeto pessoal para instalação local e acesso por VPN. A distribuição atual é a **10.1**, com atualização de dependências, esclarecimentos de YouTube e preservação dos recursos de karaokê, SRT, backing-vocal, Biblioteca, fila, Telegram e Android.
 
 Não há um roteiro público de desenvolvimento ativo. Publicações pontuais não representam compromisso de novas versões, funcionalidades, migrações ou acompanhamento contínuo. Pull requests e solicitações de funcionalidades provavelmente não serão revisados.
 

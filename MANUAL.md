@@ -1,6 +1,8 @@
 # Manual do Sal0 Karaokê
 
-Este manual descreve os controles disponíveis na distribuição 10.0. Para instalar o servidor, consulte [DEPLOYMENT.md](DEPLOYMENT.md). Para configurar o aparelho, consulte o [guia Android](android/README.md).
+Este manual descreve os controles disponíveis na distribuição 10.1. Para instalar o servidor, consulte [DEPLOYMENT.md](DEPLOYMENT.md). Para configurar o aparelho, consulte o [guia Android](android/README.md).
+
+O Sal0 Karaokê é destinado a uma instalação pessoal, acessada pela rede local ou por VPN, como ZeroTier. O repositório aberto disponibiliza o código e os pacotes; o projeto não opera um serviço público de processamento nem coleta centralmente as mídias das instalações. Não é necessário expor a porta do app à internet. O processamento principal é local, mas as integrações escolhidas podem se comunicar com serviços externos.
 
 ## 1. Primeiro acesso e navegação
 
@@ -341,3 +343,19 @@ Consulte também [o guia de busca, sincronização, backing vocals e publicaçã
 A leitura de áudio para o Whisper usa o FFmpeg instalado no servidor, com conversão para mono a 16 kHz. Isso evita incompatibilidades de abertura de arquivos no PyAV. Em caso de falha, repita a tarefa usando o cache disponível para aproveitar as faixas já separadas.
 
 Quando um vídeo de fundo decorativo é maior que a música, o início do trecho é escolhido aleatoriamente a cada nova renderização, cabendo a música inteira até o fim do fundo. Vídeos curtos continuam em loop. O vídeo original da música mantém o início e a sincronização. Com letra sincronizada, seu texto e seus tempos controlam os versos; o Whisper serve apenas à animação das palavras.
+
+## Uso do YouTube em uma instalação local
+
+As funções de pesquisa, importação por link e publicação no canal continuam disponíveis e têm papéis diferentes:
+
+- **Pesquisar** consulta o YouTube para localizar vídeos e exibir título, canal e miniatura. Isso não concede direitos sobre o conteúdo.
+- **Importar por link** usa `yt-dlp` para obter a mídia escolhida. Use somente quando os direitos do conteúdo e as condições do serviço permitirem a obtenção e o processamento. A autorização do titular, por si só, não substitui as permissões exigidas pelo YouTube. Os termos restringem downloads e acesso automatizado; as políticas de API também restringem armazenamento e separação de áudio/vídeo. A presença da função no app não comprova autorização da plataforma. Quando a obtenção pela plataforma não for permitida, use um arquivo disponibilizado por uma fonte autorizada.
+- **Publicar no canal** usa a YouTube Data API com autorização OAuth do administrador. Essa autorização dá ao app acesso ao canal conectado; não licencia músicas, gravações, letras ou fundos. Contas locais autorizadas publicam nesse canal, não em um canal próprio de cada usuário. Confira o título, a capa, a playlist e a privacidade antes de iniciar.
+
+A publicação começa marcada nos modos Rápido e Detalhado quando há canal e playlist válida no perfil. Desmarcar a opção naquela tarefa impede o envio. A privacidade padrão é **Não listado**: quem tiver o link poderá assistir; isso não equivale a privado nem dispensa direitos autorais. O servidor começa o envio como privado, aplica capa e playlist e então solicita a privacidade escolhida. O Google pode manter restrições em projetos sem auditoria.
+
+Resultados do modo **Gerar SRT**, incluindo seus MP4, nunca são publicados no YouTube: o bloqueio vale para envio automático, manual e retomadas. Permanecem disponíveis para download, Biblioteca, prévia e Telegram configurado. Vídeos antigos sem origem confirmada também ficam bloqueados na publicação.
+
+O uso pessoal, a ausência de divulgação, a gratuidade e o acesso por VPN não criam autorização para baixar, transformar ou publicar conteúdo protegido. Regras do serviço e direitos autorais são condições independentes. As funções foram preservadas; este texto não certifica que toda forma de uso esteja autorizada.
+
+Referências: [Termos do YouTube](https://www.youtube.com/static?template=terms), [políticas da API](https://developers.google.com/youtube/terms/developer-policies), [privacidade do Google](https://policies.google.com/privacy) e [permissões da conta Google](https://myaccount.google.com/permissions).

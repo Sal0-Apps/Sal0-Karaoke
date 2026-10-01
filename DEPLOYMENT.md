@@ -2,6 +2,10 @@
 
 Este guia descreve a instalação Docker e os cuidados de operação do Sal0 Karaokê. O [manual completo](MANUAL.md) explica a utilização da interface.
 
+O Sal0 Karaokê é destinado a uma instalação pessoal, acessada pela rede local ou por VPN, como ZeroTier. O repositório aberto disponibiliza o código e os pacotes; o projeto não opera um serviço público de processamento nem coleta centralmente as mídias das instalações. Não é necessário expor a porta do app à internet. O processamento principal é local, mas as integrações escolhidas podem se comunicar com serviços externos.
+
+Para acesso remoto, conecte primeiro a VPN e abra o endereço privado do servidor. Não encaminhe a porta 7885 no roteador para a internet. HTTP pode ser usado dentro dessa rede restrita; a VPN protege o trecho do túnel, não qualquer rede local insegura nem um aparelho comprometido. HTTPS continua opcional dentro da instalação e recomendado quando viável.
+
 ## Requisitos e capacidade
 
 - Docker Engine e Docker Compose v2.
@@ -21,7 +25,7 @@ Crie uma pasta própria para a instalação e salve nela o arquivo `compose.yaml
 ```yaml
 services:
   karaoke-app:
-    image: ghcr.io/sal0-apps/sal0-karaoke:9.5.0
+    image: ghcr.io/sal0-apps/sal0-karaoke:10.1
     container_name: karaoke-app
     ports:
       - "7885:7860"

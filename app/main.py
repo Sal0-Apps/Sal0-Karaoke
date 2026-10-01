@@ -2264,7 +2264,7 @@ def download_bg_youtube_preset(
 
 
 LRCLIB_API_URL = "https://lrclib.net/api"
-LRCLIB_USER_AGENT = "Sal0-Karaoke/10.0 (+https://github.com/Sal0-Apps/Sal0-Karaoke)"
+LRCLIB_USER_AGENT = "Sal0-Karaoke/10.1 (+https://github.com/Sal0-Apps/Sal0-Karaoke)"
 LYRICS_OVH_API_URL = "https://api.lyrics.ovh/v1"
 LYRICS_PROVIDER_TIMEOUT = (3.05, 6)
 MUSIXMATCH_API_URL = "https://apic-desktop.musixmatch.com/ws/1.1"
@@ -2735,7 +2735,7 @@ def download_diagnostic_logs(current_user: dict = Depends(get_current_user)):
     with state_lock:
         current_state = dict(state)
     report = "\n".join([
-"Sal0 Karaokê v10.0 — diagnóstico ao vivo",
+"Sal0 Karaokê v10.1 — diagnóstico ao vivo",
         f"Gerado em: {time.strftime('%Y-%m-%d %H:%M:%S')}",
         "",
         "=== ESTADO ATUAL ===",
@@ -3904,11 +3904,11 @@ def cancel_process(current_user: dict = Depends(get_current_user)):
     return {"status": "success", "message": "Processamento cancelado com sucesso."}
 
 @app.get("/", response_class=HTMLResponse)
-def read_index():
+def read_index(request: Request):
     """Serve a interface gráfica web da aplicação."""
     # Retorna o arquivo de template HTML compilado com Jinja2
     # Como não temos variáveis dinâmicas de renderização inicial, passamos apenas o contexto vazio
-    return templates.TemplateResponse("index.html", {"request": {}})
+    return templates.TemplateResponse(request=request, name="index.html", context={})
 
 @app.get("/api/status")
 def get_status(response: Response, current_user: dict = Depends(get_current_user)):

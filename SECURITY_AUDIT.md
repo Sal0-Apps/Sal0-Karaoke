@@ -2,7 +2,19 @@
 
 > Revisão técnica realizada em 31 de agosto de 2026 sobre a versão 9.0.7. Este documento é um retrato datado, não uma certificação, garantia de ausência de vulnerabilidades ou substituto para testes de intrusão.
 
-## Revisão de publicação de 12 de setembro de 2026
+## Atualização de 1º de outubro de 2026 · v10.1
+
+O cenário previsto é instalação pessoal em rede local ou por VPN, sem exposição direta da porta do aplicativo à internet. A VPN reduz a exposição remota, mas não protege um host comprometido, um backup acessível ou qualquer uso de conteúdo sem as permissões necessárias.
+
+As dependências web declaradas foram atualizadas: Requests 2.34.2, python-multipart 0.0.32, Jinja2 3.1.6, FastAPI 0.142.2, Starlette 1.7.0 e Uvicorn 0.54.0. Transformers passou para 5.18.0. A chamada da página principal foi adaptada à assinatura atual do Starlette. Os achados abaixo sobre versões antigas permanecem como histórico e não são uma contagem de vulnerabilidades da v10.1.
+
+Uma consulta atual via pip-audit 2.9.0 sobre o conjunto web e suas dependências resolvidas não encontrou vulnerabilidades conhecidas em 23 pacotes. O [relatório JSON](docs/security/web-audit-2026-10-01.json) inclui os auxiliares de teste HTTP instalados nesse ambiente. Ele não cobre Transformers, PyTorch, toda a imagem Docker ou todas as dependências de processamento.
+
+A revisão anterior nesta sessão examinou a árvore v10.0 e 85 commits alcançáveis em busca de padrões de PAT GitHub, tokens Telegram, chaves AWS, chaves privadas e segredos OAuth Google, sem correspondências. Não examinou integralmente binários antigos, referências inacessíveis nem todos os formatos possíveis de segredo.
+
+Os testes de regressão e a validação real em CPU da imagem verificam compatibilidade; não certificam ausência de vulnerabilidades. Persistem a necessidade de inventário e análise da imagem completa, dependências transitivas, pacotes Debian, modelos, Android e obrigações de licença. Tokens de sessão em arquivos/URLs, armazenamento local e retenção de links continuam sujeitos aos limites descritos neste documento e em PRIVACY.md.
+
+## Revisão histórica de publicação de 12 de setembro de 2026
 
 Na preparação da versão 9.5.0, a cópia de publicação foi sincronizada com o GitHub e os 22 commits alcançáveis anteriores à nova versão foram examinados novamente, incluindo branches e tags disponíveis. A varredura por padrões de PAT do GitHub, tokens de Telegram, chaves AWS e chaves privadas não encontrou valores de alta confiança. Os nomes de arquivos sensíveis no histórico apontaram somente para o antigo `.env.example`, que contém um marcador sem credencial. A identidade dos commits usa o endereço público `users.noreply.github.com` do projeto.
 
