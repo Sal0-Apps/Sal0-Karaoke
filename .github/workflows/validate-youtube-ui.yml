@@ -28,6 +28,8 @@ jobs:
           python -m unittest discover -s tests -p test_whisper_audio.py -v
           python -m unittest discover -s tests -p test_youtube_connection_feedback.py -v
           python -m unittest discover -s tests -p test_youtube_publisher.py -v
+          python -m unittest discover -s tests -p test_srt_youtube_block.py -v
+          python -m unittest discover -s tests -p test_random_video_background.py -v
           python -m unittest discover -s tests -p "test_subtitle*.py" -v
           python -m unittest discover -s tests -p "test_backing*.py" -v
           python -m unittest discover -s tests -p test_automatic_lyrics_and_search.py -v

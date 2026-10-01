@@ -10,6 +10,7 @@ from unittest.mock import Mock, patch
 
 ROOT = Path(__file__).parents[1]
 sys.path.insert(0, str(ROOT / 'app'))
+from result_publication import record_result_kind
 from youtube_publisher import YouTubePublisher, PublicationError, uploaded_offset, write_private_json
 
 
@@ -29,6 +30,7 @@ class PublisherTests(unittest.TestCase):
         self.publisher.save('settings.json', {'defaults':{'playlist_id':'playlist-one'}})
         self.video = Path(self.folder.name) / 'song.mp4'
         self.video.write_bytes(b'mp4-video-fixture')
+        record_result_kind(self.video, 'karaoke')
         self.cover = Path(self.folder.name) / 'cover.jpg'
         self.cover.write_bytes(b'\xff\xd8\xfftest')
         self.job = {'id': 'job', 'identity': 'identity', 'video': str(self.video), 'thumbnail': str(self.cover),
@@ -235,7 +237,7 @@ class PublisherTests(unittest.TestCase):
 
     def test_duplicate_media_copies_reuse_one_publication(self):
         self.publisher.save('jobs.json', [])
-        other = Path(self.folder.name) / 'copy.mp4'; other.write_bytes(self.video.read_bytes())
+        other = Path(self.folder.name) / 'copy.mp4'; other.write_bytes(self.video.read_bytes()); record_result_kind(other, 'karaoke')
         with patch.object(self.publisher, 'start'):
             first = self.publisher.enqueue(self.video, 'Primeira', thumbnail=self.cover.read_bytes())
             second = self.publisher.enqueue(other, 'Segunda', thumbnail=self.cover.read_bytes())

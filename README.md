@@ -123,14 +123,14 @@ Em **Playlist de cada usuário**, a administração define uma playlist válida 
 
 ## Início rápido com Docker
 
-A versão de distribuição desta documentação é **9.9.11**. O título e o rodapé da página mostram apenas o nome da aplicação. A versão do servidor pode ser consultada no Manual; a versão do APK aparece nas configurações nativas.
+A versão de distribuição desta documentação é **10.0**. O título e o rodapé da página mostram apenas o nome da aplicação. A versão do servidor pode ser consultada no Manual; a versão do APK aparece nas configurações nativas.
 
 Crie um arquivo `compose.yaml`:
 
 ```yaml
 services:
   karaoke-app:
-    image: ghcr.io/sal0-apps/sal0-karaoke:9.9.11
+    image: ghcr.io/sal0-apps/sal0-karaoke:10.0
     container_name: karaoke-app
     ports:
       - "7885:7860"
@@ -159,6 +159,10 @@ O repositório não distribui músicas, vídeos ou letras comerciais e não ince
 
 Consulte [LEGAL.md](LEGAL.md) para os cuidados relativos a serviços externos, modelos, imagens e distribuição de binários.
 
+A leitura de áudio para o Whisper usa o FFmpeg instalado no servidor, com conversão para mono a 16 kHz. Isso evita incompatibilidades de abertura de arquivos no PyAV. Em caso de falha, repita a tarefa usando o cache disponível para aproveitar as faixas já separadas.
+
+Resultados do modo SRT, incluindo o MP4 criado para áudio, nunca são enviados ao YouTube, nem automaticamente nem manualmente. A publicação aceita somente karaokês com origem confirmada.
+
 ## Suporte
 
 Issues sobre bugs críticos são bem-vindas quando não contêm dados privados. Vulnerabilidades devem ser comunicadas pelo procedimento de [SECURITY.md](SECURITY.md), sem publicação de detalhes exploráveis em Issues.
@@ -169,4 +173,4 @@ A manutenção é mínima. Não há SLA, garantia de respostas rápidas, revisã
 
 O código original permanece sob [MIT](LICENSE), permitindo uso, estudo, modificação e redistribuição com preservação dos avisos exigidos. Bibliotecas, modelos, fontes, imagens e executáveis de terceiros mantêm suas próprias condições. Consulte [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
-A leitura de áudio para o Whisper usa o FFmpeg instalado no servidor, com conversão para mono a 16 kHz. Isso evita incompatibilidades de abertura de arquivos no PyAV. Em caso de falha, repita a tarefa usando o cache disponível para aproveitar as faixas já separadas.
+Quando um vídeo de fundo decorativo é maior que a música, o início do trecho é escolhido aleatoriamente a cada nova renderização, cabendo a música inteira até o fim do fundo. Vídeos curtos continuam em loop. O vídeo original da música mantém o início e a sincronização. Com letra sincronizada, seu texto e seus tempos controlam os versos; o Whisper serve apenas à animação das palavras.

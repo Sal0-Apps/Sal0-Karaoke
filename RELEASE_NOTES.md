@@ -1,7 +1,9 @@
-# 9.9.11
+# 10.0
 
-- Corrigida a falha `metadata_errors` ao iniciar a transcrição: o áudio é convertido pelo FFmpeg para o formato do Whisper, sem depender da abertura de arquivos pelo PyAV.
-- A mesma conversão atende transcrição, tradução e animação das letras sincronizadas; a tentativa sem VAD reaproveita o áudio convertido.
-- Áudio inválido e cancelamento são tratados antes do carregamento do modelo. As faixas de backing-vocal existentes continuam aproveitáveis pelo cache.
-- A publicação valida leitura de áudio e inferência real do Whisper em CPU dentro da imagem, além dos testes do backing-vocal, interface e Android.
-- Mantidos os tempos dos versos da letra sincronizada, animação pelo Whisper, busca no YouTube, MP4 para áudio no modo SRT, playlists por perfil, privacidade Não listado, fila, Biblioteca e Android.
+- Vídeos de fundo decorativos mais longos que a música começam em um trecho aleatório a cada nova renderização. O áudio, as legendas e o vídeo original mantêm seus tempos.
+
+- Resultados do modo SRT nunca podem ser enviados ao YouTube, incluindo o MP4 gerado para entradas de áudio.
+- Bloqueio no servidor para publicação automática, manual e retomadas; resultados SRT não aparecem na seleção de vídeos para publicar.
+- Origem dos novos vídeos fica registrada no histórico. Vídeos antigos sem origem confirmada também são bloqueados; o resultado legado mais recente pode ser reconhecido pelos metadados existentes.
+- Downloads, prévia, Biblioteca e envios dos resultados SRT ao Telegram continuam disponíveis.
+- Mantidos o decode corrigido do Whisper, tempos da letra sincronizada, animação por palavras, backing-vocal, busca, playlists por perfil, privacidade Não listado, fila e Android.

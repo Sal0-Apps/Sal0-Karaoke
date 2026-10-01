@@ -1,4 +1,6 @@
 import ast
+import os
+import subprocess
 import unittest
 from pathlib import Path
 
@@ -87,14 +89,14 @@ class VersionEightQueueTests(unittest.TestCase):
         self.assertNotIn('#ec4899', form)
 
     def test_release_metadata_is_9_9_4(self):
-        self.assertIn("Versão do servidor: 9.9.11", HTML)
+        self.assertIn("Versão do servidor: 10.0", HTML)
         self.assertIn("<title>Sal0 Karaokê</title>", HTML)
         self.assertEqual(HTML.split("<footer>")[1].split("</footer>")[0].strip(), "Sal0 Karaokê")
-        self.assertIn('.orElse("9.9.11")', ANDROID_BUILD)
-        self.assertIn('.orElse("90911")', ANDROID_BUILD)
+        self.assertIn('.orElse("10.0")', ANDROID_BUILD)
+        self.assertIn('.orElse("100000")', ANDROID_BUILD)
         self.assertIn("-PVERSION_CODE=${{ env.VERSION_CODE }}", WORKFLOW)
         self.assertIn("sal0-karaoke:9.9.0", COMPOSE)  # Existing sample; personal Compose is delivered separately.
-        self.assertIn('org.opencontainers.image.version="9.9.11"', DOCKERFILE)
+        self.assertIn('org.opencontainers.image.version="10.0"', DOCKERFILE)
 
     def test_generated_icon_is_committed_for_web_and_android(self):
         self.assertTrue((ROOT / "app" / "templates" / "app-icon-v8.png").is_file())
@@ -103,3 +105,14 @@ class VersionEightQueueTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ShortVersionReleaseTests(unittest.TestCase):
+    def test_release_accepts_v10_0_without_changing_the_tag(self):
+        start = WORKFLOW.index('          [[ "$VERSION_TAG" =~')
+        end = WORKFLOW.index('          echo "VERSION_TAG=', start)
+        script = '\n'.join(line.strip() for line in WORKFLOW[start:end].splitlines())
+        script += '\nprintf "%s %s" "$VERSION_TAG" "$VERSION_CODE"\n'
+        for version, code in (("10.0", "100000"), ("9.9.11", "90911")):
+            output = subprocess.check_output(['bash', '-e', '-c', script], env=dict(os.environ, VERSION_TAG=version), text=True)
+            self.assertEqual(output, version + ' ' + code)

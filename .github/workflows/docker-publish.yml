@@ -68,8 +68,9 @@ jobs:
           else
             VERSION_TAG=$(cat VERSION)
           fi
-          [[ "$VERSION_TAG" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          [[ "$VERSION_TAG" =~ ^[0-9]+\.[0-9]+(\.[0-9]+)?$ ]]
           IFS=. read -r MAJOR MINOR PATCH <<< "$VERSION_TAG"
+          PATCH=${PATCH:-0}
           VERSION_CODE=$((10#$MAJOR * 10000 + 10#$MINOR * 100 + 10#$PATCH))
           echo "VERSION_TAG=$VERSION_TAG" >> "$GITHUB_ENV"
           echo "VERSION_CODE=$VERSION_CODE" >> "$GITHUB_ENV"
