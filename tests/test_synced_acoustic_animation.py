@@ -369,7 +369,8 @@ class SyncedAcousticAnimationTests(unittest.TestCase):
                                max(i % 640 for i in pixels), max(i // 640 for i in pixels)))
             # Color conversion changes antialiasing at glyph edges by one pixel.
             for left, top, right, bottom in bounds[1:]:
-                self.assertEqual((left, right), (bounds[0][0], bounds[0][2]))
+                self.assertLessEqual(abs(left - bounds[0][0]), 1)
+                self.assertLessEqual(abs(right - bounds[0][2]), 1)
                 self.assertLessEqual(abs(top - bounds[0][1]), 1)
                 self.assertLessEqual(abs(bottom - bounds[0][3]), 1)
             self.assertLess(max(map(sum, masks)) / min(map(sum, masks)), 1.15)
