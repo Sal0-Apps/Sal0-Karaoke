@@ -1,3 +1,12 @@
+# 10.9
+
+- Corrigida a divisão de frases no karaokê gerado apenas pelo Whisper. Os controles de palavras e caracteres passam a organizar linhas visuais, sem cortar versos pela contagem nem deixar “deu” separado de “me”. Pausas, pontuação, início de frase e marcadores de letra-guia orientam as trocas de verso.
+- Verso e prévia mantêm posições estáveis em toda a música, inclusive no último verso. A prévia fica mais legível e aparece durante os três segundos da contagem regressiva.
+- Corrigida a direção do destaque: texto aguardando o canto em branco, cor escolhida aplicada conforme as palavras são cantadas. Palavras recebem uma transição breve e gradual; sílabas mantêm a varredura pelos tempos locais, respeitando pausas e sem deslocar o texto.
+- Letra sincronizada preserva integralmente texto, espaços, pontuação e intervalos do provedor. Apenas os tempos locais animam as palavras. A escolha entre sílabas, palavras e modos estáticos é respeitada também no fluxo do servidor.
+- Mudanças visuais invalidam somente legenda e vídeo no checkpoint, preservando áudio, análise Whisper e revisão já salva. Use **Refazer** para aplicar a correção a vídeos concluídos.
+- Verificação com FFmpeg/libass real de posições, palavras completas, transição de cor, pausas e letra sincronizada, além dos testes de criação, fila e publicação. Atualização somente do servidor.
+
 # 10.8
 
 - Removida a mensagem fixa de arquivos adicionados acima do andamento. A contagem da fila continua refletindo os itens realmente aguardando.

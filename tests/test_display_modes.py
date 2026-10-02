@@ -1,12 +1,15 @@
 """Verify real libass layout and each advertised animation mode."""
 import copy
+import os
 import re
 import subprocess
 import sys
 import tempfile
+import textwrap
 import unittest
 from pathlib import Path
-from unittest.mock import patch
+from types import SimpleNamespace
+from unittest.mock import Mock, patch
 
 import numpy as np
 
@@ -24,6 +27,28 @@ def frame(path, time=0.5):
 
 
 class DisplayModeTests(unittest.TestCase):
+    def test_server_respects_display_mode_when_synchronized_lyrics_exist(self):
+        source = (Path(__file__).parents[1] / 'app/main.py').read_text()
+        stage = source[source.index('            # Passo 4: Gerar legendas ASS'):
+                       source.index('            # Passo 5: Renderizar o vídeo final')]
+        segments = anchor_synced_animation([dict(start=0, end=3, text='Original lyrics')],
+            [dict(words=[dict(word='incorrect', start=.2, end=.8), dict(word='words', start=1.4, end=2.8)])])
+        for mode in ('word', 'syllable', 'line', 'phrase'):
+            with self.subTest(mode=mode), tempfile.TemporaryDirectory() as folder:
+                generator = Mock(wraps=generate_ass_karaoke)
+                scope = dict(os=os, cache_dir=folder, stage_checkpoint=Mock(return_value={}),
+                    update_state=Mock(), notify_targets=Mock(), telegram_targets=[], telegram_notice=Mock(),
+                    segments=segments, synced_segments=segments, generate_ass_karaoke=generator,
+                    font_size=50, text_color='#00FFFF', text_position='middle', subtitle_mode=mode,
+                    words_per_line=0, max_chars_line=0, break_on_punctuation=True, show_instrumental=False,
+                    show_next_line_preview=False, keep_first_line_visible=False,
+                    pm=SimpleNamespace(check_cancelled=Mock()), save_stage_checkpoint=Mock())
+                exec(compile(textwrap.dedent(stage), 'server-subtitle-stage', 'exec'), scope)
+                self.assertEqual(generator.call_args.kwargs['subtitle_mode'], mode)
+                event = next(line for line in (Path(folder) / 'karaoke.ass').read_text().splitlines()
+                             if line.startswith('Dialogue:'))
+                self.assertEqual(re.sub(r'\{[^}]*\}', '', event.split(',', 9)[-1]).replace(r'\N', ''), 'Original lyrics')
+
     def test_whisper_current_and_preview_have_separate_regions_in_every_position(self):
         texts = ("And if the words float up to the surface, I'll keep them down",
                  "This is the first time I know I don't want the crown")
@@ -47,7 +72,7 @@ class DisplayModeTests(unittest.TestCase):
                     bounds.append((y.min(), y.max()))
                 self.assertGreater(bounds[1][0] - bounds[0][1], 10)
 
-    def test_word_mode_changes_whole_word_at_start_and_syllable_mode_sweeps(self):
+    def test_word_mode_fades_whole_word_at_start_and_syllable_mode_sweeps(self):
         segments = anchor_synced_animation([dict(start=0, end=3, text='Longword next')],
             [dict(words=[dict(word='irrelevant', start=.2, end=1.2),
                          dict(word='incorrect', start=1.8, end=2.5)])])
@@ -55,9 +80,10 @@ class DisplayModeTests(unittest.TestCase):
             with self.subTest(mode=mode), tempfile.TemporaryDirectory() as folder:
                 path = Path(folder) / 'mode.ass'
                 generate_ass_karaoke(segments, str(path), subtitle_mode=mode, show_instrumental=False)
-                def white(time):
-                    return np.count_nonzero(frame(path, time).min(axis=2) > 220)
-                before, early, later, pause = [white(time) for time in (.1, .4, 1.1, 1.6)]
+                def highlighted(time):
+                    pixels = frame(path, time)
+                    return np.count_nonzero((pixels[:, :, 0] < 40) & (pixels[:, :, 1:].min(axis=2) > 220))
+                before, early, later, pause = [highlighted(time) for time in (.1, .4, 1.1, 1.6)]
                 self.assertEqual(before, 0)
                 self.assertGreater(early, 100)
                 self.assertEqual(later, pause)
@@ -65,6 +91,63 @@ class DisplayModeTests(unittest.TestCase):
                     self.assertEqual(early, later)
                 else:
                     self.assertGreater(later, early)
+
+    def test_word_color_transition_is_gradual_and_does_not_move_glyphs(self):
+        words = [dict(word='A', start=0, end=.2), dict(word=' longword', start=.4, end=1.5),
+                 dict(word=' next', start=2, end=2.7)]
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / 'smooth.ass'
+            generate_ass_karaoke([dict(start=0, end=3, text='A longword next', words=words)],
+                                 str(path), font_size=60, subtitle_mode='word', show_instrumental=False)
+            before, middle, after, pause = [frame(path, t) for t in (.36, .44, .56, 1.8)]
+            mask = (before[:, :, :].min(axis=2) > 220) & (after[:, :, 0] < 40)
+            self.assertGreater(mask.sum(), 100)
+            self.assertGreater(middle[:, :, 0][mask].mean(), after[:, :, 0][mask].mean() + 30)
+            self.assertLess(middle[:, :, 0][mask].mean(), before[:, :, 0][mask].mean() - 30)
+            self.assertTrue(np.array_equal(after, pause))
+            bounds = []
+            for pixels in (before, middle, after):
+                y, x = np.where(pixels.max(axis=2) > 35)
+                bounds.append((x.min(), y.min(), x.max(), y.max()))
+            self.assertEqual(bounds[0], bounds[1])
+            self.assertEqual(bounds[0], bounds[2])
+
+    def test_active_baseline_and_preview_top_stay_fixed_across_verse_lengths(self):
+        segments = [dict(start=0, end=1, text='One short phrase', words=[]),
+                    dict(start=1, end=2, text='A substantially longer phrase spanning several visual rows without moving the preview', words=[]),
+                    dict(start=2, end=3, text='The final phrase', words=[])]
+        for position in ('top', 'middle', 'bottom'):
+            with self.subTest(position=position), tempfile.TemporaryDirectory() as folder:
+                path = Path(folder) / 'stable.ass'
+                generate_ass_karaoke(segments, str(path), font_size=50, max_chars_line=32,
+                    text_position=position, show_instrumental=False, show_next_line_preview=True)
+                events = [line for line in path.read_text().splitlines() if line.startswith('Dialogue:')]
+                active_positions = [re.search(r'\\pos\([^)]+\)', event).group()
+                                    for event in events if ',Default,' in event]
+                preview_positions = [re.search(r'\\pos\([^)]+\)', event).group()
+                                     for event in events if ',NextLine,' in event]
+                self.assertEqual(len(set(active_positions)), 1)
+                self.assertEqual(len(set(preview_positions)), 1)
+                # Compare actual glyph baselines rather than just override tags.
+                active_output = '\n'.join(line for line in path.read_text().splitlines()
+                    if not line.startswith('Dialogue:') or ',Default,' in line)
+                path.write_text(active_output)
+                bottoms = [np.where(frame(path, t).max(axis=2) > 35)[0].max() for t in (.5, 1.5, 2.5)]
+                self.assertLessEqual(max(bottoms) - min(bottoms), 1)
+
+    def test_upcoming_phrase_is_readable_during_all_three_countdown_seconds(self):
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / 'countdown.ass'
+            generate_ass_karaoke([dict(start=5, end=8, text='The upcoming verse', words=[], synced_line=True)],
+                                 str(path), show_next_line_preview=True)
+            output = path.read_text()
+            previews = [line for line in output.splitlines() if line.startswith('Dialogue:') and ',NextLine,' in line]
+            self.assertEqual(len(previews), 3)
+            path.write_text('\n'.join(line for line in output.splitlines()
+                if not line.startswith('Dialogue:') or ',NextLine,' in line))
+            frames = [frame(path, t) for t in (2.5, 3.5, 4.5)]
+            self.assertGreater(frames[0].max(), 120)
+            self.assertTrue(all(np.array_equal(frames[0], pixels) for pixels in frames[1:]))
 
     def test_static_modes_preserve_source_and_do_not_change_with_local_word_times(self):
         text = '  Original source,  intact!  '

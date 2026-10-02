@@ -8,9 +8,9 @@ logger = logging.getLogger("karaoke")
 
 AUTO_WORDS_PER_LINE = 9
 AUTO_MAX_CHARS_LINE = 54
-AUTO_HARD_WORDS_PER_LINE = 15
-AUTO_HARD_CHARS_LINE = 86
-AUTO_MAX_LINE_DURATION = 10.0
+AUTO_MAX_PHRASE_WORDS = 24
+AUTO_MAX_PHRASE_CHARS = 160
+AUTO_MAX_PHRASE_DURATION = 14.0
 
 def format_time(seconds: float) -> str:
     """Converte segundos para o formato de tempo do ASS: H:MM:SS.CS (Centisegundos)."""
@@ -46,97 +46,76 @@ def split_and_wrap_segments(
     max_chars_line: int = 0,
     break_on_punctuation: bool = True,
 ) -> list[dict]:
-    """Cria versos legiveis sem usar os cortes internos do Whisper como regra.
+    """Choose sung phrases independently of the visual wrapping preferences.
 
-    A letra oficial, quando encontrada, fornece marcadores de fim de verso. Sem
-    ela, pontuacao, pausas e os limites suaves guiam a divisao. Um limite duro
-    continua protegendo a tela contra blocos excessivamente grandes.
+    Synchronized verses pass through intact. Confirmed lyric markers take
+    precedence over ASR chunk boundaries; otherwise punctuation, pauses and
+    sentence starts provide boundaries. Safety limits only bound unusually
+    long unpunctuated recognition, without leaving a connector behind.
     """
-    soft_words = words_per_line if words_per_line > 0 else AUTO_WORDS_PER_LINE
-    soft_chars = max_chars_line if max_chars_line > 0 else AUTO_MAX_CHARS_LINE
-    hard_words = words_per_line if words_per_line > 0 else AUTO_HARD_WORDS_PER_LINE
-    hard_chars = max_chars_line if max_chars_line > 0 else AUTO_HARD_CHARS_LINE
-    word_stream = []
-    passthrough_segments = []
-
-    for segment_index, segment in enumerate(segments):
-        words = segment.get("words", [])
-        if not words or segment.get("synced_line"):
-            passthrough_segments.append(segment)
+    word_stream, passthrough_segments = [], []
+    for segment in segments:
+        words = segment.get('words', [])
+        if not words or segment.get('synced_line'):
+            passthrough_segments.append(dict(segment))
             continue
-        for word_index, word_info in enumerate(words):
-            word_stream.append({
-                "word": word_info,
-                "source_end": word_index == len(words) - 1,
-                "source_segment": segment_index,
-            })
+        for index, word in enumerate(words):
+            word_stream.append({'word': word, 'source_end': index == len(words) - 1})
 
-    chunks = []
-    current_chunk = []
+    # These short connectors should stay with the word completing the phrase.
+    connectors = set('a o as os um uma uns umas de da do das dos em no na nos nas '
+                     'por para pra pro com sem e ou que se me te lhe nos vos '
+                     'the a an and or of to for with from at in on my your'.split())
+    next_marker, marker = [], None
+    for index in range(len(word_stream) - 1, -1, -1):
+        if word_stream[index]['word'].get('lyric_line_break'):
+            marker = index
+        next_marker.append(marker)
+    next_marker.reverse()
+
+    chunks, current = [], []
     for index, entry in enumerate(word_stream):
-        word_info = entry["word"]
-        current_chunk.append(word_info)
-        clean_text = str(word_info.get("word", "")).strip()
-        chunk_text = "".join(str(word.get("word", "")) for word in current_chunk).strip()
-        word_count = len(current_chunk)
-        char_count = len(chunk_text)
-        duration = float(word_info.get("end", 0)) - float(current_chunk[0].get("start", 0))
-
-        next_entry = word_stream[index + 1] if index + 1 < len(word_stream) else None
-        next_word = next_entry["word"] if next_entry else None
-        gap = (
-            float(next_word.get("start", 0)) - float(word_info.get("end", 0))
-            if next_word else 0.0
+        word = entry['word']
+        current.append(word)
+        clean = str(word.get('word', '')).strip()
+        text = ''.join(str(item.get('word', '')) for item in current).strip()
+        count = len(current)
+        duration = float(word.get('end', 0)) - float(current[0].get('start', 0))
+        following = word_stream[index + 1]['word'] if index + 1 < len(word_stream) else None
+        gap = float(following.get('start', 0)) - float(word.get('end', 0)) if following else 0
+        next_text = str(following.get('word', '')).strip() if following else ''
+        trailing_connector = clean.casefold().strip('.,!?;:') in connectors
+        strong_stop = break_on_punctuation and clean.endswith(('.', '?', '!', ';', ':'))
+        comma = break_on_punctuation and clean.endswith(',')
+        soft_target = count >= AUTO_WORDS_PER_LINE or len(text) >= AUTO_MAX_CHARS_LINE
+        # A capitalized ASR continuation alone is not sufficient: also require
+        # a pause, a segment boundary, or a substantial sung phrase.
+        sentence_start = (next_text[:1].isupper() and next_text != 'I' and count >= 4
+                          and (gap >= .12 or entry['source_end'] or soft_target or duration >= 4))
+        natural_boundary = (strong_stop and count >= 3) or (
+            not trailing_connector and (
+                (gap >= .75 and count >= 2)
+                or sentence_start
+                or (soft_target and (gap >= .30 or comma))
+            )
         )
-        official_line_end = bool(word_info.get("lyric_line_break"))
-        strong_punctuation = bool(clean_text and clean_text[-1] in ".?!;:")
-        soft_punctuation = bool(clean_text and clean_text[-1] == ",")
-        reached_soft_target = word_count >= soft_words or char_count >= soft_chars
-        reached_hard_limit = (
-            word_count >= hard_words
-            or char_count >= hard_chars
-            or duration >= AUTO_MAX_LINE_DURATION
-        )
-        natural_soft_boundary = (
-            (break_on_punctuation and soft_punctuation and word_count >= 5)
-            or gap >= 0.30
-            or entry["source_end"]
-        )
-        should_break = (
-            official_line_end
-            or (break_on_punctuation and strong_punctuation and word_count >= 3)
-            or (gap >= 0.75 and word_count >= 2)
-            or (reached_soft_target and natural_soft_boundary)
-            or reached_hard_limit
-            or next_entry is None
-        )
-
+        safety_limit = (count >= AUTO_MAX_PHRASE_WORDS or len(text) >= AUTO_MAX_PHRASE_CHARS
+                        or duration >= AUTO_MAX_PHRASE_DURATION)
+        guided = next_marker[index] is not None
+        should_break = (bool(word.get('lyric_line_break')) or following is None
+                        or (not guided and (natural_boundary or (safety_limit and not trailing_connector))))
         if should_break:
-            chunks.append(current_chunk)
-            current_chunk = []
+            chunks.append(current)
+            current = []
 
-    new_segments = [
-        {
-            "start": chunk[0]["start"],
-            "end": chunk[-1]["end"],
-            "text": "".join(str(word.get("word", "")) for word in chunk).strip(),
-            "words": chunk,
-        }
-        for chunk in chunks
-    ]
-    new_segments.extend(passthrough_segments)
-    new_segments.sort(key=lambda item: float(item.get("start", 0)))
-    logger.info(
-        "Segmentacao inteligente: %s segmentos -> %s versos; alvos=%s/%s, protecao=%s/%s.",
-        len(segments),
-        len(new_segments),
-        soft_words,
-        soft_chars,
-        hard_words,
-        hard_chars,
-    )
-    return new_segments
-
+    result = [dict(start=chunk[0]['start'], end=chunk[-1]['end'],
+                   text=''.join(str(word.get('word', '')) for word in chunk).strip(), words=chunk)
+              for chunk in chunks]
+    result.extend(passthrough_segments)
+    result.sort(key=lambda segment: float(segment.get('start', 0)))
+    logger.info('Segmentacao por frases: %s segmentos -> %s versos; quebra visual=%s/%s.',
+                len(segments), len(result), words_per_line, max_chars_line)
+    return result
 
 def insert_instrumental_breaks(segments: list[dict]) -> list[dict]:
     """
@@ -238,15 +217,22 @@ def synced_animation_text(segment, normal_color, highlight_color, line_breaks=()
     duration_cs = max(0, round((segment['end'] - segment['start']) * 100))
     offset = 0
     for span in spans:
-        tags = f"\\1c{normal_color}\\2c{normal_color}\\kf0"
+        tags = f"\\1c{normal_color}\\2c{normal_color}\\k0"
         if 'start' in span and 'end' in span:
             start_cs = min(duration_cs, max(0, round((span['start'] - segment['start']) * 100)))
             end_cs = min(duration_cs, max(start_cs + 1, round((span['end'] - segment['start']) * 100)))
             if end_cs > start_cs:
                 # libass >= 0.17 supports an absolute karaoke start (\kt).
                 # Pauses need no invisible characters that could shift or wrap text.
-                effect = 'k' if subtitle_mode == 'word' else 'kf'
-                tags = f"\\1c{normal_color}\\2c{highlight_color}\\kt{start_cs}\\{effect}{end_cs - start_cs}"
+                if subtitle_mode == 'word':
+                    # Fade the whole word at its real onset, without a hard
+                    # color switch or any change to the recognition clocks.
+                    fade_end_ms = start_cs * 10 + min(120, (end_cs - start_cs) * 10)
+                    tags = (f"\\1c{normal_color}\\2c{normal_color}\\k0"
+                            f"\\t({start_cs * 10},{fade_end_ms},\\1c{highlight_color})")
+                else:
+                    # ASS sweeps from secondary (pending) to primary (sung).
+                    tags = f"\\1c{highlight_color}\\2c{normal_color}\\kt{start_cs}\\kf{end_cs - start_cs}"
         word = span['word']
         # Visual wrapping never changes the source text or its timing data.
         for boundary in sorted((b for b in line_breaks if offset <= b < offset + len(word)), reverse=True):
@@ -309,21 +295,22 @@ def synced_display_layout(text, font_size, words_per_line=0, max_chars_line=0, h
     return {'font_size': size, 'breaks': breaks, 'height': math.ceil(height)}
 
 
-def synced_display_positions(current, preview, text_position):
-    """Keep the active verse and preview in separate, explicitly placed regions."""
-    gap = 24
-    height = current['height'] + (gap + preview['height'] if preview else 0)
-    if text_position == 'top':
-        top = 35
-    elif text_position == 'middle':
-        top = (720 - height) / 2
+def synced_display_positions(current, preview, text_position, reserve_preview=False):
+    """Place lyrics in fixed regions, independent of the current line count."""
+    if preview or reserve_preview:
+        # Reserve the same space through every verse and every countdown.
+        # The active baseline and preview top never jump as the text changes.
+        total_height = 260 + 24 + 170
+        top = 35 if text_position == 'top' else (
+            (720 - total_height) / 2 if text_position == 'middle' else 720 - 35 - total_height)
+        active = f"{{\\an2\\pos(640,{round(top + 260)})\\q2\\fs{current['font_size']}}}"
+        following = (f"{{\\an8\\pos(640,{round(top + 284)})\\q2\\fs{preview['font_size']}}}"
+                     if preview else '')
     else:
-        top = 720 - 35 - height
-    active = f"{{\\an8\\pos(640,{round(top)})\\q2\\fs{current['font_size']}}}"
-    following = (f"{{\\an8\\pos(640,{round(top + current['height'] + gap)})"
-                 f"\\q2\\fs{preview['font_size']}}}" if preview else '')
+        alignment, y = {'top': (8, 35), 'middle': (5, 360), 'bottom': (2, 685)}.get(text_position, (2, 685))
+        active = f"{{\\an{alignment}\\pos(640,{y})\\q2\\fs{current['font_size']}}}"
+        following = ''
     return active, following
-
 
 def generate_ass_karaoke(
     segments: list[dict], 
@@ -385,10 +372,10 @@ def generate_ass_karaoke(
         ass_primary_color = html_color_to_ass(text_color_hex)
         ass_secondary_color = "&H00FFFFFF"
 
-    # Configurar cor ofuscada da próxima linha (transparência alpha 80 no canal principal)
-    ass_dimmed_color = html_color_to_ass(text_color_hex).replace("&H00", "&H80")
-    if subtitle_mode == "syllable":
-        ass_dimmed_color = "&H80FFFFFF" # Branco com 50% de transparência para karaoke
+    # Configurar a prévia com contraste legível (alpha 50 no canal principal)
+    ass_dimmed_color = html_color_to_ass(text_color_hex).replace("&H00", "&H50")
+    if subtitle_mode in {"syllable", "word"}:
+        ass_dimmed_color = "&H50FFFFFF" # Prévia branca legível sobre o vídeo
 
     # Configurar margens verticais para alinhar a linha ativa e a próxima
     margin_v_default = 55
@@ -431,7 +418,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
             intro_layout = intro_preview_layout
         else:
             intro_layout = synced_display_layout(first_lyrics_seg['text'], font_size, words_per_line, max_chars_line)
-            intro_pos, _ = synced_display_positions(intro_layout, None, text_position)
+            intro_pos, _ = synced_display_positions(intro_layout, None, text_position, show_next_line_preview)
         intro_text = synced_animation_text({'text': first_lyrics_seg['text'], 'start': 0, 'end': 1},
                                            ass_primary_color, ass_primary_color, intro_layout['breaks'])
         lines.append(f"Dialogue: 0,{format_time(0)},{format_time(first_lyrics_seg['start'])},Default,,0,0,0,,{intro_pos}{intro_text}\n")
@@ -441,6 +428,11 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         end_time_str = format_time(seg["end"])
         next_seg = segments[idx + 1] if show_next_line_preview and idx + 1 < len(segments) else None
         preview_seg = next_seg if next_seg and 'Instrumental' not in next_seg['text'] else None
+        if show_next_line_preview and 'Instrumental' in seg['text']:
+            upcoming = next((candidate for candidate in segments[idx + 1:]
+                             if 'Instrumental' not in candidate['text']), None)
+            if upcoming and seg['start'] >= upcoming['start'] - 3:
+                preview_seg = upcoming
         intro_instrumental = bool(persistent_intro and intro_preview_layout and
                                   seg['start'] < first_lyrics_seg['start'])
         if intro_instrumental:
@@ -451,10 +443,13 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                           words_per_line, max_chars_line, height_limit=170) if preview_seg else None)
         if intro_instrumental:
             active_layout['height'] = instrumental_layout['height']
-        active_pos, preview_pos = synced_display_positions(active_layout, preview_layout, text_position)
+        active_pos, preview_pos = synced_display_positions(active_layout, preview_layout, text_position,
+                                                           show_next_line_preview or intro_instrumental)
         text = synced_animation_text(seg, ass_primary_color, ass_secondary_color,
                                      active_layout['breaks'], subtitle_mode)
-        lines.append(f"Dialogue: 0,{start_time_str},{end_time_str},Default,,0,0,0,,{active_pos}{text}\n")
+        fade = (r'{\fad(80,0)}' if not seg.get('synced_line') and subtitle_mode in {'word', 'syllable'}
+                and 'Instrumental' not in seg['text'] else '')
+        lines.append(f"Dialogue: 0,{start_time_str},{end_time_str},Default,,0,0,0,,{active_pos}{fade}{text}\n")
         if preview_seg and not intro_instrumental:
             preview_text = synced_animation_text({'text': preview_seg['text'], 'start': 0, 'end': 1},
                                                  ass_dimmed_color, ass_dimmed_color,
