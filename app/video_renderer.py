@@ -199,7 +199,7 @@ def render_karaoke_video(
             "-preset", "ultrafast",
             "-pix_fmt", "yuv420p",
             "-c:a", "aac",
-            "-b:a", "192k",
+            "-b:a", "320k",
             "-t", f"{duration:.3f}",
             output_mp4_path
         ]
@@ -222,7 +222,7 @@ def render_karaoke_video(
                 "-preset", "ultrafast",
                 "-pix_fmt", "yuv420p",
                 "-c:a", "aac",
-                "-b:a", "192k",
+                "-b:a", "320k",
                 "-t", f"{duration:.3f}",
                 output_mp4_path
             ]
@@ -239,7 +239,7 @@ def render_karaoke_video(
                 "-preset", "ultrafast",
                 "-pix_fmt", "yuv420p",
                 "-c:a", "aac",
-                "-b:a", "192k",
+                "-b:a", "320k",
                 "-t", f"{duration:.3f}",
                 output_mp4_path
             ]
@@ -259,7 +259,7 @@ def render_karaoke_video(
             "-preset", "ultrafast",
             "-pix_fmt", "yuv420p",
             "-c:a", "aac",
-            "-b:a", "192k",
+            "-b:a", "320k",
             "-shortest",
             output_mp4_path
         ])

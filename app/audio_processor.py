@@ -53,16 +53,16 @@ def get_file_duration(file_path: str) -> float:
         return 0.0
 
 def extract_audio(input_path: str, output_wav_path: str) -> str:
-    """Extrai ou converte o áudio do arquivo de entrada para um WAV estéreo de 44.1kHz 16-bit."""
+    """Extrai para PCM float32 estéreo a 44,1 kHz, exigidos pelo Demucs."""
     logger.info(f"Iniciando extração/conversão de áudio do arquivo: {input_path}")
     
-    # Comando FFmpeg para extrair apenas áudio e converter para WAV 16-bit 44.1kHz estéreo
+    # Comando FFmpeg para extrair sem compressão intermediária em PCM float32
     cmd = [
         "ffmpeg",
         "-y",
         "-i", input_path,
         "-vn",                   # Sem vídeo
-        "-acodec", "pcm_s16le",  # PCM 16-bit
+        "-acodec", "pcm_f32le",  # Sem quantização intermediária para 16 bits
         "-ar", "44100",          # Taxa de amostragem 44.1kHz
         "-ac", "2",              # Estéreo
         output_wav_path
@@ -137,6 +137,7 @@ def separate_vocals(audio_path: str, temp_output_dir: str, update_callback=None)
         "-d", "cpu",
         "-n", "htdemucs_ft",
         "--two-stems", "vocals",
+        "--float32",  # Preserve the floating-point stems instead of 16-bit quantization.
         # Um único arquivo não precisa de vários workers de segmentos. O
         # padrão 0 mantém o caminho de alta precisão e deixa o PyTorch usar
         # as threads de CPU configuradas abaixo, como no CLI original.

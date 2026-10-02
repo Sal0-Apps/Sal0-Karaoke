@@ -58,7 +58,7 @@ def mix_backing(instrumental, backing, output, gain=1.0):
         "-i", instrumental, "-i", backing,
         "-filter_complex",
         f"[1:a]volume={float(gain)}[back];[0:a][back]amix=inputs=2:duration=first:normalize=0,alimiter=limit=0.95:level=false:latency=1[out]",
-        "-map", "[out]", "-ar", "44100", "-ac", "2", "-c:a", "pcm_s16le", output,
+        "-map", "[out]", "-ar", "44100", "-ac", "2", "-c:a", "pcm_f32le", output,
     ])
 
 

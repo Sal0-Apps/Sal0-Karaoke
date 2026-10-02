@@ -1,3 +1,13 @@
+# 10.3
+
+- Corrigida a perda do cache acústico de letras sincronizadas ao refazer um vídeo. Análise bruta e metadados são reaproveitados sem reutilizar checkpoints de outra tarefa; revisão manual não sobrescreve o resultado original do Whisper.
+- Preservado o cache após falhas posteriores e incluídos os resultados de análise SRT. O cache só é apagado após uma promoção bem-sucedida; pedidos compatíveis do mesmo vídeo YouTube podem reutilizar o download.
+- Identificação da mídia por SHA-256, com migração do cache legado sem repetir a separação desnecessariamente. Mesma letra com mudanças apenas de espaços/quebras de linha não invalida a análise.
+- Letra-guia corrige também palavras mal reconhecidas entre duas frases confirmadas, sem inserir versos ausentes ou alterar tempos da voz. Letras sincronizadas aceitas continuam mantendo texto e relógios do provedor.
+- Downloads novos buscam os melhores fluxos disponíveis, sem teto de 1080p. Preparação e mixagem em PCM float32; Whisper recebe seu formato exigido de mono/16 kHz com reamostragem de maior precisão e usa precisão máxima no modelo escolhido.
+- SRT usa a mídia original diretamente, sem recompressão intermediária MP3. Exportação de áudio dos vídeos em AAC a 320 kbps. Estas escolhas aumentam uso de CPU, memória, disco e tempo, sem garantia de reconhecimento perfeito ou recuperação de detalhes ausentes na fonte.
+- Primeira análise após atualizar a versão de preparação/precisão é refeita uma vez. Repetições compatíveis posteriores reutilizam o Whisper. Mantidos abertura fora do relógio da música, animação, backing vocals, revisão, busca, fila, Biblioteca, Telegram, interface responsiva e bloqueio absoluto de publicação dos resultados SRT no YouTube.
+
 # 10.2
 
 - Corrigida a aceitação de letras sincronizadas com introdução ou cortes diferentes da gravação, mesmo quando artista, título e duração total coincidem.

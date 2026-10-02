@@ -31,7 +31,7 @@ Dentro da aplicação, o botão **Manual** abre tutoriais curtos, organizados em
 | Detalhado | Controlar reconhecimento, versos, visual e revisão | Fonte, perfil, modelo Whisper, letra-guia, fundo e ajustes avançados | MP4 de karaokê; a opção de somente remover vocais gera vídeo instrumental sem legenda |
 | Gerar SRT | Legendar áudio ou vídeo preservando a fala | Fonte, modelo, leitura da fala, VAD, revisão e idioma da tradução opcional | SRT original, tradução opcional e MP4 legendado automático para entradas somente de áudio |
 
-**Gerar SRT** normaliza o áudio para MP3 e preserva a faixa completa, sem Demucs. Quando a entrada contém somente áudio, também cria um MP4 com fundo simples e as legendas na tela, usando a tradução quando ela for gerada ou o SRT original. A detecção verifica os fluxos da mídia: uma capa incorporada em MP3 não conta como vídeo. Entradas que já contêm vídeo continuam gerando os arquivos SRT. A tradução depende exclusivamente de uma instância LibreTranslate configurada pelo administrador, com padrão de detecção automática → português do Brasil (`pt-BR`). O SRT original é salvo antes da tradução. O Karaokê continua entregando os arquivos gerados pela interface, Biblioteca e Telegram configurado, com os links de download. Se o LibreTranslate falhar, o original continua disponível e sua entrega ao Telegram ainda é tentada. Não há limite fixo de duração imposto pelo modo, mas os recursos do servidor limitam a operação.
+**Gerar SRT** usa diretamente o áudio da mídia original e preserva a faixa completa, sem Demucs. Quando a entrada contém somente áudio, também cria um MP4 com fundo simples e as legendas na tela, usando a tradução quando ela for gerada ou o SRT original. A detecção verifica os fluxos da mídia: uma capa incorporada em MP3 não conta como vídeo. Entradas que já contêm vídeo continuam gerando os arquivos SRT. A tradução depende exclusivamente de uma instância LibreTranslate configurada pelo administrador, com padrão de detecção automática → português do Brasil (`pt-BR`). O SRT original é salvo antes da tradução. O Karaokê continua entregando os arquivos gerados pela interface, Biblioteca e Telegram configurado, com os links de download. Se o LibreTranslate falhar, o original continua disponível e sua entrega ao Telegram ainda é tentada. Não há limite fixo de duração imposto pelo modo, mas os recursos do servidor limitam a operação.
 
 ### Configurar e manter a tradução
 
@@ -125,14 +125,14 @@ Em **Playlist de cada usuário**, a administração define uma playlist válida 
 
 ## Início rápido com Docker
 
-A versão de distribuição desta documentação é **10.2**. O título e o rodapé da página mostram apenas o nome da aplicação. A versão do servidor pode ser consultada no Manual; a versão do APK aparece nas configurações nativas.
+A versão de distribuição desta documentação é **10.3**. O título e o rodapé da página mostram apenas o nome da aplicação. A versão do servidor pode ser consultada no Manual; a versão do APK aparece nas configurações nativas.
 
 Crie um arquivo `compose.yaml`:
 
 ```yaml
 services:
   karaoke-app:
-    image: ghcr.io/sal0-apps/sal0-karaoke:10.2
+    image: ghcr.io/sal0-apps/sal0-karaoke:10.3
     container_name: karaoke-app
     ports:
       - "7885:7860"
@@ -197,3 +197,5 @@ Quando um vídeo de fundo decorativo é maior que a música, o início do trecho
 
 
 Antes de aplicar os tempos da letra sincronizada, o app compara o início de vários versos com frases reconhecidas na gravação. Artista, título e duração total iguais não garantem uma introdução ou edição idêntica. Se houver um desvio consistente, a LRC é tratada como incompatível: o texto continua como guia e o vídeo usa os tempos medidos na voz. Nenhum deslocamento é aplicado aos tempos de uma LRC aceita. Quando faltam frases reconhecidas para uma conclusão, a verificação fica inconclusiva; isso não prova que a letra esteja certa ou errada. O resultado da verificação aparece nos registros e no resumo quando há incompatibilidade. A etapa envia um único aviso de início ao Telegram e mostra conclusão percentual. Refazer após esta atualização aproveita as faixas e a transcrição válidas, mas recria as legendas e o vídeo; vídeos antigos já salvos não são alterados.
+
+Downloads novos selecionam o melhor vídeo e áudio disponíveis no YouTube, sem teto de 1080p, inclusive para fundos. Isso pode aumentar o espaço e o tempo necessários. Os arquivos já em cache não ganham qualidade retroativamente; para substituir um download antigo, solicite novamente o link. A separação trabalha em PCM float32 a 44,1 kHz, a cópia de análise Whisper usa PCM float32 mono a 16 kHz e o vídeo exporta AAC a 320 kbps. A precisão máxima do Whisper é aplicada ao modelo escolhido, com maior custo em CPU/RAM. Mais precisão numérica e qualidade de origem não garantem transcrição perfeita nem restauram detalhes ausentes na fonte. O cache da análise é preservado entre tarefas compatíveis, incluindo letras sincronizadas e SRT; a revisão e a renderização continuam independentes.
