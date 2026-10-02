@@ -1,6 +1,6 @@
 # Manual do Sal0 Karaokê
 
-Este manual descreve os controles disponíveis na distribuição 10.6. Para instalar o servidor, consulte [DEPLOYMENT.md](DEPLOYMENT.md). Para configurar o aparelho, consulte o [guia Android](android/README.md).
+Este manual descreve os controles disponíveis na distribuição 10.7. Para instalar o servidor, consulte [DEPLOYMENT.md](DEPLOYMENT.md). Para configurar o aparelho, consulte o [guia Android](android/README.md).
 
 O Sal0 Karaokê é destinado a uma instalação pessoal, acessada pela rede local ou por VPN, como ZeroTier. O repositório aberto disponibiliza o código e os pacotes; o projeto não opera um serviço público de processamento nem coleta centralmente as mídias das instalações. Não é necessário expor a porta do app à internet. O processamento principal é local, mas as integrações escolhidas podem se comunicar com serviços externos.
 
@@ -87,9 +87,9 @@ Quando existir letra sincronizada correspondente à música, o texto completo, a
 
 ### Fundo e legenda
 
-Escolha **Vídeo original**, **Imagem / Vídeo** ou **Cor sólida** como modo de fundo. Para imagem/vídeo, envie um arquivo, use a Biblioteca ou um link. O áudio do fundo não é usado como trilha do karaokê.
+Escolha **Vídeo original**, **Imagem / Vídeo** ou **Cor sólida** (preto) como modo de fundo. Para imagem/vídeo, envie um arquivo, use a Biblioteca ou um link. O áudio do fundo não é usado como trilha do karaokê.
 
-A legenda pode destacar sílabas, palavras, linhas ou exibir a frase estática. O modo por sílabas é uma animação baseada nos tempos reconhecidos; não é garantia de alinhamento fonético perfeito.
+Em **Sílabas (varredura)**, a cor avança dentro das palavras pelos tempos locais. Em **Palavras**, a palavra inteira muda de cor no seu início. **Linhas** e **Frase estática** mantêm o texto na cor escolhida durante o intervalo do verso. Estas opções também se aplicam às letras sincronizadas, preservando texto e tempos dos versos. O modo por sílabas não garante alinhamento fonético perfeito. O verso e a prévia ficam em regiões separadas em todas as posições; a primeira linha na introdução não é duplicada pela contagem regressiva.
 
 ### Mais ajustes
 
@@ -102,7 +102,7 @@ A legenda pode destacar sílabas, palavras, linhas ou exibir a frase estática. 
 | Fonte da transcrição | Usa áudio original ou vocais separados; com backing vocals ativos, sempre usa a voz principal isolada |
 | Prévia da próxima frase | Mostra antecipadamente o próximo trecho |
 | Legenda no início | Permite apresentar a primeira linha desde o início |
-| Silero VAD | Filtra trechos reconhecidos como fala; pode omitir canto suave ou sustentado |
+| Áudio completo / VAD | Karaokê sempre mantém silêncios e canto, sem VAD; o filtro continua disponível no modo SRT |
 | Quebra por pontuação | Considera pontuação na divisão de versos |
 | Texto “Instrumental” | Mostra indicação nos intervalos sem legenda |
 | Salvar mídias na Biblioteca | Controla o arquivamento de mídias de entrada; os resultados têm salvamento próprio |
@@ -148,9 +148,9 @@ Não há corte fixo de duração no modo. Ainda é necessário ter espaço para 
 A revisão é ativada antes do envio da tarefa. Quando o processamento chega ao editor:
 
 1. Selecione um trecho e use **Anterior** / **Próxima** para navegar.
-2. Confira o texto e os tempos de início/fim.
-3. Reproduza a mídia para comparar o trecho com o áudio.
-4. Faça correções e use o botão de salvar/continuar.
+2. Confira o texto e os tempos de início/fim. Os campos aceitam `MM:SS.cc` ou segundos; os inícios devem permanecer em ordem e o fim deve vir depois do início.
+3. Use o player do áudio original. Ao trocar de linha, ele busca o início do verso, sem incluir a abertura do título.
+4. Faça correções e use **Salvar e renderizar**. Para remover uma linha, use a lixeira; uma linha vazia apresenta um erro no editor. Em letras sincronizadas, salvar sem editar preserva também os espaços do texto. A prévia mostra texto e fundo; a animação é aplicada na renderização final.
 5. Se não desejar editar, use **Continuar sem editar**.
 
 No karaokê, a renderização ocorre depois da revisão. No modo SRT, a revisão é do original, antes da tradução opcional. Enquanto aguarda a revisão, esse trabalho mantém a fila ocupada.
@@ -167,7 +167,7 @@ A revisão não é a pausa administrativa para reinício. Ao atualizar o servido
 4. Informe arquivo(s), link ou Biblioteca e configure o novo trabalho.
 5. Envie o formulário. Cada envio conserva suas opções.
 
-Os formulários ficam recolhidos durante o acompanhamento e só abrem quando você pede um novo processo. Se selecionar vários arquivos no mesmo formulário, todos usam o modo e os ajustes daquele envio; para misturar configurações, faça envios separados.
+Os formulários ficam recolhidos durante o acompanhamento e só abrem quando você pede um novo processo. Se selecionar vários arquivos no mesmo formulário, todos usam o modo e os ajustes daquele envio; para misturar configurações, faça envios separados. Se um arquivo falhar, os já aceitos permanecem na fila e apenas os pendentes continuam selecionados para tentar novamente. A mensagem na página informa o resultado do envio.
 
 ### Permissões e limites
 
@@ -364,4 +364,4 @@ O uso pessoal, a ausência de divulgação, a gratuidade e o acesso por VPN não
 
 Referências: [Termos do YouTube](https://www.youtube.com/static?template=terms), [políticas da API](https://developers.google.com/youtube/terms/developer-policies), [privacidade do Google](https://policies.google.com/privacy) e [permissões da conta Google](https://myaccount.google.com/permissions).
 
-A v10.6 preserva também `synced_acoustic_segments.json` e os metadados originais do Whisper ao refazer tarefas. A revisão manual fica separada da análise bruta. Alterar apenas a aparência não chama novamente o modelo; mudar mídia, fonte de voz, modelo, VAD, perfil de reconhecimento ou conteúdo da guia exige nova análise. Quebras de linha/espaços na mesma guia não invalidam o cache. Falhas posteriores preservam as etapas caras; se a cópia do cache falhar, a pasta original não é apagada. A primeira análise após atualizar a preparação de áudio/precisão será refeita uma vez; tentativas compatíveis seguintes reutilizam o resultado. Um novo pedido do mesmo link YouTube, no mesmo perfil, também reaproveita o download em qualidade atual. O cache reutilizável contém a última tarefa desse perfil, não um arquivo permanente de todas as músicas.
+A v10.7 preserva também `synced_acoustic_segments.json` e os metadados originais do Whisper ao refazer tarefas. A revisão manual fica separada da análise bruta. Alterar apenas a aparência não chama novamente o modelo; mudar mídia, fonte de voz, modelo, VAD, perfil de reconhecimento ou conteúdo da guia exige nova análise. Quebras de linha/espaços na mesma guia não invalidam o cache. Falhas posteriores preservam as etapas caras; se a cópia do cache falhar, a pasta original não é apagada. A primeira análise após atualizar a preparação de áudio/precisão será refeita uma vez; tentativas compatíveis seguintes reutilizam o resultado. Um novo pedido do mesmo link YouTube, no mesmo perfil, também reaproveita o download em qualidade atual. O cache reutilizável contém a última tarefa desse perfil, não um arquivo permanente de todas as músicas.

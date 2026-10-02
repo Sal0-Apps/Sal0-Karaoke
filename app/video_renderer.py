@@ -66,6 +66,7 @@ def run_ffmpeg_with_logging(
     """Executa o FFmpeg transmitindo a saída em tempo real para os logs do container."""
     import process_manager as pm
     pm.check_cancelled()
+    process = None
     try:
         logger.info(f"Executando FFmpeg: {' '.join(cmd)}")
         ffmpeg_cmd = cmd
@@ -115,6 +116,18 @@ def run_ffmpeg_with_logging(
         pm.clear_active_process()
         logger.error(f"Exceção ao rodar FFmpeg: {e}")
         raise
+    finally:
+        if process is not None:
+            if process.poll() is None:
+                process.terminate()
+                try:
+                    process.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    process.kill()
+                    process.wait()
+            if process.stdout:
+                process.stdout.close()
+        pm.clear_active_process()
 
 def render_karaoke_video(
     instrumental_path: str,
@@ -134,7 +147,7 @@ def render_karaoke_video(
     
     # 1. Obter a duração exata do áudio instrumental
     duration = get_file_duration(instrumental_path)
-    if duration <= 0:
+    if not math.isfinite(duration) or duration <= 0:
         raise ValueError(
             f"Duração inválida do áudio instrumental ({duration}s). Não é possível renderizar."
         )
@@ -162,7 +175,7 @@ def render_karaoke_video(
                 final_bg_image = background_image_path
             else:
                 logger.info("Nenhuma imagem de paisagem disponível no cache. Usando fundo preto sólido.")
-    elif background_mode == "solid_black":
+    elif background_mode in {"solid_black", "color"}:
         # Mantém final_bg_image = None
         pass
     else:

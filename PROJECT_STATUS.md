@@ -1,6 +1,6 @@
 # Estado do projeto
 
-O Sal0 Karaokê é um projeto pessoal para instalação local e acesso por VPN. A distribuição atual é a **10.6**, com verificação dos tempos da letra sincronizada, atualização de dependências, esclarecimentos de YouTube e preservação dos recursos de karaokê, SRT, backing-vocal, Biblioteca, fila, Telegram e Android.
+O Sal0 Karaokê é um projeto pessoal para instalação local e acesso por VPN. A distribuição atual é a **10.7**, com auditoria do fluxo, revisão com áudio, validação de entradas, recuperação de fila/cache e melhorias no layout das legendas e da interface. Os recursos de karaokê, SRT, backing-vocal, Biblioteca, fila, Telegram e Android permanecem. Veja [AUDIT_FLOW_V10_7.md](AUDIT_FLOW_V10_7.md) para o alcance da verificação.
 
 Não há um roteiro público de desenvolvimento ativo. Publicações pontuais não representam compromisso de novas versões, funcionalidades, migrações ou acompanhamento contínuo. Pull requests e solicitações de funcionalidades provavelmente não serão revisados.
 

@@ -4,9 +4,11 @@ Esta atualização permite pesquisar pelo nome da música nas entradas do YouTub
 
 ## Letra sincronizada somente quando disponível
 
-No modo de letra automática, o app preserva os tempos LRC fornecidos pela LRCLIB. Esses tempos só são utilizados quando artista, título, indicação de versão e duração são compatíveis com a mídia selecionada. A duração precisa diferir em no máximo dois segundos. A correspondência é conservadora, mas não garante que uma gravação com introdução diferente tenha os mesmos tempos.
+No modo automático, uma letra sincronizada correspondente ao artista, título e versão fornece o texto completo e os intervalos dos versos. Diferenças no texto reconhecido, no tempo ou na duração da gravação não substituem essa letra por palavras do Whisper. O reconhecimento local usa somente os tempos das palavras, aplicados em ordem, para animar a cor dentro dos intervalos do provedor.
 
-A letra LRC controla o texto e os horários de exibição de cada verso. O Whisper analisa a gravação somente para animar as palavras reconhecidas dentro desses intervalos. Ele não substitui os tempos dos versos nem troca ou elimina palavras da letra pronta. A animação preserva pausas e durações medidas na voz, sem distribuição uniforme. Palavras sem correspondência segura continuam visíveis em cor discreta, sem animação ou tempos inventados. A etapa informa o progresso e o total de palavras animadas e envia um aviso inicial ao Telegram. O processamento é local e gratuito, sem outra dependência ou serviço pago. Sem letra sincronizada compatível, continua o reconhecimento acústico comum. Os caches acústicos e de revisão são separados; o cache antigo é invalidado ao refazer o resultado, mas vídeos já salvos permanecem intactos.
+O processamento local organiza quebras visuais e ajusta o tamanho da fonte quando necessário, sem excluir palavras, modificar espaços ou alterar os tempos dos versos. Pausas usam tempos absolutos, sem caracteres invisíveis. Palavras sem tempos locais suficientes ficam visíveis. Os modos de varredura, palavra inteira e texto estático seguem a escolha da interface, inclusive com letra sincronizada. Sem letra sincronizada correspondente, o reconhecimento comum usa a letra-guia quando disponível ou somente o Whisper.
+
+O áudio do karaokê é completo, sem VAD nem remoção de silêncios. Com backing vocals ativos, a análise recebe a voz principal isolada; as vozes de apoio permanecem na mixagem final. A revisão permite ouvir o áudio original e não altera o texto sincronizado ao salvar sem mudanças. Vídeos antigos precisam ser refeitos; análises acústicas compatíveis permanecem reutilizáveis.
 
 ## Preservar backing vocals
 
