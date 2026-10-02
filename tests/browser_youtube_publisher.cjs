@@ -18,7 +18,7 @@ await page.route('**/*',async route=>{
  if(u.pathname==='/api/users')data=[{username:'owner',role:'admin'},{username:'alice',role:'user'},{username:'bob',role:'user'}];
  if(u.pathname==='/api/admin/results')data={results:[{kind:'video',filename:'karaoke.mp4',owner:'owner',owner_key:'__admin__',youtube_eligible:true},{kind:'video',filename:'srt-result.mp4',owner:'owner',owner_key:'__admin__',youtube_eligible:false},{kind:'video',filename:'unknown.mp4',owner:'owner',owner_key:'__admin__'}]};
  if(u.pathname==='/api/library')data={audio:[],backgrounds:[],history:[],videos:[],photos:[]};
- if(u.pathname==='/api/processing-queue')data={jobs:[]};
+ if(u.pathname==='/api/queue')data={jobs:[]};
  if(u.pathname==='/api/admin/youtube/status')data={configured:true,web_configured:false,connected,channel_title:'Canal teste',jobs:[],settings:{privacy:'private',playlist_id:'',title_template:'{title} | Karaokê',users_can_publish:true,user_assignments:{alice:{enabled:true,playlist_id:'PL-one',default_publish:false}}}};
  if(u.pathname==='/api/admin/youtube/import-authorization'){
   await new Promise(r=>setTimeout(r,350));
