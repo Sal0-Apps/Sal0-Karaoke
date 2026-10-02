@@ -1,6 +1,6 @@
 # Manual do Sal0 Karaokê
 
-Este manual descreve os controles disponíveis na distribuição 10.7. Para instalar o servidor, consulte [DEPLOYMENT.md](DEPLOYMENT.md). Para configurar o aparelho, consulte o [guia Android](android/README.md).
+Este manual descreve os controles disponíveis na distribuição 10.8. Para instalar o servidor, consulte [DEPLOYMENT.md](DEPLOYMENT.md). Para configurar o aparelho, consulte o [guia Android](android/README.md).
 
 O Sal0 Karaokê é destinado a uma instalação pessoal, acessada pela rede local ou por VPN, como ZeroTier. O repositório aberto disponibiliza o código e os pacotes; o projeto não opera um serviço público de processamento nem coleta centralmente as mídias das instalações. Não é necessário expor a porta do app à internet. O processamento principal é local, mas as integrações escolhidas podem se comunicar com serviços externos.
 
@@ -162,12 +162,12 @@ A revisão não é a pausa administrativa para reinício. Ao atualizar o servido
 ### Criar outro trabalho durante o atual
 
 1. Mantenha a aba **Criar** aberta para acompanhar o progresso principal.
-2. Toque em **Adicionar novo processo**.
-3. Escolha Rápido, Detalhado ou Gerar SRT.
-4. Informe arquivo(s), link ou Biblioteca e configure o novo trabalho.
-5. Envie o formulário. Cada envio conserva suas opções.
+2. Toque em **Adicionar à fila**, ao lado de **Cancelar**.
+3. A tela abre o formulário inicial e um aviso compacto sobre a tarefa atual. Escolha Rápido, Detalhado ou Gerar SRT.
+4. Informe arquivo(s), link ou Biblioteca e configure o novo trabalho. **Voltar ao andamento** retorna à visualização da tarefa sem cancelar nada.
+5. Envie o formulário. A tela mostra **Adicionando à fila** enquanto o servidor recebe e confirma os itens. O acompanhamento e a contagem real da fila voltam somente após essa confirmação.
 
-Os formulários ficam recolhidos durante o acompanhamento e só abrem quando você pede um novo processo. Se selecionar vários arquivos no mesmo formulário, todos usam o modo e os ajustes daquele envio; para misturar configurações, faça envios separados. Se um arquivo falhar, os já aceitos permanecem na fila e apenas os pendentes continuam selecionados para tentar novamente. A mensagem na página informa o resultado do envio.
+Atualizações do processo atual não fecham o formulário nem interrompem o carregamento. Se a tarefa terminar durante a inclusão, o aviso muda e você pode continuar. Cada envio conserva suas opções. Se selecionar vários arquivos no mesmo formulário, todos usam o modo e os ajustes daquele envio; para misturar configurações, faça envios separados. Se um arquivo falhar, os já aceitos permanecem na fila e apenas os pendentes continuam selecionados para tentar novamente. O erro aparece junto ao formulário. A contagem de itens aguardando acompanha o estado atual da fila, sem uma mensagem fixa de sucesso acima do processo.
 
 ### Permissões e limites
 

@@ -1,3 +1,12 @@
+# 10.8
+
+- Removida a mensagem fixa de arquivos adicionados acima do andamento. A contagem da fila continua refletindo os itens realmente aguardando.
+- **Adicionar à fila** aparece ao lado de **Cancelar**, no progresso e na revisão. A inclusão abre uma tela limpa com os três modos e um aviso compacto sobre o processamento atual. **Voltar ao andamento** retorna sem cancelar a tarefa.
+- Carregamento separado enquanto a mídia é preparada e enviada. O andamento só reaparece depois que o servidor confirma todos os itens do envio, incluindo lotes. Respostas sem confirmação válida preservam a seleção e mostram o erro no formulário.
+- Atualizações de progresso, término da tarefa, fila e carregamento atrasado do editor de revisão não substituem o formulário nem o estado de envio. Falha parcial conserva somente os arquivos pendentes para a próxima tentativa.
+- Corrigido o resumo da música escolhida ao selecionar um arquivo no Modo Rápido. Nova inclusão limpa a seleção anterior e mantém os ajustes do usuário.
+- Verificação de navegador para os três modos, respostas atrasadas, falhas parciais, revisão, permissões, fila pausada e cinco larguras de tela. Publicação somente do servidor.
+
 # 10.7
 
 - Auditoria do fluxo de criação, revisão, fila, cache, renderização e interface. Relatório: [AUDIT_FLOW_V10_7.md](AUDIT_FLOW_V10_7.md).

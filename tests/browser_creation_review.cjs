@@ -41,7 +41,7 @@ for (const script of HTML.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/g)) new 
             if (url.pathname === '/api/status') data = {status: 'idle', progress: 0};
             if (url.pathname === '/api/easy-mode') data = {enabled: true, font_size: 50, whisper_model: 'medium', background_mode: 'random_library', lyrics_mode: 'auto', enable_vad: true};
             if (url.pathname === '/api/library') data = {audio: [], backgrounds: [], history: [], videos: [], photos: []};
-            if (url.pathname === '/api/processing-queue') data = {jobs: []};
+            if (url.pathname === '/api/queue') data = {jobs: []};
             if (url.pathname === '/api/cache_info') data = {has_cache: reviewCache, bg_is_video: false, audio_filename: 'review.wav'};
             if (url.pathname === '/api/segments_to_edit') data = [{start: 10, end: 13, text: '  Exact lyric  ', words: [], synced_line: true, acoustic_animation: true},
                 {start: 14, end: 17, text: 'Next verse', words: [], synced_line: true, acoustic_animation: true}];
@@ -84,7 +84,7 @@ for (const script of HTML.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/g)) new 
         assert((await page.locator('#creationFeedback').textContent()).includes('1 arquivo(s) já adicionado(s)'));
         failSecond = false;
         await page.locator('#easySubmitBtn').click();
-        await page.waitForFunction(() => document.getElementById('creationFeedback').dataset.kind === 'success');
+        await page.waitForFunction(() => !clientPreparationInProgress && document.getElementById('easyAudioFile').files.length === 0);
         assert.deepEqual(submitted, ['one.wav', 'two.wav', 'two.wav', 'three.wav']);
         assert.equal(await page.locator('#easyAudioFile').evaluate(input => input.files.length), 0);
 
@@ -93,7 +93,7 @@ for (const script of HTML.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/g)) new 
             await page.evaluate(mode => {setQueueCreationExpanded(true); setCreatorMode(mode);}, mode);
             await page.locator('#' + input).setInputFiles(files.slice(0, 1));
             await page.locator('#' + button).click();
-            await page.waitForFunction(() => document.getElementById('creationFeedback').dataset.kind === 'success');
+            await page.waitForFunction(id => !clientPreparationInProgress && document.getElementById(id).files.length === 0, input);
             assert.equal(await page.locator('#' + input).evaluate(input => input.files.length), 0);
         }
         assert.equal(await page.locator('#enableVad').inputValue(), 'false');
