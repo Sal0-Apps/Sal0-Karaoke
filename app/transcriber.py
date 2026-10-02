@@ -234,9 +234,9 @@ def transcribe_vocals(
                     logger.warning("Tentando fallback de emergência para o modelo 'medium'...")
                     med_dir = get_model_local_dir("medium")
                     if med_dir:
-                        model = WhisperModel(med_dir, device="cpu", compute_type="int8", cpu_threads=cpu_threads)
+                        model = WhisperModel(med_dir, device="cpu", compute_type=compute_type, cpu_threads=cpu_threads)
                     else:
-                        model = WhisperModel("Systran/faster-whisper-medium", device="cpu", compute_type="int8", cpu_threads=cpu_threads, download_root=save_dir, local_files_only=False)
+                        model = WhisperModel("Systran/faster-whisper-medium", device="cpu", compute_type=compute_type, cpu_threads=cpu_threads, download_root=save_dir, local_files_only=False)
                 else:
                     raise RuntimeError(f"Erro fatal ao baixar e carregar o modelo Whisper '{model_size}': {ex_online}")
 

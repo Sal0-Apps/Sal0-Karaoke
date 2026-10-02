@@ -2,6 +2,7 @@ import math
 import json
 import os
 import struct
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -25,12 +26,13 @@ def tone(path, frequency, amplitude=0.08, seconds=0.25):
 
 
 def spectral_amplitude(path, frequency):
-    with wave.open(str(path), "rb") as audio:
-        rate = audio.getframerate()
-        values = struct.unpack("<" + "h" * (audio.getnframes() * 2), audio.readframes(audio.getnframes()))[::2]
+    rate = 44100
+    data = subprocess.check_output(['ffmpeg', '-v', 'error', '-i', str(path),
+                                    '-af', 'pan=mono|c0=c0', '-ar', str(rate), '-f', 'f32le', '-'])
+    values = struct.unpack('<' + 'f' * (len(data) // 4), data)
     real = sum(v * math.cos(2 * math.pi * frequency * i / rate) for i, v in enumerate(values))
     imag = sum(v * math.sin(2 * math.pi * frequency * i / rate) for i, v in enumerate(values))
-    return 2 * math.hypot(real, imag) / len(values) / 32767
+    return 2 * math.hypot(real, imag) / len(values)
 
 
 class BackingVocalsTests(unittest.TestCase):
@@ -43,8 +45,9 @@ class BackingVocalsTests(unittest.TestCase):
             self.assertAlmostEqual(spectral_amplitude(output, 400), 0.08, delta=0.004)
             self.assertAlmostEqual(spectral_amplitude(output, 800), 0.04, delta=0.004)
             self.assertLess(spectral_amplitude(output, 1200), 0.003)
-            with wave.open(str(output), "rb") as audio:
-                self.assertEqual(audio.getnframes(), round(0.25 * 44100))
+            duration = float(subprocess.check_output(['ffprobe', '-v', 'error',
+                '-show_entries', 'format=duration', '-of', 'csv=p=0', str(output)]))
+            self.assertAlmostEqual(duration, .25, places=4)
 
     def test_valid_cached_stems_are_reused_and_volume_is_recomputed(self):
         with tempfile.TemporaryDirectory() as folder:

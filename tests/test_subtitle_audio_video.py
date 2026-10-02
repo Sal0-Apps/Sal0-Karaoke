@@ -48,7 +48,7 @@ class AudioSubtitleVideoTests(unittest.TestCase):
                 root=Path(directory); cache=root/'cache'; cache.mkdir(); output=root/'out'; library=root/'library'; (library/'history').mkdir(parents=True)
                 (cache/'subtitle_source.mp3').write_bytes(b'audio')
                 (cache/'subtitle_segments_original.json').write_text(json.dumps([{'start':0,'end':1,'text':'Hello'}]))
-                (cache/'subtitle_info_original.json').write_text(json.dumps({'language':'en','cache_signature':{'whisper_model':'medium','enable_vad':True,'transcription_preset':'standard'}}))
+                (cache/'subtitle_info_original.json').write_text(json.dumps({'language':'en','cache_signature':{'whisper_model':'medium','enable_vad':True,'transcription_preset':'standard','whisper_audio_version':2,'whisper_quality_mode':'max_quality'}}))
                 def save_srt(path,*args):shutil.copy2(path,library/'history'/'original.srt');return 'original.srt'
                 def render(audio,subtitles,destination,*args,**kwargs):
                     kwargs['progress_callback'](50);kwargs['progress_callback'](100)

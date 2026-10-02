@@ -42,7 +42,7 @@ from karaoke_generator import generate_ass_karaoke
 import libretranslate_client
 from video_renderer import render_karaoke_video, check_has_video
 from subtitle_video import media_has_motion_video, render_audio_subtitle_video
-from reprocess_cache import copy_reusable_inputs
+from reprocess_cache import copy_reusable_inputs, youtube_identity, file_fingerprint
 from media_covers import video_thumbnail
 from lyrics_sync import recording_matches, parse_lrc, require_acoustic_word_timing, anchor_synced_animation, assess_synced_timing
 from backing_vocals import preserve_backing_vocals
@@ -218,7 +218,7 @@ def download_youtube(url: str, cache_dir: str) -> tuple[str, str]:
 
         base_options = youtube_download_options(os.path.join(cache_dir, "original_input.%(ext)s"))
         formats = (
-            "bv*[height<=1080]+ba/b[height<=1080]/b",
+            "bv+ba/b",
             "b/bv*+ba",
         )
         title = "Vídeo do YouTube"
@@ -823,6 +823,7 @@ def remove_finished_queue_cache(cache_dir: str | None):
 
 def promote_queue_cache_in_background(job_cache: str, owner: dict):
     """Atualiza o cache reutilizável sem impedir que o worker inicie o próximo trabalho."""
+    promoted = False
     try:
         with legacy_cache_promotion_lock:
             if not job_cache or not os.path.isdir(job_cache):
@@ -839,10 +840,12 @@ def promote_queue_cache_in_background(job_cache: str, owner: dict):
                 except OSError as exc:
                     logger.warning("Não foi possível atualizar o cache reutilizável: %s", exc)
             shutil.copytree(job_cache, legacy_cache, dirs_exist_ok=True)
+            promoted = True
     except Exception:
         logger.exception("Não foi possível promover o cache concluído em segundo plano.")
     finally:
-        remove_finished_queue_cache(job_cache)
+        if promoted:
+            remove_finished_queue_cache(job_cache)
 
 
 def cleanup_queue_cache_in_background(job_cache: str | None):
@@ -891,7 +894,7 @@ def processing_queue_worker():
                     queue_status = "done"
                     queue_message = "Resultado concluído e salvo na Biblioteca."
                     job_cache = pipeline.get("cache_dir")
-                    if job_cache and os.path.isdir(job_cache) and not pipeline.get("subtitle_only"):
+                    if job_cache and os.path.isdir(job_cache):
                         deferred_cache_cleanup = True
                         threading.Thread(
                             target=promote_queue_cache_in_background,
@@ -905,6 +908,13 @@ def processing_queue_worker():
                 else:
                     queue_status = "error"
                     queue_message = final_error or "O processamento não foi concluído."
+                    # Preserve completed expensive stages if rendering/delivery fails.
+                    job_cache = pipeline.get("cache_dir")
+                    if job_cache and os.path.isdir(job_cache):
+                        deferred_cache_cleanup = True
+                        threading.Thread(target=promote_queue_cache_in_background,
+                            args=(job_cache, owner), daemon=True,
+                            name=f"cache-preserve-{job.get('id', 'job')}").start()
             except StagePauseRequested as exc:
                 queue_status = "queued"
                 queue_message = f"Pausado com segurança após: {exc.label}."
@@ -1125,10 +1135,9 @@ def clean_word(w: str) -> str:
 def align_lyrics(official_lyrics_text: str, transcribed_segments: list[dict]) -> list[dict]:
     """Usa a letra como guia de grafia sem criar ou mover timestamps.
 
-    Refrões repetidos tornam inseguro reconstruir a linha do tempo a partir de
-    uma comparação textual global. Por isso, somente palavras já confirmadas
-    pelo Whisper recebem a grafia da letra oficial; versos ausentes permanecem
-    ausentes e toda a estrutura temporal original é preservada.
+    Palavras coincidentes e trechos curtos entre duas frases confirmadas recebem
+    a grafia da guia. Não insere versos ausentes nem inventa tempos.
+    Toda a estrutura temporal original é preservada.
     """
     official_words = []
     official_line_ends = set()
@@ -1161,18 +1170,27 @@ def align_lyrics(official_lyrics_text: str, transcribed_segments: list[dict]) ->
     matcher = difflib.SequenceMatcher(None, official_clean, transcribed_clean, autojunk=False)
     matched = 0
 
-    for block in matcher.get_matching_blocks():
-        for offset in range(block.size):
-            official_index = block.a + offset
-            official_word = official_words[official_index].strip()
-            target_word = transcribed_words[block.b + offset]
-            current_text = str(target_word.get("word", ""))
-            leading_space = current_text[:len(current_text) - len(current_text.lstrip())]
-            trailing_space = current_text[len(current_text.rstrip()):]
-            target_word["word"] = f"{leading_space}{official_word}{trailing_space}"
-            if official_index in official_line_ends:
-                target_word["lyric_line_break"] = True
-            matched += 1
+    blocks = matcher.get_matching_blocks()
+    pairs = [(block.a + offset, block.b + offset)
+             for block in blocks for offset in range(block.size)]
+    coverage = len(pairs) / max(1, len(transcribed_words))
+    for left, right in zip(blocks, blocks[1:]):
+        oa, ob = left.a + left.size, right.a
+        ta, tb = left.b + left.size, right.b
+        # Never insert missing lyrics, delete speech or invent word clocks.
+        if (left.size >= 2 and right.size >= 2 and coverage >= .35
+                and 0 < ob - oa == tb - ta <= 8):
+            pairs.extend(zip(range(oa, ob), range(ta, tb)))
+    for official_index, transcript_index in sorted(pairs):
+        official_word = official_words[official_index].strip()
+        target_word = transcribed_words[transcript_index]
+        current_text = str(target_word.get("word", ""))
+        leading_space = current_text[:len(current_text) - len(current_text.lstrip())]
+        trailing_space = current_text[len(current_text.rstrip()):]
+        target_word["word"] = f"{leading_space}{official_word}{trailing_space}"
+        if official_index in official_line_ends:
+            target_word["lyric_line_break"] = True
+        matched += 1
 
     for segment in guided_segments:
         if segment.get("words"):
@@ -2080,6 +2098,7 @@ def run_youtube_download_bg(url: str, owner: dict):
 
         cached_meta = {
             "youtube_url": url,
+            "download_quality_version": 2,
             "original_filename": title,
             "audio_filename": title + ext,
             "input_ext": ext,
@@ -2135,7 +2154,7 @@ def download_bg_youtube(url: str, cache_dir: str) -> tuple[str, str]:
 
         base_options = youtube_download_options(os.path.join(cache_dir, "bg_yt_raw.%(ext)s"))
         formats = (
-            "bv*[height<=1080]/b[height<=1080]/bv*/b",
+            "bv/b",
             "b/bv*+ba",
         )
         title = "Fundo do YouTube"
@@ -4082,11 +4101,11 @@ def process_karaoke(
         or (library_audio and library_audio.strip())
         or (audio_file and audio_file.filename and audio_file.filename.strip())
     )
-    if not has_new_source:
+    if not has_new_source or (youtube_url and not library_audio and not (audio_file and audio_file.filename)):
         legacy_cache_dir = user_paths["cache"]
         with legacy_cache_promotion_lock:
             if os.path.isdir(legacy_cache_dir):
-                copy_reusable_inputs(legacy_cache_dir, cache_dir)
+                copy_reusable_inputs(legacy_cache_dir, cache_dir, youtube_url=youtube_url if has_new_source else None)
 
     if quick_random_background_requested:
         library_bg, quick_background_title = stage_quick_random_background(easy_config, current_user)
@@ -4121,7 +4140,7 @@ def process_karaoke(
             try:
                 with open(cache_meta_file, "r", encoding="utf-8") as f:
                     meta = json.load(f)
-                    if meta.get("youtube_url") == youtube_url.strip():
+                    if youtube_identity(meta.get("youtube_url")) == youtube_identity(youtube_url.strip()):
                         ext = meta.get("input_ext", ".mp4")
                         orig_file = os.path.join(cache_dir, f"original_input{ext}")
                         if os.path.exists(orig_file):
@@ -4184,6 +4203,7 @@ def process_karaoke(
             cached_meta = {
                 "source_type": "youtube",
                 "youtube_url": youtube_url.strip(),
+                "download_quality_version": 2,
                 "original_filename": orig_name,
                 "audio_filename": orig_name + ext,
                 "input_ext": ext,
@@ -4828,7 +4848,7 @@ def run_subtitle_srt_pipeline(
     import process_manager as pm
 
     os.makedirs(output_dir, exist_ok=True)
-    normalized_mp3 = os.path.join(cache_dir, "subtitle_source.mp3")
+    transcription_source = input_media_path  # original source; no lossy MP3 intermediate
     segments_cache_file = os.path.join(cache_dir, "subtitle_segments_original.json")
     info_cache_file = os.path.join(cache_dir, "subtitle_info_original.json")
     final_original_srt = os.path.join(output_dir, "final_subtitles_original.srt")
@@ -4837,18 +4857,16 @@ def run_subtitle_srt_pipeline(
         "whisper_model": whisper_model,
         "enable_vad": bool(enable_vad),
         "transcription_preset": transcription_preset,
+        "whisper_audio_version": 2,
+        "whisper_quality_mode": "max_quality",
     }
 
     pm.check_cancelled()
-    if not os.path.isfile(normalized_mp3):
-        update_state("processing", "Converting media to MP3", 15)
-        extract_audio_mp3(input_media_path, normalized_mp3)
-    else:
-        update_state("processing", "Using normalized MP3", 15)
-    media_duration = get_file_duration(normalized_mp3)
+    update_state("processing", "Preparing original audio", 15)
+    media_duration = get_file_duration(transcription_source)
     if media_duration <= 0:
         raise ValueError("Não foi possível determinar a duração do áudio normalizado.")
-    save_stage_checkpoint(cache_dir, "subtitle_audio_ready", "áudio normalizado para MP3", 20)
+    save_stage_checkpoint(cache_dir, "subtitle_audio_ready", "áudio original preparado", 20)
 
     original_segments = None
     transcription_info = {}
@@ -4869,7 +4887,7 @@ def run_subtitle_srt_pipeline(
         pm.check_cancelled()
         update_state(
             "processing",
-            "Transcribing complete MP3",
+            "Transcribing original audio",
             45,
             stage_progress=0,
             stage_detail="Carregando o modelo Whisper e preparando o áudio",
@@ -4893,16 +4911,16 @@ def run_subtitle_srt_pipeline(
                     detail += f" · faltam {int(remaining // 60):02d}:{int(remaining % 60):02d} de áudio"
             update_state(
                 "processing",
-                "Transcribing complete MP3",
+                "Transcribing original audio",
                 min(69, 45 + round(percent * 0.24)),
                 stage_progress=percent,
                 stage_detail=detail,
             )
 
         original_segments, transcription_info = transcribe_vocals(
-            normalized_mp3,
+            transcription_source,
             model_size=whisper_model,
-            quality_mode="max_quality" if whisper_model == "large-v3" else "standard",
+            quality_mode="max_quality",
             enable_vad=enable_vad,
             transcription_preset=transcription_preset,
             task="transcribe",
@@ -5074,7 +5092,7 @@ def run_subtitle_srt_pipeline(
             update_state("processing", "Rendering subtitle video", 96 + min(2, int(percent * 2 / 100)),
                          stage_progress=percent, stage_detail="Criando MP4 com o áudio original e as legendas")
         publish_subtitle_video_progress(0)
-        render_audio_subtitle_video(normalized_mp3,
+        render_audio_subtitle_video(transcription_source,
             final_translated_srt if translated_filename else final_original_srt,
             final_video, media_duration,
             progress_callback=publish_subtitle_video_progress)
@@ -5280,7 +5298,7 @@ def run_pipeline(
                 try:
                     with open(cache_meta_file, "r", encoding="utf-8") as f:
                         meta = json.load(f)
-                        if meta.get("youtube_url") == youtube_url.strip():
+                        if youtube_identity(meta.get("youtube_url")) == youtube_identity(youtube_url.strip()):
                             ext = meta.get("input_ext", ".mp4")
                             orig_file = os.path.join(cache_dir, f"original_input{ext}")
                             if os.path.exists(orig_file):
@@ -5309,6 +5327,7 @@ def run_pipeline(
                     update_state("processing", "Extracting audio", 15, original_filename=orig_name)
 
                     ext = os.path.splitext(input_audio_path)[1]
+                    cached_meta["download_quality_version"] = 2
                     cached_meta["youtube_url"] = youtube_url
                     cached_meta["original_filename"] = orig_name
                     cached_meta["audio_filename"] = orig_name + ext
@@ -5459,12 +5478,13 @@ def run_pipeline(
         new_audio_hash = None
         try:
             if os.path.exists(input_audio_path):
-                new_audio_hash = f"{os.path.basename(input_audio_path)}_{os.path.getsize(input_audio_path)}"
+                new_audio_hash = file_fingerprint(input_audio_path)
         except Exception:
             pass
 
         cached_audio_hash = cached_meta.get("audio_hash")
-        if new_audio_hash and cached_audio_hash != new_audio_hash:
+        legacy_audio_hash = f"{os.path.basename(input_audio_path)}_{os.path.getsize(input_audio_path)}" if os.path.isfile(input_audio_path) else None
+        if new_audio_hash and cached_audio_hash not in (new_audio_hash, legacy_audio_hash):
             logger.info(f"Nova mídia detectada para processamento ({orig_name}). Limpando cache de áudio anterior...")
             for inter_file in [
                 "original_converted.wav",
@@ -5475,6 +5495,10 @@ def run_pipeline(
                 "instrumental_with_backing.wav",
                 "backing_model_version.txt",
                 "transcribed_segments.json",
+                "synced_acoustic_segments.json",
+                "whisper_cache_meta.json",
+                "reviewed_segments.json",
+                "reviewed_synced_segments.json",
                 "karaoke.ass",
                 "stage_checkpoints.json",
             ]:
@@ -5492,9 +5516,12 @@ def run_pipeline(
         else:
             logger.info(f"Reaproveitando cache de áudio válido para '{orig_name}' (audio_hash={new_audio_hash}).")
 
+        if new_audio_hash:
+            cached_meta["audio_hash"] = new_audio_hash
+
         # Provider availability can change between retries. Never reuse subtitles
         # created from different line clocks, even with the same display options.
-        clock_hash = hashlib.sha256(json.dumps({"animation_timing_version": 3, "synced_validation_version": 1, "lyrics": synced_segments}, sort_keys=True).encode()).hexdigest()
+        clock_hash = hashlib.sha256(json.dumps({"animation_timing_version": 3, "synced_validation_version": 2, "guided_spelling_version": 2, "lyrics": synced_segments}, sort_keys=True).encode()).hexdigest()
         if cached_meta.get("lyrics_clock_hash") != clock_hash:
             checkpoints = load_stage_checkpoints(cache_dir)
             for stage in ("transcription_reviewed", "subtitles_generated", "video_rendered"):
@@ -5671,10 +5698,29 @@ def run_pipeline(
             if synced_segments:
                 lyrics_text = "\n".join(segment["text"] for segment in synced_segments)
             segments_cache_file = os.path.join(cache_dir, "synced_acoustic_segments.json" if synced_segments else "transcribed_segments.json")
-            lyrics_hint_hash = hashlib.sha256((lyrics_text or "").strip().encode("utf-8")).hexdigest()
+            lyrics_hint_hash = hashlib.sha256(" ".join((lyrics_text or "").split()).encode("utf-8")).hexdigest()
+            whisper_meta_file = os.path.join(cache_dir, "whisper_cache_meta.json")
+            if os.path.isfile(whisper_meta_file):
+                try:
+                    with open(whisper_meta_file, encoding="utf-8") as f:
+                        whisper_meta = json.load(f)
+                    if whisper_meta.get("audio_hash") == cached_meta.get("audio_hash"):
+                        for key in ("animation_timing_version", "vocal_source", "transcribe_source",
+                                    "whisper_model", "enable_vad", "transcription_preset", "lyrics_hint_hash",
+                                    "whisper_audio_version", "whisper_quality_mode"):
+                            if key in whisper_meta:
+                                cached_meta[key] = whisper_meta[key]
+                except (OSError, ValueError, AttributeError):
+                    logger.warning("Metadados do cache Whisper inválidos; refazendo a análise.")
+            if not os.path.isfile(segments_cache_file):
+                alternate = os.path.join(cache_dir, "transcribed_segments.json" if synced_segments else "synced_acoustic_segments.json")
+                if os.path.isfile(alternate):
+                    segments_cache_file = alternate
 
             if (os.path.exists(segments_cache_file) and
                 cached_meta.get("animation_timing_version") == 3 and
+                cached_meta.get("whisper_audio_version") == 2 and
+                cached_meta.get("whisper_quality_mode") == "max_quality" and
                 cached_meta.get("vocal_source", "all") == vocal_source and
                 cached_meta.get("transcribe_source") == transcribe_source and
                 cached_meta.get("whisper_model") == whisper_model and
@@ -5685,6 +5731,9 @@ def run_pipeline(
                     with open(segments_cache_file, "r", encoding="utf-8") as f:
                         import json
                         segments = json.load(f)
+                    if not isinstance(segments, list) or not segments:
+                        raise ValueError("Cache de transcrição vazio ou inválido.")
+                    require_acoustic_word_timing(segments)
                     logger.info("Aproveitando transcrição do Whisper do cache.")
                     update_state(
                         "processing",
@@ -5694,6 +5743,7 @@ def run_pipeline(
                         stage_detail="Transcrição recuperada do cache",
                     )
                 except Exception as e:
+                    segments = None
                     logger.error(f"Erro ao ler cache de segmentos transcritos: {e}")
 
             if segments is None:
@@ -5737,7 +5787,7 @@ def run_pipeline(
                         stage_detail="Baixando o modelo Whisper antes da transcrição",
                     )
 
-                quality_preset = "max_quality" if whisper_model == "large-v3" else "standard"
+                quality_preset = "max_quality"
                 def publish_whisper_progress(percent: int, elapsed: float, total: float):
                     remaining = max(0.0, total - elapsed)
                     detail = f"Whisper {percent}%"
@@ -5768,12 +5818,16 @@ def run_pipeline(
                         import json
                         json.dump(segments, f, indent=4)
                     cached_meta["animation_timing_version"] = 3
+                    cached_meta["whisper_audio_version"] = 2
+                    cached_meta["whisper_quality_mode"] = "max_quality"
                     cached_meta["vocal_source"] = vocal_source
                     cached_meta["transcribe_source"] = transcribe_source
                     cached_meta["whisper_model"] = whisper_model
                     cached_meta["enable_vad"] = enable_vad
                     cached_meta["transcription_preset"] = transcription_preset
                     cached_meta["lyrics_hint_hash"] = lyrics_hint_hash
+                    with open(whisper_meta_file, "w", encoding="utf-8") as f:
+                        json.dump(cached_meta, f, indent=4)
                     with open(cache_meta_file, "w", encoding="utf-8") as f:
                         import json
                         json.dump(cached_meta, f, indent=4)
@@ -5853,15 +5907,15 @@ def run_pipeline(
                 segments = segments_to_edit
 
                 # Salvar os segmentos corrigidos também no cache, para não perder o trabalho se refazer!
-                reviewed_cache_file = os.path.join(cache_dir, "reviewed_synced_segments.json") if synced_segments else segments_cache_file
+                reviewed_cache_file = os.path.join(cache_dir, "reviewed_synced_segments.json") if synced_segments else os.path.join(cache_dir, "reviewed_segments.json")
                 with open(reviewed_cache_file, "w", encoding="utf-8") as f:
                     import json
                     json.dump(segments, f, indent=4)
 
                 save_stage_checkpoint(cache_dir, "transcription_reviewed", "revisão das legendas concluída", 78)
             elif review_checkpoint:
-                reviewed_cache_file = os.path.join(cache_dir, "reviewed_synced_segments.json")
-                if synced_segments and os.path.isfile(reviewed_cache_file):
+                reviewed_cache_file = os.path.join(cache_dir, "reviewed_synced_segments.json" if synced_segments else "reviewed_segments.json")
+                if os.path.isfile(reviewed_cache_file):
                     with open(reviewed_cache_file, encoding="utf-8") as f:
                         segments = json.load(f)
 

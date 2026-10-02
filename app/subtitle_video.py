@@ -32,7 +32,7 @@ def render_audio_subtitle_video(audio, subtitles, output, duration, runner=None,
                 'color=c=0x101827:s=1280x720:r=25', '-map', '1:v:0', '-map', '0:a:0',
                 '-vf', f"subtitles='{caption_file}':force_style='FontName=DejaVu Sans,FontSize=24,Outline=2,MarginV=40'",
                 '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23', '-pix_fmt', 'yuv420p',
-                '-c:a', 'aac', '-b:a', '192k', '-t', str(duration), '-shortest', '-movflags', '+faststart', temporary_output]
+                '-c:a', 'aac', '-b:a', '320k', '-t', str(duration), '-shortest', '-movflags', '+faststart', temporary_output]
             if not runner(command, progress_callback=progress_callback, total_duration=duration):
                 raise RuntimeError('Não foi possível criar o vídeo do áudio. O SRT permanece na Biblioteca.')
             os.replace(temporary_output, output)

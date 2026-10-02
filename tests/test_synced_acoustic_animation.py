@@ -20,10 +20,11 @@ from lyrics_sync import parse_lrc, require_acoustic_word_timing, anchor_synced_a
 from karaoke_generator import generate_ass_karaoke
 from media_covers import add_cover_to_command
 from test_automatic_lyrics_and_search import load_function
+from reprocess_cache import copy_reusable_inputs
 
 
 class SyncedAcousticAnimationTests(unittest.TestCase):
-    def run_stage(self, cache_version=None, verses=None, voice=None):
+    def run_stage(self, cache_version=None, verses=None, voice=None, reprocess=False):
         source = (ROOT / 'app/main.py').read_text()
         stage = source[source.index('            segments = None\n', source.index('# Passo 3: Transcrever vocais')):
                        source.index('            # --- NOVO: Passo de Pausa')]
@@ -39,11 +40,12 @@ class SyncedAcousticAnimationTests(unittest.TestCase):
             (Path(folder) / 'synced_acoustic_segments.json').write_text(json.dumps(cached))
             meta = dict(animation_timing_version=cache_version, vocal_source='lead',
                         transcribe_source='vocals', whisper_model='medium', enable_vad=True,
-                        transcription_preset='standard', lyrics_hint_hash=hashlib.sha256(lyric_text.encode()).hexdigest())
+                        transcription_preset='standard', whisper_audio_version=2, whisper_quality_mode='max_quality',
+                        lyrics_hint_hash=hashlib.sha256(' '.join(lyric_text.split()).encode()).hexdigest())
             transcriber = Mock(return_value=acoustic)
             scope = dict(os=os, hashlib=hashlib, json=json, synced_segments=lrc,
                 lyrics_text='original guide', cache_dir=folder, cached_meta=meta,
-                cache_meta_file=str(Path(folder) / 'meta.json'), vocal_source='lead',
+                cache_meta_file=str(Path(folder) / 'cache_meta.json'), vocal_source='lead',
                 transcribe_source='vocals', whisper_model='medium', enable_vad=True,
                 transcription_preset='standard', vocals_wav='lead.wav', converted_wav='mix.wav',
                 pm=SimpleNamespace(check_cancelled=Mock()), update_state=Mock(),
@@ -54,6 +56,15 @@ class SyncedAcousticAnimationTests(unittest.TestCase):
                 update_process_summary=Mock(), assess_synced_timing=assess_synced_timing,
                 align_lyrics=load_function('align_lyrics', clean_word=load_function('clean_word', unicodedata=unicodedata)), require_acoustic_word_timing=require_acoustic_word_timing, anchor_synced_animation=anchor_synced_animation)
             exec(compile(textwrap.dedent(stage), 'transcription-stage', 'exec'), scope)
+            if reprocess:
+                next_cache = Path(folder) / 'next'
+                copy_reusable_inputs(folder, next_cache)
+                scope.update(cache_dir=str(next_cache),
+                    cache_meta_file=str(next_cache / 'cache_meta.json'),
+                    cached_meta=json.loads((next_cache / 'cache_meta.json').read_text()),
+                    synced_segments=lrc, lyrics_text='original guide')
+                transcriber.reset_mock()
+                exec(compile(textwrap.dedent(stage), 'transcription-stage', 'exec'), scope)
         return scope, transcriber
 
     def test_synced_lyrics_do_not_bypass_voice_analysis_or_reuse_verse_only_cache(self):
@@ -74,6 +85,17 @@ class SyncedAcousticAnimationTests(unittest.TestCase):
         scope, transcriber = self.run_stage(cache_version=3)
         transcriber.assert_not_called()
         self.assertEqual(scope['segments'][0]['words'][1]['start'], 11.6)
+
+    def test_new_task_reuses_saved_whisper_analysis_without_calling_model(self):
+        scope, transcriber = self.run_stage(reprocess=True)
+        transcriber.assert_not_called()
+        self.assertEqual(scope['segments'][0]['words'][1]['start'], 11.6)
+
+    def test_incompatible_lrc_retry_reuses_analysis_after_copying_cache(self):
+        verses, voice = self.timing_fixture([4.13, 2.33, 2.53, 3.28, 3.46, 3.76])
+        scope, transcriber = self.run_stage(verses=verses, voice=voice, reprocess=True)
+        transcriber.assert_not_called()
+        self.assertEqual(scope['synced_segments'], [])
 
     def timing_fixture(self, shifts):
         verses, voice = [], []

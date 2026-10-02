@@ -43,6 +43,29 @@ def make_words(texts, start=0.0, step=0.5):
 
 
 class SubtitleSegmentationTests(unittest.TestCase):
+    def test_guide_corrects_misheard_words_between_confirmed_phrases(self):
+        words = make_words(['eu', 'quero', 'gastar', 'com', 'você', 'nesta', 'noite'])
+        original = [{'start': 0, 'end': 3.5, 'words': words, 'text': ''}]
+        result = align_lyrics('eu quero cantar com você nesta noite', original)
+        self.assertEqual(result[0]['words'][2]['word'], ' cantar')
+        self.assertEqual([(w['start'], w['end']) for w in result[0]['words']],
+                         [(w['start'], w['end']) for w in words])
+        self.assertEqual(original[0]['words'][2]['word'], ' gastar')
+
+    def test_guide_does_not_insert_missing_words_or_copy_an_unrelated_lyric(self):
+        words = make_words(['fala', 'outra', 'coisa', 'hoje'])
+        result = align_lyrics('eu quero cantar com você nesta noite',
+                              [{'start':0,'end':2,'words':words}])
+        self.assertEqual(result[0]['words'], words)
+
+    def test_repeated_choruses_keep_their_existing_word_clocks(self):
+        words = make_words(['eu','quero','gastar','com','você','eu','quero','gastar','com','você'])
+        result = align_lyrics('eu quero cantar com você\neu quero cantar com você',
+                              [{'start':0,'end':5,'words':words}])
+        self.assertEqual([w['word'].strip() for w in result[0]['words']],
+                         'eu quero cantar com você eu quero cantar com você'.split())
+        self.assertEqual([w['start'] for w in result[0]['words']], [w['start'] for w in words])
+
     def test_lyrics_lines_become_natural_verse_boundaries(self):
         words = make_words(["eu", "canto", "este", "verso", "e", "depois", "vem", "outro"])
         transcription = [

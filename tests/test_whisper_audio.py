@@ -36,6 +36,27 @@ class WhisperAudioTests(unittest.TestCase):
         self.assertGreater(float(np.max(np.abs(audio))), 0.05)
         self.assertLess(float(np.max(np.abs(audio))), 1)
 
+    def test_float_decode_preserves_samples_smaller_than_a_16_bit_step(self):
+        path = self.audio.with_name('quiet.wav')
+        subprocess.run(['ffmpeg','-v','error','-f','lavfi','-i',
+            'sine=frequency=440:duration=0.5','-af','volume=0.00008',
+            '-c:a','pcm_f32le',str(path)],check=True)
+        audio = load_whisper_audio(path)
+        self.assertGreater(float(np.max(np.abs(audio))), .000005)
+        self.assertLess(float(np.max(np.abs(audio))), 1/32768)
+
+    def test_max_quality_uses_float_precision_and_guided_vocabulary(self):
+        info = SimpleNamespace(language='pt', language_probability=1, duration=.5)
+        transcribe = Mock(return_value=(iter([]), info))
+        model = Mock(return_value=SimpleNamespace(transcribe=transcribe))
+        module = self.load_transcriber(model)
+        with patch.object(module.os, 'makedirs'):
+            module.transcribe_vocals(str(self.audio), quality_mode='max_quality',
+                                    initial_prompt='cantar você cantar')
+        self.assertEqual(model.call_args.kwargs['compute_type'], 'float32')
+        self.assertGreaterEqual(transcribe.call_args.kwargs['beam_size'], 10)
+        self.assertEqual(transcribe.call_args.kwargs['hotwords'], 'cantar você')
+
     def test_compressed_audio_and_video(self):
         for extension in ('mp3', 'mp4'):
             path = self.audio.with_suffix('.' + extension)
