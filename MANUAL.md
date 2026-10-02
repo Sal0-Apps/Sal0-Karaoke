@@ -113,7 +113,7 @@ Em **Perfil de Ajustes**, dê um nome à configuração e toque em **Salvar Perf
 
 Sem letra sincronizada, o Whisper mantém as palavras e os tempos reconhecidos, e o processamento local organiza as frases por pausas, pontuação e início de frase. Os limites de palavras e caracteres apenas quebram linhas dentro da tela: não antecipam a troca de verso nem separam trechos como “me deu”. Uma proteção automática ainda divide blocos excepcionalmente longos sem pontuação. O texto aguardando o canto fica branco e recebe a cor escolhida conforme é cantado. A posição do verso e da prévia permanece estável mesmo quando muda a quantidade de linhas. A próxima frase aparece durante os três segundos da contagem regressiva.
 
-Após atualizar o servidor, use **Refazer** no resultado anterior para recriar legenda e vídeo. A atualização visual preserva o cache compatível do Whisper e as revisões salvas; somente a apresentação é refeita. Um MP4 já concluído continua contendo a legenda antiga até ser reprocessado.
+Após atualizar o servidor, use **Refazer** no resultado anterior para recriar legenda e vídeo, reaproveitando a análise compatível do Whisper. Refazer cria um novo trabalho; confirme novamente a revisão, se estiver habilitada. Ao retomar um trabalho já em andamento, a atualização visual preserva também a revisão salva e refaz somente a apresentação. Um MP4 já concluído continua contendo a legenda antiga até ser reprocessado.
 
 ## 5. Gerar SRT original e tradução opcional
 

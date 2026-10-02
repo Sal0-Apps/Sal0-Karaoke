@@ -109,8 +109,9 @@ class DisplayModeTests(unittest.TestCase):
             for pixels in (before, middle, after):
                 y, x = np.where(pixels.max(axis=2) > 35)
                 bounds.append((x.min(), y.min(), x.max(), y.max()))
-            self.assertEqual(bounds[0], bounds[1])
-            self.assertEqual(bounds[0], bounds[2])
+            # YUV chroma antialiasing can change a threshold edge by one pixel.
+            for bound in bounds[1:]:
+                self.assertTrue(all(abs(a - b) <= 1 for a, b in zip(bounds[0], bound)))
 
     def test_active_baseline_and_preview_top_stay_fixed_across_verse_lengths(self):
         segments = [dict(start=0, end=1, text='One short phrase', words=[]),
