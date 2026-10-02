@@ -221,9 +221,16 @@ def insert_instrumental_breaks(segments: list[dict]) -> list[dict]:
                 
     return new_segments
 
-def synced_animation_text(segment, normal_color, highlight_color, line_breaks=()):
-    """Use the classic karaoke sweep with absolute clocks and no spacer glyphs."""
-    spans = segment.get('animation_words') or [{'word': str(segment['text'])}]
+def synced_animation_text(segment, normal_color, highlight_color, line_breaks=(), subtitle_mode='syllable'):
+    """Keep original text visible; only the selected color animation uses clocks."""
+    spans = segment.get('animation_words')
+    if not spans and not segment.get('synced_line') and segment.get('words'):
+        spans = [dict(word) for word in segment['words']]
+        # Whisper often includes a leading space excluded from the displayed line.
+        spans[0]['word'] = str(spans[0].get('word', '')).lstrip()
+        spans[-1]['word'] = str(spans[-1].get('word', '')).rstrip()
+    if subtitle_mode in {'line', 'phrase'} or not spans:
+        spans = [{'word': str(segment['text'])}]
     if ''.join(str(span.get('word', '')) for span in spans) != str(segment['text']):
         # An old/stale animation cache can never change the authoritative text.
         spans = [{'word': str(segment['text'])}]
@@ -238,7 +245,8 @@ def synced_animation_text(segment, normal_color, highlight_color, line_breaks=()
             if end_cs > start_cs:
                 # libass >= 0.17 supports an absolute karaoke start (\kt).
                 # Pauses need no invisible characters that could shift or wrap text.
-                tags = f"\\1c{normal_color}\\2c{highlight_color}\\kt{start_cs}\\kf{end_cs - start_cs}"
+                effect = 'k' if subtitle_mode == 'word' else 'kf'
+                tags = f"\\1c{normal_color}\\2c{highlight_color}\\kt{start_cs}\\{effect}{end_cs - start_cs}"
         word = span['word']
         # Visual wrapping never changes the source text or its timing data.
         for boundary in sorted((b for b in line_breaks if offset <= b < offset + len(word)), reverse=True):
@@ -372,7 +380,7 @@ def generate_ass_karaoke(
     ass_primary_color = "&H00FFFFFF" # Branco por padrão para karaoke
     ass_secondary_color = html_color_to_ass(text_color_hex) # Cor de destaque para karaoke
     
-    if subtitle_mode == "phrase":
+    if subtitle_mode in {"phrase", "line"}:
         # Em modo frase comum, a cor principal é a cor de destaque selecionada
         ass_primary_color = html_color_to_ass(text_color_hex)
         ass_secondary_color = "&H00FFFFFF"
@@ -410,98 +418,49 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 
     lines = [ass_header]
     
-    # Se configurado para manter a primeira linha visível desde o início do vídeo sem coloração (para introdução)
-    if keep_first_line_visible and segments:
-        first_lyrics_seg = None
-        for seg in segments:
-            if "Instrumental" not in seg["text"]:
-                first_lyrics_seg = seg
-                break
-        if first_lyrics_seg and first_lyrics_seg["start"] > 0.0:
-            start_str = format_time(0.0)
-            end_str = format_time(first_lyrics_seg["start"])
-            clean_text = first_lyrics_seg["text"]
-            lines.append(f"Dialogue: 0,{start_str},{end_str},Default,,0,0,0,,{clean_text}\n")
-            
+    first_lyrics_seg = next((seg for seg in segments if "Instrumental" not in seg['text']), None)
+    persistent_intro = bool(keep_first_line_visible and first_lyrics_seg and first_lyrics_seg['start'] > 0)
+    intro_preview_layout = None
+    instrumental_layout = None
+    if persistent_intro:
+        if show_instrumental and first_lyrics_seg['start'] >= 3:
+            instrumental_layout = synced_display_layout('Instrumental (3)', font_size, words_per_line, max_chars_line)
+            intro_preview_layout = synced_display_layout(first_lyrics_seg['text'], int(font_size * .85),
+                                                         words_per_line, max_chars_line, height_limit=170)
+            _, intro_pos = synced_display_positions(instrumental_layout, intro_preview_layout, text_position)
+            intro_layout = intro_preview_layout
+        else:
+            intro_layout = synced_display_layout(first_lyrics_seg['text'], font_size, words_per_line, max_chars_line)
+            intro_pos, _ = synced_display_positions(intro_layout, None, text_position)
+        intro_text = synced_animation_text({'text': first_lyrics_seg['text'], 'start': 0, 'end': 1},
+                                           ass_primary_color, ass_primary_color, intro_layout['breaks'])
+        lines.append(f"Dialogue: 0,{format_time(0)},{format_time(first_lyrics_seg['start'])},Default,,0,0,0,,{intro_pos}{intro_text}\n")
+
     for idx, seg in enumerate(segments):
         start_time_str = format_time(seg["start"])
         end_time_str = format_time(seg["end"])
-
         next_seg = segments[idx + 1] if show_next_line_preview and idx + 1 < len(segments) else None
         preview_seg = next_seg if next_seg and 'Instrumental' not in next_seg['text'] else None
-        if seg.get('synced_line') or (preview_seg and preview_seg.get('synced_line')):
-            active_layout = synced_display_layout(seg['text'], font_size, words_per_line, max_chars_line)
-            preview_layout = (synced_display_layout(preview_seg['text'], int(font_size * .85),
-                              words_per_line, max_chars_line, height_limit=170) if preview_seg else None)
-            active_pos, preview_pos = synced_display_positions(active_layout, preview_layout, text_position)
-            text = synced_animation_text(seg, ass_primary_color, ass_secondary_color, active_layout['breaks'])
-            lines.append(f"Dialogue: 0,{start_time_str},{end_time_str},Default,,0,0,0,,{active_pos}{text}\n")
-            if preview_seg:
-                preview_text = synced_animation_text({'text': preview_seg['text'], 'start': 0, 'end': 1},
-                                                      ass_dimmed_color, ass_dimmed_color,
-                                                      preview_layout['breaks'])
-                lines.append(f"Dialogue: 0,{start_time_str},{end_time_str},NextLine,,0,0,0,,{preview_pos}{preview_text}\n")
-            continue
+        intro_instrumental = bool(persistent_intro and intro_preview_layout and
+                                  seg['start'] < first_lyrics_seg['start'])
+        if intro_instrumental:
+            # One persistent first verse, shared with the entire countdown.
+            preview_seg = first_lyrics_seg
+        active_layout = synced_display_layout(seg['text'], font_size, words_per_line, max_chars_line)
+        preview_layout = (synced_display_layout(preview_seg['text'], int(font_size * .85),
+                          words_per_line, max_chars_line, height_limit=170) if preview_seg else None)
+        if intro_instrumental:
+            active_layout['height'] = instrumental_layout['height']
+        active_pos, preview_pos = synced_display_positions(active_layout, preview_layout, text_position)
+        text = synced_animation_text(seg, ass_primary_color, ass_secondary_color,
+                                     active_layout['breaks'], subtitle_mode)
+        lines.append(f"Dialogue: 0,{start_time_str},{end_time_str},Default,,0,0,0,,{active_pos}{text}\n")
+        if preview_seg and not intro_instrumental:
+            preview_text = synced_animation_text({'text': preview_seg['text'], 'start': 0, 'end': 1},
+                                                 ass_dimmed_color, ass_dimmed_color,
+                                                 preview_layout['breaks'])
+            lines.append(f"Dialogue: 0,{start_time_str},{end_time_str},NextLine,,0,0,0,,{preview_pos}{preview_text}\n")
 
-        # 1. Linha ativa (Default)
-        if not seg.get("acoustic_animation") and (subtitle_mode in {"phrase", "line"} or not seg.get("words")):
-            line = f"Dialogue: 0,{start_time_str},{end_time_str},Default,,0,0,0,,{seg['text']}\n"
-        else:
-            # Modo Karaoke (segue sílabas)
-            karaoke_text = ""
-            current_ref_cs = 0
-
-            animation_words = seg["animation_words"] if seg.get("acoustic_animation") else seg["words"]
-            for word_info in animation_words:
-                word_text = word_info["word"]
-                if "start" not in word_info or "end" not in word_info:
-                    # Unrecognized words stay visible in a fixed dim color;
-                    # never assign invented clocks to the original lyric text.
-                    karaoke_text += (f"{{\\kf0\\1c{ass_dimmed_color}\\2c{ass_dimmed_color}}}{word_text}"
-                                     f"{{\\1c{ass_primary_color}\\2c{ass_secondary_color}}}")
-                    continue
-                w_start = word_info["start"]
-                w_end = word_info["end"]
-                word_start_cs = max(0, int(round((w_start - seg["start"]) * 100)))
-                word_end_cs = max(word_start_cs + 1, int(round((w_end - seg["start"]) * 100)))
-
-                # O tempo é calculado a partir do início absoluto da linha. Isso
-                # evita que arredondamentos de cada palavra se acumulem. Espaços
-                # invisíveis consomem pausas reais; uma tag sem texto seria
-                # ignorada pelo renderizador ASS e adiantaria as palavras seguintes.
-                gap_cs = word_start_cs - current_ref_cs
-                if gap_cs > 0:
-                    karaoke_text += f"{{\\k{gap_cs}\\alpha&HFF&}}\\h{{\\alpha&H00&}}"
-
-                # Calcular a duração da palavra
-                word_cs = max(1, word_end_cs - word_start_cs)
-
-                # Separar espaços
-                leading_spaces = len(word_text) - len(word_text.lstrip(' '))
-                trailing_spaces = len(word_text.lstrip(' ')) - len(word_text.strip(' '))
-                clean_text = word_text.strip(' ')
-                
-                if clean_text:
-                    spaces_before = " " * leading_spaces
-                    spaces_after = " " * trailing_spaces
-                    karaoke_text += f"{spaces_before}{{\\kf{word_cs}}}{clean_text}{spaces_after}"
-                else:
-                    karaoke_text += f"{{\\kf{word_cs}}}{word_text}"
-
-                current_ref_cs = word_end_cs
-
-            line = f"Dialogue: 0,{start_time_str},{end_time_str},Default,,0,0,0,,{karaoke_text}\n"
-            
-        lines.append(line)
-        
-        # 2. Pré-visualização da próxima linha (NextLine - Ofuscada)
-        if show_next_line_preview and idx < len(segments) - 1:
-            next_seg = segments[idx + 1]
-            # Apenas exibe a próxima linha se ela for uma linha de letra (ignora instrumental e contagens)
-            if "Instrumental" not in next_seg["text"]:
-                preview_line = f"Dialogue: 0,{start_time_str},{end_time_str},NextLine,,0,0,0,,{next_seg['text']}\n"
-                lines.append(preview_line)
-        
     with open(output_ass_path, "w", encoding="utf-8") as f:
         f.writelines(lines)
         

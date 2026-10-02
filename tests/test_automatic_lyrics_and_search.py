@@ -13,6 +13,7 @@ ROOT = Path(__file__).parents[1]
 sys.path.insert(0, str(ROOT / "app"))
 from lyrics_sync import parse_lrc, recording_matches
 from karaoke_generator import generate_ass_karaoke
+from processing_validation import validate_review_segments, validate_processing_options
 import tempfile
 import subprocess
 
@@ -29,7 +30,9 @@ def load_function(name, **values):
     selected.decorator_list = []
     scope = dict(HTTPException=HTTPError, Depends=lambda _: None, get_current_user=Mock(),
                  YouTubeSearchRequest=object, re=re, difflib=difflib,
-                 logger=logging.getLogger("test"), recording_matches=recording_matches, **values)
+                 logger=logging.getLogger("test"), recording_matches=recording_matches,
+                 validate_review_segments=validate_review_segments,
+                 validate_processing_options=validate_processing_options, **values)
     exec(compile(ast.Module(body=[selected], type_ignores=[]), "main.py", "exec"), scope)
     return scope[name]
 

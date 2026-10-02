@@ -255,7 +255,8 @@
             align-items: center;
             justify-content: center;
             gap: 0.4rem;
-            overflow-wrap: anywhere;
+            white-space: nowrap;
+            min-height: 44px;
         }
 
         .tab-btn:hover {
@@ -884,13 +885,22 @@
             }
         }
         @media (max-width: 460px) {
-            .header-actions {
-                grid-template-columns: repeat(2, minmax(0, 1fr));
-            }
-            #btnLogout {
-                grid-column: 1 / -1;
-            }
+            .header-actions { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+            .header-btn { min-height: 44px; }
+            .nav-tabs .line-glyph { display: none; }
         }
+        .flow-feedback {
+            padding: .8rem 1rem;
+            margin: .8rem 0;
+            border: 1px solid var(--glass-border);
+            border-radius: var(--radius-sm);
+            background: var(--bg-card);
+            overflow-wrap: anywhere;
+        }
+        .flow-feedback[data-kind="error"] { border-color: #ef4444; }
+        .flow-feedback:empty { display: none; }
+        .correction-head { flex-wrap: wrap; gap: .8rem; }
+        .correction-segment [aria-invalid="true"] { border-color: #ef4444; }
         @media (max-width: 640px) {
             .user-chip {
                 max-width: none;
@@ -1542,10 +1552,10 @@
         </header>
 
         <!-- NAVEGAÇÃO ENTRE ABAS -->
-        <div class="nav-tabs">
-            <button type="button" class="tab-btn active" id="tabBtnCreate"><span class="line-glyph">◉</span> Criar</button>
-            <button type="button" class="tab-btn" id="tabBtnSettings"><span class="line-glyph">⌁</span> Ajustes</button>
-            <button type="button" class="tab-btn" id="tabBtnLibrary"><span class="line-glyph">▣</span> Biblioteca</button>
+        <div class="nav-tabs" role="tablist" aria-label="Seções do aplicativo">
+            <button type="button" class="tab-btn active" id="tabBtnCreate" role="tab" aria-controls="createTabContent" aria-selected="true" tabindex="0"><span class="line-glyph">◉</span> Criar</button>
+            <button type="button" class="tab-btn" id="tabBtnSettings" role="tab" aria-controls="settingsTabContent" aria-selected="false" tabindex="-1"><span class="line-glyph">⌁</span> Ajustes</button>
+            <button type="button" class="tab-btn" id="tabBtnLibrary" role="tab" aria-controls="libraryTabContent" aria-selected="false" tabindex="-1"><span class="line-glyph">▣</span> Biblioteca</button>
         </div>
 
         <!-- ============================================================= -->
@@ -1564,6 +1574,7 @@
                 </button>
             </div>
 
+            <p id="creationFeedback" class="flow-feedback" role="status" aria-live="polite"></p>
             <form id="easyModeForm">
                 <div class="card easy-hero">
                     <div class="easy-hero-head">
@@ -1640,7 +1651,8 @@
 
                         <div class="quick-extra-audio">
                             <label for="easyLyricsTiming">Como sincronizar a letra</label>
-                            <select id="easyLyricsTiming" class="select-input"><option value="auto">Automático: usar a letra sincronizada quando disponível</option><option value="acoustic">Animação local — mantém os versos sincronizados</option></select>
+                            <select id="easyLyricsTiming" class="select-input" disabled aria-describedby="easyLyricsPolicy"><option value="auto">Letra sincronizada + animação local</option></select>
+                            <p id="easyLyricsPolicy" class="compact-note">A letra sincronizada tem prioridade: texto e tempos dos versos preservados. Os tempos locais animam apenas as palavras.</p>
                             <label for="easyKeepBackingVocals">Vozes de apoio</label>
                             <select id="easyKeepBackingVocals" class="select-input"><option value="true">Manter vozes de apoio; retirar a voz principal</option><option value="false">Retirar todas as vozes</option></select>
                             <label for="easyBackingVolume">Volume das vozes de apoio (%)</label>
@@ -1832,10 +1844,9 @@
                                     <option value="manual">Manual</option>
                                 </select>
                             </div>
-                            <label for="lyricsTiming" class="compact-note">Sincronização automática</label>
-                            <select id="lyricsTiming" name="lyrics_timing" class="select-input">
-                                <option value="auto">Usar tempos somente de uma letra sincronizada disponível</option>
-                                <option value="acoustic">Animação local — letra e versos sincronizados intactos</option>
+                            <label for="lyricsTiming" class="compact-note">Fonte da letra e sincronização</label>
+                            <select id="lyricsTiming" name="lyrics_timing" class="select-input" disabled>
+                                <option value="auto">Letra sincronizada + animação local</option>
                             </select>
                             <p class="compact-note">Quando disponível, a letra sincronizada mantém texto e tempos dos versos intactos. Somente a cor das palavras é animada pelos tempos locais, sem usar o texto reconhecido pelo Whisper. O karaokê analisa o áudio completo, sem VAD.</p>
                             <p id="lyricsModeHint" style="font-size: 0.7rem; color: var(--text-muted); margin: 0.35rem 0 0.45rem;">A letra é uma guia. Texto manual sempre tem prioridade.</p>
@@ -1948,7 +1959,7 @@
 
                             <div class="form-group">
                                 <span class="label">Tamanho da Fonte (pt)</span>
-                                <input type="number" id="fontSize" name="font_size" value="32" class="input-text">
+                                <input type="number" id="fontSize" name="font_size" value="32" min="16" max="120" class="input-text">
                             </div>
 
                             <div class="form-group">
@@ -1992,7 +2003,6 @@
                                 <span class="label">Filtro de fala (Silero VAD)</span>
                                 <select id="enableVad" name="enable_vad" class="select-input" disabled>
                                     <option value="false" selected>Desligado — áudio completo para canto</option>
-                                    <option value="true">Ligado (fala ou muito ruído)</option>
                                 </select>
                             </div>
 
@@ -2112,8 +2122,8 @@
 
             <!-- CARD DE REVISÃO E EDIÇÃO DE LEGENDAS (PAUSA INTERMEDIÁRIA) -->
             <!-- CARD DE REVISÃO E EDIÇÃO DE LEGENDAS (V2.2.4 FULL COMPATIBILIDADE) -->
-        <div id="correctionCard" style="display: none; background: rgba(30, 27, 57, 0.85); border: 1px solid var(--glass-border); padding: 1.5rem; border-radius: 14px; margin-top: 1.5rem; box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37); backdrop-filter: blur(8px);">
-            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem;">
+        <div id="correctionCard" style="display: none; background: var(--bg-card); border: 1px solid var(--glass-border); padding: 1.5rem; border-radius: 14px; margin-top: 1.5rem; box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37); backdrop-filter: blur(8px);">
+            <div class="correction-head" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem;">
                 <div style="display: flex; align-items: center; gap: 0.5rem;">
                     <span style="font-size: 1.3rem;">✏️</span>
                     <h3 style="margin: 0; font-size: 1.1rem; font-weight: 700; color: var(--text-main);">✍️ Revisar legendas</h3>
@@ -2121,18 +2131,22 @@
                 <button type="button" id="btnContinueProcess" class="btn-primary" style="width: auto; padding: 0.5rem 1.2rem; font-size: 0.85rem;">🚀 Salvar e renderizar</button>
             </div>
 
+            <p id="correctionValidationMessage" class="flow-feedback" role="alert"></p>
+            <p class="compact-note">Confira o texto e os tempos. Para remover uma linha, use a lixeira. A prévia mostra o texto; a animação final é aplicada ao renderizar.</p>
+            <audio id="correctionAudio" controls preload="metadata" aria-label="Áudio original para revisar as legendas" style="width:100%; margin:.5rem 0;"></audio>
+            <p id="correctionAudioHint" class="compact-note">Ouça o áudio original. Ao trocar de linha, o player vai para o início do verso.</p>
             <!-- Grid de Duas Colunas: Live Preview e Lista de Estrofes -->
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr)); gap: 1.5rem; margin-bottom: 1.5rem;">
 
                 <!-- Coluna A: Mockup Live Preview -->
                 <div style="display: flex; flex-direction: column; gap: 0.8rem;">
-                    <span style="font-size: 0.82rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">📺 Pré-visualização ao Vivo</span>
+                    <span style="font-size: 0.82rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">📺 Prévia do texto e do fundo</span>
 
                     <!-- Container Mockup 16:9 -->
                     <div id="previewVideoMock" style="position: relative; width: 100%; aspect-ratio: 16/9; background: #000; border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; padding: 1.5rem; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.5);">
                         <img id="previewBgImage" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; z-index: 1; display: none;">
                         <video id="previewBgVideo" autoplay loop muted playsinline style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; z-index: 1; display: none;"></video>
-                        <div id="previewSubtitleText" style="position: relative; z-index: 2; text-align: center; line-height: 1.2; text-shadow: 2px 2px 0px #000, -2px -2px 0px #000, 2px -2px 0px #000, -2px 2px 0px #000; font-weight: 700; width: 95%; overflow: hidden; text-overflow: ellipsis; white-space: normal; word-wrap: break-word;">
+                        <div id="previewSubtitleText" style="color: #fff; position: relative; z-index: 2; text-align: center; line-height: 1.2; text-shadow: 2px 2px 0px #000, -2px -2px 0px #000, 2px -2px 0px #000, -2px 2px 0px #000; font-weight: 700; width: 95%; overflow: hidden; text-overflow: ellipsis; white-space: normal; word-wrap: break-word;">
                             Selecione ou edite uma linha...
                         </div>
                     </div>
@@ -2145,7 +2159,7 @@
 
                 <!-- Coluna B: Lista de Estrofes com Edição de Tempos e Texto -->
                 <div style="display: flex; flex-direction: column; gap: 0.8rem;">
-                    <span style="font-size: 0.82rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">📜 Estrofes & Tempos Transcritor</span>
+                    <span style="font-size: 0.82rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">📜 Texto e tempos dos versos</span>
 
                     <div id="correctionList" style="display: flex; flex-direction: column; gap: 0.8rem; max-height: 400px; overflow-y: auto; padding-right: 0.5rem;">
                         <!-- Preenchido dinamicamente via renderSegments() -->
@@ -2307,7 +2321,7 @@
                         <div class="form-group"><span class="label">Modelo Whisper</span><select id="easyModeModel" class="select-input"><option value="large-v3-turbo">Large V3 Turbo</option><option value="large-v3">Large V3</option><option value="medium">Medium</option><option value="small">Small</option><option value="tiny">Tiny</option></select></div>
                         <div class="form-group"><span class="label">Perfil da voz</span><select id="easyModePreset" class="select-input"><option value="difficult">Voz difícil</option><option value="karaoke">Karaokê equilibrado</option><option value="continuous">Canto contínuo</option><option value="fast">Criação rápida</option></select></div>
                         <div class="form-group"><span class="label">Fonte da transcrição</span><select id="easyModeSource" class="select-input"><option value="original">Áudio original</option><option value="vocals" selected>Vocais separados pelo Demucs</option></select></div>
-                        <div class="form-group"><span class="label">Filtro Silero VAD</span><select id="easyModeEnableVad" class="select-input" disabled><option value="false">Desligado</option><option value="true">Ligado</option></select></div>
+                        <div class="form-group"><span class="label">Áudio para canto</span><select id="easyModeEnableVad" class="select-input" disabled><option value="false">Completo, sem cortes de silêncio</option></select></div>
                         <div class="form-group"><span class="label">Busca automática de letra</span><select id="easyModeLyricsMode" class="select-input"><option value="auto">Buscar automaticamente</option><option value="manual">Não buscar</option></select></div>
                     </div>
                 </details>
@@ -2647,7 +2661,7 @@
                 </ol>
                 <p>A API tem cota gratuita e pode limitar projetos sem auditoria a vídeos privados. Guarde a autorização como uma senha. Backing vocals e vídeo do modo SRT mostram porcentagem da etapa e avisam o avanço no Telegram; o LibreTranslate informa apenas início e término.</p>
             </details>
-            <p class="compact-note">Versão do servidor: 10.6. A transcrição é local; fontes, modelos e integrações podem acessar serviços externos. Use conteúdo autorizado.</p>
+            <p class="compact-note">Versão do servidor: 10.7. A transcrição é local; fontes, modelos e integrações podem acessar serviços externos. Use conteúdo autorizado.</p>
             <p class="compact-note">Use o servidor pela rede local ou VPN. A busca/importação do YouTube não concede direitos sobre a mídia. OAuth autoriza o acesso ao canal, não o uso de músicas. Confira as permissões do conteúdo e os termos do YouTube antes de importar ou publicar. Não listado permite acesso a quem tiver o link; resultados SRT nunca vão ao YouTube.</p>
             <p class="compact-note"><a href="https://www.youtube.com/static?template=terms" target="_blank" rel="noopener noreferrer">Termos do YouTube</a> · <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer">Privacidade do Google</a> · <a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener noreferrer">Revogar acesso ao canal</a></p>
         </div>
@@ -2755,6 +2769,27 @@
             subtitleButton?.setAttribute('aria-selected', String(mode === 'subtitle'));
         }
 
+        document.querySelectorAll('[role="tablist"]').forEach(tablist => {
+            tablist.addEventListener('keydown', event => {
+                if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+                const tabs = [...tablist.querySelectorAll('[role="tab"]')].filter(tab => !tab.disabled);
+                const index = tabs.indexOf(event.target);
+                if (index < 0) return;
+                event.preventDefault();
+                const next = event.key === 'Home' ? 0 : event.key === 'End' ? tabs.length - 1 :
+                    (index + (event.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length;
+                tabs[next].click();
+                tabs[next].focus();
+            });
+        });
+
+        function showCreationFeedback(text, kind = 'error') {
+            const message = document.getElementById('creationFeedback');
+            message.dataset.kind = kind;
+            message.textContent = text;
+            message.scrollIntoView({behavior: 'smooth', block: 'nearest'});
+        }
+
         function setCreationUiLocked(locked) {
             creationUiLocked = Boolean(locked);
             const switcher = document.getElementById('creatorModeSwitch');
@@ -2852,7 +2887,7 @@
                 easyModeWordsPerLine: config.words_per_line,
                 easyModeMaxCharsLine: config.max_chars_line,
                 easyModeBreakPunctuation: Boolean(config.break_on_punctuation),
-                easyModeEnableVad: Boolean(config.enable_vad),
+                easyModeEnableVad: false,
                 easyModePreset: config.transcription_preset,
                 easyModeBackgroundMode: config.background_mode,
                 easyModeSource: config.transcribe_source,
@@ -3307,6 +3342,10 @@
         const libraryTabContent = document.getElementById('libraryTabContent');
 
         function switchTab(tab) {
+            for (const [name, button] of [['create', tabBtnCreate], ['settings', tabBtnSettings], ['library', tabBtnLibrary]]) {
+                button?.setAttribute('aria-selected', String(name === tab));
+                if (button) button.tabIndex = name === tab ? 0 : -1;
+            }
             if (tabBtnCreate) tabBtnCreate.classList.remove('active');
             if (tabBtnSettings) tabBtnSettings.classList.remove('active');
             if (tabBtnLibrary) tabBtnLibrary.classList.remove('active');
@@ -3352,7 +3391,7 @@
             setValue('wordsPerLine', profile.words_per_line);
             setValue('maxCharsLine', profile.max_chars_line);
             setValue('breakOnPunctuation', profile.break_on_punctuation);
-            setValue('enableVad', profile.enable_vad);
+            setValue('enableVad', false);
             setValue('enableCorrection', profile.enable_correction);
             setValue('showInstrumental', profile.show_instrumental);
             setValue('transcribeSource', profile.transcribe_source);
@@ -3362,7 +3401,7 @@
             setValue('onlyRemoveVocals', profile.only_remove_vocals);
             setValue('keepBackingVocals', profile.keep_backing_vocals ?? true);
             setValue('backingVocalsVolume', profile.backing_vocals_volume ?? 100);
-            setValue('lyricsTiming', profile.lyrics_timing || 'auto');
+            setValue('lyricsTiming', 'auto');
 
             const description = document.getElementById('profileDescription');
             if (description) description.textContent = profile.description || 'Perfil personalizado por você.';
@@ -3752,18 +3791,50 @@
             return copy;
         }
 
-        async function submitProcessBatch(baseFormData, audioFiles = []) {
+        async function reportCreationError(error, processCard) {
+            const message = document.getElementById('creationFeedback');
+            message.dataset.kind = 'error';
+            message.textContent = error.message;
+            if (processCard) processCard.style.display = error.partialResults?.length ? 'block' : 'none';
+            if (error.partialResults?.length) {
+                await fetchProcessingQueue();
+                startPolling();
+                setQueueCreationExpanded(true);
+            }
+            message.scrollIntoView({behavior: 'smooth', block: 'nearest'});
+        }
+
+        function retainBatchFiles(inputId, files) {
+            const input = document.getElementById(inputId);
+            if (!input) return;
+            const remaining = new DataTransfer();
+            for (const file of files) remaining.items.add(file);
+            input.files = remaining.files;
+            input.dispatchEvent(new Event('change', {bubbles: true}));
+        }
+
+        async function submitProcessBatch(baseFormData, audioFiles = [], inputId = '') {
             const files = Array.from(audioFiles || []);
             const submissions = files.length ? files : [null];
             const results = [];
+            document.getElementById('creationFeedback').dataset.kind = 'progress';
+            document.getElementById('creationFeedback').textContent = '';
             for (const [index, file] of submissions.entries()) {
                 const formData = cloneFormData(baseFormData);
                 formData.delete('audio_file');
                 if (file) formData.set('audio_file', file, file.name);
-                const response = await authFetch('/api/process', { method: 'POST', body: formData });
-                const result = await response.json().catch(() => ({}));
-                if (!response.ok) {
-                    throw new Error(`${file?.name || 'vídeo'}: ${result.detail || 'não foi possível adicionar à fila.'}`);
+                let result;
+                try {
+                    const response = await authFetch('/api/process', { method: 'POST', body: formData });
+                    result = await response.json().catch(() => ({}));
+                    if (!response.ok) throw new Error(result.detail || 'Não foi possível adicionar à fila.');
+                } catch (cause) {
+                    if (files.length) retainBatchFiles(inputId, files.slice(index));
+                    const accepted = results.length ? `${results.length} arquivo(s) já adicionado(s) à fila. ` : '';
+                    const pending = files.length ? ' Os arquivos pendentes continuam selecionados.' : '';
+                    const error = new Error(`${accepted}${file?.name || 'Vídeo'}: ${cause.message}${pending}`);
+                    error.partialResults = results;
+                    throw error;
                 }
                 results.push(result);
                 clearTimeout(processingQueuePollTimer);
@@ -3774,6 +3845,10 @@
                 const button = document.getElementById(buttonId);
                 if (button && submissions.length > 1) button.textContent = `Enviando ${index + 1}/${submissions.length}...`;
             }
+            if (files.length) retainBatchFiles(inputId, []);
+            const message = document.getElementById('creationFeedback');
+            message.dataset.kind = 'success';
+            message.textContent = `${results.length} ${results.length === 1 ? 'arquivo adicionado' : 'arquivos adicionados'} à fila. Acompanhe o progresso abaixo.`;
             return results;
         }
 
@@ -4364,7 +4439,7 @@
                 if (easyAudioMode === 'upload') {
                     audioFiles = Array.from(document.getElementById('easyAudioFile')?.files || []);
                     if (!audioFiles.length) { quickValidation('Toque em Enviar arquivo e escolha uma música.', 'easyAudioFile'); return; }
-                    if (audioFiles.length > 25) { alert('Envie no máximo 25 arquivos por vez.'); return; }
+                    if (audioFiles.length > 25) { quickValidation('Envie no máximo 25 arquivos por vez.', 'easyAudioFile'); return; }
                 } else if (easyAudioMode === 'youtube') {
                     const url = document.getElementById('easyYoutubeUrl')?.value.trim();
                     if (!url) { quickValidation('Busque pelo nome ou cole o link da música.', 'easyYoutubeUrlSearch'); return; }
@@ -4412,7 +4487,7 @@
                     if (button) button.textContent = 'Preparando a criação...';
                     if (status) status.textContent = 'Preparando a criação rápida...';
 
-                    const results = await submitProcessBatch(formData, audioFiles);
+                    const results = await submitProcessBatch(formData, audioFiles, 'easyAudioFile');
                     clientPreparationInProgress = false;
                     setQueueCreationExpanded(false);
                     if (button) {
@@ -4424,9 +4499,8 @@
                 } catch (error) {
                     clientPreparationInProgress = false;
                     setCreationUiLocked(false);
-                    alert('Erro no Modo Rápido: ' + error.message);
                     if (button) { button.disabled = false; button.textContent = 'Criar karaokê'; }
-                    if (processCard) processCard.style.display = 'none';
+                    await reportCreationError(error, processCard);
                 }
             });
 
@@ -4440,11 +4514,11 @@
                 const libraryVideo = document.getElementById('subtitleLibraryVideo')?.value || '';
                 const selectedSources = Number(audioFiles.length > 0) + Number(Boolean(youtubeUrl)) + Number(Boolean(libraryVideo));
                 if (selectedSources !== 1) {
-                    alert('Escolha apenas uma origem: arquivos, link do YouTube ou vídeo da Biblioteca.');
+                    showCreationFeedback('Escolha apenas uma origem: arquivos, link do YouTube ou vídeo da Biblioteca.');
                     return;
                 }
                 if (audioFiles.length > 25) {
-                    alert('Envie no máximo 25 vídeos por vez.');
+                    showCreationFeedback('Envie no máximo 25 vídeos por vez.');
                     return;
                 }
 
@@ -4480,7 +4554,7 @@
                 });
                 updateTimelineUI('Uploading');
                 try {
-                    const results = await submitProcessBatch(formData, audioFiles);
+                    const results = await submitProcessBatch(formData, audioFiles, 'subtitleVideoFile');
                     clientPreparationInProgress = false;
                     setQueueCreationExpanded(false);
                     if (button) {
@@ -4493,8 +4567,7 @@
                     clientPreparationInProgress = false;
                     setCreationUiLocked(false);
                     if (button) { button.disabled = false; button.textContent = '▤ Gerar arquivos SRT'; }
-                    if (processCard) processCard.style.display = 'none';
-                    alert('Erro ao legendar vídeo: ' + error.message);
+                    await reportCreationError(error, processCard);
                 }
             });
 
@@ -5671,6 +5744,7 @@
                 btnLogout.onclick = async () => {
                     try { await authFetch('/api/logout', { method: 'POST' }); } catch (e) {}
                     localStorage.removeItem('karaoke_token');
+                    localStorage.removeItem('auth_token');
                     localStorage.removeItem('karaoke_username');
                     window.location.reload();
                 };
@@ -5801,7 +5875,7 @@
                         formData.delete('library_bg');
                     }
                     if (initialStatus) initialStatus.textContent = 'Preparando a criação...';
-                    const results = await submitProcessBatch(formData, audioFiles);
+                    const results = await submitProcessBatch(formData, audioFiles, 'audioFile');
                     clientPreparationInProgress = false;
                     setQueueCreationExpanded(false);
                     btnSubmit.disabled = false;
@@ -5811,10 +5885,9 @@
                 } catch (err) {
                     clientPreparationInProgress = false;
                     setCreationUiLocked(false);
-                    alert("Erro ao enviar: " + err.message);
                     btnSubmit.disabled = false;
                     btnSubmit.innerHTML = '🎬 Criar Karaokê';
-                    processCard.style.display = 'none';
+                    await reportCreationError(err, processCard);
                 }
             });
         }
@@ -5903,7 +5976,7 @@
 
                 if (data.has_cache) {
                     if (text) {
-                        text.innerHTML = `Mídia em cache: <strong>${data.audio_filename}</strong>. Altere cor, fonte, modo de legenda ou fundo e clique em <em>'Criar Vídeo Karaokê'</em> para gerar uma nova versão instantaneamente!`;
+                        text.innerHTML = `Mídia em cache: <strong>${escapeHtml(data.audio_filename)}</strong>. Ajuste o visual e crie outra versão. A análise de áudio compatível será reaproveitada; o vídeo será renderizado novamente.`;
                     }
                     if (badge) badge.style.display = 'flex';
                 } else {
@@ -5932,8 +6005,7 @@
                         const previewBgVideo = document.getElementById('previewBgVideo');
 
                         if (cacheData.has_cache) {
-                            const token = localStorage.getItem('auth_token') || '';
-                            const bgUrl = `/api/cache/background?token=${encodeURIComponent(token)}`;
+                            const bgUrl = `/api/cache/background?token=${encodeURIComponent(authToken)}`;
                             if (cacheData.bg_is_video) {
                                 if (previewBgImage) previewBgImage.style.display = 'none';
                                 if (previewBgVideo) {
@@ -5961,6 +6033,15 @@
                 currentSegments = await res.json();
                 selectedSegmentIndex = 0;
                 renderSegments();
+                const audio = document.getElementById('correctionAudio');
+                audio.src = `/api/cache/audio?token=${encodeURIComponent(authToken)}`;
+                audio.onloadedmetadata = () => {
+                    const start = currentSegments[selectedSegmentIndex]?.start || 0;
+                    audio.currentTime = Math.min(start, audio.duration || start);
+                };
+                audio.onerror = () => {
+                    document.getElementById('correctionAudioHint').textContent = 'Prévia de áudio indisponível. Confira a mídia original.';
+                };
 
                 initCorrectionButtonListeners();
                 const correctionCard = document.getElementById('correctionCard');
@@ -5973,26 +6054,20 @@
 
                 // CONVERSÃO DE TEMPO PARA EDICAO DE LEGENDAS EM MM:SS.ms
         function formatTimeMMSS(sec) {
-            if (isNaN(sec) || sec < 0) sec = 0;
-            const mins = Math.floor(sec / 60);
-            const remainder = (sec % 60).toFixed(2);
-            const paddedMins = String(mins).padStart(2, '0');
-            const paddedSecs = parseFloat(remainder) < 10 ? '0' + remainder : remainder;
-            return `${paddedMins}:${paddedSecs}`;
+            if (!Number.isFinite(sec) || sec < 0) return '';
+            const centiseconds = Math.round(sec * 100);
+            const mins = Math.floor(centiseconds / 6000);
+            const seconds = Math.floor(centiseconds % 6000 / 100);
+            return `${String(mins).padStart(2, '0')}:${String(seconds).padStart(2, '0')}.${String(centiseconds % 100).padStart(2, '0')}`;
         }
 
         function parseTimeMMSS(str) {
-            if (!str) return 0;
-            str = String(str).trim();
-            if (str.includes(':')) {
-                const parts = str.split(':');
-                const mins = parseFloat(parts[0]) || 0;
-                const secs = parseFloat(parts[1]) || 0;
-                return mins * 60 + secs;
-            } else {
-                const parsed = parseFloat(str);
-                return isNaN(parsed) ? 0 : parsed;
+            const value = String(str || '').trim().replace(',', '.');
+            if (/^\d+:\d{1,2}(?:\.\d+)?$/.test(value)) {
+                const [mins, secs] = value.split(':').map(Number);
+                return secs < 60 ? mins * 60 + secs : NaN;
             }
+            return /^\d+(?:\.\d+)?$/.test(value) ? Number(value) : NaN;
         }
 
         function selectCorrectionSegment(index, shouldScroll = false) {
@@ -6004,8 +6079,13 @@
                 return;
             }
 
+            const previousIndex = selectedSegmentIndex;
             selectedSegmentIndex = Math.max(0, Math.min(currentSegments.length - 1, index));
             const selected = currentSegments[selectedSegmentIndex];
+            const audio = document.getElementById('correctionAudio');
+            if (audio?.readyState > 0 && previousIndex !== selectedSegmentIndex) {
+                audio.currentTime = Math.min(selected.start, audio.duration || selected.start);
+            }
             updatePreviewText(selected.text);
 
             document.querySelectorAll('.correction-segment').forEach(card => {
@@ -6074,6 +6154,7 @@
                 btnDelete.style.cursor = "pointer";
                 btnDelete.style.fontSize = "0.85rem";
                 btnDelete.title = "Excluir Linha";
+                btnDelete.setAttribute('aria-label', `Excluir linha ${idx + 1}`);
                 btnDelete.onclick = event => {
                     event.stopPropagation();
                     currentSegments.splice(idx, 1);
@@ -6179,8 +6260,10 @@
                 card.appendChild(timeRow);
 
                 // Campo de Texto da Estrofe
-                const textInput = document.createElement('input');
-                textInput.type = "text";
+                const textInput = document.createElement('textarea');
+                textInput.rows = 2;
+                textInput.style.resize = 'vertical';
+                textInput.setAttribute('aria-label', `Letra da linha ${idx + 1}`);
                 textInput.className = "input-text";
                 textInput.value = seg.text || "";
                 textInput.style.fontWeight = "500";
@@ -6214,6 +6297,25 @@
 
             if (btnContinue) {
                 btnContinue.onclick = async () => {
+                    const feedback = document.getElementById('correctionValidationMessage');
+                    feedback.textContent = '';
+                    const invalid = currentSegments.findIndex((segment, index) => !segment.text.trim() ||
+                        !Number.isFinite(segment.start) || !Number.isFinite(segment.end) || segment.start < 0 ||
+                        segment.end <= segment.start || (index > 0 && segment.start < currentSegments[index - 1].start));
+                    if (!currentSegments.length || invalid >= 0) {
+                        feedback.dataset.kind = 'error';
+                        feedback.textContent = !currentSegments.length ? 'Mantenha pelo menos uma linha antes de renderizar.' :
+                            `Linha ${invalid + 1}: confira o texto e os tempos. O fim deve vir depois do início; mantenha os inícios em ordem. Para remover texto, exclua a linha.`;
+                        if (invalid >= 0) {
+                            selectCorrectionSegment(invalid, true);
+                            const card = document.querySelector(`.correction-segment[data-segment-index="${invalid}"]`);
+                            const input = card.querySelector(!currentSegments[invalid].text.trim() ? 'textarea' : 'input');
+                            input.setAttribute('aria-invalid', 'true');
+                            input.focus();
+                        }
+                        return;
+                    }
+                    document.querySelectorAll('.correction-segment [aria-invalid]').forEach(input => input.removeAttribute('aria-invalid'));
                     btnContinue.disabled = true;
                     btnContinue.innerText = "⏳ Salvando e Renderizando...";
                     try {
@@ -6223,18 +6325,22 @@
                             body: JSON.stringify({ segments: currentSegments })
                         });
                         if (res.ok) {
+                            document.getElementById('correctionAudio')?.pause();
                             document.getElementById('correctionCard').style.display = 'none';
                             document.getElementById('processCard').style.display = 'block';
                             isShowingCorrection = false;
                             startPolling();
                         } else {
-                            alert("Erro ao retomar renderização.");
+                            const error = await res.json().catch(() => ({}));
+                            feedback.dataset.kind = 'error';
+                            feedback.textContent = error.detail || 'Não foi possível salvar a revisão. Tente novamente.';
                         }
                     } catch (e) {
-                        alert("Erro: " + e.message);
+                        feedback.dataset.kind = 'error';
+                        feedback.textContent = e.message;
                     } finally {
                         btnContinue.disabled = false;
-                        btnContinue.innerText = "🚀 Salvar e Renderizar Vídeo Karaokê";
+                        btnContinue.innerText = "🚀 Salvar e renderizar";
                     }
                 };
             }
@@ -6246,6 +6352,7 @@
                     try {
                         const res = await authFetch('/api/skip_edit', { method: 'POST' });
                         if (res.ok) {
+                            document.getElementById('correctionAudio')?.pause();
                             document.getElementById('correctionCard').style.display = 'none';
                             document.getElementById('processCard').style.display = 'block';
                             isShowingCorrection = false;
@@ -6269,6 +6376,7 @@
                     try {
                         const res = await authFetch('/api/cancel', { method: 'POST' });
                         if (res.ok) {
+                            document.getElementById('correctionAudio')?.pause();
                             document.getElementById('correctionCard').style.display = 'none';
                             document.getElementById('processCard').style.display = 'none';
                             clientPreparationInProgress = false;
@@ -6296,6 +6404,9 @@
                 const previousStatus = lastKnownServerStatus;
                 lastKnownServerStatus = data.status || 'idle';
                 const statusChanged = previousStatus !== lastKnownServerStatus;
+                if (isShowingCorrection && !['waiting_for_user_correction', 'awaiting_review'].includes(data.status)) {
+                    document.getElementById('correctionAudio')?.pause();
+                }
 
                 const formCard = document.getElementById('karaokêForm');
                 const processCard = document.getElementById('processCard');

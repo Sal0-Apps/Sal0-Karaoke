@@ -46,6 +46,7 @@ from reprocess_cache import copy_reusable_inputs, youtube_identity, file_fingerp
 from media_covers import video_thumbnail
 from lyrics_sync import recording_matches, parse_lrc, require_acoustic_word_timing, anchor_synced_animation
 from backing_vocals import preserve_backing_vocals
+from processing_validation import validate_processing_options, validate_review_segments
 
 # Configurar logs
 logging.basicConfig(
@@ -296,6 +297,7 @@ USER_DATA_ROOT = "/data/user_data"
 LEGACY_LIBRARY_DIR = "/data/library"
 LEGACY_CACHE_DIR = "/data/cache"
 LEGACY_OUTPUT_DIR = "/data/output"
+legacy_cache_promotion_lock = threading.RLock()
 
 
 def is_admin(user: dict) -> bool:
@@ -337,7 +339,14 @@ def get_user_paths(user: dict) -> dict:
 
     for section in ("videos", "photos", "history"):
         os.makedirs(os.path.join(paths["library"], section), exist_ok=True)
-    os.makedirs(paths["cache"], exist_ok=True)
+    previous_cache = paths["cache"] + ".previous"
+    if os.path.isdir(previous_cache) or not os.path.isdir(paths["cache"]):
+        with legacy_cache_promotion_lock:
+            if os.path.isdir(previous_cache) and (not os.path.exists(paths["cache"]) or not os.listdir(paths["cache"])):
+                if os.path.isdir(paths["cache"]):
+                    os.rmdir(paths["cache"])
+                os.replace(previous_cache, paths["cache"])
+            os.makedirs(paths["cache"], exist_ok=True)
     os.makedirs(paths["output"], exist_ok=True)
     return paths
 
@@ -589,7 +598,6 @@ processing_queue = []
 processing_queue_paused = False
 processing_queue_worker_started = False
 ACTIVE_QUEUE_STATUSES = {"queued", "processing"}
-legacy_cache_promotion_lock = threading.Lock()
 
 
 class StagePauseRequested(Exception):
@@ -684,8 +692,10 @@ def save_stage_checkpoint(
 
 def save_processing_queue_control_unlocked():
     os.makedirs(os.path.dirname(PROCESSING_QUEUE_CONTROL_FILE), exist_ok=True)
-    with open(PROCESSING_QUEUE_CONTROL_FILE, "w", encoding="utf-8") as control_file:
+    temporary_file = f"{PROCESSING_QUEUE_CONTROL_FILE}.tmp"
+    with open(temporary_file, "w", encoding="utf-8") as control_file:
         json.dump({"paused": processing_queue_paused}, control_file, ensure_ascii=False, indent=2)
+    os.replace(temporary_file, PROCESSING_QUEUE_CONTROL_FILE)
 
 
 def load_processing_queue_control():
@@ -707,8 +717,10 @@ def save_processing_queue_unlocked():
         if job.get("status") in ACTIVE_QUEUE_STATUSES
     ]
     os.makedirs(os.path.dirname(PROCESSING_QUEUE_FILE), exist_ok=True)
-    with open(PROCESSING_QUEUE_FILE, "w", encoding="utf-8") as queue_file:
+    temporary_file = f"{PROCESSING_QUEUE_FILE}.tmp"
+    with open(temporary_file, "w", encoding="utf-8") as queue_file:
         json.dump(processing_queue, queue_file, ensure_ascii=False, indent=2)
+    os.replace(temporary_file, PROCESSING_QUEUE_FILE)
 
 
 def load_processing_queue():
@@ -763,7 +775,12 @@ def enqueue_processing_job(job: dict) -> int:
             raise HTTPException(status_code=429, detail="Sua fila atingiu o limite de 25 vídeos pendentes.")
         processing_queue.append(job)
         position = sum(1 for queued_job in processing_queue if queued_job.get("status") == "queued")
-        save_processing_queue_unlocked()
+        try:
+            save_processing_queue_unlocked()
+        except OSError:
+            processing_queue.remove(job)
+            logger.exception("Não foi possível salvar a nova tarefa na fila.")
+            raise HTTPException(status_code=503, detail="Não foi possível salvar a tarefa. Verifique o espaço do servidor e tente novamente.")
     processing_queue_event.set()
     return position
 
@@ -829,18 +846,28 @@ def promote_queue_cache_in_background(job_cache: str, owner: dict):
             if not job_cache or not os.path.isdir(job_cache):
                 return
             legacy_cache = get_user_paths(owner)["cache"]
-            os.makedirs(legacy_cache, exist_ok=True)
-            for cached_name in os.listdir(legacy_cache):
-                cached_path = os.path.join(legacy_cache, cached_name)
-                try:
-                    if os.path.isdir(cached_path):
-                        shutil.rmtree(cached_path)
-                    else:
-                        os.remove(cached_path)
-                except OSError as exc:
-                    logger.warning("Não foi possível atualizar o cache reutilizável: %s", exc)
-            shutil.copytree(job_cache, legacy_cache, dirs_exist_ok=True)
+            staging = legacy_cache + ".promoting"
+            previous = legacy_cache + ".previous"
+            os.makedirs(os.path.dirname(legacy_cache), exist_ok=True)
+            # Recover an interrupted swap before preparing the next complete copy.
+            if os.path.isdir(previous) and not os.path.exists(legacy_cache):
+                os.replace(previous, legacy_cache)
+            if os.path.isdir(staging):
+                shutil.rmtree(staging)
+            shutil.copytree(job_cache, staging)
+            if os.path.isdir(previous):
+                shutil.rmtree(previous)
+            if os.path.exists(legacy_cache):
+                os.replace(legacy_cache, previous)
+            try:
+                os.replace(staging, legacy_cache)
+            except OSError:
+                if os.path.isdir(previous):
+                    os.replace(previous, legacy_cache)
+                raise
             promoted = True
+            if os.path.isdir(previous):
+                shutil.rmtree(previous, ignore_errors=True)
     except Exception:
         logger.exception("Não foi possível promover o cache concluído em segundo plano.")
     finally:
@@ -1653,9 +1680,13 @@ def normalize_easy_mode_config(config: dict | None = None) -> dict:
         normalized["lyrics_mode"] = EASY_MODE_DEFAULTS["lyrics_mode"]
     if not re.fullmatch(r"#[0-9A-Fa-f]{6}", str(normalized.get("text_color", ""))):
         normalized["text_color"] = EASY_MODE_DEFAULTS["text_color"]
-    normalized["font_size"] = max(24, min(72, int(normalized.get("font_size", 50))))
-    normalized["words_per_line"] = max(0, min(30, int(normalized.get("words_per_line", 0))))
-    normalized["max_chars_line"] = max(0, min(100, int(normalized.get("max_chars_line", 0))))
+    for key, minimum, maximum in (("font_size", 24, 72), ("words_per_line", 0, 30),
+                                  ("max_chars_line", 0, 100)):
+        try:
+            value = int(normalized[key])
+        except (ValueError, TypeError, OverflowError):
+            value = EASY_MODE_DEFAULTS[key]
+        normalized[key] = max(minimum, min(maximum, value))
     random_backgrounds = normalized.get("random_backgrounds", [])
     if not isinstance(random_backgrounds, list):
         random_backgrounds = []
@@ -1673,7 +1704,9 @@ def normalize_easy_mode_config(config: dict | None = None) -> dict:
         "show_instrumental", "enable_correction", "keep_first_line_visible",
         "save_to_library", "only_remove_vocals",
     ):
-        normalized[bool_key] = bool(normalized.get(bool_key, EASY_MODE_DEFAULTS[bool_key]))
+        value = normalized.get(bool_key, EASY_MODE_DEFAULTS[bool_key])
+        normalized[bool_key] = (value.strip().lower() == "true" if isinstance(value, str) else bool(value))
+    normalized["enable_vad"] = False  # Singing always keeps the full audio timeline.
     return normalized
 
 
@@ -2883,7 +2916,7 @@ BUILTIN_PROFILES = {
         "show_next_line_preview": False,
         "keep_first_line_visible": False,
         "enable_correction": False,
-        "enable_vad": True,
+        "enable_vad": False,
         "transcription_preset": "fast",
         "save_to_library": True,
         "only_remove_vocals": False,
@@ -2936,6 +2969,9 @@ def load_profiles(user: dict) -> dict:
                 profiles[name] = dict(BUILTIN_PROFILES[name])
                 changed = True
             continue
+        if profile_data.get("enable_vad") is not False:
+            profile_data["enable_vad"] = False
+            changed = True
         if "enable_correction" not in profile_data:
             profile_data["enable_correction"] = profile_data.get("pause_for_editing", False)
             changed = True
@@ -2967,6 +3003,10 @@ def save_profile(profile: ProfileModel, current_user: dict = Depends(get_current
         raise HTTPException(status_code=400, detail="Informe um nome para o perfil.")
     if profile_name in BUILTIN_PROFILES:
         raise HTTPException(status_code=400, detail="Perfis prontos não podem ser sobrescritos. Salve sua variação com outro nome.")
+    try:
+        validate_processing_options(**profile.dict())
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
     profiles[profile_name] = {
         "description": "Perfil personalizado por você.",
         "_builtin": False,
@@ -2986,7 +3026,7 @@ def save_profile(profile: ProfileModel, current_user: dict = Depends(get_current
         "show_next_line_preview": profile.show_next_line_preview,
         "keep_first_line_visible": profile.keep_first_line_visible,
         "enable_correction": profile.enable_correction,
-        "enable_vad": profile.enable_vad,
+        "enable_vad": False,
         "transcription_preset": profile.transcription_preset,
         "save_to_library": profile.save_to_library,
         "keep_backing_vocals": profile.keep_backing_vocals,
@@ -3730,7 +3770,12 @@ def get_cache_info(current_user: dict = Depends(get_current_user)):
 
             bg_filename = None
             bg_is_video = False
-            if meta.get("has_bg"):
+            active_pipeline = active_queue_pipeline_for_user(current_user)
+            original_video = active_pipeline.get("input_audio_path")
+            uses_original = active_pipeline.get("subtitle_only") or active_pipeline.get("background_mode") == "original"
+            if uses_original and original_video and check_has_video(original_video):
+                bg_is_video = True
+            if meta.get("has_bg") and not uses_original and active_pipeline.get("background_mode") != "color":
                 bg_ext = meta.get("bg_ext", "")
                 if os.path.exists(os.path.join(cache_dir, f"original_bg{bg_ext}")):
                     bg_filename = meta.get("bg_filename")
@@ -3752,6 +3797,13 @@ def get_cache_info(current_user: dict = Depends(get_current_user)):
 def get_cached_background(current_user: dict = Depends(get_current_user)):
     """Serve o arquivo de background em cache (imagem ou vídeo) ou uma paisagem padrão como fallback."""
     cache_dir = queue_cache_dir_for_user(current_user) or get_user_paths(current_user)["cache"]
+    active_pipeline = active_queue_pipeline_for_user(current_user)
+    original_video = active_pipeline.get("input_audio_path")
+    uses_original = active_pipeline.get("subtitle_only") or active_pipeline.get("background_mode") == "original"
+    if uses_original and original_video and check_has_video(original_video):
+        return FileResponse(original_video, media_type=mimetypes.guess_type(original_video)[0] or "video/mp4")
+    if active_pipeline.get("background_mode") == "color":
+        return Response('<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720"><rect width="100%" height="100%" fill="black"/></svg>', media_type="image/svg+xml")
     cache_meta_file = os.path.join(cache_dir, "cache_meta.json")
     if os.path.exists(cache_meta_file):
         try:
@@ -3772,18 +3824,30 @@ def get_cached_background(current_user: dict = Depends(get_current_user)):
         except Exception:
             pass
 
-    active_pipeline = active_queue_pipeline_for_user(current_user)
-    original_video = active_pipeline.get("input_audio_path")
-    if active_pipeline.get("subtitle_only") and original_video and check_has_video(original_video):
-        media_type = mimetypes.guess_type(original_video)[0] or "video/mp4"
-        return FileResponse(original_video, media_type=media_type)
-
     # Fallback para paisagem aleatória
     default_bg = get_random_default_background()
     if default_bg and os.path.exists(default_bg):
         return FileResponse(default_bg, media_type="image/jpeg")
 
     raise HTTPException(status_code=404, detail="Nenhum plano de fundo disponível em cache.")
+
+
+@app.get("/api/cache/audio")
+def get_cached_audio(current_user: dict = Depends(get_current_user)):
+    """Serve the complete source of this user's review, without the title cover."""
+    pipeline = active_queue_pipeline_for_user(current_user)
+    source = pipeline.get("input_audio_path")
+    if not source:
+        cache_dir = queue_cache_dir_for_user(current_user) or get_user_paths(current_user)["cache"]
+        try:
+            with open(os.path.join(cache_dir, "cache_meta.json"), encoding="utf-8") as file:
+                extension = json.load(file).get("input_ext", "")
+            source = os.path.join(cache_dir, f"original_input{extension}")
+        except (OSError, ValueError):
+            source = None
+    if not source or not os.path.isfile(source):
+        raise HTTPException(status_code=404, detail="Áudio da revisão não está disponível.")
+    return FileResponse(source, media_type=mimetypes.guess_type(source)[0] or "audio/wav")
 
 
 @app.post("/api/skip_edit")
@@ -3808,9 +3872,14 @@ def continue_process(data: ContinueProcessModel, current_user: dict = Depends(ge
     if not segments_to_edit:
         raise HTTPException(status_code=400, detail="Nenhum processamento aguardando correção.")
 
+    try:
+        validate_review_segments(data.segments)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
     updated_segments = []
     for s in data.segments:
-        seg_text = s.text.strip()
+        seg_text = s.text if s.synced_line else s.text.strip()
         if s.synced_line:
             if getattr(s, "acoustic_animation", False):
                 source = {"start": s.start, "end": s.end, "text": seg_text}
@@ -4086,8 +4155,22 @@ def process_karaoke(
         lyrics_text = ""
         only_remove_vocals = False
 
-    if transcription_preset not in {"karaoke", "continuous", "difficult", "fast"}:
-        raise HTTPException(status_code=400, detail="Perfil de leitura da voz inválido.")
+    lyrics_mode = (lyrics_mode or "auto").strip().lower()
+    if not subtitle_only:
+        enable_vad = False
+    try:
+        validate_processing_options(
+            whisper_model=whisper_model, transcription_preset=transcription_preset,
+            font_size=font_size, text_color=text_color, text_position=text_position,
+            subtitle_mode=subtitle_mode, words_per_line=words_per_line,
+            max_chars_line=max_chars_line, background_mode=background_mode,
+            transcribe_source=transcribe_source, backing_vocals_volume=backing_vocals_volume,
+            lyrics_timing=lyrics_timing, lyrics_mode=lyrics_mode,
+            youtube_url=youtube_url if not library_audio else None,
+            library_audio=library_audio, library_bg=library_bg,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
 
     user_paths = get_user_paths(current_user)
     job_id = uuid.uuid4().hex
@@ -4114,13 +4197,6 @@ def process_karaoke(
         else:
             background_mode = "original"
 
-    if not 0 <= backing_vocals_volume <= 100:
-        raise HTTPException(status_code=400, detail="Volume dos backing vocals deve estar entre 0 e 100%.")
-    if lyrics_timing not in {"auto", "acoustic"}:
-        raise HTTPException(status_code=400, detail="Modo de sincronização inválido.")
-    lyrics_mode = (lyrics_mode or "auto").strip().lower()
-    if lyrics_mode not in {"auto", "manual"}:
-        raise HTTPException(status_code=400, detail="Modo de letra inválido.")
     if lyrics_mode == "auto":
         # A letra automática pertence à mídia atual. Nunca reutilizar o texto
         # enviado pelo navegador, que pode ter vindo da música anterior.
@@ -5524,7 +5600,8 @@ def run_pipeline(
 
         # Provider availability can change between retries. Never reuse subtitles
         # created from different line clocks, even with the same display options.
-        clock_hash = hashlib.sha256(json.dumps({"animation_timing_version": 3, "synced_validation_version": 4, "synced_text_version": 2, "synced_animation_version": 3, "synced_layout_version": 1, "lead_whisper_version": 1, "guided_spelling_version": 2, "lyrics": synced_segments}, sort_keys=True).encode()).hexdigest()
+        clock_hash = hashlib.sha256(json.dumps({"animation_timing_version": 3, "synced_validation_version": 4, "synced_text_version": 2, "synced_animation_version": 3, "synced_layout_version": 2,
+            "display_animation_version": 1, "lead_whisper_version": 1, "guided_spelling_version": 2, "lyrics": synced_segments}, sort_keys=True).encode()).hexdigest()
         if cached_meta.get("lyrics_clock_hash") != clock_hash:
             checkpoints = load_stage_checkpoints(cache_dir)
             for stage in ("transcription_reviewed", "subtitles_generated", "video_rendered"):

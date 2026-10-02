@@ -1,3 +1,15 @@
+# 10.7
+
+- Auditoria do fluxo de criação, revisão, fila, cache, renderização e interface. Relatório: [AUDIT_FLOW_V10_7.md](AUDIT_FLOW_V10_7.md).
+- Letra sincronizada continua sendo a fonte do texto completo e dos intervalos dos versos. Salvar uma revisão sem alterações preserva também os espaços originais. O Whisper fornece apenas os tempos locais da animação; karaokê mantém o áudio completo e a voz principal isolada quando há backing vocals.
+- Layout com regiões separadas para verso e prévia também aplicado às legendas comuns. Corrigida a duplicação do primeiro verso na introdução. Sílabas usam varredura; palavras destacam a palavra inteira; linhas/frases ficam estáticas, respeitando a cor escolhida.
+- Revisão com campos maiores, áudio original autenticado e navegação que busca o início do verso. Linhas vazias, tempos inválidos e ordem invertida mostram o erro no editor e não liberam uma renderização inválida. A prévia de fundo usa a sessão atual e o vídeo original quando selecionado.
+- Envios em lote preservam somente os arquivos pendentes em caso de falha; arquivos já aceitos não são enviados novamente pela repetição do lote. Erros e confirmações ficam na página. A fila é salva com substituição atômica; falha ao salvar uma tarefa não deixa um trabalho oculto em memória.
+- Promoção de cache prepara a cópia antes de substituir a anterior, com recuperação após interrupção. Corrigido o fundo de cor sólida para usar preto. Finalização do FFmpeg fecha o pipe e encerra processos em falhas de acompanhamento.
+- Cabeçalho menor no celular, Biblioteca sem quebra de palavra, navegação por teclado e controles que refletem a política de letra sincronizada e áudio sem cortes. Configurações antigas são normalizadas.
+- Verificação com 244 testes Python, FFmpeg/libass real e testes de navegador para os três modos, revisão, tentativas de novo, YouTube e tamanhos de tela. O workflow de publicação verifica também os modelos reais de backing vocals e Whisper em CPU.
+- Publicação somente do servidor. Android e configurador Windows existentes são reutilizados.
+
 # 10.6
 
 - Reverte a mudança visual da 10.5 e restaura a varredura clássica de cor do karaokê. Corrigida a sobreposição entre verso atual e prévia da próxima linha mostrada na foto.

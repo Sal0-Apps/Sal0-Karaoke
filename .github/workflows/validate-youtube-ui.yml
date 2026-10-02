@@ -1,9 +1,8 @@
-name: Validate YouTube administration
+name: Validate server flow and interface
 on:
   pull_request:
     paths:
-      - 'app/templates/index.html'
-      - 'app/youtube_publisher.py'
+      - 'app/**'
       - 'tests/**'
       - '.github/workflows/validate-youtube-ui.yml'
   workflow_dispatch:
@@ -36,6 +35,9 @@ jobs:
           python -m unittest discover -s tests -p test_automatic_lyrics_and_search.py -v
           python -m unittest discover -s tests -p test_synced_acoustic_animation.py -v
           python -m unittest discover -s tests -p test_synced_preview_layout.py -v
+          python -m unittest discover -s tests -p test_processing_flow.py -v
+          python -m unittest discover -s tests -p test_display_modes.py -v
+          python -m unittest discover -s tests -p test_whisper_cache_reuse.py -v
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
@@ -43,9 +45,12 @@ jobs:
           npm install --prefix /tmp/sal0-ui playwright@1.51.1
           /tmp/sal0-ui/node_modules/.bin/playwright install --with-deps chromium
           NODE_PATH=/tmp/sal0-ui/node_modules node tests/browser_youtube_publisher.cjs
+          NODE_PATH=/tmp/sal0-ui/node_modules node tests/browser_creation_review.cjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: youtube-admin-layout
-          path: youtube-admin-*.png
+          name: server-flow-layout
+          path: |
+            youtube-admin-*.png
+            creation-review-*.png
           if-no-files-found: ignore

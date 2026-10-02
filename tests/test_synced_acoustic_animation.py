@@ -311,7 +311,7 @@ class SyncedAcousticAnimationTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder:
             target = Path(folder) / 'repeated.ass'
             generate_ass_karaoke(anchored, str(target), show_instrumental=False,
-                                 subtitle_mode='phrase', words_per_line=1)
+                                 subtitle_mode='syllable', words_per_line=1)
             output = target.read_text()
         self.assertIn('0:00:10.00,0:00:13.00', output)
         self.assertNotIn('0:00:10.00,0:00:30.00', output)
