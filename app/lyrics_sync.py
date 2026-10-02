@@ -65,9 +65,9 @@ def parse_lrc(text, duration):
         times = list(stamp.finditer(line))
         if not times:
             continue
-        lyric = stamp.sub("", line).strip()
+        lyric = stamp.sub("", line)
         # Enhanced LRC includes word clocks; this parser intentionally uses lines.
-        lyric = re.sub(r"<\d+:\d+(?:\.\d+)?>", "", lyric).strip()
+        lyric = re.sub(r"<\d+:\d+(?:\.\d+)?>", "", lyric)
         for match in times:
             start = int(match[1]) * 60 + int(match[2]) + float("0." + (match[3] or "0")) + offset
             if 0 <= start < duration:
@@ -78,9 +78,8 @@ def parse_lrc(text, duration):
     segments = []
     for index, (start, lyric) in enumerate(ordered):
         end = ordered[index + 1][0] if index + 1 < len(ordered) else duration
-        # LRC has no reliable sung end. Cap display to preserve long instrumental gaps.
-        end = min(end, start + 12)
-        if lyric and end > start:
+        # Only provider boundaries (including blank lines) end a synced verse.
+        if lyric.strip() and end > start:
             segments.append({"start": start, "end": end, "text": lyric, "words": [], "synced_line": True})
     return segments if len(segments) >= 2 else []
 
@@ -163,81 +162,46 @@ def assess_synced_timing(synced_segments, acoustic_segments):
 
 
 def anchor_synced_animation(synced_segments, acoustic_segments):
-    """Keep every provider verse/text intact; match animation clocks only in its window."""
-    acoustic_words = [word for segment in acoustic_segments for word in segment.get('words', [])]
-    result = []
-    def key(text):
-        value = unicodedata.normalize('NFKD', str(text)).casefold()
-        value = ''.join(char for char in value if not unicodedata.combining(char))
-        return ''.join(re.findall(r'\w+', value))
-    for verse in synced_segments:
-        start, end = float(verse['start']), float(verse['end'])
-        tokens = str(verse['text']).split()
-        candidates = []
-        for word in acoustic_words:
-            try:
-                w_start, w_end = float(word['start']), float(word['end'])
-            except (KeyError, TypeError, ValueError):
-                continue
-            if (math.isfinite(w_start) and math.isfinite(w_end) and w_end > w_start
-                    and start <= (w_start + w_end) / 2 < end and key(word.get('word', ''))):
-                candidates.append(word)
-        matcher = SequenceMatcher(None, [key(token) for token in tokens],
-                                  [key(word['word']) for word in candidates], autojunk=False)
-        clocks = {}
-        for block in matcher.get_matching_blocks():
-            for offset in range(block.size):
-                index = block.a + offset
-                word = candidates[block.b + offset]
-                clocks[index] = (max(start, float(word['start'])), min(end, float(word['end'])))
-        animation_words, matched_words = [], []
-        for index, token in enumerate(tokens):
-            word = {'word': token + (' ' if index < len(tokens) - 1 else '')}
-            if index in clocks:
-                word['start'], word['end'] = clocks[index]
-                matched_words.append(dict(word))
-            animation_words.append(word)
-        result.append({**verse, 'words': matched_words, 'animation_words': animation_words,
-                       'synced_line': True, 'acoustic_animation': True})
-    return result
+    """Keep provider text/verse clocks immutable; attach only local word times.
 
-
-def retime_synced_verses(synced_segments, acoustic_segments):
-    """Use locally measured verse clocks while retaining all provider text.
-
-    Global sequence matching keeps repeated choruses in occurrence order. A
-    verse without sufficient recognized words retains its provider clock; it
-    never gets replaced with the recognized text or removed from the lyrics.
+    Recognized strings play no part in timing assignment. Local intervals are
+    ordered within each provider verse and assigned in order to its own words.
+    When recognition yields extra intervals, adjacent intervals are grouped;
+    if it yields fewer intervals, remaining words stay fully visible/static.
     """
-    def key(value):
-        value = unicodedata.normalize('NFKD', str(value)).casefold()
-        return ''.join(re.findall(r'\w+', ''.join(c for c in value if not unicodedata.combining(c))))
-
-    lyric_tokens = []
-    ranges = []
-    for verse in synced_segments:
-        begin = len(lyric_tokens)
-        lyric_tokens.extend(key(token) for token in str(verse['text']).split())
-        ranges.append((begin, len(lyric_tokens)))
-    acoustic = []
+    clocks = []
     for segment in acoustic_segments:
         for word in segment.get('words', []):
             try:
                 start, end = float(word['start']), float(word['end'])
             except (KeyError, TypeError, ValueError):
                 continue
-            token = key(word.get('word', ''))
-            if token and math.isfinite(start) and math.isfinite(end) and 0 <= start < end:
-                acoustic.append((token, start, end))
-    acoustic.sort(key=lambda word: word[1])
-    matcher = SequenceMatcher(None, lyric_tokens, [word[0] for word in acoustic], autojunk=False)
-    clocks = {block.a + i: acoustic[block.b + i][1:]
-              for block in matcher.get_matching_blocks() for i in range(block.size)}
+            if math.isfinite(start) and math.isfinite(end) and 0 <= start < end:
+                clocks.append((start, end))
+    clocks.sort()
     result = []
-    for verse, (begin, end) in zip(synced_segments, ranges):
-        measured = [clocks[i] for i in range(begin, end) if i in clocks]
-        updated = dict(verse)
-        if len(measured) >= max(2, math.ceil((end - begin) * .35)):
-            updated.update(start=measured[0][0], end=measured[-1][1], local_verse_timing=True)
-        result.append(updated)
+    for verse in synced_segments:
+        start, end = float(verse['start']), float(verse['end'])
+        text = str(verse['text'])
+        tokens = list(re.finditer(r'\S+\s*', text))
+        candidates = [(max(start, a), min(end, b)) for a, b in clocks
+                      if start <= (a + b) / 2 < end]
+        animation_words, measured_words = [], []
+        if tokens and tokens[0].start():
+            animation_words.append({'word': text[:tokens[0].start()]})
+        for index, token in enumerate(tokens):
+            word = {'word': token.group()}
+            if index < len(candidates):
+                if len(candidates) >= len(tokens):
+                    begin = index * len(candidates) // len(tokens)
+                    finish = (index + 1) * len(candidates) // len(tokens)
+                    word['start'], word['end'] = candidates[begin][0], candidates[finish - 1][1]
+                else:
+                    word['start'], word['end'] = candidates[index]
+                measured_words.append(dict(word))
+            animation_words.append(word)
+        if not tokens:
+            animation_words.append({'word': text})
+        result.append({**verse, 'words': measured_words, 'animation_words': animation_words,
+                       'synced_line': True, 'acoustic_animation': True})
     return result
