@@ -1995,7 +1995,7 @@
                             </div>
 
                             <div class="form-group">
-                                <span class="label">Cor Principal da Fonte</span>
+                                <span class="label">Cor do Destaque</span>
                                 <input type="color" id="textColor" name="text_color" value="#00FFFF" style="width: 100%; height: 38px; border-radius: 8px; border: 1px solid var(--glass-border); cursor: pointer; background: transparent;">
                             </div>
 
@@ -2005,12 +2005,12 @@
                             </div>
 
                             <div class="form-group">
-                                <span class="label">Palavras / verso (0 = automático)</span>
+                                <span class="label">Palavras / linha (0 = automático)</span>
                                 <input type="number" id="wordsPerLine" name="words_per_line" value="0" min="0" max="30" class="input-text">
                             </div>
 
                             <div class="form-group">
-                                <span class="label">Caracteres / verso (0 = automático)</span>
+                                <span class="label">Caracteres / linha (0 = automático)</span>
                                 <input type="number" id="maxCharsLine" name="max_chars_line" value="0" min="0" max="100" class="input-text">
                             </div>
 
@@ -2366,10 +2366,10 @@
                     <div class="easy-config-fields">
                         <div class="form-group"><span class="label">Modo da legenda</span><select id="easyModeSubtitleMode" class="select-input"><option value="syllable">Sílabas (varredura)</option><option value="word">Palavras</option><option value="line">Linhas</option><option value="phrase">Frase estática</option></select></div>
                         <div class="form-group"><span class="label">Tamanho da fonte</span><input type="number" id="easyModeFontSize" min="24" max="72" value="50" class="input-text"></div>
-                        <div class="form-group"><span class="label">Cor principal</span><input type="color" id="easyModeTextColor" value="#008080" class="input-text" style="height: 38px; padding: 0.25rem;"></div>
+                        <div class="form-group"><span class="label">Cor do destaque</span><input type="color" id="easyModeTextColor" value="#008080" class="input-text" style="height: 38px; padding: 0.25rem;"></div>
                         <div class="form-group"><span class="label">Posição do texto</span><select id="easyModeTextPosition" class="select-input"><option value="bottom">Inferior</option><option value="middle" selected>Centralizada</option><option value="top">Superior</option></select></div>
-                        <div class="form-group"><span class="label">Palavras por verso (0 = auto)</span><input type="number" id="easyModeWordsPerLine" min="0" max="30" value="0" class="input-text"></div>
-                        <div class="form-group"><span class="label">Caracteres por verso (0 = auto)</span><input type="number" id="easyModeMaxCharsLine" min="0" max="100" value="0" class="input-text"></div>
+                        <div class="form-group"><span class="label">Palavras por linha (0 = auto)</span><input type="number" id="easyModeWordsPerLine" min="0" max="30" value="0" class="input-text"></div>
+                        <div class="form-group"><span class="label">Caracteres por linha (0 = auto)</span><input type="number" id="easyModeMaxCharsLine" min="0" max="100" value="0" class="input-text"></div>
                         <div class="form-group"><span class="label">Prévia da próxima frase</span><select id="easyModeNextPreview" class="select-input"><option value="true">Sim</option><option value="false">Não</option></select></div>
                         <div class="form-group"><span class="label">Primeira legenda no início</span><select id="easyModeFirstLine" class="select-input"><option value="false">Não</option><option value="true">Sim</option></select></div>
                         <div class="form-group"><span class="label">Fundo quando nada for escolhido</span><select id="easyModeBackgroundMode" class="select-input"><option value="random_library">Coleção aleatória do administrador</option><option value="original">Vídeo original</option><option value="color">Cor sólida</option><option value="image">Imagem/vídeo enviado</option></select></div>
@@ -2696,7 +2696,7 @@
                 </ol>
                 <p>A API tem cota gratuita e pode limitar projetos sem auditoria a vídeos privados. Guarde a autorização como uma senha. Backing vocals e vídeo do modo SRT mostram porcentagem da etapa e avisam o avanço no Telegram; o LibreTranslate informa apenas início e término.</p>
             </details>
-            <p class="compact-note">Versão do servidor: 10.8. A transcrição é local; fontes, modelos e integrações podem acessar serviços externos. Use conteúdo autorizado.</p>
+            <p class="compact-note">Versão do servidor: 10.9. A transcrição é local; fontes, modelos e integrações podem acessar serviços externos. Use conteúdo autorizado.</p>
             <p class="compact-note">Use o servidor pela rede local ou VPN. A busca/importação do YouTube não concede direitos sobre a mídia. OAuth autoriza o acesso ao canal, não o uso de músicas. Confira as permissões do conteúdo e os termos do YouTube antes de importar ou publicar. Não listado permite acesso a quem tiver o link; resultados SRT nunca vão ao YouTube.</p>
             <p class="compact-note"><a href="https://www.youtube.com/static?template=terms" target="_blank" rel="noopener noreferrer">Termos do YouTube</a> · <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer">Privacidade do Google</a> · <a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener noreferrer">Revogar acesso ao canal</a></p>
         </div>

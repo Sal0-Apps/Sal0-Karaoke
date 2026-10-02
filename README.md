@@ -125,14 +125,14 @@ Em **Playlist de cada usuário**, a administração define uma playlist válida 
 
 ## Início rápido com Docker
 
-A versão de distribuição desta documentação é **10.8**. O título e o rodapé da página mostram apenas o nome da aplicação. A versão do servidor pode ser consultada no Manual; a versão do APK aparece nas configurações nativas.
+A versão de distribuição desta documentação é **10.9**. O título e o rodapé da página mostram apenas o nome da aplicação. A versão do servidor pode ser consultada no Manual; a versão do APK aparece nas configurações nativas.
 
 Crie um arquivo `compose.yaml`:
 
 ```yaml
 services:
   karaoke-app:
-    image: ghcr.io/sal0-apps/sal0-karaoke:10.8
+    image: ghcr.io/sal0-apps/sal0-karaoke:10.9
     container_name: karaoke-app
     ports:
       - "7885:7860"
@@ -192,6 +192,10 @@ A manutenção é mínima. Não há SLA, garantia de respostas rápidas, revisã
 O código original permanece sob [MIT](LICENSE), permitindo uso, estudo, modificação e redistribuição com preservação dos avisos exigidos. Bibliotecas, modelos, fontes, imagens e executáveis de terceiros mantêm suas próprias condições. Consulte [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 Quando um vídeo de fundo decorativo é maior que a música, o início do trecho é escolhido aleatoriamente a cada nova renderização, cabendo a música inteira até o fim do fundo. Vídeos curtos continuam em loop. O vídeo original da música mantém o início e a sincronização. Com letra sincronizada, seu texto fornece os versos; o Whisper serve à análise dos tempos e da animação local.
+
+### Exibição das frases e animação
+
+Sem LRC, as pausas, a pontuação e os inícios de frase orientam a organização do Whisper. Limites de palavras e caracteres controlam a quebra visual, preservando a frase na mesma tela. Verso e prévia usam posições fixas; o texto aguardando o canto fica branco e o destaque segue os tempos das palavras. O modo por palavras tem uma transição curta de cor. Refazer recria o visual com as regras atuais, reaproveitando a análise compatível.
 
 ### Verificação dos tempos da letra sincronizada
 

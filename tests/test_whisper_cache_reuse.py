@@ -16,6 +16,30 @@ from test_automatic_lyrics_and_search import load_function
 
 
 class WhisperCacheReuseTests(unittest.TestCase):
+    def test_display_update_rebuilds_render_without_losing_recognition_or_review(self):
+        load = load_function('load_stage_checkpoints', os=os, json=json)
+        invalidate = load_function('invalidate_subtitle_display_cache', os=os, json=json, load_stage_checkpoints=load)
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            stages = {name: {'done': True} for name in ('audio_extracted', 'vocals_separated',
+                      'transcription_ready', 'transcription_reviewed', 'subtitles_generated', 'video_rendered')}
+            checkpoint = root / 'stage_checkpoints.json'
+            checkpoint.write_text(json.dumps({'completed_stages': stages, 'active_processing_seconds': 42}))
+            for name in ('vocals.wav', 'transcribed_segments.json', 'reviewed_segments.json'):
+                (root / name).write_text('saved recognition or user correction')
+            before = {file.name: file.read_bytes() for file in root.iterdir() if file != checkpoint}
+            meta = {'subtitle_display_options': {'version': 1}}
+            options = {'version': 2, 'words_per_line': 6}
+            self.assertTrue(invalidate(folder, meta, options))
+            remaining = json.loads(checkpoint.read_text())
+            self.assertEqual(set(remaining['completed_stages']), set(stages) - {'subtitles_generated', 'video_rendered'})
+            self.assertEqual(remaining['active_processing_seconds'], 42)
+            self.assertEqual({file.name: file.read_bytes() for file in root.iterdir() if file != checkpoint}, before)
+            self.assertEqual(meta['subtitle_display_options'], options)
+            unchanged = checkpoint.read_bytes()
+            self.assertFalse(invalidate(folder, meta, dict(options)))
+            self.assertEqual(checkpoint.read_bytes(), unchanged)
+
     def test_synced_and_srt_analysis_are_copied_but_review_is_separate(self):
         with tempfile.TemporaryDirectory() as folder:
             source, destination = Path(folder) / 'old', Path(folder) / 'new'

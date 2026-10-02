@@ -1,4 +1,5 @@
 import ast
+import copy
 import difflib
 import importlib.util
 import logging
@@ -109,7 +110,50 @@ class SubtitleSegmentationTests(unittest.TestCase):
         result = karaoke_generator.split_and_wrap_segments(segments, 0, 0, False)
 
         self.assertGreater(len(result), 1)
-        self.assertTrue(all(len(segment["words"]) <= 15 for segment in result))
+        self.assertTrue(all(segment['end'] - segment['start'] <= 14 for segment in result))
+        self.assertEqual([word for segment in result for word in segment['words']], words)
+
+    def test_display_limits_never_split_me_deu_between_pages(self):
+        text = 'Prefiro ter você a meu lado e lembrar com saudade o retratinho que você me deu'
+        words = make_words(text.split(), step=.45)
+        original = [dict(start=0, end=8, text=text, words=words)]
+        before = copy.deepcopy(original)
+        for words_limit, chars_limit in ((0, 0), (4, 18), (1, 3), (6, 40)):
+            with self.subTest(limits=(words_limit, chars_limit)):
+                result = karaoke_generator.split_and_wrap_segments(original, words_limit, chars_limit)
+                self.assertEqual([segment['text'] for segment in result], [text])
+        self.assertEqual(original, before)
+
+    def test_whisper_only_follows_sung_phrases_without_guide_markers(self):
+        phrases = ['Achei numa caixinha de lembranças',
+                   'Um presente de alguém que está ausente de mim',
+                   'Prefiro ter você a meu lado',
+                   'E lembrar com saudade o retratinho que você me deu']
+        words = make_words(' '.join(phrases).split(), step=.7)
+        for word in words:
+            word['end'] = word['start'] + .55
+        # ASR segments can themselves stop in the middle of a sung phrase.
+        segments = [dict(words=words[:8]), dict(words=words[8:25]), dict(words=words[25:])]
+        result = karaoke_generator.split_and_wrap_segments(segments)
+        self.assertEqual([segment['text'] for segment in result], phrases)
+        self.assertEqual([word for segment in result for word in segment['words']], words)
+
+    def test_asr_boundary_cannot_orphan_me_deu_in_next_verse(self):
+        first = 'Prefiro ter você a meu lado e lembrar com saudade o retratinho que você me deu'
+        second = 'Prefiro ter você a meu lado'
+        words = make_words((first + ' ' + second).split(), step=.45)
+        for boundary in (14, 15):
+            with self.subTest(asr_boundary=boundary):
+                segments = [dict(words=words[:boundary]), dict(words=words[boundary:])]
+                result = karaoke_generator.split_and_wrap_segments(segments, 6, 40)
+                self.assertEqual([segment['text'] for segment in result], [first, second])
+
+    def test_long_confirmed_guide_line_is_not_cut_by_asr_pauses_or_display_limits(self):
+        words = make_words('Quando a música começa eu canto até o fim e sigo com você até o amanhecer'.split(), step=1)
+        words[-1]['lyric_line_break'] = True
+        result = karaoke_generator.split_and_wrap_segments([dict(words=words)], 3, 15)
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0]['words'], words)
 
     def test_display_continues_until_the_next_verse(self):
         first = make_words(["primeiro", "verso"])
@@ -129,6 +173,23 @@ class SubtitleSegmentationTests(unittest.TestCase):
             ass_text = output.read_text(encoding="utf-8")
 
         self.assertIn("Dialogue: 0,0:00:00.00,0:00:03.00", ass_text)
+
+    def test_overlapping_whisper_word_clocks_never_stack_two_active_verses(self):
+        first = make_words(['first', 'complete', 'phrase.'])
+        first[-1]['end'] = 2.3
+        second = make_words(['next', 'complete', 'phrase.'], start=2)
+        original = [dict(words=first + second)]
+        untouched = copy.deepcopy(original)
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / 'overlap.ass'
+            karaoke_generator.generate_ass_karaoke(original, str(path), show_instrumental=False,
+                                                    show_next_line_preview=True)
+            events = [line for line in path.read_text().splitlines()
+                      if line.startswith('Dialogue:') and ',Default,' in line]
+        self.assertEqual(len(events), 2)
+        self.assertIn('0:00:00.00,0:00:02.00', events[0])
+        self.assertIn('0:00:02.00,0:00:03.40', events[1])
+        self.assertEqual(original, untouched)
 
 
 if __name__ == "__main__":

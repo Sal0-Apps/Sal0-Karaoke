@@ -383,12 +383,14 @@ class SyncedAcousticAnimationTests(unittest.TestCase):
             target = Path(folder) / 'pause.ass'
             generate_ass_karaoke(anchor_synced_animation(verses,acoustic), str(target),
                 font_size=24, show_instrumental=False, show_next_line_preview=False)
-            def white_pixels(time):
+            def highlight_amount(time):
                 raw = subprocess.check_output(['ffmpeg','-v','error','-f','lavfi','-i',
                     'color=c=black:s=640x360:r=25:d=3','-vf','ass='+str(target),'-ss',str(time),
                     '-frames:v','1','-f','rawvideo','-pix_fmt','rgb24','-'])
-                return sum(min(raw[i:i+3]) > 220 for i in range(0,len(raw),3))
-            before, during, gap_start, gap_end, after = map(white_pixels, [0.1,0.35,0.6,1.2,2.6])
+                # Measure color across antialiased glyphs too. At a 12px
+                # rendered font some platforms have very few solid pixels.
+                return sum(max(0, (raw[i+1] + raw[i+2]) // 2 - raw[i]) for i in range(0,len(raw),3))
+            before, during, gap_start, gap_end, after = map(highlight_amount, [0.1,0.35,0.6,1.2,2.6])
         self.assertEqual(before, 0)
         self.assertGreater(during, before)
         self.assertLess(during, gap_start)

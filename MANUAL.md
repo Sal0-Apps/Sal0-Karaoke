@@ -1,6 +1,6 @@
 # Manual do Sal0 Karaokê
 
-Este manual descreve os controles disponíveis na distribuição 10.8. Para instalar o servidor, consulte [DEPLOYMENT.md](DEPLOYMENT.md). Para configurar o aparelho, consulte o [guia Android](android/README.md).
+Este manual descreve os controles disponíveis na distribuição 10.9. Para instalar o servidor, consulte [DEPLOYMENT.md](DEPLOYMENT.md). Para configurar o aparelho, consulte o [guia Android](android/README.md).
 
 O Sal0 Karaokê é destinado a uma instalação pessoal, acessada pela rede local ou por VPN, como ZeroTier. O repositório aberto disponibiliza o código e os pacotes; o projeto não opera um serviço público de processamento nem coleta centralmente as mídias das instalações. Não é necessário expor a porta do app à internet. O processamento principal é local, mas as integrações escolhidas podem se comunicar com serviços externos.
 
@@ -89,16 +89,16 @@ Quando existir letra sincronizada correspondente à música, o texto completo, a
 
 Escolha **Vídeo original**, **Imagem / Vídeo** ou **Cor sólida** (preto) como modo de fundo. Para imagem/vídeo, envie um arquivo, use a Biblioteca ou um link. O áudio do fundo não é usado como trilha do karaokê.
 
-Em **Sílabas (varredura)**, a cor avança dentro das palavras pelos tempos locais. Em **Palavras**, a palavra inteira muda de cor no seu início. **Linhas** e **Frase estática** mantêm o texto na cor escolhida durante o intervalo do verso. Estas opções também se aplicam às letras sincronizadas, preservando texto e tempos dos versos. O modo por sílabas não garante alinhamento fonético perfeito. O verso e a prévia ficam em regiões separadas em todas as posições; a primeira linha na introdução não é duplicada pela contagem regressiva.
+Em **Sílabas (varredura)**, a cor avança dentro das palavras pelos tempos locais. Em **Palavras**, a palavra inteira recebe o destaque com uma transição curta de cor no seu início. **Linhas** e **Frase estática** mantêm o texto na cor escolhida durante o intervalo do verso. Estas opções também se aplicam às letras sincronizadas, preservando texto e tempos dos versos. O modo por sílabas não garante alinhamento fonético perfeito. O verso e a prévia ficam em regiões separadas em todas as posições; a primeira linha na introdução não é duplicada pela contagem regressiva.
 
 ### Mais ajustes
 
 | Controle | Efeito |
 | --- | --- |
 | Posição do texto | Coloca a legenda na parte inferior, central ou superior |
-| Cor principal e tamanho | Altera a aparência das letras |
-| Palavras por verso | Limita a quantidade de palavras; zero solicita divisão automática |
-| Caracteres por verso | Limita o comprimento; zero solicita divisão automática |
+| Cor do destaque e tamanho | Define o destaque das palavras cantadas ou a cor da frase estática e o tamanho do texto |
+| Palavras por linha | Organiza as quebras visuais do mesmo verso; zero usa o padrão automático |
+| Caracteres por linha | Organiza a largura visual sem trocar de verso; zero usa o padrão automático |
 | Fonte da transcrição | Usa áudio original ou vocais separados; com backing vocals ativos, sempre usa a voz principal isolada |
 | Prévia da próxima frase | Mostra antecipadamente o próximo trecho |
 | Legenda no início | Permite apresentar a primeira linha desde o início |
@@ -110,6 +110,10 @@ Em **Sílabas (varredura)**, a cor avança dentro das palavras pelos tempos loca
 | Revisar antes de finalizar | Abre o editor após a transcrição |
 
 Em **Perfil de Ajustes**, dê um nome à configuração e toque em **Salvar Perfil**. Selecione um perfil para reaplicá-lo. **Excluir** remove o perfil selecionado; não exclui as mídias já produzidas com ele.
+
+Sem letra sincronizada, o Whisper mantém as palavras e os tempos reconhecidos, e o processamento local organiza as frases por pausas, pontuação e início de frase. Os limites de palavras e caracteres apenas quebram linhas dentro da tela: não antecipam a troca de verso nem separam trechos como “me deu”. Uma proteção automática ainda divide blocos excepcionalmente longos sem pontuação. O texto aguardando o canto fica branco e recebe a cor escolhida conforme é cantado. A posição do verso e da prévia permanece estável mesmo quando muda a quantidade de linhas. A próxima frase aparece durante os três segundos da contagem regressiva.
+
+Após atualizar o servidor, use **Refazer** no resultado anterior para recriar legenda e vídeo, reaproveitando a análise compatível do Whisper. Refazer cria um novo trabalho; confirme novamente a revisão, se estiver habilitada. Ao retomar um trabalho já em andamento, a atualização visual preserva também a revisão salva e refaz somente a apresentação. Um MP4 já concluído continua contendo a legenda antiga até ser reprocessado.
 
 ## 5. Gerar SRT original e tradução opcional
 

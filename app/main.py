@@ -624,6 +624,22 @@ def load_stage_checkpoints(cache_dir: str | None) -> dict:
     return {"completed_stages": {}}
 
 
+def invalidate_subtitle_display_cache(cache_dir: str, cached_meta: dict, options: dict) -> bool:
+    """Rebuild presentation while preserving audio, recognition and user review."""
+    if cached_meta.get("subtitle_display_options") == options:
+        return False
+    checkpoints = load_stage_checkpoints(cache_dir)
+    for stage in ("subtitles_generated", "video_rendered"):
+        checkpoints.get("completed_stages", {}).pop(stage, None)
+    checkpoint_file = os.path.join(cache_dir, "stage_checkpoints.json")
+    temporary_file = f"{checkpoint_file}.tmp"
+    with open(temporary_file, "w", encoding="utf-8") as f:
+        json.dump(checkpoints, f, indent=4)
+    os.replace(temporary_file, checkpoint_file)
+    cached_meta["subtitle_display_options"] = dict(options)
+    return True
+
+
 def stage_checkpoint(cache_dir: str | None, stage: str) -> dict:
     return dict(load_stage_checkpoints(cache_dir).get("completed_stages", {}).get(stage) or {})
 
@@ -5598,6 +5614,14 @@ def run_pipeline(
         if new_audio_hash:
             cached_meta["audio_hash"] = new_audio_hash
 
+        invalidate_subtitle_display_cache(cache_dir, cached_meta, {
+            "version": 2, "font_size": font_size, "text_color": text_color,
+            "text_position": text_position, "subtitle_mode": subtitle_mode,
+            "words_per_line": words_per_line, "max_chars_line": max_chars_line,
+            "break_on_punctuation": break_on_punctuation, "show_instrumental": show_instrumental,
+            "show_next_line_preview": show_next_line_preview, "keep_first_line_visible": keep_first_line_visible,
+        })
+
         # Provider availability can change between retries. Never reuse subtitles
         # created from different line clocks, even with the same display options.
         clock_hash = hashlib.sha256(json.dumps({"animation_timing_version": 3, "synced_validation_version": 4, "synced_text_version": 2, "synced_animation_version": 3, "synced_layout_version": 2,
@@ -6015,7 +6039,7 @@ def run_pipeline(
                     font_size=font_size,
                     text_color_hex=text_color,
                     text_position=text_position,
-                    subtitle_mode="syllable" if synced_segments else subtitle_mode,
+                    subtitle_mode=subtitle_mode,
                     words_per_line=words_per_line,
                     max_chars_line=max_chars_line,
                     break_on_punctuation=break_on_punctuation,
