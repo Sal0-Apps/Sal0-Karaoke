@@ -1,4 +1,5 @@
 """Synced lyrics must use recording word clocks, including cache and ASS gaps."""
+import re
 import hashlib
 import json
 import logging
@@ -16,8 +17,8 @@ from unittest.mock import Mock
 
 ROOT = Path(__file__).parents[1]
 sys.path.insert(0, str(ROOT / 'app'))
-from lyrics_sync import parse_lrc, require_acoustic_word_timing, anchor_synced_animation, assess_synced_timing, retime_synced_verses
-from karaoke_generator import generate_ass_karaoke
+from lyrics_sync import parse_lrc, require_acoustic_word_timing, anchor_synced_animation, assess_synced_timing
+from karaoke_generator import generate_ass_karaoke, synced_animation_text
 from media_covers import add_cover_to_command
 from test_automatic_lyrics_and_search import load_function
 from reprocess_cache import copy_reusable_inputs
@@ -39,7 +40,7 @@ class SyncedAcousticAnimationTests(unittest.TestCase):
             cached = acoustic if cache_version == 3 else lrc
             (Path(folder) / 'synced_acoustic_segments.json').write_text(json.dumps(cached))
             meta = dict(animation_timing_version=cache_version, vocal_source='lead',
-                        transcribe_source=source_mode, whisper_model='medium', enable_vad=True,
+                        transcribe_source=source_mode, whisper_model='medium', enable_vad=False,
                         transcription_preset='standard', whisper_audio_version=2, whisper_quality_mode='max_quality',
                         lyrics_hint_hash=hashlib.sha256(' '.join(lyric_text.split()).encode()).hexdigest())
             transcriber = Mock(return_value=acoustic)
@@ -54,8 +55,12 @@ class SyncedAcousticAnimationTests(unittest.TestCase):
                 logger=logging.getLogger('test'), is_model_downloaded=lambda _:True,
                 transcribe_vocals=transcriber, save_stage_checkpoint=Mock(),
                 update_process_summary=Mock(), assess_synced_timing=assess_synced_timing,
-                retime_synced_verses=retime_synced_verses, lyrics_timing=timing,
+                lyrics_timing=timing,
                 align_lyrics=load_function('align_lyrics', clean_word=load_function('clean_word', unicodedata=unicodedata)), require_acoustic_word_timing=require_acoustic_word_timing, anchor_synced_animation=anchor_synced_animation)
+            policy = source[source.index('    if not subtitle_only:\n', source.index('def run_pipeline(')):
+                            source.index('    # Obter o lock', source.index('def run_pipeline('))]
+            scope['subtitle_only'] = False
+            exec(compile(textwrap.dedent(policy), 'full-audio-policy', 'exec'), scope)
             if backing_enabled:
                 preparation = source[source.index('            if keep_backing_vocals:\n', source.index('# Passo 2:')):
                                      source.index('            def publish_render_progress', source.index('# Passo 2:'))]
@@ -89,7 +94,7 @@ class SyncedAcousticAnimationTests(unittest.TestCase):
         notices = scope['notify_targets'].call_args_list
         self.assertEqual(len(notices), 2)
         self.assertIn('Sincronização da animação pela voz', notices[0].args[1])
-        self.assertIn('Verificação da letra sincronizada', notices[1].args[1])
+        self.assertIn('Animação da letra sincronizada', notices[1].args[1])
 
     def test_current_acoustic_cache_is_reused(self):
         scope, transcriber = self.run_stage(cache_version=3)
@@ -152,17 +157,30 @@ class SyncedAcousticAnimationTests(unittest.TestCase):
         transcriber.assert_not_called()
         self.assertEqual(scope['cached_meta']['transcribe_source'], 'vocals')
 
-    def test_local_retiming_keeps_unrecognized_verse_and_repeated_chorus_order(self):
-        verses = [dict(start=2, end=5, text='Mesmo verso cantado'),
-                  dict(start=8, end=11, text='Palavras não reconhecidas'),
-                  dict(start=15, end=19, text='Mesmo verso cantado')]
-        voice = [dict(words=[dict(word=token, start=start + i * .4, end=start + (i + 1) * .4)
-                            for token, i in zip(['Mesmo', 'verso', 'cantado'], range(3))])
-                 for start in (4, 17)]
-        retimed = retime_synced_verses(verses, voice)
-        self.assertEqual([s['text'] for s in retimed], [s['text'] for s in verses])
-        self.assertEqual([s['start'] for s in retimed], [4, 8, 17])
-        self.assertEqual([s['start'] for s in verses], [2, 8, 15])
+    def test_recognized_text_is_irrelevant_even_when_all_words_are_wrong(self):
+        verses = [dict(start=10, end=13, text='  Olá,  lindo mundo!  ')]
+        words = [dict(word=word, start=10.1+i*.7, end=10.5+i*.7)
+                 for i, word in enumerate(['nonsense', 'WRONG', ''])]
+        anchored = anchor_synced_animation(verses, [dict(words=words)])
+        other = anchor_synced_animation(verses, [dict(words=[{**w, 'word':'DIFFERENT'} for w in words])])
+        self.assertEqual(anchored, other)
+        self.assertEqual(anchored[0]['text'], verses[0]['text'])
+        self.assertEqual(''.join(w['word'] for w in anchored[0]['animation_words']), verses[0]['text'])
+        self.assertEqual([(w['start'], w['end']) for w in anchored[0]['words']],
+                         [(w['start'], w['end']) for w in words])
+
+    def test_stale_animation_text_cannot_remove_or_replace_provider_words(self):
+        segment = dict(start=10, end=13, text='Texto completo original',
+                       animation_words=[dict(word='Texto cortado', start=10.2, end=11)])
+        text = synced_animation_text(segment, '&H00FFFFFF', '&H00FFFF00')
+        self.assertEqual(re.sub(r'\{[^}]*\}', '', text), segment['text'])
+        self.assertNotIn('cortado', text)
+        self.assertNotIn(r'\t(', text)
+
+    def test_karaoke_disables_vad_even_when_the_saved_profile_requests_it(self):
+        scope, transcriber = self.run_stage()
+        self.assertFalse(transcriber.call_args.kwargs['enable_vad'])
+        self.assertFalse(scope['cached_meta']['enable_vad'])
 
     def timing_fixture(self, shifts):
         verses, voice = [], []
@@ -213,23 +231,22 @@ class SyncedAcousticAnimationTests(unittest.TestCase):
                  for verse in verses]
         self.assertEqual(assess_synced_timing(verses, voice)['status'], 'consistent')
 
-    def test_incompatible_lrc_preserves_provider_text_and_renders_local_clock(self):
+    def test_incompatible_lrc_preserves_both_provider_text_and_provider_clock(self):
         verses, voice = self.timing_fixture([4.13, 2.33, 2.53, 3.28, 3.46, 3.76])
         scope, transcriber = self.run_stage(cache_version=3, verses=verses, voice=voice)
         transcriber.assert_not_called()
         self.assertEqual(scope['synced_segments'], verses)
-        self.assertAlmostEqual(scope['segments'][0]['start'], 11.22)
+        self.assertAlmostEqual(scope['segments'][0]['start'], 7.09)
         self.assertTrue(scope['segments'][0]['synced_line'])
         self.assertEqual([s['text'] for s in scope['segments']], [s['text'] for s in verses])
-        self.assertEqual(scope['cached_meta']['synced_timing_assessment']['status'], 'incompatible')
         self.assertEqual(len(scope['notify_targets'].call_args_list), 1)  # One verification notice.
         scope['update_process_summary'].assert_called_once()
         with tempfile.TemporaryDirectory() as folder:
             target = Path(folder) / 'fallback.ass'
             generate_ass_karaoke(scope['segments'], str(target), show_instrumental=False)
             output = target.read_text()
-        self.assertIn('0:00:11.22', output)
-        self.assertNotIn('0:00:07.09', output)
+        self.assertIn('0:00:07.09', output)
+        self.assertNotIn('0:00:11.22,', output)
 
     def test_real_cover_shifts_audio_and_animated_lyric_together(self):
         # All lyric/Whisper clocks are relative to the song, excluding the cover.
@@ -257,7 +274,7 @@ class SyncedAcousticAnimationTests(unittest.TestCase):
                     '-i', str(output), '-frames:v', '1', '-f', 'rawvideo', '-pix_fmt', 'rgb24', '-'])
             before, after = frame(4.9), frame(5.7)
             self.assertEqual(sum(min(before[i:i+3]) > 220 for i in range(0, len(before), 3)), 0)
-            self.assertGreater(sum(min(after[i:i+3]) > 220 for i in range(0, len(after), 3)), 10)
+            self.assertGreater(sum(max(after[i:i+3]) > 220 for i in range(0, len(after), 3)), 10)
             samples = array.array('f', subprocess.check_output(['ffmpeg', '-v', 'error', '-i',
                 str(output), '-vn', '-ac', '1', '-ar', '16000', '-f', 'f32le', '-']))
             def rms(start, end):
@@ -274,11 +291,12 @@ class SyncedAcousticAnimationTests(unittest.TestCase):
             generate_ass_karaoke(scope['segments'], str(target), show_instrumental=False,
                                  break_on_punctuation=False)
             output = target.read_text()
-        self.assertIn(r'{\kf30}Olá', output)
-        self.assertIn(r'{\k110\alpha&HFF&}\h', output)
+        self.assertIn(r'\t(200,500,', output)
+        self.assertNotIn(r'\h', output)
+        self.assertNotIn(r'\alpha&HFF&', output)
         self.assertIn('0:00:10.00,0:00:13.00', output)
-        self.assertIn(r'{\k20\alpha&HFF&}\h', output)
-        self.assertIn(r'{\kf90}mundo', output)
+        self.assertNotIn(r'\clip', output)
+        self.assertIn(r'\t(1600,2500,', output)
         self.assertNotIn(r'{\kf300}Olá mundo', output)
 
     def test_repeated_verses_keep_provider_clocks_and_match_only_local_words(self):
@@ -298,7 +316,7 @@ class SyncedAcousticAnimationTests(unittest.TestCase):
         self.assertIn('0:00:10.00,0:00:13.00', output)
         self.assertNotIn('0:00:10.00,0:00:30.00', output)
         self.assertIn('0:00:30.00,0:00:33.00', output)
-        self.assertIn(r'{\kf30}Olá', output)
+        self.assertIn(r'\t(200,500,', output)
 
     def test_unrecognized_words_preserve_complete_lyrics_without_assigned_clocks(self):
         verses = [{'start':10,'end':13,'text':'Olá lindo mundo'}]
@@ -306,7 +324,7 @@ class SyncedAcousticAnimationTests(unittest.TestCase):
                               {'word':'mundo','start':11.6,'end':12.5}]}]
         anchored = anchor_synced_animation(verses, acoustic)
         self.assertEqual(anchored[0]['text'], 'Olá lindo mundo')
-        self.assertEqual(anchored[0]['animation_words'][1], {'word':'lindo '})
+        self.assertEqual(anchored[0]['animation_words'][2], {'word':'mundo'})
         self.assertEqual(len(anchored[0]['words']), 2)
         self.assertEqual(anchored[0]['end'], 13)
 
@@ -321,7 +339,40 @@ class SyncedAcousticAnimationTests(unittest.TestCase):
         revised = resume.__globals__['segments_to_edit'][0]
         self.assertEqual((revised['start'], revised['end']), (10,13))
         self.assertEqual([(w['start'],w['end']) for w in revised['words']], [(10.2,10.5),(11.6,12.5)])
-        self.assertEqual(revised['animation_words'][1], {'word':'lindo '})
+        self.assertEqual(revised['animation_words'][2], {'word':'mundo'})
+
+    def test_long_verse_never_disappears_or_changes_layout_during_animation(self):
+        verses = parse_lrc('[00:00]Full verse stays visible, unchanged!\n[00:20]Second verse', 25)
+        self.assertEqual(verses[0]['end'], 20)
+        acoustic = [dict(words=[dict(word='wrong', start=13+i*.7, end=13.4+i*.7)
+                               for i in range(5)])]
+        with tempfile.TemporaryDirectory() as folder:
+            target = Path(folder) / 'stable.ass'
+            generate_ass_karaoke(anchor_synced_animation(verses, acoustic), str(target),
+                                 font_size=32, show_instrumental=False, show_next_line_preview=False,
+                                 words_per_line=1, max_chars_line=3)
+            content = target.read_text()
+            first = next(line for line in content.splitlines() if line.startswith('Dialogue:'))
+            rendered_text = re.sub(r'\{[^}]*\}', '', first.split(',',9)[-1])
+            self.assertEqual(rendered_text, verses[0]['text'])
+            masks = []
+            for time in (.1, 12.5, 15, 19.8):
+                raw = subprocess.check_output(['ffmpeg','-v','error','-f','lavfi','-i',
+                    'color=c=black:s=640x360:r=25:d=21','-vf','ass='+str(target),'-ss',str(time),
+                    '-frames:v','1','-f','rawvideo','-pix_fmt','rgb24','-'])
+                masks.append(bytes(max(raw[i:i+3]) > 50 for i in range(0,len(raw),3)))
+            self.assertGreater(sum(masks[0]),100)
+            bounds = []
+            for mask in masks:
+                pixels = [i for i, visible in enumerate(mask) if visible]
+                bounds.append((min(i % 640 for i in pixels), min(i // 640 for i in pixels),
+                               max(i % 640 for i in pixels), max(i // 640 for i in pixels)))
+            # Color conversion changes antialiasing at glyph edges by one pixel.
+            for left, top, right, bottom in bounds[1:]:
+                self.assertEqual((left, right), (bounds[0][0], bounds[0][2]))
+                self.assertLessEqual(abs(top - bounds[0][1]), 1)
+                self.assertLessEqual(abs(bottom - bounds[0][3]), 1)
+            self.assertLess(max(map(sum, masks)) / min(map(sum, masks)), 1.15)
 
     def test_ffmpeg_highlight_stops_during_whisper_pause_inside_fixed_verse(self):
         verses = [{'start':0,'end':3,'text':'Hello world'}]
@@ -335,7 +386,7 @@ class SyncedAcousticAnimationTests(unittest.TestCase):
                 raw = subprocess.check_output(['ffmpeg','-v','error','-f','lavfi','-i',
                     'color=c=black:s=640x360:r=25:d=3','-vf','ass='+str(target),'-ss',str(time),
                     '-frames:v','1','-f','rawvideo','-pix_fmt','rgb24','-'])
-                return sum(min(raw[i:i+3]) > 220 for i in range(0,len(raw),3))
+                return sum(raw[i] < 120 and raw[i+1] > 220 and raw[i+2] > 220 for i in range(0,len(raw),3))
             before, gap_start, gap_end, after = map(white_pixels, [0.1,0.6,1.2,2.6])
         self.assertEqual(before, 0)
         self.assertGreater(gap_start, before)

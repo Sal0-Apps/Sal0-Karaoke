@@ -1640,7 +1640,7 @@
 
                         <div class="quick-extra-audio">
                             <label for="easyLyricsTiming">Como sincronizar a letra</label>
-                            <select id="easyLyricsTiming" class="select-input"><option value="auto">Automático: usar a letra sincronizada quando disponível</option><option value="acoustic">Tempos pela voz — preserva a letra sincronizada</option></select>
+                            <select id="easyLyricsTiming" class="select-input"><option value="auto">Automático: usar a letra sincronizada quando disponível</option><option value="acoustic">Animação local — mantém os versos sincronizados</option></select>
                             <label for="easyKeepBackingVocals">Vozes de apoio</label>
                             <select id="easyKeepBackingVocals" class="select-input"><option value="true">Manter vozes de apoio; retirar a voz principal</option><option value="false">Retirar todas as vozes</option></select>
                             <label for="easyBackingVolume">Volume das vozes de apoio (%)</label>
@@ -1835,9 +1835,9 @@
                             <label for="lyricsTiming" class="compact-note">Sincronização automática</label>
                             <select id="lyricsTiming" name="lyrics_timing" class="select-input">
                                 <option value="auto">Usar tempos somente de uma letra sincronizada disponível</option>
-                                <option value="acoustic">Tempos pelo áudio — preserva o texto da letra sincronizada</option>
+                                <option value="acoustic">Animação local — letra e versos sincronizados intactos</option>
                             </select>
-                            <p class="compact-note">Quando disponível para esta música, o texto da letra sincronizada vai para o vídeo. O Whisper cuida da animação; diferenças de tempo são ajustadas localmente nos versos reconhecidos. Sem letra sincronizada, usamos a transcrição com letra-guia.</p>
+                            <p class="compact-note">Quando disponível, a letra sincronizada mantém texto e tempos dos versos intactos. Somente a cor das palavras é animada pelos tempos locais, sem usar o texto reconhecido pelo Whisper. O karaokê analisa o áudio completo, sem VAD.</p>
                             <p id="lyricsModeHint" style="font-size: 0.7rem; color: var(--text-muted); margin: 0.35rem 0 0.45rem;">A letra é uma guia. Texto manual sempre tem prioridade.</p>
                             <textarea id="lyricsText" name="lyrics_text" placeholder="Cole ou edite a letra aqui..." class="input-text" style="height: 72px; resize: vertical; background: var(--input-bg); border: 1px solid var(--glass-border);"></textarea>
                             <div id="lyricsBadge" style="display: none; margin-top: 0.35rem; background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.3); color: #34d399; padding: 0.3rem 0.55rem; border-radius: 7px; font-size: 0.7rem; font-weight: 600;"></div>
@@ -1990,8 +1990,8 @@
                         <div class="form-grid" style="margin-top: 1rem;">
                             <div class="form-group">
                                 <span class="label">Filtro de fala (Silero VAD)</span>
-                                <select id="enableVad" name="enable_vad" class="select-input">
-                                    <option value="false" selected>Desligado (melhor para canto)</option>
+                                <select id="enableVad" name="enable_vad" class="select-input" disabled>
+                                    <option value="false" selected>Desligado — áudio completo para canto</option>
                                     <option value="true">Ligado (fala ou muito ruído)</option>
                                 </select>
                             </div>
@@ -2307,7 +2307,7 @@
                         <div class="form-group"><span class="label">Modelo Whisper</span><select id="easyModeModel" class="select-input"><option value="large-v3-turbo">Large V3 Turbo</option><option value="large-v3">Large V3</option><option value="medium">Medium</option><option value="small">Small</option><option value="tiny">Tiny</option></select></div>
                         <div class="form-group"><span class="label">Perfil da voz</span><select id="easyModePreset" class="select-input"><option value="difficult">Voz difícil</option><option value="karaoke">Karaokê equilibrado</option><option value="continuous">Canto contínuo</option><option value="fast">Criação rápida</option></select></div>
                         <div class="form-group"><span class="label">Fonte da transcrição</span><select id="easyModeSource" class="select-input"><option value="original">Áudio original</option><option value="vocals" selected>Vocais separados pelo Demucs</option></select></div>
-                        <div class="form-group"><span class="label">Filtro Silero VAD</span><select id="easyModeEnableVad" class="select-input"><option value="false">Desligado</option><option value="true">Ligado</option></select></div>
+                        <div class="form-group"><span class="label">Filtro Silero VAD</span><select id="easyModeEnableVad" class="select-input" disabled><option value="false">Desligado</option><option value="true">Ligado</option></select></div>
                         <div class="form-group"><span class="label">Busca automática de letra</span><select id="easyModeLyricsMode" class="select-input"><option value="auto">Buscar automaticamente</option><option value="manual">Não buscar</option></select></div>
                     </div>
                 </details>
@@ -2559,7 +2559,7 @@
                     <li>Em <strong>Vozes de apoio</strong>, mantenha ou desative os backing vocals e ajuste seu volume. A opção usa uma segunda separação local da voz principal.</li>
                     <li>A sincronização automática só usa tempos de versos quando existe uma letra LRC compatível com a gravação. Os versos aparecem nos tempos da letra pronta. O Whisper anima as palavras dentro de cada verso, sem alterar esses horários. Sem LRC, o processo usa Whisper e os tempos das palavras reconhecidas.</li>
                     <li>Em <strong>Mais ajustes</strong>, altere cor, tamanho, posição, limites dos versos, prévia da próxima frase, VAD e fonte da transcrição. Você também pode salvar um perfil e habilitar somente a remoção de vocais.</li>
-                    <li>Ative a revisão para corrigir texto e tempos antes de finalizar. Em canto, o VAD pode cortar notas sustentadas; use com cuidado.</li>
+                    <li>Ative a revisão para corrigir texto e tempos antes de finalizar. O karaokê preserva o áudio completo, com VAD desativado para manter silêncios e notas sustentadas.</li>
                 </ol>
             </details>
             <details>
@@ -2647,7 +2647,7 @@
                 </ol>
                 <p>A API tem cota gratuita e pode limitar projetos sem auditoria a vídeos privados. Guarde a autorização como uma senha. Backing vocals e vídeo do modo SRT mostram porcentagem da etapa e avisam o avanço no Telegram; o LibreTranslate informa apenas início e término.</p>
             </details>
-            <p class="compact-note">Versão do servidor: 10.4. A transcrição é local; fontes, modelos e integrações podem acessar serviços externos. Use conteúdo autorizado.</p>
+            <p class="compact-note">Versão do servidor: 10.5. A transcrição é local; fontes, modelos e integrações podem acessar serviços externos. Use conteúdo autorizado.</p>
             <p class="compact-note">Use o servidor pela rede local ou VPN. A busca/importação do YouTube não concede direitos sobre a mídia. OAuth autoriza o acesso ao canal, não o uso de músicas. Confira as permissões do conteúdo e os termos do YouTube antes de importar ou publicar. Não listado permite acesso a quem tiver o link; resultados SRT nunca vão ao YouTube.</p>
             <p class="compact-note"><a href="https://www.youtube.com/static?template=terms" target="_blank" rel="noopener noreferrer">Termos do YouTube</a> · <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer">Privacidade do Google</a> · <a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener noreferrer">Revogar acesso ao canal</a></p>
         </div>

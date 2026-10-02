@@ -65,6 +65,21 @@ class WhisperAudioTests(unittest.TestCase):
             self.assertEqual(audio.dtype, np.float32)
             self.assertGreater(audio.size, 7000)
 
+    def test_decode_keeps_the_full_timeline_silence_and_sustained_notes(self):
+        path = self.audio.with_name('complete.wav')
+        subprocess.run(['ffmpeg','-v','error','-f','lavfi','-i',
+            'aevalsrc=if(between(t\\,1\\,1.5)+between(t\\,3\\,3.8)\\,0.2*sin(2*PI*440*t)\\,0):s=44100:d=4',
+            '-ac','2','-c:a','pcm_f32le',str(path)],check=True)
+        audio = load_whisper_audio(path)
+        self.assertEqual(audio.shape,(64000,))
+        def rms(a,b):
+            chunk=audio[int(a*16000):int(b*16000)]
+            return float(np.sqrt(np.mean(chunk*chunk)))
+        self.assertLess(rms(0,.8),.001)
+        self.assertAlmostEqual(rms(1.1,1.4),.1,delta=.005)
+        self.assertLess(rms(1.7,2.8),.001)
+        self.assertAlmostEqual(rms(3.1,3.7),.1,delta=.005)
+
     def test_invalid_audio_reports_decode_error(self):
         self.audio.write_bytes(b'not audio')
         with self.assertRaisesRegex(RuntimeError, 'abrir o áudio'):

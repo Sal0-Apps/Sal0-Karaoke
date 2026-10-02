@@ -218,6 +218,25 @@ def insert_instrumental_breaks(segments: list[dict]) -> list[dict]:
                 
     return new_segments
 
+def synced_animation_text(segment, normal_color, highlight_color):
+    """Animate color on the immutable text, without invisible spacing or crops."""
+    spans = segment.get('animation_words') or [{'word': str(segment['text'])}]
+    if ''.join(str(span.get('word', '')) for span in spans) != str(segment['text']):
+        # An old/stale animation cache can never change the authoritative text.
+        spans = [{'word': str(segment['text'])}]
+    result = ''
+    duration_ms = max(0, round((segment['end'] - segment['start']) * 1000))
+    for span in spans:
+        tags = f"\\alpha&H00&\\1c{normal_color}\\2c{normal_color}"
+        if 'start' in span and 'end' in span:
+            start_ms = min(duration_ms, max(0, round((span['start'] - segment['start']) * 1000)))
+            end_ms = min(duration_ms, max(start_ms + 1, round((span['end'] - segment['start']) * 1000)))
+            if end_ms > start_ms:
+                tags += f"\\t({start_ms},{end_ms},\\1c{highlight_color}\\2c{highlight_color})"
+        result += '{' + tags + '}' + span['word']
+    return result
+
+
 def generate_ass_karaoke(
     segments: list[dict], 
     output_ass_path: str,
@@ -329,11 +348,10 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         end_time_str = format_time(seg["end"])
 
         # 1. Linha ativa (Default)
-        if seg.get("synced_line") and not seg.get("words") and not seg.get("acoustic_animation"):
-            # LRC gives the verse clock. Animate the full verse within that clock,
-            # without inventing word timestamps or changing its start/end.
-            duration_cs = max(1, round((seg["end"] - seg["start"]) * 100))
-            text = f"{{\\kf{duration_cs}}}{seg['text']}"
+        if seg.get("synced_line"):
+            # One complete, stable line for the provider's full display interval.
+            # Only color changes; no hidden spacer, clipping, split or text rewrite.
+            text = synced_animation_text(seg, ass_primary_color, ass_secondary_color)
             line = f"Dialogue: 0,{start_time_str},{end_time_str},Default,,0,0,0,,{text}\n"
         elif not seg.get("acoustic_animation") and (subtitle_mode in {"phrase", "line"} or not seg.get("words")):
             line = f"Dialogue: 0,{start_time_str},{end_time_str},Default,,0,0,0,,{seg['text']}\n"

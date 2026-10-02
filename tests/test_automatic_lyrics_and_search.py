@@ -91,8 +91,8 @@ class AutomaticLyricsTests(unittest.TestCase):
             output = Path(path).read_text()
         self.assertIn("0:00:10.00,0:00:13.00", output)
         self.assertIn("Primeiro verso", output)
-        self.assertIn("{\\kf300}Primeiro verso", output)
-        self.assertIn("{\\kf400}Segundo verso", output)
+        self.assertNotIn("\\t(", output)
+        self.assertIn("Segundo verso", output)
         self.assertTrue(all(not s["words"] for s in segments))
 
     def test_synced_line_animation_survives_every_display_mode(self):
@@ -101,7 +101,7 @@ class AutomaticLyricsTests(unittest.TestCase):
             with self.subTest(mode=mode), tempfile.TemporaryDirectory() as folder:
                 path = Path(folder) / 'karaoke.ass'
                 generate_ass_karaoke(segments, str(path), subtitle_mode=mode, show_instrumental=False)
-                self.assertIn("{\\kf300}Primeiro verso", path.read_text())
+                self.assertIn("Primeiro verso", path.read_text())
 
     def test_manual_review_keeps_synced_verse_animation_and_no_word_clocks(self):
         resume = load_function('continue_process', ContinueProcessModel=object,
@@ -113,9 +113,9 @@ class AutomaticLyricsTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder:
             path = Path(folder) / 'reviewed.ass'
             generate_ass_karaoke(revised, str(path), show_instrumental=False)
-            self.assertIn('{\\kf300}Edited verse', path.read_text())
+            self.assertIn('Edited verse', path.read_text())
 
-    def test_ffmpeg_displays_progressive_highlight_within_synced_verse(self):
+    def test_ffmpeg_keeps_synced_verse_static_without_local_word_times(self):
         segments = parse_lrc('[00:00]First synchronized verse\n[00:01]Second verse', 2)
         with tempfile.TemporaryDirectory() as folder:
             path = Path(folder) / 'karaoke.ass'
@@ -125,7 +125,9 @@ class AutomaticLyricsTests(unittest.TestCase):
                     'color=c=black:s=1280x720:r=25:d=2', '-vf', 'ass='+str(path), '-ss', str(time),
                     '-frames:v', '1', '-f', 'rawvideo', '-pix_fmt', 'rgb24', '-'])
                 return sum(min(raw[i:i+3]) > 220 for i in range(0, len(raw), 3))
-            self.assertGreater(white_pixels(.8), white_pixels(.2))
+            early, late = white_pixels(.2), white_pixels(.8)
+            self.assertGreater(early, 100)
+            self.assertEqual(late, early)
 
 
 class YouTubeSearchTests(unittest.TestCase):

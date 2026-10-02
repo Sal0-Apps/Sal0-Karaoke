@@ -1,3 +1,11 @@
+# 10.5
+
+- Letra sincronizada mantém texto completo e tempos dos versos intactos. Retirados o ajuste dos versos pela voz e o limite artificial de 12 segundos.
+- Animação usa somente os intervalos locais de palavras, em ordem, ignorando totalmente o texto reconhecido. A letra inteira fica visível; somente a cor muda, sem espaços invisíveis, cortes ou desaparecimento de palavras.
+- Palavras sem tempo local suficiente continuam visíveis. Um cache de animação incompatível não pode substituir o texto original.
+- Karaokê envia o áudio completo ao Whisper, sem VAD nem remoção de silêncios: voz principal isolada com backing vocals ativos, PCM float32 e precisão máxima no modelo escolhido. A abertura do título permanece fora da música.
+- Resultados antigos são refeitos; análises acústicas compatíveis permanecem reutilizáveis. Servidor Docker, interface e documentação atualizados para 10.5. Android e configurador Windows existentes são reutilizados; só são recompilados quando houver alterações relevantes em seu código.
+
 # 10.4
 
 - Letra sincronizada fornece sempre o texto completo do karaokê quando corresponde ao artista e à música. Divergências de duração ou tempo e a opção de tempos pelo áudio não substituem esse texto pela transcrição do Whisper.
