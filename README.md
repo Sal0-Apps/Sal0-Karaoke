@@ -125,14 +125,14 @@ Em **Playlist de cada usuário**, a administração define uma playlist válida 
 
 ## Início rápido com Docker
 
-A versão de distribuição desta documentação é **10.3**. O título e o rodapé da página mostram apenas o nome da aplicação. A versão do servidor pode ser consultada no Manual; a versão do APK aparece nas configurações nativas.
+A versão de distribuição desta documentação é **10.4**. O título e o rodapé da página mostram apenas o nome da aplicação. A versão do servidor pode ser consultada no Manual; a versão do APK aparece nas configurações nativas.
 
 Crie um arquivo `compose.yaml`:
 
 ```yaml
 services:
   karaoke-app:
-    image: ghcr.io/sal0-apps/sal0-karaoke:10.3
+    image: ghcr.io/sal0-apps/sal0-karaoke:10.4
     container_name: karaoke-app
     ports:
       - "7885:7860"
@@ -191,11 +191,11 @@ A manutenção é mínima. Não há SLA, garantia de respostas rápidas, revisã
 
 O código original permanece sob [MIT](LICENSE), permitindo uso, estudo, modificação e redistribuição com preservação dos avisos exigidos. Bibliotecas, modelos, fontes, imagens e executáveis de terceiros mantêm suas próprias condições. Consulte [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
-Quando um vídeo de fundo decorativo é maior que a música, o início do trecho é escolhido aleatoriamente a cada nova renderização, cabendo a música inteira até o fim do fundo. Vídeos curtos continuam em loop. O vídeo original da música mantém o início e a sincronização. Com letra sincronizada, seu texto e seus tempos controlam os versos; o Whisper serve apenas à animação das palavras.
+Quando um vídeo de fundo decorativo é maior que a música, o início do trecho é escolhido aleatoriamente a cada nova renderização, cabendo a música inteira até o fim do fundo. Vídeos curtos continuam em loop. O vídeo original da música mantém o início e a sincronização. Com letra sincronizada, seu texto fornece os versos; o Whisper serve à análise dos tempos e da animação local.
 
 ### Verificação dos tempos da letra sincronizada
 
 
-Antes de aplicar os tempos da letra sincronizada, o app compara o início de vários versos com frases reconhecidas na gravação. Artista, título e duração total iguais não garantem uma introdução ou edição idêntica. Se houver um desvio consistente, a LRC é tratada como incompatível: o texto continua como guia e o vídeo usa os tempos medidos na voz. Nenhum deslocamento é aplicado aos tempos de uma LRC aceita. Quando faltam frases reconhecidas para uma conclusão, a verificação fica inconclusiva; isso não prova que a letra esteja certa ou errada. O resultado da verificação aparece nos registros e no resumo quando há incompatibilidade. A etapa envia um único aviso de início ao Telegram e mostra conclusão percentual. Refazer após esta atualização aproveita as faixas e a transcrição válidas, mas recria as legendas e o vídeo; vídeos antigos já salvos não são alterados.
+Quando uma letra sincronizada corresponde ao artista e à música, seu texto completo é usado no vídeo, inclusive as palavras que o Whisper não reconhece. O Whisper fornece apenas a análise local da animação. A diferença de duração não descarta esse texto. Se os tempos da gravação forem diferentes, ou você escolher tempos pelo áudio, os versos reconhecidos usam os tempos locais; versos sem reconhecimento suficiente conservam os tempos fornecidos. Palavras sem tempos medidos permanecem visíveis sem animação inventada. Com backing vocals ativados, o Whisper recebe somente a voz principal isolada, mesmo se o perfil selecionar áudio original ou volume de backing zero. As vozes de apoio continuam na mixagem final conforme o volume escolhido. A abertura com o título continua fora do relógio da música. Refazer aproveita as faixas e análises compatíveis, mas recria as legendas e o vídeo; análises antigas feitas sobre o áudio original com backing vocals são refeitas uma vez.
 
 Downloads novos selecionam o melhor vídeo e áudio disponíveis no YouTube, sem teto de 1080p, inclusive para fundos. Isso pode aumentar o espaço e o tempo necessários. Os arquivos já em cache não ganham qualidade retroativamente; para substituir um download antigo, solicite novamente o link. A separação trabalha em PCM float32 a 44,1 kHz, a cópia de análise Whisper usa PCM float32 mono a 16 kHz e o vídeo exporta AAC a 320 kbps. A precisão máxima do Whisper é aplicada ao modelo escolhido, com maior custo em CPU/RAM. Mais precisão numérica e qualidade de origem não garantem transcrição perfeita nem restauram detalhes ausentes na fonte. O cache da análise é preservado entre tarefas compatíveis, incluindo letras sincronizadas e SRT; a revisão e a renderização continuam independentes.

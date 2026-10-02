@@ -17,7 +17,7 @@ def normalize_identity(value):
     return " ".join(re.findall(r"\w+", text))
 
 
-def recording_matches(query, record, duration):
+def recording_matches(query, record, duration, check_duration=True):
     """Require artist, title, version and duration before trusting LRC clocks."""
     parts = re.split(r"\s+[-–—|]\s+", str(query or ""), maxsplit=1)
     if len(parts) != 2:
@@ -31,6 +31,12 @@ def recording_matches(query, record, duration):
     versions = {"live", "vivo", "remix", "cover", "acoustic", "acustico", "karaoke", "sped", "slowed"}
     if (set(title.split()) & versions) != (set(candidate_title.split()) & versions):
         return False
+    identity_matches = (
+        SequenceMatcher(None, artist, candidate_artist).ratio() >= 0.85
+        and SequenceMatcher(None, title, candidate_title).ratio() >= 0.85
+    )
+    if not check_duration:
+        return identity_matches
     try:
         actual, expected = float(duration), float(record.get("duration"))
     except (TypeError, ValueError):
@@ -39,8 +45,7 @@ def recording_matches(query, record, duration):
         return False
     return (
         abs(actual - expected) <= 2
-        and SequenceMatcher(None, artist, candidate_artist).ratio() >= 0.85
-        and SequenceMatcher(None, title, candidate_title).ratio() >= 0.85
+        and identity_matches
     )
 
 
@@ -194,4 +199,45 @@ def anchor_synced_animation(synced_segments, acoustic_segments):
             animation_words.append(word)
         result.append({**verse, 'words': matched_words, 'animation_words': animation_words,
                        'synced_line': True, 'acoustic_animation': True})
+    return result
+
+
+def retime_synced_verses(synced_segments, acoustic_segments):
+    """Use locally measured verse clocks while retaining all provider text.
+
+    Global sequence matching keeps repeated choruses in occurrence order. A
+    verse without sufficient recognized words retains its provider clock; it
+    never gets replaced with the recognized text or removed from the lyrics.
+    """
+    def key(value):
+        value = unicodedata.normalize('NFKD', str(value)).casefold()
+        return ''.join(re.findall(r'\w+', ''.join(c for c in value if not unicodedata.combining(c))))
+
+    lyric_tokens = []
+    ranges = []
+    for verse in synced_segments:
+        begin = len(lyric_tokens)
+        lyric_tokens.extend(key(token) for token in str(verse['text']).split())
+        ranges.append((begin, len(lyric_tokens)))
+    acoustic = []
+    for segment in acoustic_segments:
+        for word in segment.get('words', []):
+            try:
+                start, end = float(word['start']), float(word['end'])
+            except (KeyError, TypeError, ValueError):
+                continue
+            token = key(word.get('word', ''))
+            if token and math.isfinite(start) and math.isfinite(end) and 0 <= start < end:
+                acoustic.append((token, start, end))
+    acoustic.sort(key=lambda word: word[1])
+    matcher = SequenceMatcher(None, lyric_tokens, [word[0] for word in acoustic], autojunk=False)
+    clocks = {block.a + i: acoustic[block.b + i][1:]
+              for block in matcher.get_matching_blocks() for i in range(block.size)}
+    result = []
+    for verse, (begin, end) in zip(synced_segments, ranges):
+        measured = [clocks[i] for i in range(begin, end) if i in clocks]
+        updated = dict(verse)
+        if len(measured) >= max(2, math.ceil((end - begin) * .35)):
+            updated.update(start=measured[0][0], end=measured[-1][1], local_verse_timing=True)
+        result.append(updated)
     return result

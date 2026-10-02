@@ -47,6 +47,15 @@ class AutomaticLyricsTests(unittest.TestCase):
                                 ("Artista - Canção", float("nan")), ("Artista - Canção", None)]:
             self.assertFalse(recording_matches(query, self.record, duration))
 
+    def test_synced_text_wins_even_when_video_duration_differs(self):
+        plain = {**self.record, "duration": 187, "synced_lyrics": ""}
+        lookup = load_function("find_lyrics_automatically", search_lyrics_providers=lambda _: [plain, self.record])
+        _, metadata = lookup("Artista - Canção", 187)
+        self.assertEqual(metadata["synced_lyrics"], self.record["synced_lyrics"])
+        self.assertTrue(recording_matches("Artista - Canção", self.record, 187, check_duration=False))
+        self.assertFalse(recording_matches("Outro - Canção", self.record, 187, check_duration=False))
+        self.assertFalse(recording_matches("Artista - Canção ao vivo", self.record, 187, check_duration=False))
+
     def test_lrc_keeps_blanks_as_instrumental_boundaries(self):
         result = parse_lrc(self.record["synced_lyrics"], 180)
         self.assertEqual([(s["start"], s["end"]) for s in result], [(10, 13), (13, 17)])

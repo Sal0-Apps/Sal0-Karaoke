@@ -1,3 +1,10 @@
+# 10.4
+
+- Letra sincronizada fornece sempre o texto completo do karaokê quando corresponde ao artista e à música. Divergências de duração ou tempo e a opção de tempos pelo áudio não substituem esse texto pela transcrição do Whisper.
+- Animação local preserva todas as palavras do provedor. Quando há incompatibilidade, versos reconhecidos usam tempos medidos na gravação; versos sem reconhecimento suficiente conservam os tempos fornecidos.
+- Com backing vocals ativados, o Whisper recebe somente a voz principal isolada, independentemente da opção de áudio original e do volume das vozes de apoio. A mixagem final continua preservando os backing vocals no volume escolhido.
+- Cache invalida legendas antigas e análises feitas na fonte vocal incorreta, preservando áudio separado e análises compatíveis. A abertura com título continua fora do relógio da música.
+
 # 10.3
 
 - Corrigida a perda do cache acústico de letras sincronizadas ao refazer um vídeo. Análise bruta e metadados são reaproveitados sem reutilizar checkpoints de outra tarefa; revisão manual não sobrescreve o resultado original do Whisper.
