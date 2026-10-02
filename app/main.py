@@ -5524,7 +5524,7 @@ def run_pipeline(
 
         # Provider availability can change between retries. Never reuse subtitles
         # created from different line clocks, even with the same display options.
-        clock_hash = hashlib.sha256(json.dumps({"animation_timing_version": 3, "synced_validation_version": 4, "synced_text_version": 2, "synced_animation_version": 2, "lead_whisper_version": 1, "guided_spelling_version": 2, "lyrics": synced_segments}, sort_keys=True).encode()).hexdigest()
+        clock_hash = hashlib.sha256(json.dumps({"animation_timing_version": 3, "synced_validation_version": 4, "synced_text_version": 2, "synced_animation_version": 3, "synced_layout_version": 1, "lead_whisper_version": 1, "guided_spelling_version": 2, "lyrics": synced_segments}, sort_keys=True).encode()).hexdigest()
         if cached_meta.get("lyrics_clock_hash") != clock_hash:
             checkpoints = load_stage_checkpoints(cache_dir)
             for stage in ("transcription_reviewed", "subtitles_generated", "video_rendered"):

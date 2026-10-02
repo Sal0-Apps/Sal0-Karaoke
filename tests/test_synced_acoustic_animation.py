@@ -291,12 +291,12 @@ class SyncedAcousticAnimationTests(unittest.TestCase):
             generate_ass_karaoke(scope['segments'], str(target), show_instrumental=False,
                                  break_on_punctuation=False)
             output = target.read_text()
-        self.assertIn(r'\t(200,500,', output)
+        self.assertIn(r'\kt20\kf30', output)
         self.assertNotIn(r'\h', output)
         self.assertNotIn(r'\alpha&HFF&', output)
         self.assertIn('0:00:10.00,0:00:13.00', output)
         self.assertNotIn(r'\clip', output)
-        self.assertIn(r'\t(1600,2500,', output)
+        self.assertIn(r'\kt160\kf90', output)
         self.assertNotIn(r'{\kf300}Olá mundo', output)
 
     def test_repeated_verses_keep_provider_clocks_and_match_only_local_words(self):
@@ -316,7 +316,7 @@ class SyncedAcousticAnimationTests(unittest.TestCase):
         self.assertIn('0:00:10.00,0:00:13.00', output)
         self.assertNotIn('0:00:10.00,0:00:30.00', output)
         self.assertIn('0:00:30.00,0:00:33.00', output)
-        self.assertIn(r'\t(200,500,', output)
+        self.assertIn(r'\kt20\kf30', output)
 
     def test_unrecognized_words_preserve_complete_lyrics_without_assigned_clocks(self):
         verses = [{'start':10,'end':13,'text':'Olá lindo mundo'}]
@@ -353,7 +353,7 @@ class SyncedAcousticAnimationTests(unittest.TestCase):
                                  words_per_line=1, max_chars_line=3)
             content = target.read_text()
             first = next(line for line in content.splitlines() if line.startswith('Dialogue:'))
-            rendered_text = re.sub(r'\{[^}]*\}', '', first.split(',',9)[-1])
+            rendered_text = re.sub(r'\{[^}]*\}', '', first.split(',',9)[-1]).replace(r'\N', '')
             self.assertEqual(rendered_text, verses[0]['text'])
             masks = []
             for time in (.1, 12.5, 15, 19.8):
@@ -387,9 +387,11 @@ class SyncedAcousticAnimationTests(unittest.TestCase):
                 raw = subprocess.check_output(['ffmpeg','-v','error','-f','lavfi','-i',
                     'color=c=black:s=640x360:r=25:d=3','-vf','ass='+str(target),'-ss',str(time),
                     '-frames:v','1','-f','rawvideo','-pix_fmt','rgb24','-'])
-                return sum(raw[i] < 120 and raw[i+1] > 220 and raw[i+2] > 220 for i in range(0,len(raw),3))
-            before, gap_start, gap_end, after = map(white_pixels, [0.1,0.6,1.2,2.6])
+                return sum(min(raw[i:i+3]) > 220 for i in range(0,len(raw),3))
+            before, during, gap_start, gap_end, after = map(white_pixels, [0.1,0.35,0.6,1.2,2.6])
         self.assertEqual(before, 0)
+        self.assertGreater(during, before)
+        self.assertLess(during, gap_start)
         self.assertGreater(gap_start, before)
         self.assertEqual(gap_start, gap_end)
         self.assertGreater(after, gap_end)

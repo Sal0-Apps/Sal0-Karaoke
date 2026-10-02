@@ -1,5 +1,8 @@
 import os
 import logging
+import math
+import re
+import unicodedata
 
 logger = logging.getLogger("karaoke")
 
@@ -218,23 +221,100 @@ def insert_instrumental_breaks(segments: list[dict]) -> list[dict]:
                 
     return new_segments
 
-def synced_animation_text(segment, normal_color, highlight_color):
-    """Animate color on the immutable text, without invisible spacing or crops."""
+def synced_animation_text(segment, normal_color, highlight_color, line_breaks=()):
+    """Use the classic karaoke sweep with absolute clocks and no spacer glyphs."""
     spans = segment.get('animation_words') or [{'word': str(segment['text'])}]
     if ''.join(str(span.get('word', '')) for span in spans) != str(segment['text']):
         # An old/stale animation cache can never change the authoritative text.
         spans = [{'word': str(segment['text'])}]
     result = ''
-    duration_ms = max(0, round((segment['end'] - segment['start']) * 1000))
+    duration_cs = max(0, round((segment['end'] - segment['start']) * 100))
+    offset = 0
     for span in spans:
-        tags = f"\\alpha&H00&\\1c{normal_color}\\2c{normal_color}"
+        tags = f"\\1c{normal_color}\\2c{normal_color}\\kf0"
         if 'start' in span and 'end' in span:
-            start_ms = min(duration_ms, max(0, round((span['start'] - segment['start']) * 1000)))
-            end_ms = min(duration_ms, max(start_ms + 1, round((span['end'] - segment['start']) * 1000)))
-            if end_ms > start_ms:
-                tags += f"\\t({start_ms},{end_ms},\\1c{highlight_color}\\2c{highlight_color})"
-        result += '{' + tags + '}' + span['word']
+            start_cs = min(duration_cs, max(0, round((span['start'] - segment['start']) * 100)))
+            end_cs = min(duration_cs, max(start_cs + 1, round((span['end'] - segment['start']) * 100)))
+            if end_cs > start_cs:
+                # libass >= 0.17 supports an absolute karaoke start (\kt).
+                # Pauses need no invisible characters that could shift or wrap text.
+                tags = f"\\1c{normal_color}\\2c{highlight_color}\\kt{start_cs}\\kf{end_cs - start_cs}"
+        word = span['word']
+        # Visual wrapping never changes the source text or its timing data.
+        for boundary in sorted((b for b in line_breaks if offset <= b < offset + len(word)), reverse=True):
+            index = boundary - offset
+            word = word[:index] + r'\N' + word[index:]
+        result += '{' + tags + '}' + word
+        offset += len(span['word'])
     return result
+
+
+def synced_display_layout(text, font_size, words_per_line=0, max_chars_line=0, height_limit=260):
+    """Wrap original words locally and reserve a bounded display region.
+
+    Conservative glyph widths leave room for font substitution. Font reduction
+    applies only when the complete provider verse would exceed its own region.
+    The result contains display breaks, never new lyric segments or clocks.
+    """
+    def units(value):
+        total = 0.0
+        for char in value:
+            if unicodedata.combining(char):
+                continue
+            if char.isspace():
+                total += .4
+            elif char in 'ilI.,!\'`:;|':
+                total += .5
+            elif char in 'MW@%' or unicodedata.east_asian_width(char) in 'WF':
+                total += 1.2
+            elif char.isupper() or not char.isascii():
+                total += 1.0
+            else:
+                total += .8
+        return total
+
+    size = max(8, int(font_size))
+    words_limit = words_per_line if words_per_line > 0 else AUTO_WORDS_PER_LINE
+    chars_limit = max_chars_line if max_chars_line > 0 else AUTO_MAX_CHARS_LINE
+    tokens = list(re.finditer(r'\S+\s*', str(text)))
+    for _ in range(12):
+        breaks, widths = [], []
+        width, chars, words = 0.0, 0, 0
+        for token in tokens:
+            value = token.group()
+            token_width = units(value) * size
+            if words and (words >= words_limit or chars + len(value.rstrip()) > chars_limit
+                          or width + token_width > 1120):
+                breaks.append(token.start())
+                widths.append(width)
+                width, chars, words = 0.0, 0, 0
+            width += token_width
+            chars += len(value)
+            words += 1
+        widths.append(width)
+        height = len(widths) * size * 1.4 + 8
+        fitted = max(8, math.floor(min(size, size * height_limit / height,
+                                       size * 1120 / max(1, max(widths)))))
+        if fitted == size:
+            return {'font_size': size, 'breaks': breaks, 'height': math.ceil(height)}
+        size = fitted
+    return {'font_size': size, 'breaks': breaks, 'height': math.ceil(height)}
+
+
+def synced_display_positions(current, preview, text_position):
+    """Keep the active verse and preview in separate, explicitly placed regions."""
+    gap = 24
+    height = current['height'] + (gap + preview['height'] if preview else 0)
+    if text_position == 'top':
+        top = 35
+    elif text_position == 'middle':
+        top = (720 - height) / 2
+    else:
+        top = 720 - 35 - height
+    active = f"{{\\an8\\pos(640,{round(top)})\\q2\\fs{current['font_size']}}}"
+    following = (f"{{\\an8\\pos(640,{round(top + current['height'] + gap)})"
+                 f"\\q2\\fs{preview['font_size']}}}" if preview else '')
+    return active, following
 
 
 def generate_ass_karaoke(
@@ -347,13 +427,24 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         start_time_str = format_time(seg["start"])
         end_time_str = format_time(seg["end"])
 
+        next_seg = segments[idx + 1] if show_next_line_preview and idx + 1 < len(segments) else None
+        preview_seg = next_seg if next_seg and 'Instrumental' not in next_seg['text'] else None
+        if seg.get('synced_line') or (preview_seg and preview_seg.get('synced_line')):
+            active_layout = synced_display_layout(seg['text'], font_size, words_per_line, max_chars_line)
+            preview_layout = (synced_display_layout(preview_seg['text'], int(font_size * .85),
+                              words_per_line, max_chars_line, height_limit=170) if preview_seg else None)
+            active_pos, preview_pos = synced_display_positions(active_layout, preview_layout, text_position)
+            text = synced_animation_text(seg, ass_primary_color, ass_secondary_color, active_layout['breaks'])
+            lines.append(f"Dialogue: 0,{start_time_str},{end_time_str},Default,,0,0,0,,{active_pos}{text}\n")
+            if preview_seg:
+                preview_text = synced_animation_text({'text': preview_seg['text'], 'start': 0, 'end': 1},
+                                                      ass_dimmed_color, ass_dimmed_color,
+                                                      preview_layout['breaks'])
+                lines.append(f"Dialogue: 0,{start_time_str},{end_time_str},NextLine,,0,0,0,,{preview_pos}{preview_text}\n")
+            continue
+
         # 1. Linha ativa (Default)
-        if seg.get("synced_line"):
-            # One complete, stable line for the provider's full display interval.
-            # Only color changes; no hidden spacer, clipping, split or text rewrite.
-            text = synced_animation_text(seg, ass_primary_color, ass_secondary_color)
-            line = f"Dialogue: 0,{start_time_str},{end_time_str},Default,,0,0,0,,{text}\n"
-        elif not seg.get("acoustic_animation") and (subtitle_mode in {"phrase", "line"} or not seg.get("words")):
+        if not seg.get("acoustic_animation") and (subtitle_mode in {"phrase", "line"} or not seg.get("words")):
             line = f"Dialogue: 0,{start_time_str},{end_time_str},Default,,0,0,0,,{seg['text']}\n"
         else:
             # Modo Karaoke (segue sílabas)
