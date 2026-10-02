@@ -174,6 +174,23 @@ class SubtitleSegmentationTests(unittest.TestCase):
 
         self.assertIn("Dialogue: 0,0:00:00.00,0:00:03.00", ass_text)
 
+    def test_overlapping_whisper_word_clocks_never_stack_two_active_verses(self):
+        first = make_words(['first', 'complete', 'phrase.'])
+        first[-1]['end'] = 2.3
+        second = make_words(['next', 'complete', 'phrase.'], start=2)
+        original = [dict(words=first + second)]
+        untouched = copy.deepcopy(original)
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / 'overlap.ass'
+            karaoke_generator.generate_ass_karaoke(original, str(path), show_instrumental=False,
+                                                    show_next_line_preview=True)
+            events = [line for line in path.read_text().splitlines()
+                      if line.startswith('Dialogue:') and ',Default,' in line]
+        self.assertEqual(len(events), 2)
+        self.assertIn('0:00:00.00,0:00:02.00', events[0])
+        self.assertIn('0:00:02.00,0:00:03.40', events[1])
+        self.assertEqual(original, untouched)
+
 
 if __name__ == "__main__":
     unittest.main()

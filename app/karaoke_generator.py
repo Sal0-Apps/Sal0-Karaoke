@@ -346,14 +346,15 @@ def generate_ass_karaoke(
     if show_instrumental:
         segments = insert_instrumental_breaks(segments)
     
-    # 3. Manter o verso atual visível até a entrada do próximo, sem um vazio artificial.
+    # 3. Manter o verso atual até o próximo, sem lacunas ou versos sobrepostos.
     for idx in range(len(segments) - 1):
         curr = segments[idx]
         nxt = segments[idx + 1]
         if (not curr.get("synced_line") and "Instrumental" not in nxt["text"]
                 and "Instrumental" not in curr["text"]):
-            gap = nxt["start"] - curr["end"]
-            if gap > 0:
+            # ASR word clocks can overlap slightly. Only the display interval
+            # is bounded here; original word clocks and LRC intervals stay intact.
+            if nxt["start"] > curr["start"]:
                 curr["end"] = nxt["start"]
     
     # 4. Determinar o alinhamento ASS (2 = base centro, 5 = meio centro, 8 = topo centro)
