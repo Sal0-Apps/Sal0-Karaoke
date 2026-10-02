@@ -71,10 +71,11 @@ jobs:
 
       - name: Reuse unchanged Windows authorizer
         if: needs.detect-client-changes.outputs.windows != 'true'
+        shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          AUTHORIZER_URL=$(gh api --paginate --slurp "repos/$GITHUB_REPOSITORY/releases?per_page=100" --jq 'flatten | [.[] | select(.draft == false) | .assets[]? | select(.name == "Sal0-YouTube-Conectar.exe")][0].browser_download_url')
+          AUTHORIZER_URL=$(gh api --paginate --slurp "repos/$GITHUB_REPOSITORY/releases?per_page=100" | jq -r 'flatten | [.[] | select(.draft == false) | .assets[]? | select(.name == "Sal0-YouTube-Conectar.exe")][0].browser_download_url')
           test -n "$AUTHORIZER_URL" && test "$AUTHORIZER_URL" != "null"
           curl --fail --location --retry 3 --output app/Sal0-YouTube-Conectar.exe "$AUTHORIZER_URL"
 
