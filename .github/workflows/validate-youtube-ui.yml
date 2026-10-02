@@ -35,6 +35,7 @@ jobs:
           python -m unittest discover -s tests -p "test_backing*.py" -v
           python -m unittest discover -s tests -p test_automatic_lyrics_and_search.py -v
           python -m unittest discover -s tests -p test_synced_acoustic_animation.py -v
+          python -m unittest discover -s tests -p test_synced_preview_layout.py -v
       - uses: actions/setup-node@v4
         with:
           node-version: '20'

@@ -125,14 +125,14 @@ Em **Playlist de cada usuário**, a administração define uma playlist válida 
 
 ## Início rápido com Docker
 
-A versão de distribuição desta documentação é **10.5**. O título e o rodapé da página mostram apenas o nome da aplicação. A versão do servidor pode ser consultada no Manual; a versão do APK aparece nas configurações nativas.
+A versão de distribuição desta documentação é **10.6**. O título e o rodapé da página mostram apenas o nome da aplicação. A versão do servidor pode ser consultada no Manual; a versão do APK aparece nas configurações nativas.
 
 Crie um arquivo `compose.yaml`:
 
 ```yaml
 services:
   karaoke-app:
-    image: ghcr.io/sal0-apps/sal0-karaoke:10.5
+    image: ghcr.io/sal0-apps/sal0-karaoke:10.6
     container_name: karaoke-app
     ports:
       - "7885:7860"
@@ -196,6 +196,6 @@ Quando um vídeo de fundo decorativo é maior que a música, o início do trecho
 ### Verificação dos tempos da letra sincronizada
 
 
-Quando existir letra sincronizada correspondente à música, o texto completo, a pontuação, os espaços e os intervalos dos versos são preservados. O texto reconhecido pelo Whisper não participa da animação: somente os tempos locais das palavras são aplicados em ordem. A letra inteira permanece visível no intervalo original do provedor; apenas a cor das palavras muda. Sem tempo local suficiente, as palavras restantes ficam visíveis sem animação. Não há limite artificial de doze segundos por verso, redimensionamento de intervalo pela voz ou espaços invisíveis usados para consumir pausas. Com backing vocals ativos, o Whisper recebe a voz principal isolada em áudio completo, sem remoção de silêncios ou VAD no karaokê. A preparação mantém PCM float32, reamostragem adequada ao Whisper e a duração integral; o modelo escolhido usa precisão máxima. A abertura com o título permanece fora do relógio da música. Vídeos existentes precisam ser refeitos para aplicar a correção.
+Quando existir letra sincronizada correspondente à música, o texto completo, a pontuação, os espaços e os intervalos dos versos são preservados. O texto reconhecido pelo Whisper não participa da animação: somente os tempos locais das palavras são aplicados em ordem. A letra inteira permanece visível no intervalo original do provedor; a varredura clássica de cor acompanha as palavras. O processamento local organiza as quebras visuais e separa a prévia do próximo verso, sem alterar palavras nem timestamps. A fonte se ajusta somente quando o verso completo não cabe na sua região. Sem tempo local suficiente, as palavras restantes ficam visíveis sem animação. Não há limite artificial de doze segundos por verso, redimensionamento de intervalo pela voz ou espaços invisíveis usados para consumir pausas. Com backing vocals ativos, o Whisper recebe a voz principal isolada em áudio completo, sem remoção de silêncios ou VAD no karaokê. A preparação mantém PCM float32, reamostragem adequada ao Whisper e a duração integral; o modelo escolhido usa precisão máxima. A abertura com o título permanece fora do relógio da música. Vídeos existentes precisam ser refeitos para aplicar a correção.
 
 Downloads novos selecionam o melhor vídeo e áudio disponíveis no YouTube, sem teto de 1080p, inclusive para fundos. Isso pode aumentar o espaço e o tempo necessários. Os arquivos já em cache não ganham qualidade retroativamente; para substituir um download antigo, solicite novamente o link. A separação trabalha em PCM float32 a 44,1 kHz, a cópia de análise Whisper usa PCM float32 mono a 16 kHz e o vídeo exporta AAC a 320 kbps. A precisão máxima do Whisper é aplicada ao modelo escolhido, com maior custo em CPU/RAM. Mais precisão numérica e qualidade de origem não garantem transcrição perfeita nem restauram detalhes ausentes na fonte. O cache da análise é preservado entre tarefas compatíveis, incluindo letras sincronizadas e SRT; a revisão e a renderização continuam independentes.

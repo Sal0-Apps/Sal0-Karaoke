@@ -1,3 +1,11 @@
+# 10.6
+
+- Reverte a mudança visual da 10.5 e restaura a varredura clássica de cor do karaokê. Corrigida a sobreposição entre verso atual e prévia da próxima linha mostrada na foto.
+- Letra sincronizada continua fornecendo todas as palavras e os intervalos dos versos. Processamento local aplica quebras visuais, ajuste de fonte quando necessário e regiões separadas para verso/prévia nas posições superior, central e inferior.
+- Animação usa somente os tempos locais, ignorando o texto reconhecido. Pausas usam início absoluto de karaokê no libass, sem caracteres invisíveis que desloquem ou cortem a letra.
+- Cache invalida a renderização da 10.5, preservando análises de voz compatíveis. Áudio completo, voz principal isolada com backing vocals ativos e ausência de VAD no karaokê permanecem.
+- Publicação somente do servidor: Android e configurador Windows existentes são reutilizados.
+
 # 10.5
 
 - Letra sincronizada mantém texto completo e tempos dos versos intactos. Retirados o ajuste dos versos pela voz e o limite artificial de 12 segundos.
