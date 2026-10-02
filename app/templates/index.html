@@ -2126,7 +2126,7 @@
             <!-- CARD DE PROGRESSO DE PRODUÇÃO -->
             <div class="card" id="processCard" style="display: none;">
                 <div class="card-header">
-                    <span class="card-title">⏳ Produzindo</span>
+                    <span id="processStatusTitle" class="card-title">⏳ Produzindo</span>
                     <span id="progressPercent" style="font-size: 1.2rem; font-weight: 800; color: var(--accent);">0%</span>
                 </div>
 
@@ -3822,6 +3822,9 @@
             });
             card.style.display = !queueCreationExpanded && !clientPreparationInProgress && (queuedCount > 0 || activeJobs.length > 1 || (adminCanControl && processingQueuePaused)) ? '' : 'none';
             badge.textContent = processingQueuePaused ? `${queuedCount} pausados` : `${queuedCount} aguardando`;
+            if (latestServerStatus && ['idle', 'done', 'error'].includes(latestServerStatus.status) && !queueCreationExpanded && !clientPreparationInProgress) {
+                void renderServerStatus(latestServerStatus);
+            }
             if (activeJobs.length <= 1 && queuedCount === 0 && !processingQueuePaused) {
                 container.replaceChildren();
                 return;
@@ -6479,6 +6482,8 @@
             const formCard = document.getElementById('karaokêForm');
             const processCard = document.getElementById('processCard');
             const correctionCard = document.getElementById('correctionCard');
+            const processStatusTitle = document.getElementById('processStatusTitle');
+            if (processStatusTitle) processStatusTitle.textContent = data.status === 'paused' ? '⏸ Pausado' : '⏳ Produzindo';
             const progressPercent = document.getElementById('progressPercent');
             const progressBarFill = document.getElementById('progressBarFill');
             const statusMessage = document.getElementById('statusMessage');
@@ -6504,6 +6509,30 @@
                 button.style.display = data.can_cancel ? '' : 'none';
             });
 
+
+            const waitingToStart = ['idle', 'done', 'error'].includes(data.status)
+                && latestQueueJobs.some(job => job.status === 'queued');
+            if (waitingToStart) {
+                setCreationUiLocked(true);
+                setActiveProcessLayout(true);
+                if (correctionCard) correctionCard.style.display = 'none';
+                if (downloadBox) downloadBox.style.display = 'none';
+                if (processCard) processCard.style.display = 'block';
+                if (processStatusTitle) processStatusTitle.textContent = processingQueuePaused ? '⏸ Fila pausada' : '⏳ Aguardando';
+                if (statusMessage) statusMessage.textContent = processingQueuePaused
+                    ? 'Item adicionado. O processamento começa quando a fila for retomada.'
+                    : 'Item adicionado à fila. Aguardando o início do processamento.';
+                if (progressPercent) progressPercent.textContent = '0%';
+                if (progressBarFill) {
+                    progressBarFill.style.width = '0%';
+                    progressBarFill.parentElement?.setAttribute('aria-valuenow', '0');
+                    progressBarFill.parentElement?.setAttribute('aria-valuetext', 'Aguardando o início do processamento');
+                }
+                if (stageProgressText) stageProgressText.textContent = '';
+                renderProcessSummary({});
+                isShowingCorrection = false;
+                return;
+            }
 
             if (data.status === "busy") {
                 clientPreparationInProgress = false;

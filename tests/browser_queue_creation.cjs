@@ -183,6 +183,28 @@ const activeJob = () => ({id: 'active', status: 'processing', title: 'Música em
         assert.equal(await page.locator('#easyAudioFile').evaluate(input => input.files[0].name), 'unconfirmed.wav');
         await page.locator('#btnReturnToProcess').click();
 
+        // When the previous job finishes, the accepted next item has its own waiting view.
+        await startNew('easy'); baseline = submissions.length;
+        jobs = []; serverStatus = {status: 'done', result_available_to_current_user: true, original_filename: 'old.mp4'};
+        await refresh();
+        await editorVisible('easy');
+        await page.locator('#easyAudioFile').setInputFiles(file('after-finish.wav'));
+        await page.locator('#easySubmitBtn').click();
+        await untilSubmitted(baseline + 1); await pending.shift()();
+        await page.waitForFunction(() => !clientPreparationInProgress && !queueCreationExpanded);
+        await page.locator('#processCard').waitFor({state: 'visible'});
+        assert.equal(await page.locator('#processStatusTitle').textContent(), '⏳ Aguardando');
+        assert(!await page.locator('#easyModeForm').isVisible());
+        assert(!await page.locator('#downloadBox').isVisible());
+        assert.equal(await page.locator('#queueCountBadge').textContent(), '1 aguardando');
+        queuePaused = true;
+        await refresh();
+        assert.equal(await page.locator('#processStatusTitle').textContent(), '⏸ Fila pausada');
+        queuePaused = false; serverStatus = processing(); jobs[0].status = 'processing';
+        await refresh();
+        assert.equal(await page.locator('#processStatusTitle').textContent(), '⏳ Produzindo');
+        assert(!await page.locator('#queueCard').isVisible());
+
         // An asynchronous review load must not reopen its panel over a new-item draft.
         serverStatus = {status: 'waiting_for_user_correction', can_cancel: true};
         await refresh();
