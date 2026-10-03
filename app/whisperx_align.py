@@ -43,7 +43,7 @@ def stabilize_word_timestamps(segments: list[dict]) -> list[dict]:
             end = _safe_time(source_word.get("end"), max(start + MIN_WORD_DURATION, segment_end))
             end = max(start + MIN_WORD_DURATION, end)
 
-            current = {"word": text, "start": start, "end": end}
+            current = {**source_word, "word": text, "start": start, "end": end}
             if previous_word is not None and current["start"] < previous_word["end"]:
                 # Divide apenas a pequena região sobreposta. Não usa o tamanho da
                 # palavra seguinte para recalcular o restante da frase.

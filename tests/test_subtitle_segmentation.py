@@ -7,8 +7,12 @@ import re
 import tempfile
 import unittest
 import unicodedata
+import sys
 from pathlib import Path
 
+
+sys.path.insert(0, str(Path(__file__).parents[1] / "app"))
+from lyric_guide import verify_lyrics_guide
 
 MODULE_PATH = Path(__file__).parents[1] / "app" / "karaoke_generator.py"
 SPEC = importlib.util.spec_from_file_location("karaoke_generator", MODULE_PATH)
@@ -25,6 +29,7 @@ def load_lyrics_alignment_functions():
     ]
     namespace = {
         "re": re,
+        "verify_lyrics_guide": verify_lyrics_guide,
         "difflib": difflib,
         "unicodedata": unicodedata,
         "logger": logging.getLogger("test"),
@@ -67,7 +72,7 @@ class SubtitleSegmentationTests(unittest.TestCase):
                          'eu quero cantar com você eu quero cantar com você'.split())
         self.assertEqual([w['start'] for w in result[0]['words']], [w['start'] for w in words])
 
-    def test_lyrics_lines_become_natural_verse_boundaries(self):
+    def test_guide_line_breaks_do_not_cut_the_whisper_phrase(self):
         words = make_words(["eu", "canto", "este", "verso", "e", "depois", "vem", "outro"])
         transcription = [
             {"start": 0, "end": 1.9, "text": "", "words": words[:4]},
@@ -77,7 +82,7 @@ class SubtitleSegmentationTests(unittest.TestCase):
         guided = align_lyrics("eu canto este verso\ne depois vem outro", transcription)
         result = karaoke_generator.split_and_wrap_segments(guided, 0, 0, True)
 
-        self.assertEqual([len(segment["words"]) for segment in result], [4, 4])
+        self.assertEqual([len(segment["words"]) for segment in result], [8])
 
     def test_whisper_boundary_does_not_cut_a_short_verse(self):
         words = make_words(["eu", "quero", "cantar", "este", "verso", "inteiro", "com", "voce"])

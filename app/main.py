@@ -44,7 +44,8 @@ from video_renderer import render_karaoke_video, check_has_video
 from subtitle_video import media_has_motion_video, render_audio_subtitle_video
 from reprocess_cache import copy_reusable_inputs, youtube_identity, file_fingerprint
 from media_covers import video_thumbnail
-from lyrics_sync import recording_matches, parse_lrc, require_acoustic_word_timing, anchor_synced_animation
+from lyrics_sync import recording_matches, require_acoustic_word_timing, anchor_synced_animation
+from lyric_guide import prepare_lyrics_guide, verify_lyrics_guide, review_lyrics_with_whisper, GUIDE_POLICY_VERSION
 from backing_vocals import preserve_backing_vocals
 from processing_validation import validate_processing_options, validate_review_segments
 
@@ -1176,75 +1177,8 @@ def clean_word(w: str) -> str:
     return re.sub(r'[^\w]', '', without_accents).casefold()
 
 def align_lyrics(official_lyrics_text: str, transcribed_segments: list[dict]) -> list[dict]:
-    """Usa a letra como guia de grafia sem criar ou mover timestamps.
-
-    Palavras coincidentes e trechos curtos entre duas frases confirmadas recebem
-    a grafia da guia. Não insere versos ausentes nem inventa tempos.
-    Toda a estrutura temporal original é preservada.
-    """
-    official_words = []
-    official_line_ends = set()
-    for lyric_line in official_lyrics_text.splitlines():
-        line_words = [word for word in lyric_line.split() if clean_word(word)]
-        if not line_words:
-            continue
-        official_words.extend(line_words)
-        official_line_ends.add(len(official_words) - 1)
-    if not official_words or not transcribed_segments:
-        return transcribed_segments
-
-    guided_segments = []
-    transcribed_words = []
-    for source_segment in transcribed_segments:
-        copied_words = [dict(word) for word in source_segment.get("words", [])]
-        for copied_word in copied_words:
-            copied_word.pop("lyric_line_break", None)
-        copied_segment = {**source_segment, "words": copied_words}
-        guided_segments.append(copied_segment)
-        for copied_word in copied_words:
-            if clean_word(copied_word.get("word", "")):
-                transcribed_words.append(copied_word)
-
-    if not transcribed_words:
-        return transcribed_segments
-
-    official_clean = [clean_word(word) for word in official_words]
-    transcribed_clean = [clean_word(word.get("word", "")) for word in transcribed_words]
-    matcher = difflib.SequenceMatcher(None, official_clean, transcribed_clean, autojunk=False)
-    matched = 0
-
-    blocks = matcher.get_matching_blocks()
-    pairs = [(block.a + offset, block.b + offset)
-             for block in blocks for offset in range(block.size)]
-    coverage = len(pairs) / max(1, len(transcribed_words))
-    for left, right in zip(blocks, blocks[1:]):
-        oa, ob = left.a + left.size, right.a
-        ta, tb = left.b + left.size, right.b
-        # Never insert missing lyrics, delete speech or invent word clocks.
-        if (left.size >= 2 and right.size >= 2 and coverage >= .35
-                and 0 < ob - oa == tb - ta <= 8):
-            pairs.extend(zip(range(oa, ob), range(ta, tb)))
-    for official_index, transcript_index in sorted(pairs):
-        official_word = official_words[official_index].strip()
-        target_word = transcribed_words[transcript_index]
-        current_text = str(target_word.get("word", ""))
-        leading_space = current_text[:len(current_text) - len(current_text.lstrip())]
-        trailing_space = current_text[len(current_text.rstrip()):]
-        target_word["word"] = f"{leading_space}{official_word}{trailing_space}"
-        if official_index in official_line_ends:
-            target_word["lyric_line_break"] = True
-        matched += 1
-
-    for segment in guided_segments:
-        if segment.get("words"):
-            segment["text"] = "".join(word.get("word", "") for word in segment["words"]).strip()
-
-    logger.info(
-        "Letra guia aplicada à grafia de %s/%s palavras; todos os timestamps do Whisper foram preservados.",
-        matched,
-        len(transcribed_words),
-    )
-    return guided_segments
+    """Confere a grafia com a guia, mantendo frases e tempos da voz local."""
+    return verify_lyrics_guide(official_lyrics_text, transcribed_segments)[0]
 
 def update_state(
     status: str,
@@ -2627,7 +2561,7 @@ def find_lyrics_automatically(query: str, duration: float | None = None) -> tupl
     for item in payload:
         if not isinstance(item, dict) or item.get("instrumental") or not item.get("has_lyrics"):
             continue
-        lyrics_text = str(item.get("lyrics_text") or "").strip()
+        lyrics_text = prepare_lyrics_guide(item.get("lyrics_text") or item.get("synced_lyrics"))
         if not lyrics_text:
             continue
 
@@ -2845,7 +2779,7 @@ class ProfileModel(BaseModel):
     save_to_library: bool = True
     keep_backing_vocals: bool = True
     backing_vocals_volume: int = Field(default=100, ge=0, le=100)
-    lyrics_timing: str = "auto"
+    lyrics_timing: str = "acoustic"
     only_remove_vocals: bool = False
 
 BUILTIN_PROFILES = {
@@ -2956,7 +2890,7 @@ PROFILE_DEFAULT_FIELDS = {
     "only_remove_vocals": False,
     "keep_backing_vocals": True,
     "backing_vocals_volume": 100,
-    "lyrics_timing": "auto",
+    "lyrics_timing": "acoustic",
     "description": "Perfil personalizado por você.",
     "_builtin": False,
 }
@@ -2987,6 +2921,9 @@ def load_profiles(user: dict) -> dict:
             continue
         if profile_data.get("enable_vad") is not False:
             profile_data["enable_vad"] = False
+            changed = True
+        if profile_data.get("lyrics_timing") != "acoustic":
+            profile_data["lyrics_timing"] = "acoustic"
             changed = True
         if "enable_correction" not in profile_data:
             profile_data["enable_correction"] = profile_data.get("pause_for_editing", False)
@@ -3047,7 +2984,7 @@ def save_profile(profile: ProfileModel, current_user: dict = Depends(get_current
         "save_to_library": profile.save_to_library,
         "keep_backing_vocals": profile.keep_backing_vocals,
         "backing_vocals_volume": profile.backing_vocals_volume,
-        "lyrics_timing": profile.lyrics_timing,
+        "lyrics_timing": "acoustic",
         "only_remove_vocals": profile.only_remove_vocals
     }
     try:
@@ -3894,7 +3831,7 @@ def continue_process(data: ContinueProcessModel, current_user: dict = Depends(ge
         raise HTTPException(status_code=400, detail=str(exc))
 
     updated_segments = []
-    for s in data.segments:
+    for segment_index, s in enumerate(data.segments):
         seg_text = s.text if s.synced_line else s.text.strip()
         if s.synced_line:
             if getattr(s, "acoustic_animation", False):
@@ -3915,7 +3852,9 @@ def continue_process(data: ContinueProcessModel, current_user: dict = Depends(ge
         if len(orig_words) == len(words_list):
             orig_dur = s.words[-1].end - s.words[0].start if len(s.words) > 0 else 0
             new_dur = s.end - s.start
-            if orig_dur > 0 and new_dur > 0:
+            original = segments_to_edit[segment_index] if segment_index < len(segments_to_edit) else {}
+            clocks_changed = (s.start != original.get("start") or s.end != original.get("end"))
+            if clocks_changed and orig_dur > 0 and new_dur > 0:
                 scale = new_dur / orig_dur
                 t0 = s.words[0].start
                 for w in orig_words:
@@ -4084,7 +4023,7 @@ def process_karaoke(
     youtube_publish: bool = Form(False),
     youtube_playlist_id: str = Form(""),
     youtube_title: str = Form(""),
-    lyrics_timing: str = Form("auto"),
+    lyrics_timing: str = Form("acoustic"),
     keep_backing_vocals: bool = Form(True),
     backing_vocals_volume: int = Form(100),
     enable_correction: bool = Form(False),
@@ -5271,7 +5210,7 @@ def run_pipeline(
     lyrics_text: str = None,
     lyrics_mode: str = "auto",
     youtube_publish_options: dict = None,
-    lyrics_timing: str = "auto",
+    lyrics_timing: str = "acoustic",
     keep_backing_vocals: bool = True,
     backing_vocals_volume: int = 100,
     enable_correction: bool = False,
@@ -5290,6 +5229,7 @@ def run_pipeline(
     if not subtitle_only:
         # Singing keeps the complete timeline, including silence and held notes.
         enable_vad = False
+        lyrics_timing = "acoustic"
     # Obter o lock de processamento exclusivo (segurança de job único)
     if not processing_lock.acquire(blocking=False):
         logger.warning("Bloqueio de concorrência ativado: Processamento já em andamento.")
@@ -5487,8 +5427,7 @@ def run_pipeline(
 
         # Busca automática de letra: sempre usa a identidade da mídia atual.
         # O texto anterior é descartado para nunca orientar outra música.
-        synced_segments = []
-        lyrics_text = (lyrics_text or "").strip() if lyrics_mode == "manual" else ""
+        lyrics_text = prepare_lyrics_guide(lyrics_text) if lyrics_mode == "manual" else ""
         if lyrics_mode == "auto":
             cached_meta["lyrics_text"] = ""
             try:
@@ -5507,20 +5446,17 @@ def run_pipeline(
             auto_lyrics, auto_match = find_lyrics_automatically(orig_name, media_duration)
             update_state("processing", "Searching lyrics online", 10,
                          stage_progress=100, stage_detail="Consulta de letra concluída")
-            if auto_match and recording_matches(orig_name, auto_match, media_duration, check_duration=False):
-                synced_segments = parse_lrc(auto_match.get("synced_lyrics"), media_duration)
+            auto_lyrics = prepare_lyrics_guide(auto_lyrics)
             if auto_lyrics:
                 lyrics_text = auto_lyrics
                 update_process_summary(lyrics="Letra-guia + Whisper")
-                if synced_segments:
-                    update_process_summary(lyrics="Letra sincronizada por versos (LRCLIB)")
                 notify_targets(
                     telegram_targets,
                     telegram_notice(
                         "📖",
-                        "Letra sincronizada encontrada" if synced_segments else "Letra-guia encontrada",
+                        "Letra-guia encontrada",
                         f"🎵 <b>{telegram_escape(orig_name)}</b>",
-                        "✅ Sincronização por versos disponível." if synced_segments else "✅ A letra será usada para orientar a grafia do Whisper.",
+                        "✅ Conferência das palavras com a guia; texto e tempos produzidos pelo Whisper.",
                     ),
                 )
                 cached_meta["lyrics_text"] = auto_lyrics
@@ -5615,17 +5551,20 @@ def run_pipeline(
             cached_meta["audio_hash"] = new_audio_hash
 
         invalidate_subtitle_display_cache(cache_dir, cached_meta, {
-            "version": 2, "font_size": font_size, "text_color": text_color,
+            "version": 3, "font_size": font_size, "text_color": text_color,
             "text_position": text_position, "subtitle_mode": subtitle_mode,
             "words_per_line": words_per_line, "max_chars_line": max_chars_line,
             "break_on_punctuation": break_on_punctuation, "show_instrumental": show_instrumental,
             "show_next_line_preview": show_next_line_preview, "keep_first_line_visible": keep_first_line_visible,
         })
 
-        # Provider availability can change between retries. Never reuse subtitles
-        # created from different line clocks, even with the same display options.
-        clock_hash = hashlib.sha256(json.dumps({"animation_timing_version": 3, "synced_validation_version": 4, "synced_text_version": 2, "synced_animation_version": 3, "synced_layout_version": 2,
-            "display_animation_version": 1, "lead_whisper_version": 1, "guided_spelling_version": 2, "lyrics": synced_segments}, sort_keys=True).encode()).hexdigest()
+        # Upgrade prior verse-based reviews once; external clocks never enter
+        # the guide signature or control subtitles in this acoustic policy.
+        clock_hash = hashlib.sha256(json.dumps({"lyrics_policy_version": GUIDE_POLICY_VERSION,
+            "lyrics": prepare_lyrics_guide(lyrics_text), "whisper_model": whisper_model,
+            "transcription_preset": transcription_preset,
+            "voice_source": "lead" if keep_backing_vocals else transcribe_source,
+            "audio_hash": new_audio_hash}, sort_keys=True).encode()).hexdigest()
         if cached_meta.get("lyrics_clock_hash") != clock_hash:
             checkpoints = load_stage_checkpoints(cache_dir)
             for stage in ("transcription_reviewed", "subtitles_generated", "video_rendered"):
@@ -5799,12 +5738,11 @@ def run_pipeline(
                 return
 
             # Passo 3: Transcrever vocais com Whisper selecionado
-            # LRC clocks describe verses, not the sung duration of each word.
-            # Always obtain word clocks from this recording, including synced lyrics.
+            # Every word and clock comes from this recording. LRC is only a guide.
             segments = None
-            if synced_segments:
-                lyrics_text = "\n".join(segment["text"] for segment in synced_segments)
-            segments_cache_file = os.path.join(cache_dir, "synced_acoustic_segments.json" if synced_segments else "transcribed_segments.json")
+            lyrics_text = prepare_lyrics_guide(lyrics_text)
+            segments_cache_file = os.path.join(cache_dir, "transcribed_segments.json")
+            transcribe_audio = vocals_wav if transcribe_source == "vocals" else converted_wav
             lyrics_hint_hash = hashlib.sha256(" ".join((lyrics_text or "").split()).encode("utf-8")).hexdigest()
             whisper_meta_file = os.path.join(cache_dir, "whisper_cache_meta.json")
             if os.path.isfile(whisper_meta_file):
@@ -5820,7 +5758,7 @@ def run_pipeline(
                 except (OSError, ValueError, AttributeError):
                     logger.warning("Metadados do cache Whisper inválidos; refazendo a análise.")
             if not os.path.isfile(segments_cache_file):
-                alternate = os.path.join(cache_dir, "transcribed_segments.json" if synced_segments else "synced_acoustic_segments.json")
+                alternate = os.path.join(cache_dir, "synced_acoustic_segments.json")
                 if os.path.isfile(alternate):
                     segments_cache_file = alternate
 
@@ -5841,6 +5779,8 @@ def run_pipeline(
                     if not isinstance(segments, list) or not segments:
                         raise ValueError("Cache de transcrição vazio ou inválido.")
                     require_acoustic_word_timing(segments)
+                    if any(s.get("synced_line") or s.get("animation_words") or s.get("acoustic_animation") for s in segments):
+                        raise ValueError("Cache contém tempos de versos externos; refazendo com Whisper.")
                     logger.info("Aproveitando transcrição do Whisper do cache.")
                     update_state(
                         "processing",
@@ -5866,7 +5806,7 @@ def run_pipeline(
                     telegram_targets,
                     telegram_notice(
                         "✍️",
-                        "Sincronização da animação pela voz" if synced_segments else "Transcrição com Whisper",
+                        "Transcrição com Whisper",
                         f"🤖 Modelo: <b>{telegram_escape(whisper_model)}</b>",
                         "🎤 Medindo os tempos das palavras cantadas na gravação.",
                         "📊 Progresso geral inicial: <b>65%</b>",
@@ -5941,29 +5881,43 @@ def run_pipeline(
 
             pm.check_cancelled()
 
-            if not segments and not synced_segments:
-                raise ValueError("Nenhum vocal detectado ou transcrição vazia.")
-
+            if not segments:
+                raise ValueError("Nenhum vocal detectado ou transcrição vazia. A letra-guia não substitui a análise da voz.")
+            require_acoustic_word_timing(segments)
             save_stage_checkpoint(cache_dir, "transcription_ready", "transcrição do Whisper concluída", 74)
 
-            # A letra corrige apenas a grafia; os tempos continuam vindo do áudio.
-            if not synced_segments and lyrics_text and lyrics_text.strip():
-                logger.info("Aplicando letra guia de forma conservadora, sem criar timestamps...")
-                segments = align_lyrics(lyrics_text, segments)
+            if lyrics_text:
+                update_state("processing", "Checking lyrics guide", 74, stage_progress=0,
+                             stage_detail="Conferindo todas as palavras reconhecidas com a letra-guia")
 
+                def retry_guided_transcription(report):
+                    pm.check_cancelled()
+                    def publish_guide_progress(percent, elapsed, total):
+                        pm.check_cancelled()
+                        update_state("processing", "Verifying lyrics with Whisper", 74,
+                                     stage_progress=percent,
+                                     stage_detail=f"Nova análise da voz: {percent}% · áudio completo, sem cortes")
+                    return transcribe_vocals(transcribe_audio, model_size=whisper_model,
+                        initial_prompt=lyrics_text, quality_mode="max_quality", enable_vad=False,
+                        transcription_preset="difficult", guidance_retry=True,
+                        guide_vocabulary=report["retry_vocabulary"] or lyrics_text,
+                        progress_callback=publish_guide_progress)
+
+                segments, guide_report = review_lyrics_with_whisper(lyrics_text, segments, cache_dir,
+                    context={key: cached_meta.get(key) for key in (
+                        "audio_hash", "vocal_source", "transcribe_source", "whisper_model",
+                        "whisper_quality_mode", "transcription_preset")},
+                    retry=retry_guided_transcription, cancel=pm.check_cancelled)
+                unresolved = guide_report["unmatched_words"] + guide_report["missing_guide_words"]
+                detail = (f'{guide_report["checked_words"]} palavras conferidas · '
+                          f'{guide_report["corrected_words"]} correções de grafia · {unresolved} diferenças')
+                update_process_summary(lyrics=f'Whisper + guia · {guide_report["checked_words"]} palavras conferidas'
+                    + (" · diferenças encontradas" if unresolved else ""), lyrics_review={key: guide_report[key]
+                    for key in ("status", "checked_words", "verified_words", "corrected_words",
+                                "unmatched_words", "missing_guide_words", "retry_attempted", "retry_selected")})
+                update_state("processing", "Checking lyrics guide", 74, stage_progress=100, stage_detail=detail)
+                logger.info("Conferência da letra-guia: %s. Todos os tempos vêm do Whisper.", detail)
             pm.check_cancelled()
-
-            if synced_segments:
-                update_state("processing", "Synced verse animation", 74, stage_progress=0,
-                             stage_detail="Aplicando os tempos locais sem alterar a letra sincronizada")
-                notify_targets(telegram_targets, telegram_notice("⏱", "Animação da letra sincronizada",
-                    "Texto e versos preservados; usando somente os tempos locais das palavras."))
-                segments = anchor_synced_animation(synced_segments, segments or [])
-                measured = sum(len(segment["words"]) for segment in segments)
-                total = sum(len(str(segment["text"]).split()) for segment in synced_segments)
-                update_process_summary(lyrics="Letra sincronizada intacta; somente animação local")
-                update_state("processing", "Synced verse animation", 74, stage_progress=100,
-                             stage_detail=f"Letra inteira e tempos dos versos preservados; {measured}/{total} palavras com tempos locais")
 
             # --- NOVO: Passo de Pausa e Correção de Legendas (se ativado pelo usuário) ---
             review_checkpoint = stage_checkpoint(cache_dir, "transcription_reviewed")
@@ -6003,14 +5957,14 @@ def run_pipeline(
                 segments = segments_to_edit
 
                 # Salvar os segmentos corrigidos também no cache, para não perder o trabalho se refazer!
-                reviewed_cache_file = os.path.join(cache_dir, "reviewed_synced_segments.json") if synced_segments else os.path.join(cache_dir, "reviewed_segments.json")
+                reviewed_cache_file = os.path.join(cache_dir, "reviewed_segments.json")
                 with open(reviewed_cache_file, "w", encoding="utf-8") as f:
                     import json
                     json.dump(segments, f, indent=4)
 
                 save_stage_checkpoint(cache_dir, "transcription_reviewed", "revisão das legendas concluída", 78)
             elif review_checkpoint:
-                reviewed_cache_file = os.path.join(cache_dir, "reviewed_synced_segments.json" if synced_segments else "reviewed_segments.json")
+                reviewed_cache_file = os.path.join(cache_dir, "reviewed_segments.json")
                 if os.path.isfile(reviewed_cache_file):
                     with open(reviewed_cache_file, encoding="utf-8") as f:
                         segments = json.load(f)

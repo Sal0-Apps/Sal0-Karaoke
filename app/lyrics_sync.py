@@ -1,7 +1,7 @@
-"""Use provider timestamps only for a confidently matched recording.
+"""Recording identity, acoustic validation and legacy LRC compatibility.
 
-LRC timestamps describe lines, not words. Production animation obtains word
-clocks from the recording instead of dividing the provider verse interval.
+The 11.0 pipeline uses Whisper words and clocks with lyric_guide. LRC parsing
+and anchoring remain only for prior review payloads and standalone callers.
 """
 import math
 import re

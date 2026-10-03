@@ -56,6 +56,38 @@ class WhisperAudioTests(unittest.TestCase):
         self.assertEqual(model.call_args.kwargs['compute_type'], 'float32')
         self.assertGreaterEqual(transcribe.call_args.kwargs['beam_size'], 10)
         self.assertEqual(transcribe.call_args.kwargs['hotwords'], 'cantar você')
+        self.assertEqual(transcribe.call_args.kwargs['initial_prompt'], 'cantar você cantar')
+
+    def test_guided_retry_uses_full_audio_and_ignores_provider_clocks(self):
+        info = SimpleNamespace(language='pt', language_probability=1, duration=.5)
+        word = SimpleNamespace(word=' cantar', start=.1, end=.4, probability=.92)
+        transcribe = Mock(return_value=(iter([SimpleNamespace(start=0, end=.5,
+            text='cantar', words=[word])]), info))
+        module = self.load_transcriber(Mock(return_value=SimpleNamespace(transcribe=transcribe)))
+        with patch.object(module.os, 'makedirs'):
+            result = module.transcribe_vocals(str(self.audio), quality_mode='max_quality',
+                initial_prompt='[offset:8000]\n[00:45]cantar você cantar', guidance_retry=True,
+                guide_vocabulary='[00:50]você cantar', enable_vad=False)
+        options = transcribe.call_args.kwargs
+        self.assertEqual(transcribe.call_args.args[0].shape, (8000,))
+        self.assertEqual(options['initial_prompt'], 'cantar você cantar')
+        self.assertEqual(options['hotwords'], 'você cantar')
+        self.assertGreaterEqual(options['beam_size'], 15)
+        self.assertGreaterEqual(options['patience'], 2)
+        self.assertNotIn('clip_timestamps', options)
+        self.assertNotIn('prefix', options)
+        self.assertFalse(options.get('vad_filter', False))
+        self.assertEqual(result[0]['words'][0]['probability'], .92)
+        self.assertEqual((result[0]['words'][0]['start'], result[0]['words'][0]['end']), (.1,.4))
+
+    def test_cancelled_progress_aborts_without_vad_retry(self):
+        info = SimpleNamespace(language='pt', language_probability=1, duration=.5)
+        transcribe = Mock(return_value=(iter([]), info))
+        module = self.load_transcriber(Mock(return_value=SimpleNamespace(transcribe=transcribe)))
+        with patch.object(module.os, 'makedirs'), self.assertRaises(InterruptedError):
+            module.transcribe_vocals(str(self.audio), enable_vad=True,
+                progress_callback=Mock(side_effect=InterruptedError('cancelado')))
+        transcribe.assert_called_once()
 
     def test_compressed_audio_and_video(self):
         for extension in ('mp3', 'mp4'):

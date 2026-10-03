@@ -4,6 +4,7 @@ import logging
 from faster_whisper import WhisperModel
 from whisper_audio import load_whisper_audio
 from whisperx_align import stabilize_word_timestamps
+from lyric_guide import prepare_lyrics_guide
 
 logger = logging.getLogger("karaoke")
 
@@ -157,6 +158,8 @@ def transcribe_vocals(
     task: str = "transcribe",
     return_info: bool = False,
     progress_callback=None,
+    guidance_retry: bool = False,
+    guide_vocabulary: str = None,
 ) -> list[dict] | tuple[list[dict], dict]:
     """
     Transcrição local de vocais com Faster-Whisper e ajustes próprios para canto.
@@ -172,7 +175,11 @@ def transcribe_vocals(
     is_max_quality = (quality_mode == "max_quality" or "max" in str(quality_mode).lower())
     compute_type = "float32" if is_max_quality else "int8"
     beam_size = max(preset["beam_size"], 10 if is_max_quality else 0)
-    lyrics_hint = _prepare_lyrics_hint(initial_prompt)
+    guide = prepare_lyrics_guide(initial_prompt)
+    lyrics_hint = _prepare_lyrics_hint(prepare_lyrics_guide(guide_vocabulary) or guide)
+    phrase_context = " ".join(guide.split())[:800] or None
+    if guidance_retry:
+        beam_size = max(beam_size, 15)
 
     logger.info(
         f"Configuração Faster-Whisper: Modelo={model_size}, Perfil={transcription_preset}, "
@@ -245,10 +252,11 @@ def transcribe_vocals(
         "task": "translate" if task == "translate" else "transcribe",
         "word_timestamps": True,
         "beam_size": beam_size,
-        "patience": preset["patience"],
+        "patience": max(preset["patience"], 2.0) if guidance_retry else preset["patience"],
         "condition_on_previous_text": preset["condition_on_previous_text"],
         "no_speech_threshold": preset["no_speech_threshold"],
         "hallucination_silence_threshold": preset["hallucination_silence_threshold"],
+        "initial_prompt": phrase_context,
         "hotwords": lyrics_hint,
     }
     if enable_vad:
@@ -272,27 +280,37 @@ def transcribe_vocals(
             if progress_callback and percent != last_percent:
                 try:
                     progress_callback(percent, segment_end, total_duration)
+                except InterruptedError:
+                    raise
                 except Exception as callback_error:
                     logger.debug("Falha ao publicar progresso do Whisper: %s", callback_error)
             last_percent = percent
         if progress_callback:
             try:
                 progress_callback(100, total_duration, total_duration)
+            except InterruptedError:
+                raise
             except Exception as callback_error:
                 logger.debug("Falha ao publicar conclusão do Whisper: %s", callback_error)
         return collected
 
     try:
-        segments, info = model.transcribe(audio, **transcribe_options)
-        segments = consume_segments(segments, info)
-    except Exception as e_vad:
-        if not enable_vad:
+        try:
+            segments, info = model.transcribe(audio, **transcribe_options)
+            segments = consume_segments(segments, info)
+        except InterruptedError:
             raise
-        logger.warning(f"Transcrição com Silero VAD retornou aviso ({e_vad}). Transcrevendo sem filtro VAD...")
-        transcribe_options.pop("vad_filter", None)
-        transcribe_options.pop("vad_parameters", None)
-        segments, info = model.transcribe(audio, **transcribe_options)
-        segments = consume_segments(segments, info)
+        except Exception as e_vad:
+            if not enable_vad:
+                raise
+            logger.warning(f"Transcrição com Silero VAD retornou aviso ({e_vad}). Transcrevendo sem filtro VAD...")
+            transcribe_options.pop("vad_filter", None)
+            transcribe_options.pop("vad_parameters", None)
+            segments, info = model.transcribe(audio, **transcribe_options)
+            segments = consume_segments(segments, info)
+    finally:
+        del model
+        gc.collect()
 
     logger.info(f"Idioma detectado: {info.language} ({info.language_probability:.2%})")
 
@@ -304,7 +322,8 @@ def transcribe_vocals(
                 segment_words.append({
                     "word": word.word,
                     "start": word.start,
-                    "end": word.end
+                    "end": word.end,
+                    **({"probability": word.probability} if getattr(word, "probability", None) is not None else {}),
                 })
         if segment_words:
             structured_segments.append({
@@ -315,9 +334,6 @@ def transcribe_vocals(
             })
 
     logger.info(f"Transcrição concluída. Segmentos obtidos: {len(structured_segments)}")
-    del model
-    gc.collect()
-
     if structured_segments:
         try:
             logger.info("Estabilizando timestamps de palavras sem alterar o alinhamento do áudio...")

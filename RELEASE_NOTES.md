@@ -1,3 +1,12 @@
+# 11.0
+
+- Whisper passa a definir as palavras, o ritmo e toda a sincronia do karaokê. Letras externas, inclusive LRC, servem apenas como guia; horários, offsets e quebras de verso do provedor são ignorados. Esta política substitui a prioridade de versos sincronizados das versões 10.x.
+- A guia orienta o contexto e o vocabulário do modelo. Todas as palavras reconhecidas são comparadas; correspondências confiáveis corrigem grafia e pontuação mantendo os tempos locais. Versos ausentes não são copiados sem reconhecimento da voz.
+- Diferenças podem disparar uma segunda análise local do áudio completo. Ela é limitada a uma tentativa e só substitui a primeira quando melhora a correspondência, sem perda relevante de confiança acústica. Contagens de conferência aparecem no andamento; o relatório e o resultado conferido ficam em cache.
+- Mantidos áudio completo sem VAD no karaokê, voz principal isolada com backing vocals, precisão máxima do modelo escolhido, frases legíveis, posições estáveis e destaque suave. Salvar uma revisão sem editar seus horários preserva os tempos das palavras.
+- Migração invalida legendas, vídeo e revisões antigas baseadas em LRC. Áudio e análises Whisper compatíveis continuam reutilizáveis; a conferência em cache é vinculada à guia, ao áudio e ao modelo. Use **Refazer** para aplicar a mudança a vídeos concluídos.
+- Interface e documentação refletem o novo fluxo. Publicação somente do servidor, com testes de fluxo, cache, transcrição, renderização real e navegador; Android e configurador Windows existentes são reutilizados.
+
 # 10.9
 
 - Corrigida a divisão de frases no karaokê gerado apenas pelo Whisper. Os controles de palavras e caracteres passam a organizar linhas visuais, sem cortar versos pela contagem nem deixar “deu” separado de “me”. Pausas, pontuação, início de frase e marcadores de letra-guia orientam as trocas de verso.
