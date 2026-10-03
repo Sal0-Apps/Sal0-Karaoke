@@ -1,6 +1,6 @@
 # Manual do Sal0 Karaokê
 
-Este manual descreve os controles disponíveis na distribuição 10.9. Para instalar o servidor, consulte [DEPLOYMENT.md](DEPLOYMENT.md). Para configurar o aparelho, consulte o [guia Android](android/README.md).
+Este manual descreve os controles disponíveis na distribuição 11.0. Para instalar o servidor, consulte [DEPLOYMENT.md](DEPLOYMENT.md). Para configurar o aparelho, consulte o [guia Android](android/README.md).
 
 O Sal0 Karaokê é destinado a uma instalação pessoal, acessada pela rede local ou por VPN, como ZeroTier. O repositório aberto disponibiliza o código e os pacotes; o projeto não opera um serviço público de processamento nem coleta centralmente as mídias das instalações. Não é necessário expor a porta do app à internet. O processamento principal é local, mas as integrações escolhidas podem se comunicar com serviços externos.
 
@@ -73,15 +73,15 @@ Modelos maiores tendem a consumir mais RAM e tempo. Large V3 Turbo, Large V3, Me
 4. O texto manual tem prioridade sobre a busca automática.
 5. Se não houver letra, o processo pode seguir apenas com Whisper; o resumo e o Telegram informam essa condição quando aplicável.
 
-A letra-guia também corrige palavras mal reconhecidas em trechos curtos com a mesma quantidade de palavras, entre duas frases confirmadas. Os tempos medidos na voz não são alterados. Trechos ausentes ou sem correspondência suficiente não recebem palavras ou tempos inventados. Em letras LRC aceitas, o texto completo da letra continua preservado.
+A letra-guia orienta o contexto e o vocabulário do Whisper. Após a transcrição, cada palavra é conferida: correspondências confiáveis corrigem a grafia sem alterar seus tempos. Trechos ausentes e diferenças permanecem visíveis no relatório local; uma segunda análise da gravação pode recuperar palavras. O processamento não insere automaticamente versos que o Whisper não reconheceu.
 
 A letra-guia orienta o reconhecimento, mas não garante que a gravação tenha os mesmos versos, repetições ou arranjos. Letras e traduções podem ter direitos próprios; verifique autorização antes de copiar ou publicar.
 
-### Letra sincronizada e vozes de apoio
+### Sincronia local e vozes de apoio
 
-A letra sincronizada fornece o texto e os intervalos dos versos. O áudio fornece apenas os tempos da animação, sem comparação com as palavras reconhecidas. Refazer recria legendas e vídeo com as regras da versão atual.
+A partir da 11.0, o Whisper define o texto e toda a sincronia. Letras sincronizadas também são apenas guias; seus horários são descartados. Refazer recria legendas e vídeo com essa política, aproveitando áudio e análise compatíveis. Revisões antigas baseadas em versos LRC são refeitas para não reintroduzir os horários externos.
 
-Quando existir letra sincronizada correspondente à música, o texto completo, a pontuação, os espaços e os intervalos dos versos são preservados. O texto reconhecido pelo Whisper não participa da animação: somente os tempos locais das palavras são aplicados em ordem. A letra inteira permanece visível no intervalo original do provedor; a varredura clássica de cor acompanha as palavras. O processamento local organiza as quebras visuais e separa a prévia do próximo verso, sem alterar palavras nem timestamps. A fonte se ajusta somente quando o verso completo não cabe na sua região. Sem tempo local suficiente, as palavras restantes ficam visíveis sem animação. Não há limite artificial de doze segundos por verso, redimensionamento de intervalo pela voz ou espaços invisíveis usados para consumir pausas. Com backing vocals ativos, o Whisper recebe a voz principal isolada em áudio completo, sem remoção de silêncios ou VAD no karaokê. A preparação mantém PCM float32, reamostragem adequada ao Whisper e a duração integral; o modelo escolhido usa precisão máxima. A abertura com o título permanece fora do relógio da música. Vídeos existentes precisam ser refeitos para aplicar a correção.
+O Whisper fornece as palavras, o ritmo e os tempos da gravação em todos os karaokês. Letras manuais ou encontradas online, inclusive LRC, servem apenas como guia: seus horários, offsets e quebras de verso não controlam a legenda. A guia orienta o contexto e o vocabulário do modelo; depois, todas as palavras reconhecidas são comparadas. Correspondências confiáveis recebem a grafia e pontuação da guia, sem mover os tempos. Palavras ausentes ou sem correspondência permanecem registradas como diferenças. Uma segunda análise local do áudio completo pode recuperar essas palavras; o resultado só substitui o primeiro quando melhora a correspondência sem perda relevante de confiança acústica. A guia não cria palavras nem tempos sem reconhecimento na voz. Com backing vocals ativos, o Whisper recebe a voz principal isolada, incluindo silêncios e notas sustentadas, sem VAD no karaokê. A preparação mantém PCM float32 e a duração integral; o modelo escolhido usa precisão máxima. A abertura com o título permanece fora do relógio da música. Vídeos existentes precisam ser refeitos para aplicar a 11.0.
 
 **Preservar backing vocals** separa a voz principal das vozes de apoio localmente com o modelo UVR-BVE, depois soma as vozes de apoio ao instrumental do Demucs. Ajuste seu volume de 0 a 100% ou desative a opção para a música. Ela está disponível nos modos Rápido e Detalhado, inclusive na personalização do rápido. O modelo é baixado no primeiro uso, fica no volume persistente e aumenta o tempo de processamento. A qualidade depende da gravação; a separação pode deixar vazamentos ou perder harmonias. O modo SRT mantém o áudio completo e não usa esta separação.
 
@@ -89,7 +89,7 @@ Quando existir letra sincronizada correspondente à música, o texto completo, a
 
 Escolha **Vídeo original**, **Imagem / Vídeo** ou **Cor sólida** (preto) como modo de fundo. Para imagem/vídeo, envie um arquivo, use a Biblioteca ou um link. O áudio do fundo não é usado como trilha do karaokê.
 
-Em **Sílabas (varredura)**, a cor avança dentro das palavras pelos tempos locais. Em **Palavras**, a palavra inteira recebe o destaque com uma transição curta de cor no seu início. **Linhas** e **Frase estática** mantêm o texto na cor escolhida durante o intervalo do verso. Estas opções também se aplicam às letras sincronizadas, preservando texto e tempos dos versos. O modo por sílabas não garante alinhamento fonético perfeito. O verso e a prévia ficam em regiões separadas em todas as posições; a primeira linha na introdução não é duplicada pela contagem regressiva.
+Em **Sílabas (varredura)**, a cor avança dentro das palavras pelos tempos locais. Em **Palavras**, a palavra inteira recebe o destaque com uma transição curta de cor no seu início. **Linhas** e **Frase estática** mantêm o texto na cor escolhida durante o intervalo da frase reconhecida. Estas opções seguem o Whisper mesmo quando há uma letra-guia sincronizada. O modo por sílabas não garante alinhamento fonético perfeito. O verso e a prévia ficam em regiões separadas em todas as posições; a primeira linha na introdução não é duplicada pela contagem regressiva.
 
 ### Mais ajustes
 
@@ -111,9 +111,9 @@ Em **Sílabas (varredura)**, a cor avança dentro das palavras pelos tempos loca
 
 Em **Perfil de Ajustes**, dê um nome à configuração e toque em **Salvar Perfil**. Selecione um perfil para reaplicá-lo. **Excluir** remove o perfil selecionado; não exclui as mídias já produzidas com ele.
 
-Sem letra sincronizada, o Whisper mantém as palavras e os tempos reconhecidos, e o processamento local organiza as frases por pausas, pontuação e início de frase. Os limites de palavras e caracteres apenas quebram linhas dentro da tela: não antecipam a troca de verso nem separam trechos como “me deu”. Uma proteção automática ainda divide blocos excepcionalmente longos sem pontuação. O texto aguardando o canto fica branco e recebe a cor escolhida conforme é cantado. A posição do verso e da prévia permanece estável mesmo quando muda a quantidade de linhas. A próxima frase aparece durante os três segundos da contagem regressiva.
+O Whisper mantém as palavras e os tempos reconhecidos, com a grafia conferida quando há guia, e o processamento local organiza as frases por pausas, pontuação e início de frase. Os limites de palavras e caracteres apenas quebram linhas dentro da tela: não antecipam a troca de verso nem separam trechos como “me deu”. Uma proteção automática ainda divide blocos excepcionalmente longos sem pontuação. O texto aguardando o canto fica branco e recebe a cor escolhida conforme é cantado. A posição do verso e da prévia permanece estável mesmo quando muda a quantidade de linhas. A próxima frase aparece durante os três segundos da contagem regressiva.
 
-Após atualizar o servidor, use **Refazer** no resultado anterior para recriar legenda e vídeo, reaproveitando a análise compatível do Whisper. Refazer cria um novo trabalho; confirme novamente a revisão, se estiver habilitada. Ao retomar um trabalho já em andamento, a atualização visual preserva também a revisão salva e refaz somente a apresentação. Um MP4 já concluído continua contendo a legenda antiga até ser reprocessado.
+Após atualizar o servidor, use **Refazer** no resultado anterior para recriar legenda e vídeo, reaproveitando a análise compatível do Whisper. Refazer cria um novo trabalho; confirme novamente a revisão, se estiver habilitada. A migração para 11.0 invalida legendas, vídeo e revisões antigas baseadas em versos externos. Mudanças posteriores apenas no visual preservam a revisão acústica. Um MP4 já concluído continua contendo a legenda antiga até ser reprocessado.
 
 ## 5. Gerar SRT original e tradução opcional
 
@@ -154,7 +154,7 @@ A revisão é ativada antes do envio da tarefa. Quando o processamento chega ao 
 1. Selecione um trecho e use **Anterior** / **Próxima** para navegar.
 2. Confira o texto e os tempos de início/fim. Os campos aceitam `MM:SS.cc` ou segundos; os inícios devem permanecer em ordem e o fim deve vir depois do início.
 3. Use o player do áudio original. Ao trocar de linha, ele busca o início do verso, sem incluir a abertura do título.
-4. Faça correções e use **Salvar e renderizar**. Para remover uma linha, use a lixeira; uma linha vazia apresenta um erro no editor. Em letras sincronizadas, salvar sem editar preserva também os espaços do texto. A prévia mostra texto e fundo; a animação é aplicada na renderização final.
+4. Faça correções e use **Salvar e renderizar**. Para remover uma linha, use a lixeira; uma linha vazia apresenta um erro no editor. Salvar sem alterar os tempos preserva os relógios das palavras do Whisper; a revisão pode corrigir sua grafia. A prévia mostra texto e fundo; a animação é aplicada na renderização final.
 5. Se não desejar editar, use **Continuar sem editar**.
 
 No karaokê, a renderização ocorre depois da revisão. No modo SRT, a revisão é do original, antes da tradução opcional. Enquanto aguarda a revisão, esse trabalho mantém a fila ocupada.
@@ -192,7 +192,7 @@ A fila não é histórico: trabalhos encerrados saem dela. Os arquivos concluíd
 
 ## 8. Progresso e pausa por etapa
 
-O número maior e a barra são o **progresso total**. O indicador menor representa a **etapa atual**, incluindo transcrição, separação de backing vocals e renderização do MP4 de áudio quando há informação disponível. O backing-vocal distingue preparação do áudio, preparação dos blocos, análise da voz e geração das faixas. Cada subetapa mostra sua própria porcentagem quando ela existe; 100% da preparação não significa conclusão da análise. A análise começa em 0% e avança somente após concluir cada bloco. A reconstrução e o salvamento das faixas ficam sem estimativa percentual até sua conclusão. O Telegram envia um aviso ao iniciar cada etapa, sem mensagens repetidas de porcentagem. A análise da voz para animar letras sincronizadas avisa no início da etapa. A tradução informa início e resultado, pois o LibreTranslate não oferece percentual interno contínuo. Downloads, carregamento de modelo e certas operações podem não fornecer um percentual contínuo.
+O número maior e a barra são o **progresso total**. O indicador menor representa a **etapa atual**, incluindo transcrição, separação de backing vocals e renderização do MP4 de áudio quando há informação disponível. O backing-vocal distingue preparação do áudio, preparação dos blocos, análise da voz e geração das faixas. Cada subetapa mostra sua própria porcentagem quando ela existe; 100% da preparação não significa conclusão da análise. A análise começa em 0% e avança somente após concluir cada bloco. A reconstrução e o salvamento das faixas ficam sem estimativa percentual até sua conclusão. O Telegram envia um aviso ao iniciar cada etapa, sem mensagens repetidas de porcentagem. A transcrição avisa no início; a conferência da guia e eventual reanálise aparecem no andamento com contagens e progresso. A tradução informa início e resultado, pois o LibreTranslate não oferece percentual interno contínuo. Downloads, carregamento de modelo e certas operações podem não fornecer um percentual contínuo.
 
 O total combina etapas com pesos; não mede diretamente tempo restante. Um avanço de 50% não significa que falta metade do tempo. CPU, duração, modelo, disco, rede e complexidade do áudio alteram a duração.
 
@@ -350,7 +350,7 @@ Consulte também [o guia de busca, sincronização, backing vocals e publicaçã
 
 A leitura de áudio para o Whisper usa o FFmpeg instalado no servidor, com conversão para mono a 16 kHz. Essa cópia usa PCM float32 com reamostragem de maior precisão e é usada apenas na análise da voz: mono a 16 kHz é o formato de entrada do Whisper, não uma configuração de baixa qualidade opcional. O modo de precisão máxima (float32 e busca de pelo menos dez hipóteses) é aplicado a todos os modelos selecionados e aumenta o uso de memória e o tempo em CPU. O modelo escolhido continua sendo respeitado. A preparação para Demucs e a mixagem usam PCM float32 estéreo a 44,1 kHz, frequência do separador. O karaokê final usa o instrumental estéreo a 44,1 kHz, com vozes de apoio quando ativadas, e é exportado em AAC a 320 kbps; a separação e a compressão podem alterar o som em relação à fonte. Isso evita incompatibilidades de abertura de arquivos no PyAV. Em caso de falha, repita a tarefa usando o cache disponível para aproveitar as faixas já separadas.
 
-Quando um vídeo de fundo decorativo é maior que a música, o início do trecho é escolhido aleatoriamente a cada nova renderização, cabendo a música inteira até o fim do fundo. Vídeos curtos continuam em loop. O vídeo original da música mantém o início e a sincronização. Com letra sincronizada, seu texto fornece os versos; o Whisper serve à análise dos tempos e da animação local.
+Quando um vídeo de fundo decorativo é maior que a música, o início do trecho é escolhido aleatoriamente a cada nova renderização, cabendo a música inteira até o fim do fundo. Vídeos curtos continuam em loop. O vídeo original da música mantém o início e a sincronização. O Whisper fornece as palavras e os tempos; toda letra externa serve apenas como guia de conferência.
 
 ## Uso do YouTube em uma instalação local
 

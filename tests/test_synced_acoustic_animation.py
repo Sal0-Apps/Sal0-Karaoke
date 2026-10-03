@@ -1,4 +1,4 @@
-"""Synced lyrics must use recording word clocks, including cache and ASS gaps."""
+"""Acoustic guide pipeline; legacy verse helpers remain covered independently."""
 import re
 import hashlib
 import json
@@ -22,6 +22,7 @@ from karaoke_generator import generate_ass_karaoke, synced_animation_text
 from media_covers import add_cover_to_command
 from test_automatic_lyrics_and_search import load_function
 from reprocess_cache import copy_reusable_inputs
+from lyric_guide import prepare_lyrics_guide, review_lyrics_with_whisper
 
 
 class SyncedAcousticAnimationTests(unittest.TestCase):
@@ -29,7 +30,7 @@ class SyncedAcousticAnimationTests(unittest.TestCase):
         source = (ROOT / 'app/main.py').read_text()
         stage = source[source.index('            segments = None\n', source.index('# Passo 3: Transcrever vocais')):
                        source.index('            # --- NOVO: Passo de Pausa')]
-        lrc = parse_lrc('[00:10]Olá mundo\n[00:13]Outra linha\n[00:17]', 20)
+        lrc = [dict(start=10, end=13, text='Olá mundo', words=[], synced_line=True)]
         acoustic = [{'start':10.2,'end':12.5,'text':' Ola mundo', 'words':[
             {'word':' Ola','start':10.2,'end':10.5},
             {'word':' mundo','start':11.6,'end':12.5}]}]
@@ -45,7 +46,8 @@ class SyncedAcousticAnimationTests(unittest.TestCase):
                         lyrics_hint_hash=hashlib.sha256(' '.join(lyric_text.split()).encode()).hexdigest())
             transcriber = Mock(return_value=acoustic)
             scope = dict(os=os, hashlib=hashlib, json=json, synced_segments=lrc,
-                lyrics_text='original guide', cache_dir=folder, cached_meta=meta,
+                lyrics_text=lyric_text, cache_dir=folder, cached_meta=meta,
+                prepare_lyrics_guide=prepare_lyrics_guide, review_lyrics_with_whisper=review_lyrics_with_whisper,
                 cache_meta_file=str(Path(folder) / 'cache_meta.json'), vocal_source='lead',
                 transcribe_source=source_mode, whisper_model='medium', enable_vad=True,
                 transcription_preset='standard', vocals_wav='lead.wav', converted_wav='mix.wav',
@@ -77,7 +79,7 @@ class SyncedAcousticAnimationTests(unittest.TestCase):
                 scope.update(cache_dir=str(next_cache),
                     cache_meta_file=str(next_cache / 'cache_meta.json'),
                     cached_meta=json.loads((next_cache / 'cache_meta.json').read_text()),
-                    synced_segments=lrc, lyrics_text='original guide')
+                    synced_segments=lrc, lyrics_text=lyric_text)
                 transcriber.reset_mock()
                 exec(compile(textwrap.dedent(stage), 'transcription-stage', 'exec'), scope)
         return scope, transcriber
@@ -85,16 +87,16 @@ class SyncedAcousticAnimationTests(unittest.TestCase):
     def test_synced_lyrics_do_not_bypass_voice_analysis_or_reuse_verse_only_cache(self):
         scope, transcriber = self.run_stage()
         transcriber.assert_called_once()
-        self.assertEqual(transcriber.call_args.kwargs['initial_prompt'], 'Olá mundo\nOutra linha')
+        self.assertEqual(transcriber.call_args.kwargs['initial_prompt'], 'Olá mundo')
         words = scope['segments'][0]['words']
         self.assertEqual([(w['start'],w['end']) for w in words], [(10.2,10.5),(11.6,12.5)])
-        self.assertEqual(words[0]['word'], 'Olá ')
+        self.assertEqual(words[0]['word'], ' Olá')
         self.assertEqual([(s['start'], s['end'], s['text']) for s in scope['segments']],
-                         [(10,13,'Olá mundo'),(13,17,'Outra linha')])
+                         [(10.2,12.5,'Olá mundo')])
         notices = scope['notify_targets'].call_args_list
-        self.assertEqual(len(notices), 2)
-        self.assertIn('Sincronização da animação pela voz', notices[0].args[1])
-        self.assertIn('Animação da letra sincronizada', notices[1].args[1])
+        self.assertEqual(len(notices), 1)
+        self.assertIn('Transcrição com Whisper', notices[0].args[1])
+        self.assertEqual(scope['guide_report']['checked_words'], 2)
 
     def test_current_acoustic_cache_is_reused(self):
         scope, transcriber = self.run_stage(cache_version=3)
@@ -112,33 +114,29 @@ class SyncedAcousticAnimationTests(unittest.TestCase):
         transcriber.assert_not_called()
         self.assertEqual(scope['synced_segments'], verses)
 
-    def test_misrecognized_words_never_replace_provider_text_in_ass(self):
+    def test_guide_corrects_spelling_but_does_not_insert_unrecognized_verses(self):
         verses = [dict(start=10, end=13, text='Olá lindo mundo'),
                   dict(start=13, end=17, text='Outra palavra correta')]
         voice = [dict(start=10.2, end=12.5, text='Ola limbo mundo', words=[
-            dict(word='Ola', start=10.2, end=10.5),
-            dict(word='limbo', start=10.6, end=11),
-            dict(word='mundo', start=11.6, end=12.5)])]
+            dict(word=' Ola', start=10.2, end=10.5),
+            dict(word=' limbo', start=10.6, end=11),
+            dict(word=' mundo', start=11.6, end=12.5)])]
         for timing in ('auto', 'acoustic'):
             scope, _ = self.run_stage(verses=verses, voice=voice, timing=timing)
-            self.assertEqual([s['text'] for s in scope['segments']], [s['text'] for s in verses])
+            self.assertEqual([s['text'] for s in scope['segments']], ['Olá lindo mundo'])
             with tempfile.TemporaryDirectory() as folder:
                 target = Path(folder) / 'text.ass'
                 generate_ass_karaoke(scope['segments'], str(target), show_instrumental=False,
                                      show_next_line_preview=False)
                 output = target.read_text()
                 self.assertIn('lindo', output)
-                self.assertIn('correta', output)
+                self.assertNotIn('correta', output)
+                self.assertTrue(scope['guide_report']['retry_attempted'])
                 self.assertNotIn('limbo', output)
 
-    def test_empty_local_recognition_still_renders_complete_synced_text(self):
-        scope, _ = self.run_stage(voice=[])
-        self.assertEqual([s['text'] for s in scope['segments']], ['Olá mundo', 'Outra linha'])
-        self.assertTrue(all(not s['words'] for s in scope['segments']))
-        with tempfile.TemporaryDirectory() as folder:
-            target = Path(folder) / 'empty-recognition.ass'
-            generate_ass_karaoke(scope['segments'], str(target), show_instrumental=False)
-            self.assertIn('Outra', target.read_text())
+    def test_empty_local_recognition_cannot_render_the_guide_instead(self):
+        with self.assertRaisesRegex(ValueError, 'Nenhum vocal detectado'):
+            self.run_stage(voice=[])
 
     def test_backing_option_forces_isolated_lead_even_with_original_source_or_zero_gain(self):
         for gain in (0, 100):
@@ -208,8 +206,8 @@ class SyncedAcousticAnimationTests(unittest.TestCase):
         verses, voice = self.timing_fixture([.2, -.15, .4, .3, .1, 4])
         self.assertEqual(assess_synced_timing(verses, voice)['status'], 'consistent')
         scope, _ = self.run_stage(cache_version=3, verses=verses, voice=voice)
-        self.assertEqual(scope['segments'][0]['start'], 7.09)
-        self.assertTrue(scope['segments'][0]['synced_line'])
+        self.assertEqual(scope['segments'][0]['start'], voice[0]['start'])
+        self.assertNotIn('synced_line', scope['segments'][0])
 
     def test_incompatible_clock_is_rejected_in_both_directions(self):
         for shift in [-3, 4]:
@@ -231,22 +229,22 @@ class SyncedAcousticAnimationTests(unittest.TestCase):
                  for verse in verses]
         self.assertEqual(assess_synced_timing(verses, voice)['status'], 'consistent')
 
-    def test_incompatible_lrc_preserves_both_provider_text_and_provider_clock(self):
+    def test_incompatible_lrc_cannot_override_whisper_clocks(self):
         verses, voice = self.timing_fixture([4.13, 2.33, 2.53, 3.28, 3.46, 3.76])
         scope, transcriber = self.run_stage(cache_version=3, verses=verses, voice=voice)
         transcriber.assert_not_called()
         self.assertEqual(scope['synced_segments'], verses)
-        self.assertAlmostEqual(scope['segments'][0]['start'], 7.09)
-        self.assertTrue(scope['segments'][0]['synced_line'])
+        self.assertAlmostEqual(scope['segments'][0]['start'], 11.22)
+        self.assertNotIn('synced_line', scope['segments'][0])
         self.assertEqual([s['text'] for s in scope['segments']], [s['text'] for s in verses])
-        self.assertEqual(len(scope['notify_targets'].call_args_list), 1)  # One verification notice.
+        self.assertEqual(len(scope['notify_targets'].call_args_list), 0)  # Acoustic cache needs no decode notice.
         scope['update_process_summary'].assert_called_once()
         with tempfile.TemporaryDirectory() as folder:
             target = Path(folder) / 'fallback.ass'
             generate_ass_karaoke(scope['segments'], str(target), show_instrumental=False)
             output = target.read_text()
-        self.assertIn('0:00:07.09', output)
-        self.assertNotIn('0:00:11.22,', output)
+        self.assertNotIn('0:00:07.09', output)
+        self.assertIn('0:00:11.22,', output)
 
     def test_real_cover_shifts_audio_and_animated_lyric_together(self):
         # All lyric/Whisper clocks are relative to the song, excluding the cover.
@@ -291,12 +289,12 @@ class SyncedAcousticAnimationTests(unittest.TestCase):
             generate_ass_karaoke(scope['segments'], str(target), show_instrumental=False,
                                  break_on_punctuation=False)
             output = target.read_text()
-        self.assertIn(r'\kt20\kf30', output)
+        self.assertIn(r'\kt0\kf30', output)
         self.assertNotIn(r'\h', output)
         self.assertNotIn(r'\alpha&HFF&', output)
-        self.assertIn('0:00:10.00,0:00:13.00', output)
+        self.assertIn('0:00:10.20,0:00:12.50', output)
         self.assertNotIn(r'\clip', output)
-        self.assertIn(r'\kt160\kf90', output)
+        self.assertIn(r'\kt140\kf90', output)
         self.assertNotIn(r'{\kf300}Olá mundo', output)
 
     def test_repeated_verses_keep_provider_clocks_and_match_only_local_words(self):

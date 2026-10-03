@@ -28,7 +28,7 @@ def youtube_identity(url):
 
 
 def copy_reusable_inputs(source, destination, youtube_url=None):
-    """Novas tarefas reaproveitam áudio caro, mas refazem revisão e renderização.
+    """Novas tarefas reaproveitam áudio e conferência; refazem revisão manual e vídeo.
 
     Retomadas após pausa continuam usando a pasta isolada da mesma tarefa e
     não passam por esta função. Checkpoints, ASS e resultados não são copiados.
@@ -48,7 +48,7 @@ def copy_reusable_inputs(source, destination, youtube_url=None):
     allowed = {'cache_meta.json', 'original_converted.wav', 'vocals.wav',
                'instrumental.wav', 'transcribed_segments.json', 'lead_vocals.wav',
                'backing_vocals.wav', 'backing_model_version.txt',
-               'synced_acoustic_segments.json', 'whisper_cache_meta.json',
+               'synced_acoustic_segments.json', 'whisper_cache_meta.json', 'lyrics_guide_cache.json',
                'subtitle_segments_original.json', 'subtitle_info_original.json'}
     os.makedirs(destination, exist_ok=True)
     for name in os.listdir(source):

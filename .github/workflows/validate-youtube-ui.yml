@@ -26,6 +26,7 @@ jobs:
           python -m compileall -q app
           python -m unittest discover -s tests -p test_web_stack_compatibility.py -v
           python -m unittest discover -s tests -p test_whisper_audio.py -v
+          python -m unittest discover -s tests -p test_lyric_guide.py -v
           python -m unittest discover -s tests -p test_youtube_connection_feedback.py -v
           python -m unittest discover -s tests -p test_youtube_publisher.py -v
           python -m unittest discover -s tests -p test_srt_youtube_block.py -v

@@ -1693,8 +1693,8 @@
 
                         <div class="quick-extra-audio">
                             <label for="easyLyricsTiming">Como sincronizar a letra</label>
-                            <select id="easyLyricsTiming" class="select-input" disabled aria-describedby="easyLyricsPolicy"><option value="auto">Letra sincronizada + animação local</option></select>
-                            <p id="easyLyricsPolicy" class="compact-note">A letra sincronizada tem prioridade: texto e tempos dos versos preservados. Os tempos locais animam apenas as palavras.</p>
+                            <select id="easyLyricsTiming" class="select-input" disabled aria-describedby="easyLyricsPolicy"><option value="acoustic">Whisper + conferência da letra-guia</option></select>
+                            <p id="easyLyricsPolicy" class="compact-note">O Whisper define a letra e os tempos pela voz. A letra disponível serve como guia para conferir e corrigir as palavras.</p>
                             <label for="easyKeepBackingVocals">Vozes de apoio</label>
                             <select id="easyKeepBackingVocals" class="select-input"><option value="true">Manter vozes de apoio; retirar a voz principal</option><option value="false">Retirar todas as vozes</option></select>
                             <label for="easyBackingVolume">Volume das vozes de apoio (%)</label>
@@ -1888,9 +1888,9 @@
                             </div>
                             <label for="lyricsTiming" class="compact-note">Fonte da letra e sincronização</label>
                             <select id="lyricsTiming" name="lyrics_timing" class="select-input" disabled>
-                                <option value="auto">Letra sincronizada + animação local</option>
+                                <option value="acoustic">Whisper + conferência da letra-guia</option>
                             </select>
-                            <p class="compact-note">Quando disponível, a letra sincronizada mantém texto e tempos dos versos intactos. Somente a cor das palavras é animada pelos tempos locais, sem usar o texto reconhecido pelo Whisper. O karaokê analisa o áudio completo, sem VAD.</p>
+                            <p class="compact-note">Toda letra, inclusive LRC, serve apenas como guia. O Whisper reconhece as palavras e seus tempos; a conferência corrige grafias confiáveis e pode reanalisar diferenças. O áudio é completo, sem VAD.</p>
                             <p id="lyricsModeHint" style="font-size: 0.7rem; color: var(--text-muted); margin: 0.35rem 0 0.45rem;">A letra é uma guia. Texto manual sempre tem prioridade.</p>
                             <textarea id="lyricsText" name="lyrics_text" placeholder="Cole ou edite a letra aqui..." class="input-text" style="height: 72px; resize: vertical; background: var(--input-bg); border: 1px solid var(--glass-border);"></textarea>
                             <div id="lyricsBadge" style="display: none; margin-top: 0.35rem; background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.3); color: #34d399; padding: 0.3rem 0.55rem; border-radius: 7px; font-size: 0.7rem; font-weight: 600;"></div>
@@ -2606,7 +2606,7 @@
                     <li>Abra <strong>Letra</strong> para buscar ou colar uma letra-guia. O texto manual tem prioridade; se não houver letra, a transcrição usa o Whisper.</li>
                     <li>Defina o fundo e a animação: sílabas, palavras, linhas ou frase estática.</li>
                     <li>Em <strong>Vozes de apoio</strong>, mantenha ou desative os backing vocals e ajuste seu volume. A opção usa uma segunda separação local da voz principal.</li>
-                    <li>A sincronização automática só usa tempos de versos quando existe uma letra LRC compatível com a gravação. Os versos aparecem nos tempos da letra pronta. O Whisper anima as palavras dentro de cada verso, sem alterar esses horários. Sem LRC, o processo usa Whisper e os tempos das palavras reconhecidas.</li>
+                    <li>O Whisper define as palavras e os tempos pela gravação. Toda letra encontrada, inclusive LRC, serve como guia de conferência. Os horários da LRC são ignorados. Diferenças podem gerar uma segunda análise local; versos ausentes não são copiados sem reconhecimento da voz.</li>
                     <li>Em <strong>Mais ajustes</strong>, altere cor, tamanho, posição, limites dos versos, prévia da próxima frase, VAD e fonte da transcrição. Você também pode salvar um perfil e habilitar somente a remoção de vocais.</li>
                     <li>Ative a revisão para corrigir texto e tempos antes de finalizar. O karaokê preserva o áudio completo, com VAD desativado para manter silêncios e notas sustentadas.</li>
                 </ol>
@@ -2696,7 +2696,7 @@
                 </ol>
                 <p>A API tem cota gratuita e pode limitar projetos sem auditoria a vídeos privados. Guarde a autorização como uma senha. Backing vocals e vídeo do modo SRT mostram porcentagem da etapa e avisam o avanço no Telegram; o LibreTranslate informa apenas início e término.</p>
             </details>
-            <p class="compact-note">Versão do servidor: 10.9. A transcrição é local; fontes, modelos e integrações podem acessar serviços externos. Use conteúdo autorizado.</p>
+            <p class="compact-note">Versão do servidor: 11.0. A transcrição é local; fontes, modelos e integrações podem acessar serviços externos. Use conteúdo autorizado.</p>
             <p class="compact-note">Use o servidor pela rede local ou VPN. A busca/importação do YouTube não concede direitos sobre a mídia. OAuth autoriza o acesso ao canal, não o uso de músicas. Confira as permissões do conteúdo e os termos do YouTube antes de importar ou publicar. Não listado permite acesso a quem tiver o link; resultados SRT nunca vão ao YouTube.</p>
             <p class="compact-note"><a href="https://www.youtube.com/static?template=terms" target="_blank" rel="noopener noreferrer">Termos do YouTube</a> · <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer">Privacidade do Google</a> · <a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener noreferrer">Revogar acesso ao canal</a></p>
         </div>
@@ -2945,13 +2945,15 @@
                 [['misturando backing vocals'], 'Misturando vozes de apoio'],
                 [['separando backing vocals'], 'Separando vozes de apoio'],
                 [['backing vocals'], 'Preservando vozes de apoio'],
+                [['checking lyrics guide'], 'Conferindo a letra-guia'],
+                [['verifying lyrics with whisper'], 'Conferindo palavras pela voz'],
                 [['checking synced lyric timing'], 'Verificando os tempos da letra'],
                 [['using synced lyrics', 'synced verse animation'], 'Aplicando letra sincronizada'],
                 [['separating', 'demucs', 'vocais'], 'Separando vocais do instrumental'],
                 [['transcribing', 'whisper'], 'Transcrevendo áudio com Whisper'],
                 [['translating', 'traduz'], 'Traduzindo o SRT'],
                 [['generating original srt'], 'Gerando o SRT original'],
-                [['generating subtitles', 'subtitles'], 'Gerando legenda sincronizada'],
+                [['generating subtitles', 'subtitles'], 'Gerando legenda do karaokê'],
                 [['rendering'], 'Gerando o vídeo final'],
                 [['sending result to telegram', 'sending subtitles to telegram'], 'Enviando resultado ao Telegram'],
                 [['cleaning'], 'Finalizando o processo'],
@@ -3517,7 +3519,7 @@
             setValue('onlyRemoveVocals', profile.only_remove_vocals);
             setValue('keepBackingVocals', profile.keep_backing_vocals ?? true);
             setValue('backingVocalsVolume', profile.backing_vocals_volume ?? 100);
-            setValue('lyricsTiming', 'auto');
+            setValue('lyricsTiming', 'acoustic');
 
             const description = document.getElementById('profileDescription');
             if (description) description.textContent = profile.description || 'Perfil personalizado por você.';
@@ -4556,7 +4558,7 @@
                 formData.set('youtube_publish', String(document.getElementById('easyYoutubePublish').checked));
                 formData.set('youtube_playlist_id', document.getElementById('easyYoutubePlaylist').value);
                 formData.set('youtube_title', document.getElementById('easyYoutubeTitle').value.trim());
-                formData.set('lyrics_timing', document.getElementById('easyLyricsTiming')?.value || 'auto');
+                formData.set('lyrics_timing', document.getElementById('easyLyricsTiming')?.value || 'acoustic');
                 formData.set('keep_backing_vocals', document.getElementById('easyKeepBackingVocals')?.value || 'true');
                 formData.set('backing_vocals_volume', document.getElementById('easyBackingVolume')?.value || '100');
                 formData.set('app_base_url', window.location.origin);
@@ -5389,9 +5391,7 @@
                     updateLyricsBadge(lyricsText.value);
                     if (lyricsSearchQuery) lyricsSearchQuery.value = `${payload.track_name} — ${payload.artist_name}`;
                     if (lyricsSearchResults) lyricsSearchResults.replaceChildren();
-                    setLyricsSearchStatus(result.has_synced_lyrics
-                        ? 'Letra com sincronização disponível. Os tempos serão usados se a gravação for compatível.'
-                        : 'Letra sem sincronização pronta. Os tempos serão obtidos pelo Whisper.');
+                    setLyricsSearchStatus('Letra importada como guia. O Whisper define os tempos e confere as palavras com esse texto.');
                     return true;
                 } catch (error) {
                     if (error.name === 'AbortError') return false;
@@ -5661,7 +5661,7 @@
                         save_to_library: getBool('saveToLibrary', true),
                         keep_backing_vocals: getBool('keepBackingVocals', true),
                         backing_vocals_volume: Number(document.getElementById('backingVocalsVolume')?.value || 100),
-                        lyrics_timing: document.getElementById('lyricsTiming')?.value || 'auto',
+                        lyrics_timing: document.getElementById('lyricsTiming')?.value || 'acoustic',
                         only_remove_vocals: getBool('onlyRemoveVocals', false)
                     };
 
@@ -5973,7 +5973,7 @@
                 { id: 'step-Extracting', keys: ['extracting', 'áudio'] },
                 { id: 'step-Separating', keys: ['separating', 'demucs', 'vocais'] },
                 { id: 'step-Transcribing', keys: ['transcribing', 'whisper'] },
-                { id: 'step-Subtitles', keys: ['subtitles', 'legenda', 'ass', 'translating', 'traduz', 'checking synced lyric timing', 'synced verse animation'] },
+                { id: 'step-Subtitles', keys: ['subtitles', 'legenda', 'ass', 'translating', 'traduz', 'checking lyrics guide', 'verifying lyrics with whisper', 'checking synced lyric timing', 'synced verse animation'] },
                 { id: 'step-Rendering', keys: ['rendering', 'renderizando'] },
                 { id: 'step-Cleaning', keys: ['cleaning', 'limpando'] },
                 { id: 'step-Done', keys: ['done', 'concluído', 'finalizado'] }

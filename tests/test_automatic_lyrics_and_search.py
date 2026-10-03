@@ -12,6 +12,7 @@ from unittest.mock import Mock
 ROOT = Path(__file__).parents[1]
 sys.path.insert(0, str(ROOT / "app"))
 from lyrics_sync import parse_lrc, recording_matches
+from lyric_guide import prepare_lyrics_guide, verify_lyrics_guide
 from karaoke_generator import generate_ass_karaoke
 from processing_validation import validate_review_segments, validate_processing_options
 import tempfile
@@ -31,6 +32,7 @@ def load_function(name, **values):
     scope = dict(HTTPException=HTTPError, Depends=lambda _: None, get_current_user=Mock(),
                  YouTubeSearchRequest=object, re=re, difflib=difflib,
                  logger=logging.getLogger("test"), recording_matches=recording_matches,
+                 prepare_lyrics_guide=prepare_lyrics_guide, verify_lyrics_guide=verify_lyrics_guide,
                  validate_review_segments=validate_review_segments,
                  validate_processing_options=validate_processing_options, **values)
     exec(compile(ast.Module(body=[selected], type_ignores=[]), "main.py", "exec"), scope)
@@ -85,6 +87,13 @@ class AutomaticLyricsTests(unittest.TestCase):
     def test_offline_provider_failure_still_allows_whisper(self):
         lookup = load_function("find_lyrics_automatically", search_lyrics_providers=lambda _: [])
         self.assertEqual(lookup("Artista - Canção", 180), ("", None))
+
+    def test_lrc_only_provider_supplies_plain_guide_without_external_clocks(self):
+        record = {**self.record, 'lyrics_text': '', 'synced_lyrics': '[02:30]Primeiro verso\n[00:01]Segundo verso'}
+        lookup = load_function('find_lyrics_automatically', search_lyrics_providers=lambda _: [record])
+        text, metadata = lookup('Artista - Canção', 180)
+        self.assertEqual(text, 'Primeiro verso\nSegundo verso')
+        self.assertEqual(metadata['synced_lyrics'], record['synced_lyrics'])
 
     def test_synced_lines_animate_without_invented_word_clocks(self):
         segments = parse_lrc(self.record["synced_lyrics"], 180)

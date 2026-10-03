@@ -72,6 +72,37 @@ class ReviewTests(unittest.TestCase):
             self.resume()(SimpleNamespace(segments=[item]), {})
 
 
+class AcousticReviewTests(unittest.TestCase):
+    def test_unchanged_bounds_and_spelling_edit_keep_every_whisper_clock(self):
+        words = [SimpleNamespace(word=' eu', start=10.2, end=10.5),
+                 SimpleNamespace(word=' gasto', start=11.6, end=12.5)]
+        for text in ('eu gasto', 'Eu canto'):
+            with self.subTest(text=text):
+                source = [{'start':10, 'end':13, 'text':'eu gasto',
+                           'words':[vars(word).copy() for word in words]}]
+                resume = load_function('continue_process', ContinueProcessModel=object,
+                    require_task_control=Mock(), segments_to_edit=source,
+                    correction_event=threading.Event(), anchor_synced_animation=anchor_synced_animation)
+                item = SimpleNamespace(start=10, end=13, text=text, words=words, synced_line=False)
+                resume(SimpleNamespace(segments=[item]), {})
+                result = resume.__globals__['segments_to_edit'][0]
+                self.assertEqual([(w['start'],w['end']) for w in result['words']], [(10.2,10.5),(11.6,12.5)])
+                self.assertEqual(result['text'], text)
+                self.assertNotIn('synced_line', result)
+
+    def test_explicit_review_time_edit_remains_available(self):
+        original = [{'start':10,'end':13,'text':'eu canto'}]
+        words = [SimpleNamespace(word=' eu', start=10, end=11),
+                 SimpleNamespace(word=' canto', start=11.5, end=13)]
+        resume = load_function('continue_process', ContinueProcessModel=object,
+            require_task_control=Mock(), segments_to_edit=original,
+            correction_event=threading.Event(), anchor_synced_animation=anchor_synced_animation)
+        resume(SimpleNamespace(segments=[SimpleNamespace(start=20,end=26,text='eu canto',
+            words=words, synced_line=False)]), {})
+        result = resume.__globals__['segments_to_edit'][0]
+        self.assertEqual([(w['start'],w['end']) for w in result['words']], [(20,22),(23,26)])
+
+
 class ProcessingChoicesTests(unittest.TestCase):
     def test_invalid_choices_are_rejected_before_creating_job_files(self):
         paths = Mock(side_effect=AssertionError('Must not create files'))

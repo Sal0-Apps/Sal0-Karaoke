@@ -13,7 +13,7 @@ for (const script of HTML.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/g)) new 
     try {
         const page = await browser.newPage({viewport: {width: 390, height: 900}});
         const errors = [], submitted = [], revisions = [];
-        let failSecond = true, failReview = false, reviewCache = false, backgroundAuthenticated = false;
+        let failSecond = true, failReview = false, reviewCache = false, backgroundAuthenticated = false, acousticReview = false;
         await page.addInitScript(() => localStorage.setItem('karaoke_token', 'test-session'));
         page.on('pageerror', error => errors.push(error.message));
         page.on('dialog', dialog => { errors.push('Unexpected blocking dialog: ' + dialog.message()); dialog.dismiss(); });
@@ -43,9 +43,9 @@ for (const script of HTML.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/g)) new 
             if (url.pathname === '/api/library') data = {audio: [], backgrounds: [], history: [], videos: [], photos: []};
             if (url.pathname === '/api/queue') data = {jobs: []};
             if (url.pathname === '/api/cache_info') data = {has_cache: reviewCache, bg_is_video: false, audio_filename: 'review.wav'};
-            if (url.pathname === '/api/segments_to_edit') data = [{start: 10, end: 13, text: '  Exact lyric  ', words: [], synced_line: true, acoustic_animation: true},
+            if (url.pathname === '/api/segments_to_edit') data = acousticReview ? [{start: 10, end: 13, text: 'Exact lyric', words: [{word: ' Exact', start: 10.2, end: 10.5}, {word: ' lyric', start: 11.6, end: 12.5}]}] : [{start: 10, end: 13, text: '  Exact lyric  ', words: [], synced_line: true, acoustic_animation: true},
                 {start: 14, end: 17, text: 'Next verse', words: [], synced_line: true, acoustic_animation: true}];
-            if (url.pathname === '/api/profiles') data = {Legacy: {font_size: 50, whisper_model: 'medium', enable_vad: true, lyrics_timing: 'acoustic', background_mode: 'original', text_position: 'middle', subtitle_mode: 'syllable'}};
+            if (url.pathname === '/api/profiles') data = {Legacy: {font_size: 50, whisper_model: 'medium', enable_vad: true, lyrics_timing: 'auto', background_mode: 'original', text_position: 'middle', subtitle_mode: 'syllable'}};
             if (url.pathname === '/api/process') {
                 const file = request.postData().match(/name="audio_file"; filename="([^"]+)"/)?.[1] || 'link';
                 submitted.push(file);
@@ -97,7 +97,10 @@ for (const script of HTML.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/g)) new 
             assert.equal(await page.locator('#' + input).evaluate(input => input.files.length), 0);
         }
         assert.equal(await page.locator('#enableVad').inputValue(), 'false');
-        assert.equal(await page.locator('#lyricsTiming').inputValue(), 'auto');
+        assert.equal(await page.locator('#lyricsTiming').inputValue(), 'acoustic');
+        assert.equal(await page.locator('#easyLyricsTiming').inputValue(), 'acoustic');
+        assert((await page.locator('#easyLyricsPolicy').textContent()).includes('O Whisper define'));
+        assert.equal(await page.evaluate(() => friendlyStageName('Verifying lyrics with Whisper')), 'Conferindo palavras pela voz');
         reviewCache = true;
         await page.evaluate(() => loadCorrectionPanel());
         await page.waitForFunction(() => document.getElementById('correctionAudio').readyState > 0);
@@ -135,6 +138,16 @@ for (const script of HTML.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/g)) new 
         await page.locator('#btnContinueProcess').click();
         await page.waitForFunction(() => document.getElementById('correctionCard').style.display === 'none');
         assert.equal(revisions.at(-1).segments[0].text, '  Exact lyric  ');
+        acousticReview = true;
+        await page.evaluate(() => loadCorrectionPanel());
+        await page.waitForFunction(() => document.querySelector('#correctionList textarea').value === 'Exact lyric');
+        await page.locator('#correctionList textarea').first().fill('Exact lyrics');
+        await page.locator('#btnContinueProcess').click();
+        await page.waitForFunction(() => document.getElementById('correctionCard').style.display === 'none');
+        const acoustic = revisions.at(-1).segments[0];
+        assert.equal(acoustic.text, 'Exact lyrics');
+        assert.equal(acoustic.synced_line ?? false, false);
+        assert.deepEqual(acoustic.words.map(word => [word.start, word.end]), [[10.2,10.5],[11.6,12.5]]);
         assert.equal(await page.evaluate(() => formatTimeMMSS(59.999)), '01:00.00');
         assert.equal(await page.evaluate(() => parseTimeMMSS('01:03,25')), 63.25);
         assert(await page.evaluate(() => Number.isNaN(parseTimeMMSS('00:90'))));
