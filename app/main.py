@@ -41,7 +41,9 @@ from subtitle_translator import (
 from karaoke_generator import generate_ass_karaoke
 import libretranslate_client
 from video_renderer import render_karaoke_video, check_has_video
-from subtitle_video import media_has_motion_video, render_audio_subtitle_video
+from subtitle_video import media_has_motion_video, render_subtitle_video
+from subtitle_settings import normalize_subtitle_settings, load_subtitle_settings, save_subtitle_settings
+from lyric_drafts import read_draft, write_draft, clear_draft
 from reprocess_cache import copy_reusable_inputs, youtube_identity, file_fingerprint
 from media_covers import video_thumbnail
 from lyrics_sync import recording_matches, require_acoustic_word_timing, anchor_synced_animation
@@ -72,7 +74,7 @@ except Exception:
     # O stdout do contêiner continua disponível mesmo se o volume ainda não estiver pronto.
     pass
 
-app = FastAPI(title="Karaokê Maker", description="Pipeline local para geração de vídeos de karaokê")
+app = FastAPI(title="Sal0 Karaokê", description="Criação local de karaokês e legendagem de vídeos com Whisper")
 
 # Diretório para templates
 templates = Jinja2Templates(directory="templates")
@@ -1333,6 +1335,9 @@ def save_video_to_history(video_path: str, orig_name: str, library_dir: str, res
         lib_history_dir = os.path.join(library_dir, "history")
         os.makedirs(lib_history_dir, exist_ok=True)
         dest_filename = karaoke_download_filename(orig_name)
+        if result_kind == "subtitle_video":
+            base_name = re.sub(r" - Karaok[eê]$", "", os.path.splitext(dest_filename)[0], flags=re.IGNORECASE)
+            dest_filename = f"{base_name} - Legendado.mp4"
         safe_name = os.path.splitext(dest_filename)[0]
 
         dest_path = os.path.join(lib_history_dir, dest_filename)
@@ -1707,6 +1712,53 @@ def save_easy_mode_config(config: EasyModeModel, current_user: dict = Depends(ge
         raise HTTPException(status_code=500, detail=f"Erro ao salvar o Modo Rápido: {exc}")
 
 
+SUBTITLE_MODE_FILE = "/data/output/subtitle_mode.json"
+
+
+class SubtitleModeModel(BaseModel):
+    text_color: str = "#FFFFFF"
+    box_color: str = "#000000"
+    box_opacity: int = 65
+    font_size: int = 24
+    text_position: str = "bottom"
+    video_subtitle_source: str = "translated"
+    background_color: str = "#101827"
+    background_file: str = ""
+
+
+@app.get("/api/subtitle-mode")
+def get_subtitle_mode_config(current_user: dict = Depends(get_current_user)):
+    settings = load_subtitle_settings(SUBTITLE_MODE_FILE)
+    settings.pop("background_owner", None)
+    return settings
+
+
+@app.post("/api/subtitle-mode")
+def save_subtitle_mode_config(config: SubtitleModeModel, current_user: dict = Depends(get_current_user)):
+    require_admin(current_user)
+    settings = normalize_subtitle_settings(config.dict())
+    photos_dir = os.path.join(get_user_paths(current_user)["library"], "photos")
+    if settings["background_file"] and not os.path.isfile(os.path.join(photos_dir, settings["background_file"])):
+        raise HTTPException(status_code=400, detail="Escolha um fundo disponível na sua Biblioteca.")
+    settings["background_owner"] = current_user.get("username", "")
+    saved = save_subtitle_settings(SUBTITLE_MODE_FILE, settings)
+    saved.pop("background_owner", None)
+    return {"status": "success", "config": saved}
+
+
+def stage_subtitle_background(settings: dict, cache_dir: str):
+    owner = user_from_username(settings.get("background_owner", ""))
+    filename = settings.get("background_file", "")
+    if not filename or not owner or not is_admin(owner):
+        return None
+    source = os.path.join(get_user_paths(owner)["library"], "photos", filename)
+    if not os.path.isfile(source):
+        return None
+    destination = os.path.join(cache_dir, "subtitle_background" + os.path.splitext(filename)[1])
+    shutil.copy2(source, destination)
+    return destination
+
+
 QUICK_BACKGROUND_STAGE_PREFIX = ".quick_random_background"
 
 
@@ -1806,7 +1858,10 @@ def get_yt_preset_audio_status(current_user: dict = Depends(get_current_user)):
     return get_youtube_status(current_user, "audio")
 
 @app.get("/api/youtube-preset-status/bg")
-def get_yt_preset_bg_status(current_user: dict = Depends(get_current_user)):
+def get_yt_preset_bg_status(current_user: dict = Depends(get_current_user), download_id: str = Query("", max_length=32)):
+    key = youtube_status_key(current_user, "background")
+    if download_id:
+        return yt_preset_statuses.get(f"{key}:{download_id}", {"status": "idle", "progress": 0})
     return get_youtube_status(current_user, "background")
 
 class YouTubePresetModel(BaseModel):
@@ -2176,52 +2231,44 @@ def download_bg_youtube(url: str, cache_dir: str) -> tuple[str, str]:
 
     return no_audio_file, title
 
-def run_bg_youtube_download_bg(url: str, owner: dict):
+def run_bg_youtube_download_bg(url: str, owner: dict, download_id: str = ""):
     status_key = youtube_status_key(owner, "background")
+    own_key = f"{status_key}:{download_id}" if download_id else status_key
     paths = get_user_paths(owner)
-    cache_dir = paths["cache"]
-    os.makedirs(cache_dir, exist_ok=True)
 
-    yt_preset_statuses[status_key] = {"status": "downloading", "progress": 15, "title": "Conectando ao YouTube...", "filename": "", "error": None}
+    def publish(status):
+        status["download_id"] = download_id
+        yt_preset_statuses[own_key] = status
+        if yt_preset_statuses.get(status_key, {}).get("download_id", "") == download_id:
+            yt_preset_statuses[status_key] = status
 
+    publish({"status": "downloading", "progress": 15, "title": "Conectando ao YouTube...", "filename": "", "error": None})
     try:
-        no_audio_path, title = download_bg_youtube(url, cache_dir)
-        ext = os.path.splitext(no_audio_path)[1]
-
-        yt_preset_statuses[status_key]["title"] = title
-        yt_preset_statuses[status_key]["progress"] = 70
-
-        dest_filename = os.path.basename(no_audio_path)
-        try:
-            lib_photos_dir = os.path.join(paths["library"], "photos")
-            os.makedirs(lib_photos_dir, exist_ok=True)
-            safe_title = "".join([c for c in title if c.isalnum() or c in ' ._-']).strip() or "fundo_youtube"
-            dest_filename = f"{safe_title}_sem_audio{ext}"
-            dest_file = os.path.join(lib_photos_dir, dest_filename)
-            shutil.copy2(no_audio_path, dest_file)
-            logger.info(f"Vídeo de fundo sem áudio salvo na biblioteca: {dest_file}")
-        except Exception as copy_err:
-            logger.error(f"Erro ao salvar fundo do YouTube na biblioteca: {copy_err}")
-
-        yt_preset_statuses[status_key] = {
-            "status": "done",
-            "progress": 100,
-            "title": title,
-            "filename": dest_filename,
-            "error": None
-        }
-    except Exception as e:
-        logger.error(f"Erro no download de fundo do YouTube em background: {e}")
-        yt_preset_statuses[status_key] = {
-            "status": "error",
-            "progress": 0,
-            "title": "",
-            "filename": "",
-            "error": str(e)
-        }
+        os.makedirs(paths["output"], exist_ok=True)
+        with tempfile.TemporaryDirectory(prefix="background-download-", dir=paths["output"]) as staging:
+            no_audio_path, title = download_bg_youtube(url, staging)
+            ext = os.path.splitext(no_audio_path)[1]
+            publish({"status": "downloading", "progress": 70, "title": title, "filename": "", "error": None})
+            photos_dir = os.path.join(paths["library"], "photos")
+            os.makedirs(photos_dir, exist_ok=True)
+            safe_title = "".join(c for c in title if c.isalnum() or c in ' ._-').strip()[:150] or "fundo_youtube"
+            # A unique suffix also prevents simultaneous downloads from overwriting each other.
+            dest_filename = f"{safe_title}_sem_audio_{(download_id or uuid.uuid4().hex)[:8]}{ext}"
+            staged_file = os.path.join(photos_dir, ".downloading-" + uuid.uuid4().hex)
+            try:
+                shutil.copy2(no_audio_path, staged_file)
+                os.replace(staged_file, os.path.join(photos_dir, dest_filename))
+            finally:
+                if os.path.exists(staged_file):
+                    os.remove(staged_file)
+        publish({"status": "done", "progress": 100, "title": title, "filename": dest_filename, "error": None})
+    except Exception as exc:
+        logger.exception("Erro no download independente do vídeo de fundo")
+        publish({"status": "error", "progress": 0, "title": "", "filename": "", "error": str(exc)})
 
 
 @app.post("/api/download-youtube-preset")
+
 def download_youtube_preset(
     data: YouTubePresetModel,
     current_user: dict = Depends(get_current_user)
@@ -2248,21 +2295,17 @@ def download_bg_youtube_preset(
     data: YouTubePresetModel,
     current_user: dict = Depends(get_current_user)
 ):
-    if processing_lock.locked():
-        raise HTTPException(
-            status_code=429,
-            detail="O servidor está ocupado processando outro vídeo. Por favor, aguarde alguns minutos."
-        )
-
     url = data.youtube_url.strip()
     if not url:
         raise HTTPException(status_code=400, detail="URL do YouTube vazia.")
 
-    yt_preset_statuses[youtube_status_key(current_user, "background")] = {
-        "status": "starting", "progress": 5, "title": "Identificando vídeo...", "filename": "", "error": None
-    }
-    threading.Thread(target=run_bg_youtube_download_bg, args=(url, dict(current_user)), daemon=True).start()
-    return {"status": "started"}
+    download_id = uuid.uuid4().hex
+    status = {"status": "starting", "progress": 5, "title": "Identificando vídeo...", "filename": "", "error": None, "download_id": download_id}
+    key = youtube_status_key(current_user, "background")
+    yt_preset_statuses[key] = status
+    yt_preset_statuses[f"{key}:{download_id}"] = status
+    threading.Thread(target=run_bg_youtube_download_bg, args=(url, dict(current_user), download_id), daemon=True).start()
+    return {"status": "started", "download_id": download_id}
 
 
 LRCLIB_API_URL = "https://lrclib.net/api"
@@ -2274,6 +2317,8 @@ MUSIXMATCH_APP_ID = "web-desktop-app-v1.0"
 
 class LyricsModel(BaseModel):
     lyrics_text: str = ""
+    source_key: str = Field(default="", max_length=512)
+    lyrics_mode: str = "manual"
 
 
 class LyricsSearchRequest(BaseModel):
@@ -2663,41 +2708,20 @@ def fetch_lyrics_online(data: LyricsFetchRequest, current_user: dict = Depends(g
     }
 
 @app.get("/api/lyrics")
-def get_saved_lyrics(current_user: dict = Depends(get_current_user)):
-    """Retorna a letra salva no servidor."""
-    lyrics_file = config_path(current_user, "saved_lyrics.txt")
-    if os.path.exists(lyrics_file):
-        try:
-            with open(lyrics_file, "r", encoding="utf-8") as f:
-                return {"lyrics_text": f.read()}
-        except Exception as e:
-            logger.error(f"Erro ao ler letra do servidor: {e}")
-    return {"lyrics_text": ""}
+def get_saved_lyrics(current_user: dict = Depends(get_current_user), source_key: str = Query("", max_length=512)):
+    return read_draft(get_user_paths(current_user)["output"], source_key)
+
 
 @app.post("/api/lyrics")
 def save_lyrics_server(data: LyricsModel, current_user: dict = Depends(get_current_user)):
-    """Salva a letra da música no servidor."""
-    try:
-        lyrics_file = config_path(current_user, "saved_lyrics.txt")
-        os.makedirs(os.path.dirname(lyrics_file), exist_ok=True)
-        with open(lyrics_file, "w", encoding="utf-8") as f:
-            f.write(data.lyrics_text or "")
-        return {"status": "saved"}
-    except Exception as e:
-        logger.error(f"Erro ao salvar letra no servidor: {e}")
-        raise HTTPException(status_code=500, detail=f"Erro ao salvar letra no servidor: {e}")
+    write_draft(get_user_paths(current_user)["output"], data.source_key, data.lyrics_text, data.lyrics_mode)
+    return {"status": "saved", "source_key": data.source_key}
+
 
 @app.delete("/api/lyrics")
-def delete_lyrics_server(current_user: dict = Depends(get_current_user)):
-    """Exclui a letra salva do servidor."""
-    try:
-        lyrics_file = config_path(current_user, "saved_lyrics.txt")
-        if os.path.exists(lyrics_file):
-            os.remove(lyrics_file)
-        return {"status": "deleted"}
-    except Exception as e:
-        logger.error(f"Erro ao excluir letra do servidor: {e}")
-        raise HTTPException(status_code=500, detail=f"Erro ao excluir letra do servidor: {e}")
+def delete_lyrics_server(current_user: dict = Depends(get_current_user), source_key: str = Query("", max_length=512)):
+    clear_draft(get_user_paths(current_user)["output"], source_key)
+    return {"status": "deleted", "source_key": source_key}
 
 
 
@@ -4020,6 +4044,8 @@ def process_karaoke(
     show_next_line_preview: bool = Form(False),
     lyrics_text: str = Form(None),
     lyrics_mode: str = Form("auto"),
+    lyrics_selected: bool = Form(False),
+    lyrics_source_key: str = Form(""),
     youtube_publish: bool = Form(False),
     youtube_playlist_id: str = Form(""),
     youtube_title: str = Form(""),
@@ -4093,8 +4119,9 @@ def process_karaoke(
         show_instrumental = easy_config["show_instrumental"]
         transcribe_source = easy_config["transcribe_source"]
         show_next_line_preview = easy_config["show_next_line_preview"]
-        lyrics_text = None
-        lyrics_mode = easy_config["lyrics_mode"]
+        if not lyrics_selected:
+            lyrics_text = None
+            lyrics_mode = easy_config["lyrics_mode"]
         enable_correction = easy_config["enable_correction"]
         keep_first_line_visible = easy_config["keep_first_line_visible"]
         pause_for_editing = False
@@ -4110,6 +4137,9 @@ def process_karaoke(
         lyrics_text = ""
         only_remove_vocals = False
 
+    if lyrics_selected and (lyrics_text or "").strip() and not subtitle_only:
+        # A selected guide is frozen in this job, even if it came from automatic search.
+        lyrics_mode = "manual"
     lyrics_mode = (lyrics_mode or "auto").strip().lower()
     if not subtitle_only:
         enable_vad = False
@@ -4153,9 +4183,11 @@ def process_karaoke(
             background_mode = "original"
 
     if lyrics_mode == "auto":
-        # A letra automática pertence à mídia atual. Nunca reutilizar o texto
-        # enviado pelo navegador, que pode ter vindo da música anterior.
         lyrics_text = ""
+    else:
+        lyrics_text = prepare_lyrics_guide(lyrics_text)
+    subtitle_settings = load_subtitle_settings(SUBTITLE_MODE_FILE) if subtitle_only else None
+    subtitle_background_path = None
 
     # Se uma música da biblioteca foi explicitamente selecionada, anular youtube_url para priorizar a biblioteca
     if library_audio and library_audio.strip():
@@ -4480,6 +4512,12 @@ def process_karaoke(
                 if not os.path.exists(input_bg_path):
                     input_bg_path = None
 
+    if subtitle_only:
+        subtitle_background_path = stage_subtitle_background(subtitle_settings, cache_dir)
+    elif lyrics_text:
+        with open(os.path.join(cache_dir, "lyrics_guide.txt"), "w", encoding="utf-8") as guide_file:
+            guide_file.write(lyrics_text)
+
     model_labels = {
         "large-v3-turbo": "Large V3 Turbo",
         "large-v3": "Large V3",
@@ -4514,8 +4552,8 @@ def process_karaoke(
             if subtitle_only else lyrics_summary
         ),
         "model": model_labels.get(whisper_model, whisper_model),
-        "mode": "Gerar SRT" if subtitle_only else ("Modo Rápido" if easy_mode else "Modo Detalhado"),
-        "background": "Somente arquivos SRT" if subtitle_only else background_summary,
+        "mode": "Legendar vídeo" if subtitle_only else ("Modo Rápido" if easy_mode else "Modo Detalhado"),
+        "background": "Vídeo original · fundo padrão para áudio" if subtitle_only else background_summary,
     }
 
     pipeline = {
@@ -4537,6 +4575,9 @@ def process_karaoke(
         "show_next_line_preview": show_next_line_preview,
         "lyrics_text": lyrics_text,
         "lyrics_mode": lyrics_mode,
+        "lyrics_source_key": str(lyrics_source_key or "")[:512],
+        "subtitle_settings": subtitle_settings,
+        "subtitle_background_path": subtitle_background_path,
         "youtube_publish_options": publication_options,
         "lyrics_timing": lyrics_timing,
         "keep_backing_vocals": keep_backing_vocals,
@@ -4573,14 +4614,19 @@ def process_karaoke(
         raise
     return {"status": "queued", "job_id": job_id, "position": position, "title": orig_name}
 
-def compress_video_for_telegram(source_path: str, destination_path: str, target_bytes: int) -> bool:
+def compress_video_for_telegram(source_path: str, destination_path: str, target_bytes: int, max_video_kbps: int = None, progress_callback=None) -> bool:
     """Cria uma prévia completa sob o limite do bot sem alterar o resultado original."""
+    import process_manager as pm
+    from video_renderer import run_ffmpeg_with_logging
+    pm.check_cancelled()
     duration = get_file_duration(source_path)
     if duration <= 0:
         return False
     total_kbps = max(32, int((target_bytes * 8 * 0.92) / duration / 1000))
     audio_kbps = 48 if total_kbps >= 120 else 24
     video_kbps = max(12, total_kbps - audio_kbps)
+    if max_video_kbps:
+        video_kbps = min(video_kbps, max_video_kbps)
     height = 720 if video_kbps >= 700 else (480 if video_kbps >= 300 else 360)
 
     with tempfile.TemporaryDirectory(prefix="sal0-telegram-") as pass_dir:
@@ -4596,40 +4642,27 @@ def compress_video_for_telegram(source_path: str, destination_path: str, target_
                 "-bufsize", f"{max(20, attempt_video_kbps * 2)}k",
                 "-pix_fmt", "yuv420p",
             ]
-            first_pass = subprocess.run(
-                [
-                    "ffmpeg", "-y", "-i", source_path,
-                    *common_video,
-                    "-pass", "1", "-passlogfile", pass_log,
-                    "-an", "-f", "null", os.devnull,
-                ],
-                capture_output=True,
-                text=True,
-                timeout=21600,
-                check=False,
-            )
-            if first_pass.returncode != 0:
-                logger.error("Primeira passagem da prévia Telegram falhou: %s", first_pass.stderr[-1000:])
+            def publish(percent, second=False):
+                if progress_callback:
+                    progress_callback((50 if second else 0) + int(percent / 2))
+            first_pass = run_ffmpeg_with_logging([
+                "ffmpeg", "-y", "-i", source_path, *common_video,
+                "-pass", "1", "-passlogfile", pass_log, "-an", "-f", "null", os.devnull,
+            ], progress_callback=lambda percent:publish(percent), total_duration=duration)
+            pm.check_cancelled()
+            if not first_pass:
                 return False
-            second_pass = subprocess.run(
-                [
-                    "ffmpeg", "-y", "-i", source_path,
-                    *common_video,
-                    "-pass", "2", "-passlogfile", pass_log,
-                    "-c:a", "aac", "-b:a", f"{audio_kbps}k",
-                    "-movflags", "+faststart", destination_path,
-                ],
-                capture_output=True,
-                text=True,
-                timeout=21600,
-                check=False,
-            )
-            if second_pass.returncode == 0 and os.path.isfile(destination_path):
+            second_pass = run_ffmpeg_with_logging([
+                "ffmpeg", "-y", "-i", source_path, *common_video,
+                "-pass", "2", "-passlogfile", pass_log,
+                "-c:a", "aac", "-b:a", f"{audio_kbps}k", "-movflags", "+faststart", destination_path,
+            ], progress_callback=lambda percent:publish(percent, True), total_duration=duration)
+            pm.check_cancelled()
+            if second_pass and os.path.isfile(destination_path):
                 if 0 < os.path.getsize(destination_path) <= target_bytes:
                     return True
                 logger.warning("Prévia Telegram ainda excedeu o limite; reduzindo a taxa de bits.")
             else:
-                logger.error("Segunda passagem da prévia Telegram falhou: %s", second_pass.stderr[-1000:])
                 return False
     return False
 
@@ -4644,8 +4677,11 @@ def send_telegram_video_flow(
     base_url: str = "",
     external_url: str = "",
     processing_seconds: float = 0,
+    subtitle_downloads: list[dict] = None,
+    embedded_subtitle: str = "",
+    prepared_preview: str = None,
 ):
-    """Envia o vídeo e só retorna quando a entrega final ao Telegram terminar."""
+    """Envia um único vídeo com todos os links antes de liberar a tarefa."""
     if not token or not chat_id:
         return False
 
@@ -4654,6 +4690,18 @@ def send_telegram_video_flow(
     duration_text = format_processing_duration(processing_seconds)
 
     def build_download_links() -> str:
+        if subtitle_downloads is not None:
+            rows = []
+            for item in subtitle_downloads:
+                route = f"/api/public/download/{item['public_download_token']}"
+                anchors = []
+                for label, origin in (("Local", base_url), ("Externo", external_url)):
+                    if origin.strip():
+                        url = telegram_escape(f"{origin.rstrip('/')}{route}")
+                        anchors.append(f'<a href="{url}">{label}</a>')
+                if anchors:
+                    rows.append(f"<b>{telegram_escape(item['label'])}</b>: " + " · ".join(anchors))
+            return "\n".join(rows)
         if not public_download_token:
             return ""
         route = f"/api/public/download/{public_download_token}"
@@ -4666,20 +4714,24 @@ def send_telegram_video_flow(
             links.append(f'🌐 <a href="{remote_url}">Acesso externo</a>')
         return "\n".join(links)
 
+    download_block = build_download_links()
     try:
         file_size = os.path.getsize(video_path)
-        download_block = build_download_links()
         success = False
         sent_compressed_preview = False
         with tempfile.TemporaryDirectory(prefix="sal0-telegram-preview-") as preview_dir:
-            upload_path = video_path
-            if file_size > limit_50mb:
+            upload_path = video_path if prepared_preview is None else prepared_preview
+            sent_compressed_preview = bool(prepared_preview)
+            if prepared_preview is None and (file_size > limit_50mb or subtitle_downloads is not None):
                 upload_path = os.path.join(preview_dir, "preview_telegram.mp4")
-                sent_compressed_preview = compress_video_for_telegram(
-                    video_path,
-                    upload_path,
-                    compressed_target,
-                )
+                if subtitle_downloads is not None:
+                    update_state("processing", "Compressing subtitle video for Telegram", 99,
+                                 stage_detail="Compactando uma cópia do vídeo; os originais continuam disponíveis")
+                    sent_compressed_preview = compress_video_for_telegram(video_path, upload_path, compressed_target, max_video_kbps=1800,
+                        progress_callback=lambda percent:update_state("processing", "Compressing subtitle video for Telegram", 99,
+                            stage_progress=percent, stage_detail="Compactando uma cópia com o áudio completo"))
+                else:
+                    sent_compressed_preview = compress_video_for_telegram(video_path, upload_path, compressed_target)
                 if not sent_compressed_preview:
                     upload_path = ""
 
@@ -4696,11 +4748,15 @@ def send_telegram_video_flow(
                 ]
                 if download_block:
                     caption_lines.extend(["", "📥 <b>Download do arquivo original sem compressão</b>", download_block])
-                completion_caption = telegram_notice(
-                    "✅",
-                    "Karaokê concluído",
-                    *caption_lines,
-                )
+                if subtitle_downloads is not None:
+                    caption_lines = [f"🎬 <b>{telegram_escape(str(orig_name)[:100])}</b>",
+                        f"Legendas no vídeo: <b>{telegram_escape(embedded_subtitle)}</b>",
+                        f"⏱ {telegram_escape(duration_text)} · vídeo compactado para Telegram"]
+                    if download_block:
+                        caption_lines.extend(["", "📥 <b>Arquivos originais</b>", download_block])
+                    update_state("processing", "Sending subtitle video to Telegram", 99,
+                                 stage_detail="Aguardando confirmação de entrega antes do próximo item")
+                completion_caption = telegram_notice("✅", "Vídeo legendado concluído" if subtitle_downloads is not None else "Karaokê concluído", *caption_lines)
                 with open(upload_path, "rb") as video_file:
                     response = requests.post(
                         f"https://api.telegram.org/bot{token}/sendVideo",
@@ -4729,8 +4785,10 @@ def send_telegram_video_flow(
         return _send_telegram_notification_worker(
             token,
             chat_id,
-            telegram_notice("✅", "Karaokê concluído", *fallback_lines),
+            telegram_notice("✅", "Vídeo legendado concluído" if subtitle_downloads is not None else "Karaokê concluído", *fallback_lines),
         )
+    except InterruptedError:
+        raise
     except Exception as exc:
         logger.error("Erro ao concluir a entrega ao Telegram: %s", exc)
         return _send_telegram_notification_worker(
@@ -4739,8 +4797,9 @@ def send_telegram_video_flow(
             telegram_notice(
                 "⚠️",
                 "Resultado salvo; envio pendente",
-                f"🎵 <b>{telegram_escape(orig_name)}</b>",
+                f"{'🎞️' if subtitle_downloads is not None else '🎵'} <b>{telegram_escape(str(orig_name)[:100])}</b>",
                 "O resultado permanece disponível na Biblioteca.",
+                download_block,
             ),
         )
 
@@ -4754,108 +4813,34 @@ def send_video_to_targets(
     base_url: str,
     external_url: str,
     processing_seconds: float = 0,
+    subtitle_downloads: list[dict] = None,
+    embedded_subtitle: str = "",
 ):
     """Entrega o resultado a todos os bots antes de liberar o próximo item da fila."""
-    for target in targets:
-        send_telegram_video_flow(
-            token=target["telegram_token"],
-            chat_id=target["telegram_chat_id"],
-            video_path=video_path,
-            orig_name=orig_name,
-            history_filename=history_filename,
-            public_download_token=public_download_token,
-            base_url=base_url,
-            external_url=external_url,
-            processing_seconds=processing_seconds,
-        )
-
-
-def send_telegram_document_flow(
-    token: str,
-    chat_id: str,
-    document_path: str,
-    display_name: str,
-    public_download_token: str,
-    base_url: str = "",
-    external_url: str = "",
-    processing_seconds: float = 0,
-):
-    """Envia um SRT e só retorna quando o Telegram confirmar a entrega."""
-    if not token or not chat_id or not os.path.isfile(document_path):
-        return False
-    route = f"/api/public/download/{public_download_token}" if public_download_token else ""
-    links = []
-    duration_text = format_processing_duration(processing_seconds)
-    if route and base_url.strip():
-        local_url = telegram_escape(f'{base_url.rstrip("/")}{route}')
-        links.append(f'🏠 <a href="{local_url}">Rede local</a>')
-    if route and external_url.strip():
-        remote_url = telegram_escape(f'{external_url.rstrip("/")}{route}')
-        links.append(f'🌐 <a href="{remote_url}">Acesso externo</a>')
-
-    caption_lines = [
-        f"📄 {telegram_escape(display_name)}",
-        f"⏱ Tempo total de processamento: <b>{telegram_escape(duration_text)}</b>",
-    ]
-    if links:
-        caption_lines.extend(["", "📥 <b>Links de download</b>", *links])
-
-    success = False
-    try:
-        with open(document_path, "rb") as document_file:
-            response = requests.post(
-                f"https://api.telegram.org/bot{token}/sendDocument",
-                data={
-                    "chat_id": chat_id,
-                    "caption": telegram_notice("✅", "Legenda concluída", *caption_lines),
-                    "parse_mode": "HTML",
-                },
-                files={"document": (os.path.basename(document_path), document_file, "application/x-subrip")},
-                timeout=90,
+    if not targets:
+        return
+    def deliver(preview=None):
+        for target in targets:
+            send_telegram_video_flow(
+                token=target["telegram_token"], chat_id=target["telegram_chat_id"],
+                video_path=video_path, orig_name=orig_name, history_filename=history_filename,
+                public_download_token=public_download_token, base_url=base_url, external_url=external_url,
+                processing_seconds=processing_seconds, subtitle_downloads=subtitle_downloads,
+                embedded_subtitle=embedded_subtitle, prepared_preview=preview,
             )
-            success = response.ok
-            if not success:
-                logger.error("Telegram recusou o documento com HTTP %s.", response.status_code)
-    except Exception as exc:
-        logger.error("Falha ao enviar documento ao Telegram: %s", exc)
-
-    if success:
-        return True
-
-    fallback_lines = [
-        f"📄 {telegram_escape(display_name)}",
-        "⚠️ O envio direto falhou; o SRT permanece salvo na Biblioteca.",
-        f"⏱ Tempo total de processamento: <b>{telegram_escape(duration_text)}</b>",
-    ]
-    if links:
-        fallback_lines.extend(["", "📥 <b>Links de download</b>", *links])
-    return _send_telegram_notification_worker(
-        token,
-        chat_id,
-        telegram_notice("✅", "Legenda concluída", *fallback_lines),
-    )
-
-
-def send_documents_to_targets(
-    targets: list[dict],
-    documents: list[dict],
-    base_url: str,
-    external_url: str,
-    processing_seconds: float = 0,
-):
-    """Entrega todos os documentos antes de liberar o próximo item da fila."""
-    for target in targets:
-        for document in documents:
-            send_telegram_document_flow(
-                token=target["telegram_token"],
-                chat_id=target["telegram_chat_id"],
-                document_path=document["path"],
-                display_name=document["label"],
-                public_download_token=document.get("public_download_token"),
-                base_url=base_url,
-                external_url=external_url,
-                processing_seconds=processing_seconds,
-            )
+    if subtitle_downloads is None:
+        deliver()
+        return
+    # The owner and administrator share the same preview; encoding is done once per job.
+    with tempfile.TemporaryDirectory(prefix="sal0-caption-preview-") as folder:
+        preview = os.path.join(folder, "video_legendado_telegram.mp4")
+        def publish(percent):
+            update_state("processing", "Compressing subtitle video for Telegram", 99,
+                         stage_progress=percent, stage_detail="Compactando uma cópia com o áudio completo")
+        publish(0)
+        ready = compress_video_for_telegram(video_path, preview, 46 * 1024 * 1024,
+                                           max_video_kbps=1800, progress_callback=publish)
+        deliver(preview if ready else "")
 
 
 def run_subtitle_srt_pipeline(
@@ -4874,11 +4859,14 @@ def run_subtitle_srt_pipeline(
     telegram_base_url: str = "",
     telegram_external_url: str = "",
     processing_elapsed_callback=None,
+    subtitle_settings: dict = None,
+    subtitle_background_path: str = None,
 ):
-    """Transcreve mídia; áudio sem vídeo também recebe MP4 legendado."""
+    """Legendagem da fala com Whisper: MP4 embutido e SRTs independentes."""
     import process_manager as pm
 
     os.makedirs(output_dir, exist_ok=True)
+    subtitle_settings = normalize_subtitle_settings(subtitle_settings)
     transcription_source = input_media_path  # original source; no lossy MP3 intermediate
     segments_cache_file = os.path.join(cache_dir, "subtitle_segments_original.json")
     info_cache_file = os.path.join(cache_dir, "subtitle_info_original.json")
@@ -4928,7 +4916,7 @@ def run_subtitle_srt_pipeline(
             telegram_notice(
                 "✍️",
                 "Transcrição com Whisper",
-                f"🎵 <b>{telegram_escape(orig_name)}</b>",
+                f"🎞️ <b>{telegram_escape(orig_name)}</b>",
                 "🎧 O áudio completo será usado para gerar o SRT.",
                 "📊 Progresso geral inicial: <b>45%</b> · etapa atual: <b>0%</b>",
             ),
@@ -4976,7 +4964,7 @@ def run_subtitle_srt_pipeline(
         global segments_to_edit, correction_event
         segments_to_edit = original_segments
         correction_event.clear()
-        update_state("waiting_for_user_correction", "Correction", 68)
+        update_state("waiting_for_user_correction", "Reviewing speech subtitles", 69)
         while not correction_event.is_set():
             pm.check_cancelled()
             if queue_pause_requested():
@@ -5004,8 +4992,7 @@ def run_subtitle_srt_pipeline(
     original_filename = str(original_checkpoint.get("filename") or "")
     original_library_path = os.path.join(library_dir, "history", original_filename) if original_filename else ""
     if original_filename and os.path.isfile(original_library_path):
-        if not os.path.isfile(final_original_srt):
-            shutil.copy2(original_library_path, final_original_srt)
+        shutil.copy2(original_library_path, final_original_srt)
         update_state("processing", "Using original SRT checkpoint", 75)
     else:
         update_state("processing", "Generating original SRT", 72)
@@ -5041,8 +5028,7 @@ def run_subtitle_srt_pipeline(
         translation_error = str(translation_checkpoint.get("error") or "")
         if checkpoint_translation_filename and os.path.isfile(checkpoint_translation_path):
             translated_filename = checkpoint_translation_filename
-            if not os.path.isfile(final_translated_srt):
-                shutil.copy2(checkpoint_translation_path, final_translated_srt)
+            shutil.copy2(checkpoint_translation_path, final_translated_srt)
         update_state("processing", "Using translation checkpoint", 95)
     elif translation_language != "original":
         try:
@@ -5055,7 +5041,7 @@ def run_subtitle_srt_pipeline(
             )
 
             notify_targets(telegram_targets, telegram_notice("🌍", "Tradução do SRT",
-                f"🎵 <b>{telegram_escape(orig_name)}</b>",
+                f"🎞️ <b>{telegram_escape(orig_name)}</b>",
                 "📊 Progresso geral: <b>80%</b>",
                 "Aguardando o LibreTranslate; a API não informa a porcentagem interna."))
             def translation_progress(completed: int, total: int):
@@ -5081,7 +5067,7 @@ def run_subtitle_srt_pipeline(
                 translation_language,
             )
             notify_targets(telegram_targets, telegram_notice("🌍", "SRT traduzido concluído",
-                f"🎵 <b>{telegram_escape(orig_name)}</b>",
+                f"🎞️ <b>{telegram_escape(orig_name)}</b>",
                 "📊 Progresso geral: <b>95%</b> · etapa atual: <b>100%</b>"))
         except InterruptedError:
             raise
@@ -5093,7 +5079,7 @@ def run_subtitle_srt_pipeline(
                 telegram_notice(
                     "⚠️",
                     "Tradução opcional não concluída",
-                    f"🎵 <b>{telegram_escape(orig_name)}</b>",
+                    f"🎞️ <b>{telegram_escape(orig_name)}</b>",
                     "✅ O SRT original foi preservado e continua disponível.",
                 ),
             )
@@ -5108,87 +5094,56 @@ def run_subtitle_srt_pipeline(
         target=translation_language,
     )
 
-    primary_subtitle = translated_filename or original_filename
-    public_token = create_public_download(owner_user, original_filename)
+    use_translation = bool(translated_filename and subtitle_settings["video_subtitle_source"] == "translated")
+    primary_subtitle = translated_filename if use_translation else original_filename
+    embedded_language = translation_language if use_translation else (transcription_info.get("language") or "original")
+    embedded_label = f"tradução ({translation_language})" if use_translation else "idioma original"
+    original_public_token = create_public_download(owner_user, original_filename)
     translated_public_token = create_public_download(owner_user, translated_filename) if translated_filename else None
-    original_public_token = public_token
-    video_history_filename = None
     final_video = os.path.join(output_dir, "final_karaoke.mp4")
-    if not media_has_motion_video(input_media_path):
-        pm.check_cancelled()
-        notify_targets(telegram_targets, telegram_notice("🎬", "Vídeo legendado do áudio",
-            f"🎵 <b>{telegram_escape(orig_name)}</b>",
-            "📊 Progresso geral: <b>96%</b> · etapa atual: <b>0%</b>"))
-        def publish_subtitle_video_progress(percent):
-            update_state("processing", "Rendering subtitle video", 96 + min(2, int(percent * 2 / 100)),
-                         stage_progress=percent, stage_detail="Criando MP4 com o áudio original e as legendas")
-        publish_subtitle_video_progress(0)
-        render_audio_subtitle_video(transcription_source,
-            final_translated_srt if translated_filename else final_original_srt,
-            final_video, media_duration,
-            progress_callback=publish_subtitle_video_progress)
-        video_history_filename = save_video_to_history(final_video, orig_name, library_dir, result_kind="subtitle_video")
-        if not video_history_filename:
-            raise RuntimeError("Não foi possível salvar o vídeo legendado na Biblioteca.")
-        public_token = create_public_download(owner_user, video_history_filename)
-    result_kind = "subtitle_video" if video_history_filename else "subtitles"
-    save_result_metadata(
-        output_dir,
-        orig_name,
-        video_history_filename or original_filename,
-        subtitle_filename=primary_subtitle,
-        subtitle_language=translation_language,
+    pm.check_cancelled()
+    has_video = media_has_motion_video(input_media_path)
+    update_process_summary(background="Vídeo original" if has_video else "Fundo padrão para áudio",
+                           lyrics=f"Fala com Whisper · {embedded_label}")
+    notify_targets(telegram_targets, telegram_notice("🎬", "Criando vídeo legendado",
+        f"🎞️ <b>{telegram_escape(orig_name)}</b>",
+        f"Legenda embutida: <b>{telegram_escape(embedded_label)}</b>",
+        "📊 Progresso geral: <b>96%</b> · etapa atual: <b>0%</b>"))
+    def publish_subtitle_video_progress(percent):
+        update_state("processing", "Rendering subtitle video", 96 + min(2, int(percent * 2 / 100)),
+                     stage_progress=percent, stage_detail="Embutindo legendas no vídeo com o áudio original completo")
+    publish_subtitle_video_progress(0)
+    render_subtitle_video(transcription_source,
+        final_translated_srt if use_translation else final_original_srt,
+        final_video, media_duration, settings=subtitle_settings, background=subtitle_background_path,
+        progress_callback=publish_subtitle_video_progress)
+    video_history_filename = save_video_to_history(final_video, orig_name, library_dir, result_kind="subtitle_video")
+    if not video_history_filename:
+        raise RuntimeError("Não foi possível salvar o vídeo legendado na Biblioteca.")
+    public_token = create_public_download(owner_user, video_history_filename)
+    save_result_metadata(output_dir, orig_name, video_history_filename,
+        subtitle_filename=primary_subtitle, subtitle_language=embedded_language,
         original_subtitle_filename=original_filename,
         translated_subtitle_filename=translated_filename,
-        translation_error=translation_error,
-        result_kind=result_kind,
-    )
-    total_processing_seconds = (
-        processing_elapsed_callback() if processing_elapsed_callback else 0
-    )
-    completion = "SRT original e traduzido" if translated_filename else "SRT original"
-    telegram_documents = [{
-        "path": os.path.join(library_dir, "history", original_filename),
-        "label": f"SRT original de {orig_name}",
-        "public_download_token": original_public_token,
-    }]
+        translation_error=translation_error, result_kind="subtitle_video")
+    total_processing_seconds = processing_elapsed_callback() if processing_elapsed_callback else 0
+    downloads = [
+        {"label": "SRT original", "public_download_token": original_public_token},
+        {"label": "Vídeo", "public_download_token": public_token},
+    ]
     if translated_filename:
-        telegram_documents.append({
-            "path": os.path.join(library_dir, "history", translated_filename),
-            "label": f"SRT traduzido de {orig_name}",
-            "public_download_token": translated_public_token,
-        })
-    update_state(
-        "processing",
-        "Sending subtitles to Telegram",
-        99,
-        stage_detail="Aguardando a confirmação de entrega antes de iniciar o próximo item",
-    )
-    if video_history_filename:
-        send_video_to_targets(telegram_targets, final_video, orig_name, video_history_filename,
-                              public_token, telegram_base_url, telegram_external_url, total_processing_seconds)
-    send_documents_to_targets(
-        telegram_targets,
-        telegram_documents,
-        telegram_base_url,
-        telegram_external_url,
-        total_processing_seconds,
-    )
-    update_state(
-        "done",
-        "SRT ready",
-        100,
-        result_file=final_video if video_history_filename else final_original_srt,
-        history_filename=video_history_filename or original_filename,
-        subtitle_filename=primary_subtitle,
-        original_subtitle_filename=original_filename,
-        translated_subtitle_filename=translated_filename or "",
-        subtitle_language=translation_language,
-        translation_error=translation_error,
-        result_kind=result_kind,
-        public_download_token=public_token,
-    )
-    logger.info("%s concluído(s) e encaminhado(s) ao Telegram.", completion)
+        downloads.append({"label": "SRT traduzido", "public_download_token": translated_public_token})
+    update_state("processing", "Sending subtitle video to Telegram", 99,
+        stage_detail="Preparando o vídeo compactado e os links dos arquivos originais")
+    send_video_to_targets(telegram_targets, final_video, orig_name, video_history_filename,
+        public_token, telegram_base_url, telegram_external_url, total_processing_seconds,
+        subtitle_downloads=downloads, embedded_subtitle=embedded_label)
+    update_state("done", "Captioned video ready", 100,
+        result_file=final_video, history_filename=video_history_filename,
+        subtitle_filename=primary_subtitle, original_subtitle_filename=original_filename,
+        translated_subtitle_filename=translated_filename or "", subtitle_language=embedded_language,
+        translation_error=translation_error, result_kind="subtitle_video", public_download_token=public_token)
+    logger.info("Vídeo legendado e links dos SRTs encaminhados ao Telegram.")
 
 def run_pipeline(
     input_audio_path: str,
@@ -5209,6 +5164,9 @@ def run_pipeline(
     show_next_line_preview: bool = False,
     lyrics_text: str = None,
     lyrics_mode: str = "auto",
+    lyrics_source_key: str = "",
+    subtitle_settings: dict = None,
+    subtitle_background_path: str = None,
     youtube_publish_options: dict = None,
     lyrics_timing: str = "acoustic",
     keep_backing_vocals: bool = True,
@@ -5240,7 +5198,7 @@ def run_pipeline(
     cache_dir = cache_dir or owner_paths["cache"]
     output_dir = output_dir or owner_paths["output"]
     library_dir = library_dir or owner_paths["library"]
-    saved_lyrics_file = os.path.join(output_dir, "saved_lyrics.txt")
+    saved_lyrics_file = os.path.join(cache_dir, "lyrics_guide.txt")
     telegram_targets = get_notification_targets(owner_user)
     os.makedirs(cache_dir, exist_ok=True)
     previous_processing_seconds = float(
@@ -5269,8 +5227,8 @@ def run_pipeline(
             telegram_targets,
             telegram_notice(
                 "🎙️",
-                "Novo processamento",
-                f"🎵 <b>{telegram_escape(orig_name)}</b>",
+                "Legendagem iniciada" if subtitle_only else "Novo processamento",
+                f"{'🎞️' if subtitle_only else '🎵'} <b>{telegram_escape(orig_name)}</b>",
                 "⏳ Preparando a primeira etapa.",
             ),
         )
@@ -5405,7 +5363,7 @@ def run_pipeline(
                 json.dump(cached_meta, f, indent=4)
 
         if subtitle_only:
-            logger.info("Modo Gerar SRT ativo: Demucs desativado; usando somente o áudio original e o Whisper.")
+            logger.info("Modo Legendar vídeo: transcrição da fala com Whisper usando o áudio original completo.")
             run_subtitle_srt_pipeline(
                 input_media_path=input_audio_path,
                 orig_name=orig_name,
@@ -5422,6 +5380,8 @@ def run_pipeline(
                 telegram_base_url=telegram_base_url,
                 telegram_external_url=telegram_external_url,
                 processing_elapsed_callback=persist_total_processing_seconds,
+                subtitle_settings=subtitle_settings,
+                subtitle_background_path=subtitle_background_path,
             )
             return
 

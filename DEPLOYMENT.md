@@ -25,7 +25,7 @@ Crie uma pasta própria para a instalação e salve nela o arquivo `compose.yaml
 ```yaml
 services:
   karaoke-app:
-    image: ghcr.io/sal0-apps/sal0-karaoke:11.0
+    image: ghcr.io/sal0-apps/sal0-karaoke:11.1
     container_name: karaoke-app
     ports:
       - "7885:7860"

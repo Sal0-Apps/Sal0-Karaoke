@@ -105,7 +105,7 @@ class SrtPublicationBlockTests(unittest.TestCase):
 
     def test_saved_videos_keep_provenance_independently_of_latest_output(self):
         node = next(n for n in TREE.body if isinstance(n, ast.FunctionDef) and n.name == 'save_video_to_history')
-        scope = {'os':os, 'shutil':shutil, 'logger':logging.getLogger('test'),
+        scope = {'os':os, 're':__import__('re'), 'shutil':shutil, 'logger':logging.getLogger('test'),
                  'record_result_kind':record_result_kind, 'karaoke_download_filename':lambda _: 'result.mp4'}
         exec(compile(ast.Module(body=[node], type_ignores=[]), 'history', 'exec'), scope)
         source = self.root / 'final.mp4'

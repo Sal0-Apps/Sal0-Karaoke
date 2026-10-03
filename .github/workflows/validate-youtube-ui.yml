@@ -37,6 +37,7 @@ jobs:
           python -m unittest discover -s tests -p test_synced_acoustic_animation.py -v
           python -m unittest discover -s tests -p test_synced_preview_layout.py -v
           python -m unittest discover -s tests -p test_processing_flow.py -v
+          python -m unittest discover -s tests -p test_queue_lyrics_and_background.py -v
           python -m unittest discover -s tests -p test_display_modes.py -v
           python -m unittest discover -s tests -p test_whisper_cache_reuse.py -v
       - uses: actions/setup-node@v4
@@ -48,6 +49,7 @@ jobs:
           NODE_PATH=/tmp/sal0-ui/node_modules node tests/browser_youtube_publisher.cjs
           NODE_PATH=/tmp/sal0-ui/node_modules node tests/browser_creation_review.cjs
           NODE_PATH=/tmp/sal0-ui/node_modules node tests/browser_queue_creation.cjs
+          NODE_PATH=/tmp/sal0-ui/node_modules node tests/browser_subtitle_lyrics.cjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -56,4 +58,5 @@ jobs:
             youtube-admin-*.png
             creation-review-*.png
             queue-creation-*.png
+            subtitle-*.png
           if-no-files-found: ignore

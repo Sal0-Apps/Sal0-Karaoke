@@ -1,6 +1,6 @@
 # Manual do Sal0 Karaokê
 
-Este manual descreve os controles disponíveis na distribuição 11.0. Para instalar o servidor, consulte [DEPLOYMENT.md](DEPLOYMENT.md). Para configurar o aparelho, consulte o [guia Android](android/README.md).
+Este manual descreve os controles disponíveis na distribuição 11.1. Para instalar o servidor, consulte [DEPLOYMENT.md](DEPLOYMENT.md). Para configurar o aparelho, consulte o [guia Android](android/README.md).
 
 O Sal0 Karaokê é destinado a uma instalação pessoal, acessada pela rede local ou por VPN, como ZeroTier. O repositório aberto disponibiliza o código e os pacotes; o projeto não opera um serviço público de processamento nem coleta centralmente as mídias das instalações. Não é necessário expor a porta do app à internet. O processamento principal é local, mas as integrações escolhidas podem se comunicar com serviços externos.
 
@@ -77,6 +77,8 @@ A letra-guia orienta o contexto e o vocabulário do Whisper. Após a transcriç�
 
 A letra-guia orienta o reconhecimento, mas não garante que a gravação tenha os mesmos versos, repetições ou arranjos. Letras e traduções podem ter direitos próprios; verifique autorização antes de copiar ou publicar.
 
+A guia fica vinculada à mídia selecionada nos modos Rápido e Detalhado. **Salvar** e **Limpar** alteram somente essa mídia; itens já enviados à fila conservam uma cópia do texto. Ao trocar de arquivo, link ou original da Biblioteca, o editor mostra a guia correspondente. Em lotes, a guia exibida vale somente para o arquivo indicado; para escolher guias distintas, prepare cada mídia separadamente.
+
 ### Sincronia local e vozes de apoio
 
 A partir da 11.0, o Whisper define o texto e toda a sincronia. Letras sincronizadas também são apenas guias; seus horários são descartados. Refazer recria legendas e vídeo com essa política, aproveitando áudio e análise compatíveis. Revisões antigas baseadas em versos LRC são refeitas para não reintroduzir os horários externos.
@@ -115,24 +117,25 @@ O Whisper mantém as palavras e os tempos reconhecidos, com a grafia conferida q
 
 Após atualizar o servidor, use **Refazer** no resultado anterior para recriar legenda e vídeo, reaproveitando a análise compatível do Whisper. Refazer cria um novo trabalho; confirme novamente a revisão, se estiver habilitada. A migração para 11.0 invalida legendas, vídeo e revisões antigas baseadas em versos externos. Mudanças posteriores apenas no visual preservam a revisão acústica. Um MP4 já concluído continua contendo a legenda antiga até ser reprocessado.
 
-## 5. Gerar SRT original e tradução opcional
+## 5. Legendar vídeo com Whisper e SRT
 
-Este modo cria arquivos de legenda e preserva o áudio completo, incluindo as vozes. Se a entrada não tiver vídeo, cria também um MP4 legendado com fundo simples. Se a entrada já contiver vídeo, continua entregando somente os SRTs. A identificação usa os fluxos da mídia, não só a extensão; capa incorporada em áudio não conta como vídeo.
+Este modo legenda a fala, preservando o áudio completo. Sempre cria um MP4 com legendas embutidas e salva os SRTs separadamente. Vídeos usam sua imagem original; entradas de áudio usam o fundo padrão do servidor. Capa incorporada em áudio não conta como vídeo. Não há animação de karaokê, separação de vocais nem abertura de título.
 
-1. Escolha **Gerar SRT**.
-2. Envie áudio/vídeo, cole um link autorizado, busque no YouTube e selecione a miniatura, ou escolha um original da Biblioteca.
-3. Em **Segundo SRT traduzido**, o padrão é **Português (Brasil)**, com detecção automática do idioma de origem pelo LibreTranslate. Também é possível selecionar português, inglês, espanhol ou **Não traduzir**.
-4. Configure modelo Whisper, leitura da fala e VAD. Para fala, o filtro pode ajudar a ignorar silêncio; para canto, avalie desligá-lo.
+1. Escolha **Legendar vídeo**.
+2. Envie áudio/vídeo, cole um link, busque no YouTube ou escolha um original da Biblioteca.
+3. Em **Segundo SRT traduzido**, o padrão é **Português (Brasil)**, com detecção automática pelo LibreTranslate. Também é possível selecionar outro destino ou **Não traduzir**.
+4. Configure modelo Whisper, leitura da fala e VAD. O filtro de fala mantém os tempos no áudio completo.
 5. Habilite a revisão se quiser corrigir o original antes da tradução.
-6. Decida se a mídia de entrada deve ser salva na Biblioteca.
-7. Toque em **Gerar arquivos SRT**.
-8. Baixe o **SRT original** e o **SRT traduzido**, quando disponível. Para entrada somente de áudio, assista à prévia e baixe também o **MP4**.
+6. Decida se a mídia de entrada deve ser salva na Biblioteca e toque em **Legendar vídeo**.
+7. Assista ao vídeo e baixe o MP4, o SRT original e, quando disponível, o traduzido.
 
-O vídeo automático usa resolução 1280×720, fundo escuro e legendas visíveis na tela. Ele utiliza a tradução concluída, ou o SRT original se não houver tradução. Não adiciona abertura de capa nem desloca os tempos. O MP4 e cada SRT ficam salvos separadamente na Biblioteca e recebem tentativas individuais de envio ao Telegram. Não é necessário escolher um fundo ou marcar uma opção extra.
+Em **Ajustes → Legendar vídeo · padrão do servidor**, o administrador configura cor, tamanho e posição do texto, cor e opacidade do fundo da legenda, e cor/imagem/vídeo de fundo para entradas de áudio. Imagens e vídeos vêm da Biblioteca do administrador. Um vídeo de origem sempre tem prioridade sobre esse fundo. Áudios geram vídeos em 1280×720; vídeos mantêm suas dimensões e proporções, com ajuste mínimo de dimensões ímpares para codificação. Cada novo item guarda uma cópia das configurações e do fundo, sem mudar itens que já estão na fila.
 
-O servidor transcreve o áudio completo diretamente da mídia original, sem recompressão intermediária para MP3, no idioma detectado. O SRT respeita os tempos das falas, priorizando os timestamps por palavra do Whisper. Pausas de pelo menos 600 ms separam blocos: a legenda não é antecipada para preencher silêncio inicial, intervalos ou o fim da mídia. A tradução preserva esses mesmos tempos.
+**Legenda embutida no vídeo** usa a tradução quando disponível por padrão. O administrador pode escolher **Sempre no idioma original**; o SRT traduzido continua disponível para download. Se a tradução falhar ou não for solicitada, o vídeo usa o SRT original. A legenda respeita os tempos das falas e não preenche silêncios. A tradução preserva esses tempos. O áudio é transcrito diretamente da mídia original, sem recompressão intermediária para MP3.
 
-A tradução depende exclusivamente do **LibreTranslate** configurado pelo administrador. O Karaokê envia os textos ao serviço e preserva os tempos das legendas; não carrega mais o modelo M2M100 para traduzir. O original e a tradução concluída continuam disponíveis no aplicativo e na Biblioteca. O Karaokê também tenta anexar ambos ao Telegram configurado, acompanhados dos links de download. Se o LibreTranslate estiver indisponível, o SRT original permanece salvo e sua entrega continua. Se a transcrição falhar antes de gerar qualquer legenda, não há SRT original para entregar.
+No Telegram, o resultado chega como **um vídeo compactado**, com links locais e externos disponíveis para **SRT original**, **vídeo completo** e **SRT traduzido** na própria mensagem. Os SRTs não são anexados separadamente. O MP4 completo e os SRTs permanecem na Biblioteca. A fila aguarda a entrega terminar; se não for possível anexar o vídeo, uma mensagem mantém os links dos arquivos já salvos.
+
+A tradução depende exclusivamente do **LibreTranslate** configurado pelo administrador. Se o serviço falhar, o SRT original permanece salvo e o vídeo legendado continua sendo criado com ele. Se a transcrição falhar antes de gerar qualquer legenda, não há SRT original para entregar.
 
 ### Configuração e atualizações do LibreTranslate
 
@@ -167,11 +170,13 @@ A revisão não é a pausa administrativa para reinício. Ao atualizar o servido
 
 1. Mantenha a aba **Criar** aberta para acompanhar o progresso principal.
 2. Toque em **Adicionar à fila**, ao lado de **Cancelar**.
-3. A tela abre o formulário inicial e um aviso compacto sobre a tarefa atual. Escolha Rápido, Detalhado ou Gerar SRT.
+3. A tela abre o formulário inicial e um aviso compacto sobre a tarefa atual. Escolha Rápido, Detalhado ou Legendar vídeo.
 4. Informe arquivo(s), link ou Biblioteca e configure o novo trabalho. **Voltar ao andamento** retorna à visualização da tarefa sem cancelar nada.
 5. Envie o formulário. A tela mostra **Adicionando à fila** enquanto o servidor recebe e confirma os itens. O acompanhamento e a contagem real da fila voltam somente após essa confirmação.
 
-Atualizações do processo atual não fecham o formulário nem interrompem o carregamento. Se a tarefa terminar durante a inclusão, o aviso muda e você pode continuar. Cada envio conserva suas opções. Se selecionar vários arquivos no mesmo formulário, todos usam o modo e os ajustes daquele envio; para misturar configurações, faça envios separados. Se um arquivo falhar, os já aceitos permanecem na fila e apenas os pendentes continuam selecionados para tentar novamente. O erro aparece junto ao formulário. A contagem de itens aguardando acompanha o estado atual da fila, sem uma mensagem fixa de sucesso acima do processo.
+Atualizações do processo atual não fecham o formulário nem interrompem o carregamento. Se a tarefa terminar durante a inclusão, o aviso muda e você pode continuar. Cada envio conserva suas opções. Se selecionar vários arquivos no mesmo formulário, todos usam o modo e os ajustes daquele envio; a letra-guia é vinculada somente ao arquivo indicado no editor, e os demais buscam suas próprias guias; para misturar configurações, faça envios separados. Se um arquivo falhar, os já aceitos permanecem na fila e apenas os pendentes continuam selecionados para tentar novamente. O erro aparece junto ao formulário. A contagem de itens aguardando acompanha o estado atual da fila, sem uma mensagem fixa de sucesso acima do processo.
+
+Você pode baixar vídeos de fundo pela Biblioteca durante um processamento. O download usa temporários e acompanhamento próprios, sem alterar cache, letra ou áudio da tarefa em andamento. Recarregar a Biblioteca conserva a mídia escolhida no formulário.
 
 ### Permissões e limites
 
@@ -222,7 +227,7 @@ No PC, os resultados são apresentados em uma grade compacta; no celular, os car
 
 Toque no título de um item para expandir o nome completo. A visualização inclui controles de avanço/retrocesso de dez segundos quando a mídia permite. SRT é entregue como arquivo de texto, não como vídeo.
 
-Os resultados de vídeo têm miniatura independente, com frame escurecido e título; SRTs têm um cartão de título. As miniaturas são geradas localmente sob demanda e armazenadas em `/data/cache/thumbnails`. Novos vídeos incluem uma abertura silenciosa de três segundos com a capa, antes do conteúdo. Áudio, imagem e legenda do conteúdo começam juntos depois dela: a abertura não encobre falas nem muda sua sincronização. Vídeos já salvos recebem miniaturas na Biblioteca, mas não são reeditados automaticamente. O modo Gerar SRT não ganha abertura nem deslocamento de tempos.
+Os resultados de vídeo têm miniatura independente, com frame escurecido e título; SRTs têm um cartão de título. As miniaturas são geradas localmente sob demanda e armazenadas em `/data/cache/thumbnails`. Novos vídeos incluem uma abertura silenciosa de três segundos com a capa, antes do conteúdo. Áudio, imagem e legenda do conteúdo começam juntos depois dela: a abertura não encobre falas nem muda sua sincronização. Vídeos já salvos recebem miniaturas na Biblioteca, mas não são reeditados automaticamente. O modo Legendar vídeo não ganha abertura nem deslocamento de tempos.
 
 O administrador acessa resultados de todos os perfis, identificados pelo proprietário, mesmo quando os nomes são iguais. Download, visualização, renomeação e exclusão dos resultados usam esse proprietário para evitar selecionar o arquivo de outra conta por engano. Contas comuns permanecem limitadas à própria Biblioteca.
 
@@ -247,7 +252,7 @@ Cada conta pode ter uma configuração própria. O bot administrativo também po
 
 - início e etapas intermediárias;
 - resultado da busca de letra-guia quando aplicável;
-- MP4 e/ou SRT, por tentativa de anexo; no SRT de áudio, vídeo e legendas são enviados separadamente;
+- MP4 por tentativa de anexo; no modo SRT, somente vídeo compactado com os links dos SRTs e do vídeo completo;
 - tempo total de processamento acumulado pelo trabalho;
 - links local e externo disponíveis.
 
@@ -362,7 +367,7 @@ As funções de pesquisa, importação por link e publicação no canal continua
 
 A publicação começa marcada nos modos Rápido e Detalhado quando há canal e playlist válida no perfil. Desmarcar a opção naquela tarefa impede o envio. A privacidade padrão é **Não listado**: quem tiver o link poderá assistir; isso não equivale a privado nem dispensa direitos autorais. O servidor começa o envio como privado, aplica capa e playlist e então solicita a privacidade escolhida. O Google pode manter restrições em projetos sem auditoria.
 
-Resultados do modo **Gerar SRT**, incluindo seus MP4, nunca são publicados no YouTube: o bloqueio vale para envio automático, manual e retomadas. Permanecem disponíveis para download, Biblioteca, prévia e Telegram configurado. Vídeos antigos sem origem confirmada também ficam bloqueados na publicação.
+Resultados do modo **Legendar vídeo**, incluindo seus MP4, nunca são publicados no YouTube: o bloqueio vale para envio automático, manual e retomadas. Permanecem disponíveis para download, Biblioteca, prévia e Telegram configurado. Vídeos antigos sem origem confirmada também ficam bloqueados na publicação.
 
 O uso pessoal, a ausência de divulgação, a gratuidade e o acesso por VPN não criam autorização para baixar, transformar ou publicar conteúdo protegido. Regras do serviço e direitos autorais são condições independentes. As funções foram preservadas; este texto não certifica que toda forma de uso esteja autorizada.
 

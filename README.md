@@ -29,9 +29,11 @@ Dentro da aplicação, o botão **Manual** abre tutoriais curtos, organizados em
 | --- | --- | --- | --- |
 | Rápido | Criar karaokê com o perfil preparado pelo administrador | Música e fundo opcional | MP4 com instrumental e legenda, conforme o perfil global |
 | Detalhado | Controlar reconhecimento, versos, visual e revisão | Fonte, perfil, modelo Whisper, letra-guia, fundo e ajustes avançados | MP4 de karaokê; a opção de somente remover vocais gera vídeo instrumental sem legenda |
-| Gerar SRT | Legendar áudio ou vídeo preservando a fala | Fonte, modelo, leitura da fala, VAD, revisão e idioma da tradução opcional | SRT original, tradução opcional e MP4 legendado automático para entradas somente de áudio |
+| Legendar vídeo (SRT) | Legendar a fala de áudio ou vídeo com Whisper | Fonte, modelo, leitura da fala, VAD, revisão e idioma da tradução opcional | MP4 com legenda embutida, SRT original e tradução opcional |
 
-**Gerar SRT** usa diretamente o áudio da mídia original e preserva a faixa completa, sem Demucs. Quando a entrada contém somente áudio, também cria um MP4 com fundo simples e as legendas na tela, usando a tradução quando ela for gerada ou o SRT original. A detecção verifica os fluxos da mídia: uma capa incorporada em MP3 não conta como vídeo. Entradas que já contêm vídeo continuam gerando os arquivos SRT. A tradução depende exclusivamente de uma instância LibreTranslate configurada pelo administrador, com padrão de detecção automática → português do Brasil (`pt-BR`). O SRT original é salvo antes da tradução. O Karaokê continua entregando os arquivos gerados pela interface, Biblioteca e Telegram configurado, com os links de download. Se o LibreTranslate falhar, o original continua disponível e sua entrega ao Telegram ainda é tentada. Não há limite fixo de duração imposto pelo modo, mas os recursos do servidor limitam a operação.
+**Legendar vídeo** transcreve a fala usando o áudio original completo, sem Demucs nem animação de karaokê. Sempre gera um MP4: entradas de vídeo mantêm a imagem original; áudio e capas incorporadas usam um fundo padrão. Em **Ajustes → Legendar vídeo · padrão do servidor**, o administrador escolhe cor, fundo e posição da legenda, fundo para áudio e qual SRT embutir. A tradução é usada por padrão quando disponível; pode-se escolher sempre o idioma original. As configurações e o fundo ficam copiados em cada novo item da fila.
+
+A tradução depende do LibreTranslate configurado pelo administrador, com padrão de detecção automática → português do Brasil (`pt-BR`). O SRT original é salvo primeiro; se a tradução falhar, o vídeo ainda é criado com a legenda original. MP4 e SRTs ficam disponíveis na interface e Biblioteca. No Telegram chega somente o vídeo compactado, com links locais e externos disponíveis para o vídeo completo, SRT original e SRT traduzido na mesma mensagem. Os SRTs não são enviados como anexos separados. Não há limite fixo de duração imposto pelo modo; os recursos do servidor limitam a operação.
 
 ### Configurar e manter a tradução
 
@@ -111,7 +113,7 @@ Novos vídeos incluem uma capa em uma abertura silenciosa adicional de três seg
 
 Refazer um karaokê pelo cache reaproveita apenas insumos compatíveis, não a renderização ou os checkpoints da tarefa anterior. A retomada de uma tarefa pausada continua preservando suas etapas concluídas.
 
-Cada conta pode configurar seu bot e destinatário. As mensagens intermediárias informam as etapas e a situação da letra-guia. A conclusão informa o tempo de processamento e os links local/externo disponíveis, além de tentar anexar o vídeo e/ou os arquivos SRT. No modo SRT com entrada somente de áudio, o MP4 e cada SRT são enviados separadamente.
+Cada conta pode configurar seu bot e destinatário. As mensagens intermediárias informam as etapas e a situação da letra-guia. A conclusão informa o tempo de processamento e os links local/externo disponíveis. Na legendagem SRT, somente o vídeo compactado é anexado, com os links do vídeo completo e dos SRTs na mesma mensagem.
 
 Quando o vídeo excede o limite adotado pelo envio, o servidor tenta criar uma prévia compactada apenas para o Telegram. O original salvo permanece intacto. Falhas de rede, limites da API e erros de compressão podem impedir o anexo; o envio direto não é garantido para toda mídia.
 
@@ -125,14 +127,14 @@ Em **Playlist de cada usuário**, a administração define uma playlist válida 
 
 ## Início rápido com Docker
 
-A versão de distribuição desta documentação é **11.0**. O título e o rodapé da página mostram apenas o nome da aplicação. A versão do servidor pode ser consultada no Manual; a versão do APK aparece nas configurações nativas.
+A versão de distribuição desta documentação é **11.1**. O título e o rodapé da página mostram apenas o nome da aplicação. A versão do servidor pode ser consultada no Manual; a versão do APK aparece nas configurações nativas.
 
 Crie um arquivo `compose.yaml`:
 
 ```yaml
 services:
   karaoke-app:
-    image: ghcr.io/sal0-apps/sal0-karaoke:11.0
+    image: ghcr.io/sal0-apps/sal0-karaoke:11.1
     container_name: karaoke-app
     ports:
       - "7885:7860"
@@ -175,7 +177,7 @@ As funções de pesquisa, importação por link e publicação no canal continua
 
 A publicação começa marcada nos modos Rápido e Detalhado quando há canal e playlist válida no perfil. Desmarcar a opção naquela tarefa impede o envio. A privacidade padrão é **Não listado**: quem tiver o link poderá assistir; isso não equivale a privado nem dispensa direitos autorais. O servidor começa o envio como privado, aplica capa e playlist e então solicita a privacidade escolhida. O Google pode manter restrições em projetos sem auditoria.
 
-Resultados do modo **Gerar SRT**, incluindo seus MP4, nunca são publicados no YouTube: o bloqueio vale para envio automático, manual e retomadas. Permanecem disponíveis para download, Biblioteca, prévia e Telegram configurado. Vídeos antigos sem origem confirmada também ficam bloqueados na publicação.
+Resultados do modo **Legendar vídeo**, incluindo seus MP4, nunca são publicados no YouTube: o bloqueio vale para envio automático, manual e retomadas. Permanecem disponíveis para download, Biblioteca, prévia e Telegram configurado. Vídeos antigos sem origem confirmada também ficam bloqueados na publicação.
 
 O uso pessoal, a ausência de divulgação, a gratuidade e o acesso por VPN não criam autorização para baixar, transformar ou publicar conteúdo protegido. Regras do serviço e direitos autorais são condições independentes. As funções foram preservadas; este texto não certifica que toda forma de uso esteja autorizada.
 

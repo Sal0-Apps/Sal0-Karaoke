@@ -14,10 +14,11 @@ AUDIO_PROCESSOR = (ROOT / "app" / "audio_processor.py").read_text(encoding="utf-
 
 
 class SubtitleTranslationModeTests(unittest.TestCase):
-    def test_srt_results_are_sent_as_telegram_documents_with_download_links(self):
-        self.assertIn("def send_telegram_document_flow", MAIN)
-        self.assertIn("/sendDocument", MAIN)
-        self.assertIn("send_documents_to_targets(", MAIN)
+    def test_srt_results_are_sent_as_one_video_with_download_links(self):
+        pipeline = MAIN[MAIN.index("def run_subtitle_srt_pipeline("):MAIN.index("def run_pipeline(")]
+        self.assertIn("send_video_to_targets(", pipeline)
+        self.assertNotIn("send_documents_to_targets(", pipeline)
+        self.assertIn("subtitle_downloads=downloads", pipeline)
         self.assertIn("translated_public_token", MAIN)
         self.assertIn("/api/public/download/", MAIN)
 
@@ -34,7 +35,7 @@ class SubtitleTranslationModeTests(unittest.TestCase):
         self.assertIn('accept="audio/*,video/*', subtitle_form)
         self.assertNotIn('id="subtitleVisualMode"', subtitle_form)
         self.assertNotIn('id="subtitleTextPosition"', subtitle_form)
-        self.assertIn('Gerar arquivos SRT', subtitle_form)
+        self.assertIn('Legendar vídeo', subtitle_form)
 
     def test_subtitle_pipeline_preserves_srt_and_creates_video_for_audio(self):
         tree = ast.parse(MAIN)
@@ -47,12 +48,13 @@ class SubtitleTranslationModeTests(unittest.TestCase):
         self.assertNotIn("render_karaoke_video", source)
         self.assertNotIn("generate_ass_karaoke", source)
         self.assertIn("final_karaoke.mp4", source)
-        self.assertIn("if not media_has_motion_video(input_media_path)", source)
+        self.assertIn("render_subtitle_video(transcription_source", source)
+        self.assertNotIn("if not media_has_motion_video(input_media_path)", source)
         self.assertNotIn("extract_audio_mp3(input_media_path, normalized_mp3)", source)
         self.assertIn("transcription_source = input_media_path", source)
         self.assertIn("final_subtitles_original.srt", source)
         self.assertIn("final_subtitles_translated.srt", source)
-        self.assertIn('result_kind=result_kind', source)
+        self.assertIn('result_kind="subtitle_video"', source)
         self.assertIn("def extract_audio_mp3", AUDIO_PROCESSOR)
         self.assertIn('"-map", "0:a:0"', AUDIO_PROCESSOR)
         self.assertIn('"-codec:a", "libmp3lame"', AUDIO_PROCESSOR)
