@@ -72,6 +72,16 @@ class LyricGuideTests(unittest.TestCase):
         self.assertEqual(report['status'], 'verified')
         self.assertEqual(clocks(checked), clocks(voice))
 
+    def test_split_whisper_contractions_do_not_duplicate_whole_guide_words(self):
+        voice = acoustic("my words I 'll keep them down")
+        voice[0]['words'][3]['word'] = "'ll"
+        checked, report = verify_lyrics_guide("My words I'll keep them down", voice)
+        self.assertEqual(checked[0]['text'], "My words I'll keep them down")
+        self.assertEqual(checked[0]['words'][2]['word'].strip(), 'I')
+        self.assertEqual(checked[0]['words'][3]['word'], "'ll")
+        self.assertEqual(clocks(checked), clocks(voice))
+        self.assertEqual(report['checked_words'], 7)
+
     def test_unrelated_guide_keeps_whisper_text_and_reports_every_difference(self):
         voice = acoustic('fala outra coisa hoje')
         checked, report = verify_lyrics_guide('eu quero cantar com você nesta noite', voice)

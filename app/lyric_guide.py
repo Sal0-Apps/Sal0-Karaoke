@@ -61,6 +61,18 @@ def _gap_pairs(expected, recognized):
     return result[::-1]
 
 
+def _safe_spelling_pair(guide, recognized):
+    """Do not replace a timed word fragment with an entire contraction."""
+    source, target = normalize_word(guide), normalize_word(recognized)
+    if source == target:
+        return True
+    if any(mark in guide for mark in ("'", '’', '-')) and (source in target or target in source):
+        return False
+    if any(mark in recognized for mark in ("'", '’')) and target in {'s', 't', 'nt', 've', 'd', 'll', 're', 'm'}:
+        return False
+    return True
+
+
 def verify_lyrics_guide(lyrics, segments):
     """Check every recognized word; correct trusted spelling without moving time.
 
@@ -101,7 +113,8 @@ def verify_lyrics_guide(lyrics, segments):
                 source, target = a+oa, c+ta
                 similarity = difflib.SequenceMatcher(None, expected[source], recognized[target]).ratio()
                 context = sum(index in pairs for index in range(max(0, target-2), min(len(words), target+3)) if index != target)
-                if similarity >= .5 and context >= 2:
+                if (similarity >= .5 and context >= 2
+                        and _safe_spelling_pair(official[source], words[target].get('word', ''))):
                     pairs[target] = source
 
     # A guide often prints its chorus once. Check later occurrences too,
@@ -124,7 +137,7 @@ def verify_lyrics_guide(lyrics, segments):
             for offset, token in enumerate(tokens):
                 index = target+offset
                 similarity = difflib.SequenceMatcher(None, token, recognized[index]).ratio()
-                if similarity >= .5:
+                if similarity >= .5 and _safe_spelling_pair(official[start+offset], words[index].get('word', '')):
                     pairs.setdefault(index, start+offset)
 
     checks, corrected, similarities = [], 0, []
