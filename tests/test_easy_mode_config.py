@@ -118,7 +118,7 @@ class EasyModeConfigTests(unittest.TestCase):
         )
         config_assignments = {}
         constants = {}
-        for node in easy_block.body:
+        for node in ast.walk(easy_block):
             if isinstance(node, ast.Assign) and len(node.targets) == 1 and isinstance(node.targets[0], ast.Name):
                 if isinstance(node.value, ast.Constant):
                     constants[node.targets[0].id] = node.value.value

@@ -92,7 +92,7 @@ class DemucsFallbackAndQueueTests(unittest.TestCase):
         demucs_call = pipeline.index("separate_vocals(")
         self.assertLess(subtitle_branch, demucs_call)
         self.assertLess(subtitle_return, demucs_call)
-        self.assertIn("Modo Gerar SRT ativo: Demucs desativado", pipeline)
+        self.assertIn("Modo Legendar vídeo: transcrição da fala", pipeline)
 
     def test_queue_removal_wakes_worker_and_cleanup_is_non_blocking(self):
         self.assertIn('target=cleanup_queue_cache_in_background', MAIN)

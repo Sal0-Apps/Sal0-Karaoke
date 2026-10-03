@@ -948,6 +948,11 @@
             gap: 0.8rem;
         }
         .settings-grid.user-settings #telegramSection { grid-column: 1 / -1; }
+        #subtitleModeSettingsSection input[type="color"] { height:44px; min-height:44px; padding:5px; cursor:pointer; }
+        #subtitleModeSettingsSection input[type="color"]::-webkit-color-swatch-wrapper { padding:0; }
+        #subtitleModeSettingsSection input[type="color"]::-webkit-color-swatch { border:1px solid var(--glass-border); border-radius:6px; }
+        .subtitle-style-sample { display:flex; justify-content:center; align-items:center; min-height:110px; margin:.8rem 0; padding:1rem; border-radius:10px; overflow-wrap:anywhere; text-align:center; }
+        .subtitle-style-sample span { max-width:100%; padding:.2em .4em; border-radius:3px; }
 
         .progress-copy {
             display: grid;
@@ -1611,8 +1616,8 @@
                 <button type="button" id="btnCreatorAdvanced" class="creator-mode-btn" role="tab" aria-selected="false" title="Controle completo da transcrição, legenda e visual">
                     <span class="creator-mode-icon">🎛️</span><span class="creator-mode-title">Detalhado</span><span class="creator-mode-hint">Todas as opções</span>
                 </button>
-                <button type="button" id="btnCreatorSubtitle" class="creator-mode-btn" role="tab" aria-selected="false" title="Gera SRT e, para áudio, vídeo legendado">
-                    <span class="creator-mode-icon">▤</span><span class="creator-mode-title">Gerar SRT</span><span class="creator-mode-hint">Original + tradução opcional</span>
+                <button type="button" id="btnCreatorSubtitle" class="creator-mode-btn" role="tab" aria-selected="false" title="Transcreve a fala e cria vídeo legendado com arquivos SRT">
+                    <span class="creator-mode-icon">▤</span><span class="creator-mode-title">Legendar vídeo</span><span class="creator-mode-hint">Vídeo legendado + SRTs</span>
                 </button>
             </div>
 
@@ -1733,9 +1738,9 @@
                     <div class="easy-hero-head">
                         <div class="easy-hero-icon"><img src="/favicon.png" alt=""></div>
                         <div>
-                            <span class="easy-kicker">Gerar SRT</span>
-                            <span class="card-title">Transcreva a mídia inteira e baixe as legendas</span>
-                            <p class="easy-intro">Aceita áudio ou vídeo em formatos compatíveis com FFmpeg. Você recebe o SRT original e a tradução opcional. Se enviar apenas áudio, também recebe um vídeo MP4 com fundo simples, áudio original e legendas na tela.</p>
+                            <span class="easy-kicker">Legendar vídeo</span>
+                            <span class="card-title">Transforme a fala em um vídeo legendado</span>
+                            <p class="easy-intro">O Whisper transcreve a fala mantendo os tempos do áudio original. Você recebe o vídeo com legendas embutidas, o SRT original e a tradução opcional. Vídeos mantêm a imagem original; arquivos de áudio usam o fundo padrão definido pelo administrador.</p>
                         </div>
                     </div>
 
@@ -1745,7 +1750,7 @@
                             <label class="upload-area" id="subtitleUploadArea" for="subtitleVideoFile" style="min-height: 112px; display:flex; flex-direction:column; align-items:center; justify-content:center; cursor:pointer; border:2px dashed var(--glass-border-light); border-radius:14px; background:var(--input-bg);" data-drop-zone>
                                 <span class="line-glyph" style="font-size:1.5rem;">＋</span>
                                 <strong id="subtitleVideoFileText">Escolher um ou mais arquivos</strong>
-                                <span class="compact-note">Áudio ou vídeo compatível; o servidor usará MP3</span>
+                                <span class="compact-note">Áudio ou vídeo compatível; áudio original completo</span>
                                 <input type="file" id="subtitleVideoFile" accept="audio/*,video/*,.mkv,.avi,.mov,.webm,.m4v,.flac,.m4a,.aac,.ogg,.opus,.wav,.mp3" multiple style="display:none;">
                             </label>
                             <div style="display:flex; flex-direction:column; gap:0.65rem;">
@@ -1765,7 +1770,7 @@
                     <div class="card" style="margin: 0 0 1rem; box-shadow: none;">
                         <div class="card-header"><span class="card-title"><span class="line-glyph">2</span> Transcrição e tradução opcional</span></div>
                         <div class="form-grid">
-                            <div class="form-group"><span class="label">Segundo SRT traduzido · origem automática</span><select id="subtitleTranslationLanguage" class="select-input"><option value="pt-BR" selected>Português (Brasil)</option><option value="pt">Português</option><option value="en">Inglês</option><option value="es">Espanhol</option><option value="original">Não traduzir</option></select><p class="compact-note">Tradução pelo LibreTranslate configurado pelo administrador. O Karaokê entrega os SRTs no aplicativo e no Telegram; o original permanece disponível se a tradução falhar.</p></div>
+                            <div class="form-group"><span class="label">Segundo SRT traduzido · origem automática</span><select id="subtitleTranslationLanguage" class="select-input"><option value="pt-BR" selected>Português (Brasil)</option><option value="pt">Português</option><option value="en">Inglês</option><option value="es">Espanhol</option><option value="original">Não traduzir</option></select><p class="compact-note">A tradução usa o LibreTranslate configurado pelo administrador. No Telegram chega o vídeo compactado com os links do vídeo original e dos SRTs. Se a tradução falhar, o vídeo usa a legenda original.</p></div>
                             <div class="form-group"><span class="label">Modelo Whisper</span><select id="subtitleWhisperModel" class="select-input"><option value="large-v3-turbo">Large V3 Turbo</option><option value="large-v3">Large V3 (máxima)</option><option value="medium">Medium</option><option value="small">Small</option><option value="tiny">Tiny</option></select></div>
                             <div class="form-group"><span class="label">Leitura da fala</span><select id="subtitleTranscriptionPreset" class="select-input"><option value="difficult">Voz difícil</option><option value="karaoke">Equilibrada</option><option value="continuous">Fala contínua</option><option value="fast">Rápida</option></select></div>
                             <div class="form-group"><span class="label">Filtro de fala (VAD)</span><select id="subtitleEnableVad" class="select-input"><option value="true">Ligado (recomendado para fala)</option><option value="false">Desligado</option></select></div>
@@ -1774,7 +1779,8 @@
                         </div>
                         <p class="compact-note" style="margin-top:0.8rem;">O SRT original é salvo primeiro. A tradução é independente: se ela falhar, o arquivo original continua disponível para download.</p>
                     </div>
-                    <button type="submit" id="subtitleSubmitBtn" class="btn-primary easy-submit">▤ Gerar arquivos SRT</button>
+                    <p id="subtitleVisualSummary" class="compact-note" aria-live="polite">Legenda embutida: tradução quando disponível. Estilo e fundo definidos pelo administrador.</p>
+                    <button type="submit" id="subtitleSubmitBtn" class="btn-primary easy-submit">▤ Legendar vídeo</button>
                 </div>
             </form>
 
@@ -1870,10 +1876,11 @@
                     </div>
 
                     <!-- Letra opcional: sempre acessível, sem ocupar espaço quando fechada -->
+                    <div id="lyricsPanelHome"></div>
                     <div id="lyricsCard" class="lyrics-panel">
                         <div class="lyrics-panel-head">
                             <div class="lyrics-panel-title">
-                                <span>📝 Letra</span>
+                                <span>📝 Letra-guia desta mídia</span>
                                 <span id="lyricsSummary" class="lyrics-summary">Sem letra</span>
                             </div>
                             <button type="button" id="btnToggleLyrics" class="btn-secondary" aria-expanded="false" style="padding: 0.38rem 0.6rem; font-size: 0.72rem; white-space: nowrap;">Abrir ▾</button>
@@ -1891,6 +1898,7 @@
                                 <option value="acoustic">Whisper + conferência da letra-guia</option>
                             </select>
                             <p class="compact-note">Toda letra, inclusive LRC, serve apenas como guia. O Whisper reconhece as palavras e seus tempos; a conferência corrige grafias confiáveis e pode reanalisar diferenças. O áudio é completo, sem VAD.</p>
+                            <p id="lyricsSourceLabel" class="compact-note" aria-live="polite">Selecione a música para vincular uma letra.</p>
                             <p id="lyricsModeHint" style="font-size: 0.7rem; color: var(--text-muted); margin: 0.35rem 0 0.45rem;">A letra é uma guia. Texto manual sempre tem prioridade.</p>
                             <textarea id="lyricsText" name="lyrics_text" placeholder="Cole ou edite a letra aqui..." class="input-text" style="height: 72px; resize: vertical; background: var(--input-bg); border: 1px solid var(--glass-border);"></textarea>
                             <div id="lyricsBadge" style="display: none; margin-top: 0.35rem; background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.3); color: #34d399; padding: 0.3rem 0.55rem; border-radius: 7px; font-size: 0.7rem; font-weight: 600;"></div>
@@ -2323,6 +2331,25 @@
                 <p id="youtubeToolsMessage" class="compact-note" style="margin: 0.75rem 0 0;">Consultando o estado do mecanismo...</p>
             </div>
 
+            <div class="card" id="subtitleModeSettingsSection" style="display:none;">
+                <div class="card-header"><span class="card-title">Legendar vídeo · padrão do servidor</span></div>
+                <p class="compact-note">Estas opções valem para novos itens da fila. O vídeo original sempre é mantido como fundo; o fundo abaixo é usado somente para arquivos de áudio.</p>
+                <div class="easy-config-fields">
+                    <div class="form-group"><label class="label" for="srtTextColor">Cor da legenda</label><input id="srtTextColor" type="color" value="#ffffff" class="input-text"></div>
+                    <div class="form-group"><label class="label" for="srtBoxColor">Cor do fundo da legenda</label><input id="srtBoxColor" type="color" value="#000000" class="input-text"></div>
+                    <div class="form-group"><label class="label" for="srtBoxOpacity">Opacidade do fundo da legenda (%)</label><input id="srtBoxOpacity" type="number" min="0" max="100" value="65" class="input-text"></div>
+                    <div class="form-group"><label class="label" for="srtFontSize">Tamanho da legenda</label><input id="srtFontSize" type="number" min="12" max="72" value="24" class="input-text"></div>
+                    <div class="form-group"><label class="label" for="srtTextPosition">Posição</label><select id="srtTextPosition" class="select-input"><option value="bottom">Embaixo</option><option value="middle">Centro</option><option value="top">Em cima</option></select></div>
+                    <div class="form-group"><label class="label" for="srtVideoSubtitleSource">Legenda embutida no vídeo</label><select id="srtVideoSubtitleSource" class="select-input"><option value="translated">Traduzida quando disponível (padrão)</option><option value="original">Sempre no idioma original</option></select></div>
+                    <div class="form-group"><label class="label" for="srtBackgroundColor">Cor de fundo para arquivos de áudio</label><input id="srtBackgroundColor" type="color" value="#101827" class="input-text"></div>
+                    <div class="form-group"><label class="label" for="srtBackgroundFile">Imagem ou vídeo de fundo para áudio</label><select id="srtBackgroundFile" class="select-input"><option value="">Usar a cor de fundo</option></select><p class="compact-note">Escolha um fundo da sua Biblioteca. Ele será copiado para cada tarefa.</p></div>
+                </div>
+                <p class="compact-note">Prévia das cores da legenda</p>
+                <div id="subtitleStyleSample" class="subtitle-style-sample"><span>Exemplo de legenda</span></div>
+                <button type="button" class="btn-primary" id="btnSaveSubtitleMode">Salvar padrão de legendagem</button>
+                <p id="subtitleSettingsMessage" class="compact-note" aria-live="polite"></p>
+            </div>
+
             <div class="card" id="translationToolsSection" style="display: none;">
                 <div class="card-header"><span class="card-title">Tradução de SRT · LibreTranslate</span></div>
                 <p class="compact-note">A tradução depende do seu servidor LibreTranslate. O padrão é detecção automática → português do Brasil. Os resultados continuam na Biblioteca, nos downloads do Karaokê e no Telegram configurado.</p>
@@ -2540,6 +2567,7 @@
                             </div>
                             <div id="libBgYoutubeTitleBadge" class="youtube-identification" aria-live="polite"><span>🎞️</span><span id="libBgYoutubeTitleText"></span></div>
                             <div id="bgYtProgressBox" class="library-import-progress"><span id="bgYtStatusTitle">Preparando...</span> · <strong id="bgYtStatusPercent">0%</strong></div>
+                            <p id="bgYtSelectedBadge" class="compact-note" style="display:none;" aria-live="polite"><span id="bgYtSelectedText"></span></p>
                         </form>
                     </div>
                 </div>
@@ -2612,21 +2640,21 @@
                 </ol>
             </details>
             <details>
-                <summary>3. Gerar legendas SRT e vídeo para áudio</summary>
+                <summary>3. Legendar vídeos com Whisper</summary>
                 <ol>
-                    <li>Escolha <strong>Gerar SRT</strong> e envie áudio/vídeo, cole um link, busque no YouTube ou escolha um original da Biblioteca.</li>
+                    <li>Escolha <strong>Legendar vídeo</strong> e envie áudio/vídeo, cole um link, busque no YouTube ou escolha um original da Biblioteca.</li>
                     <li>Como administrador, configure <strong>Ajustes → Tradução de SRT · LibreTranslate</strong>: salve o endereço e a chave opcional, depois toque em <strong>Testar e atualizar idiomas</strong>.</li>
                     <li>Em <strong>Segundo SRT traduzido</strong>, o padrão é <strong>detecção automática → Português (Brasil)</strong>. A tradução depende desse LibreTranslate. Você também pode escolher outro destino ou <strong>Não traduzir</strong>.</li>
-                    <li>Ajuste modelo, leitura da fala, VAD e revisão se necessário. Toque em <strong>Gerar arquivos SRT</strong>.</li>
-                    <li>Baixe o <strong>SRT original</strong> e, se gerado, o <strong>SRT traduzido</strong> no Karaokê. Ambos também são enviados por tentativa de anexo ao Telegram configurado, com os links de download. Se a tradução falhar, a entrega do original continua.</li>
+                    <li>Ajuste modelo, leitura da fala, VAD e revisão se necessário. Toque em <strong>Legendar vídeo</strong>.</li>
+                    <li>Assista ou baixe o <strong>vídeo legendado</strong>, o <strong>SRT original</strong> e a tradução disponível. No Telegram chega somente o vídeo compactado, com links locais e externos para os três arquivos na própria mensagem.</li>
                 </ol>
-                <p>Este modo usa o áudio completo normalizado para MP3, sem Demucs. Entradas de áudio também geram MP4 com fundo simples e legendas na tela; o vídeo e os arquivos SRT são enviados ao Telegram configurado. Entradas com vídeo continuam gerando apenas os arquivos SRT. As legendas respeitam os tempos das falas e não preenchem silêncios. O SRT traduzido mantém os mesmos tempos. Não há abertura de capa neste modo nem limite fixo de duração; disco, memória e servidor continuam sendo limites.</p>
+                <p>Este modo usa o áudio original completo e o Whisper para reconhecer a fala. Sempre cria MP4 com legendas embutidas: vídeos mantêm sua imagem; áudios usam o fundo padrão. Em <strong>Ajustes → Legendar vídeo · padrão do servidor</strong>, o administrador configura estilo e fundo e escolhe a legenda embutida. O padrão usa a tradução disponível; sem tradução, usa o original. Os SRTs mantêm os tempos das falas, sem preencher silêncios.</p>
             </details>
             <details>
                 <summary>4. Adicionar e organizar a fila</summary>
                 <ol>
                     <li>Toque em <strong>Adicionar novo processo</strong> para abrir os três modos e preparar o próximo trabalho com suas próprias opções.</li>
-                    <li>Use arquivos, links ou Biblioteca. Vários arquivos selecionados juntos usam os ajustes do mesmo envio.</li>
+                    <li>Use arquivos, links ou Biblioteca. Vários arquivos usam os ajustes do envio; cada guia pertence somente à mídia indicada no editor. Salvar ou limpar não altera os itens já na fila. Você também pode baixar fundos enquanto outro item processa.</li>
                     <li>O administrador usa <strong>↑ / ↓</strong> para ordenar qualquer item aguardando. Cada perfil pode usar <strong>Remover</strong> nos próprios itens.</li>
                     <li><strong>Cancelar Processamento</strong> encerra o atual. O próximo elegível começa quando a fila está ativa.</li>
                 </ol>
@@ -2661,7 +2689,7 @@
                     <li>Em <strong>Ajustes → Telegram → Editar</strong>, informe o token do bot e o Chat ID do destino. Salve. Em grupos, permita o envio de mensagens e arquivos.</li>
                     <li>Confira as notificações de etapas e o aviso sobre a letra-guia. O resultado inclui o tempo de processamento e os links disponíveis.</li>
                 </ol>
-                <p>O servidor tenta anexar o MP4 ou os SRTs. Para vídeos grandes, tenta gerar uma prévia compactada só para o Telegram; o original permanece na Biblioteca. A fila aguarda a tentativa de entrega terminar. Limites e falhas do Telegram podem impedir o anexo; nesse caso, use os links disponíveis. Proteja tokens e links.</p>
+                <p>O servidor envia o MP4. Na legendagem SRT, envia somente uma cópia compactada, com os links dos SRTs e do vídeo completo na própria mensagem. No karaokê, compacta quando necessário; o original permanece na Biblioteca. A fila aguarda a tentativa de entrega terminar. Limites e falhas do Telegram podem impedir o anexo; nesse caso, use os links disponíveis. Proteja tokens e links.</p>
             </details>
             <details>
                 <summary>8. Configurar o aplicativo Android</summary>
@@ -2696,7 +2724,7 @@
                 </ol>
                 <p>A API tem cota gratuita e pode limitar projetos sem auditoria a vídeos privados. Guarde a autorização como uma senha. Backing vocals e vídeo do modo SRT mostram porcentagem da etapa e avisam o avanço no Telegram; o LibreTranslate informa apenas início e término.</p>
             </details>
-            <p class="compact-note">Versão do servidor: 11.0. A transcrição é local; fontes, modelos e integrações podem acessar serviços externos. Use conteúdo autorizado.</p>
+            <p class="compact-note">Versão do servidor: 11.1. A transcrição é local; fontes, modelos e integrações podem acessar serviços externos. Use conteúdo autorizado.</p>
             <p class="compact-note">Use o servidor pela rede local ou VPN. A busca/importação do YouTube não concede direitos sobre a mídia. OAuth autoriza o acesso ao canal, não o uso de músicas. Confira as permissões do conteúdo e os termos do YouTube antes de importar ou publicar. Não listado permite acesso a quem tiver o link; resultados SRT nunca vão ao YouTube.</p>
             <p class="compact-note"><a href="https://www.youtube.com/static?template=terms" target="_blank" rel="noopener noreferrer">Termos do YouTube</a> · <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer">Privacidade do Google</a> · <a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener noreferrer">Revogar acesso ao canal</a></p>
         </div>
@@ -2739,6 +2767,7 @@
         let easyAudioMode = 'youtube';
         let easyRandomBackgroundSelection = new Set();
         let latestLibraryPhotos = [];
+        let latestSubtitleBackgrounds = [];
         let clientPreparationInProgress = false;
         let creationUiLocked = false;
         let lastKnownServerStatus = 'unknown';
@@ -2761,7 +2790,7 @@
         function applyRoleUI() {
             const admin = currentUser?.role === 'admin';
             document.querySelector('.settings-grid')?.classList.toggle('user-settings', !admin);
-            ['youtubePublisherSection', 'modelManagerSection', 'youtubeToolsSection', 'translationToolsSection', 'easyModeSettingsSection', 'externalUrlSection', 'userManagementSection', 'logsSection'].forEach(id => {
+            ['youtubePublisherSection', 'modelManagerSection', 'youtubeToolsSection', 'translationToolsSection', 'subtitleModeSettingsSection', 'easyModeSettingsSection', 'externalUrlSection', 'userManagementSection', 'logsSection'].forEach(id => {
                 const element = document.getElementById(id);
                 if (element) element.style.display = admin ? '' : 'none';
             });
@@ -2806,6 +2835,10 @@
             easyButton?.setAttribute('aria-selected', String(mode === 'easy'));
             advancedButton?.setAttribute('aria-selected', String(mode === 'advanced'));
             subtitleButton?.setAttribute('aria-selected', String(mode === 'subtitle'));
+            const panel = document.getElementById('lyricsCard');
+            if (mode === 'easy') document.querySelector('.quick-create-action')?.before(panel);
+            else document.getElementById('lyricsPanelHome')?.after(panel);
+            window.onLyricSourceChange?.();
         }
 
         document.querySelectorAll('[role="tablist"]').forEach(tablist => {
@@ -2869,14 +2902,15 @@
         }
 
         function resetCreationButtons() {
-            for (const [id, text] of [['easySubmitBtn', '⚡ Criar meu karaokê'], ['btnSubmit', '🎬 Criar Karaokê'], ['subtitleSubmitBtn', '▤ Gerar arquivos SRT']]) {
+            for (const [id, text] of [['easySubmitBtn', '⚡ Criar meu karaokê'], ['btnSubmit', '🎬 Criar Karaokê'], ['subtitleSubmitBtn', '▤ Legendar vídeo']]) {
                 const button = document.getElementById(id);
                 if (button) { button.disabled = false; button.textContent = text; }
             }
         }
 
         function resetCreationSources() {
-            const inputs = ['easyAudioFile', 'audioFile', 'subtitleVideoFile', 'easyYoutubeUrl', 'youtubeUrl', 'subtitleYoutubeUrl', 'easyLibraryAudio', 'libraryAudioSelect', 'libraryAudioHidden', 'subtitleLibraryVideo', 'easyYoutubeTitle', 'fullYoutubeTitle', 'lyricsText']
+            window.rememberLyricDraft?.();
+            const inputs = ['easyAudioFile', 'audioFile', 'subtitleVideoFile', 'easyYoutubeUrl', 'youtubeUrl', 'subtitleYoutubeUrl', 'easyLibraryAudio', 'libraryAudioSelect', 'libraryAudioHidden', 'subtitleLibraryVideo', 'easyYoutubeTitle', 'fullYoutubeTitle']
                 .map(id => document.getElementById(id)).filter(Boolean);
             for (const input of inputs) {
                 input.value = '';
@@ -2953,7 +2987,15 @@
                 [['transcribing', 'whisper'], 'Transcrevendo áudio com Whisper'],
                 [['translating', 'traduz'], 'Traduzindo o SRT'],
                 [['generating original srt'], 'Gerando o SRT original'],
-                [['generating subtitles', 'subtitles'], 'Gerando legenda do karaokê'],
+                [['using cached transcription'], 'Retomando transcrição do Whisper'],
+                [['using reviewed transcription checkpoint'], 'Retomando a revisão'],
+                [['using original srt checkpoint'], 'Restaurando o SRT original'],
+                [['using translation checkpoint'], 'Restaurando o SRT traduzido'],
+                [['rendering subtitle video'], 'Embutindo legendas no vídeo'],
+                [['compressing subtitle video'], 'Compactando vídeo para o Telegram'],
+                [['sending subtitle video'], 'Enviando vídeo legendado ao Telegram'],
+                [['reviewing speech subtitles'], 'Revisando a transcrição da fala'],
+                [['generating subtitles'], 'Gerando legenda do karaokê'],
                 [['rendering'], 'Gerando o vídeo final'],
                 [['sending result to telegram', 'sending subtitles to telegram'], 'Enviando resultado ao Telegram'],
                 [['cleaning'], 'Finalizando o processo'],
@@ -3023,9 +3065,10 @@
             });
             easyRandomBackgroundSelection = new Set(config.random_backgrounds || []);
             renderEasyRandomBackgroundChoices(latestLibraryPhotos);
+            renderSubtitleBackgroundOptions();
             updateEasyModeRandomBackgroundSection();
             refreshEasySummary(config);
-            applySubtitleModeDefaults(config);
+            // Speech captioning keeps its own defaults.
             const defaultBackground = document.getElementById('easyDefaultBackgroundOption');
             if (defaultBackground) {
                 const labels = {
@@ -3038,19 +3081,49 @@
             }
         }
 
-        function applySubtitleModeDefaults(config) {
-            const values = {
-                subtitleWhisperModel: config.whisper_model || 'large-v3-turbo',
-                subtitleTranscriptionPreset: config.transcription_preset || 'difficult',
-                subtitleEnableCorrection: Boolean(config.enable_correction),
-                subtitleSaveLibrary: Boolean(config.save_to_library),
-            };
-            Object.entries(values).forEach(([id, value]) => {
-                const element = document.getElementById(id);
-                if (element) element.value = String(value);
-            });
-            const vad = document.getElementById('subtitleEnableVad');
-            if (vad) vad.value = 'true';
+        let subtitleModeConfig = {};
+        const subtitleSettingFields = {
+            text_color: 'srtTextColor', box_color: 'srtBoxColor', box_opacity: 'srtBoxOpacity',
+            font_size: 'srtFontSize', text_position: 'srtTextPosition', video_subtitle_source: 'srtVideoSubtitleSource',
+            background_color: 'srtBackgroundColor', background_file: 'srtBackgroundFile',
+        };
+        function renderSubtitleBackgroundOptions() {
+            const select = document.getElementById('srtBackgroundFile');
+            if (!select) return;
+            const selected = select.value || subtitleModeConfig.background_file || '';
+            select.replaceChildren(new Option('Usar a cor de fundo', ''));
+            for (const entry of latestSubtitleBackgrounds || []) {
+                const filename = typeof entry === 'string' ? entry : (entry.filename || entry.name);
+                const owner = typeof entry === 'string' ? '' : entry.owner;
+                if (!filename || (owner && owner !== currentUser?.username)) continue;
+                select.add(new Option(filename, filename));
+            }
+            select.value = selected;
+        }
+        function updateSubtitleStyleSample() {
+            const sample = document.getElementById('subtitleStyleSample');
+            const text = sample.querySelector('span');
+            const color = document.getElementById('srtBoxColor').value;
+            const rgb = [1,3,5].map(offset => parseInt(color.slice(offset,offset+2),16));
+            const opacity = Math.max(0,Math.min(100,Number(document.getElementById('srtBoxOpacity').value)||0));
+            sample.style.backgroundColor = document.getElementById('srtBackgroundColor').value;
+            text.style.color = document.getElementById('srtTextColor').value;
+            text.style.backgroundColor = `rgba(${rgb.join(',')},${opacity/100})`;
+            text.style.fontSize = `${Math.max(12,Math.min(72,Number(document.getElementById('srtFontSize').value)||24))}px`;
+        }
+        function applySubtitleSettings(config) {
+            subtitleModeConfig = config;
+            renderSubtitleBackgroundOptions();
+            for (const [key, id] of Object.entries(subtitleSettingFields)) {
+                if (config[key] !== undefined) document.getElementById(id).value = String(config[key]);
+            }
+            updateSubtitleStyleSample();
+            const source = config.video_subtitle_source === 'original' ? 'idioma original' : 'tradução quando disponível';
+            document.getElementById('subtitleVisualSummary').textContent = `Legenda embutida: ${source}. Estilo e fundo definidos pelo administrador.`;
+        }
+        async function fetchSubtitleModeConfig() {
+            const response = await authFetch('/api/subtitle-mode');
+            if (response.ok) applySubtitleSettings(await response.json());
         }
 
         async function fetchEasyModeConfig() {
@@ -3076,6 +3149,7 @@
                 box?.classList.toggle('is-active', item === mode);
                 if (box) box.hidden = item !== mode;
             });
+            window.onLyricSourceChange?.();
         }
 
         function updateQuickSelection() {
@@ -3306,9 +3380,11 @@
                 const error = await startResponse.json().catch(() => ({}));
                 throw new Error(error.detail || 'Não foi possível iniciar o download do YouTube.');
             }
+            const started = await startResponse.json().catch(() => ({}));
+            const statusUrl = isBackground ? '/api/youtube-preset-status/bg' + (started.download_id ? `?download_id=${encodeURIComponent(started.download_id)}` : '') : '/api/youtube-preset-status/audio';
             for (let attempt = 0; attempt < 600; attempt += 1) {
                 await new Promise(resolve => setTimeout(resolve, 1000));
-                const statusResponse = await authFetch(isBackground ? '/api/youtube-preset-status/bg' : '/api/youtube-preset-status/audio');
+                const statusResponse = await authFetch(statusUrl);
                 if (!statusResponse.ok) continue;
                 const status = await statusResponse.json();
                 onStatus(status);
@@ -3946,6 +4022,7 @@
                 const formData = cloneFormData(baseFormData);
                 formData.delete('audio_file');
                 if (file) formData.set('audio_file', file, file.name);
+                if (formData.get('subtitle_only') !== 'true') window.attachLyricDraft?.(formData, file);
                 let result;
                 document.getElementById('creationLoadingDetail').textContent = submissions.length > 1
                     ? `Enviando arquivo ${index + 1} de ${submissions.length} e aguardando a confirmação do servidor…`
@@ -4273,8 +4350,11 @@
 
         function fillLibrarySelect(select, files, placeholder) {
             if (!select) return;
+            const selected = select.value;
             select.replaceChildren(new Option(placeholder, ''));
             (files || []).forEach(file => select.add(new Option(file, file)));
+            if ((files || []).includes(selected)) select.value = selected;
+            else if (selected) select.dispatchEvent(new Event('change', {bubbles:true}));
         }
 
         async function loadLibrary() {
@@ -4294,10 +4374,12 @@
                 ].includes((file.split('.').pop() || '').toLowerCase()));
                 fillLibrarySelect(document.getElementById('subtitleLibraryVideo'), subtitleMedia, 'Ou escolha na Biblioteca...');
                 latestLibraryPhotos = data.photos || [];
+                latestSubtitleBackgrounds = data.photos_items || data.photos || [];
                 easyRandomBackgroundSelection = new Set(
                     [...easyRandomBackgroundSelection].filter(filename => latestLibraryPhotos.includes(filename))
                 );
                 renderEasyRandomBackgroundChoices(latestLibraryPhotos);
+            renderSubtitleBackgroundOptions();
             } catch (e) {
                 console.error('Erro ao carregar biblioteca:', e);
             }
@@ -4503,6 +4585,26 @@
             });
 
             document.getElementById('btnUpdateYoutubeTools')?.addEventListener('click', updateYoutubeTools);
+
+            for (const id of Object.values(subtitleSettingFields)) document.getElementById(id)?.addEventListener('input', updateSubtitleStyleSample);
+            updateSubtitleStyleSample();
+            document.getElementById('btnSaveSubtitleMode')?.addEventListener('click', async () => {
+                const button = document.getElementById('btnSaveSubtitleMode');
+                const message = document.getElementById('subtitleSettingsMessage');
+                const payload = Object.fromEntries(Object.entries(subtitleSettingFields).map(([key, id]) => [key, document.getElementById(id).value]));
+                payload.font_size = Number(payload.font_size);
+                payload.box_opacity = Number(payload.box_opacity);
+                button.disabled = true;
+                message.textContent = 'Salvando…';
+                try {
+                    const response = await authFetch('/api/subtitle-mode', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)});
+                    const result = await response.json();
+                    if (!response.ok) throw new Error(result.detail || 'Não foi possível salvar.');
+                    applySubtitleSettings(result.config);
+                    message.textContent = 'Padrão salvo. Será usado nos próximos itens adicionados à fila.';
+                } catch (error) { message.textContent = error.message; }
+                finally { button.disabled = false; }
+            });
 
             document.getElementById('btnSaveEasyMode')?.addEventListener('click', async () => {
                 const button = document.getElementById('btnSaveEasyMode');
@@ -5065,50 +5167,21 @@
                     if (progressBar) progressBar.style.width = "10%";
 
                     try {
-                        const res = await authFetch('/api/download-bg-youtube-preset', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ youtube_url: url })
+                        const result = await importYoutubeToLibrary(url, 'background', current => {
+                            if (statusTitle) statusTitle.textContent = `Baixando fundo: ${current.title || 'YouTube'}`;
+                            if (statusPercent) statusPercent.textContent = `${current.progress || 0}%`;
+                            if (progressBar) progressBar.style.width = `${current.progress || 0}%`;
                         });
-
-                        if (!res.ok) throw new Error("Falha ao iniciar download de fundo.");
-
-                        if (bgYtPollInterval) clearInterval(bgYtPollInterval);
-                        bgYtPollInterval = setInterval(async () => {
-                            try {
-                                const stRes = await authFetch('/api/youtube-preset-status/bg');
-                                if (stRes.ok) {
-                                    const stData = await stRes.json();
-                                    if (stData.status === "downloading") {
-                                        if (statusTitle) statusTitle.innerText = `⏳ Baixando Fundo: "${stData.title || 'Vídeo'}"...`;
-                                        if (statusPercent) statusPercent.innerText = `${stData.progress || 50}%`;
-                                        if (progressBar) progressBar.style.width = `${stData.progress || 50}%`;
-                                    } else if (stData.status === "done") {
-                                        clearInterval(bgYtPollInterval);
-                                        if (progressBox) progressBox.style.display = "none";
-                                        btnDownloadBgYoutube.disabled = false;
-                                        btnDownloadBgYoutube.innerText = "📥 Baixar Fundo";
-
-                                        // Recarregar a biblioteca sem alterar o fundo da criação atual.
-                                        await loadLibrary();
-                                        if (selectedBadge) selectedBadge.style.display = "none";
-                                        if (selectedText) selectedText.innerText = `✓ Fundo guardado: "${stData.filename}"`;
-                                    } else if (stData.status === "error") {
-                                        clearInterval(bgYtPollInterval);
-                                        if (progressBox) progressBox.style.display = "none";
-                                        btnDownloadBgYoutube.disabled = false;
-                                        btnDownloadBgYoutube.innerText = "📥 Baixar Fundo";
-                                        alert("Erro no download de fundo do YouTube: " + (stData.error || "Desconhecido"));
-                                    }
-                                }
-                            } catch (errPoll) { console.error("Erro no polling de fundo YouTube:", errPoll); }
-                        }, 1500);
-
-                    } catch (e) {
-                        if (progressBox) progressBox.style.display = "none";
+                        await loadLibrary();
+                        if (selectedBadge) selectedBadge.style.display = 'block';
+                        if (selectedText) selectedText.textContent = `✓ Fundo guardado: "${result.filename}"`;
+                    } catch (error) {
+                        if (selectedBadge) selectedBadge.style.display = 'block';
+                        if (selectedText) selectedText.textContent = error.message;
+                    } finally {
+                        if (progressBox) progressBox.style.display = 'none';
                         btnDownloadBgYoutube.disabled = false;
-                        btnDownloadBgYoutube.innerText = "📥 Baixar Fundo";
-                        alert("Erro: " + e.message);
+                        btnDownloadBgYoutube.textContent = '📥 Baixar Fundo';
                     }
                 };
                 document.getElementById('libBgYoutubeForm')?.addEventListener('submit', event => {
@@ -5209,6 +5282,97 @@
             let autoLyricsController = null;
             let youtubeLyricsTimer = null;
             let noticeTimer = null;
+            const lyricDrafts = new Map();
+            let boundLyricSource = '';
+            let pendingLyricLoad = Promise.resolve();
+            const draftStorageKey = () => `sal0-lyric-drafts:${currentUser?.username || ''}`;
+            function restoreLyricDrafts() {
+                try { for (const [key, value] of JSON.parse(sessionStorage.getItem(draftStorageKey()) || '[]')) lyricDrafts.set(key, value); } catch (_) {}
+            }
+
+            function fileLyricKey(file) { return file ? `upload:${file.name}:${file.size}:${file.lastModified}` : ''; }
+            function youtubeLyricKey(value) {
+                if (!value?.trim()) return '';
+                try { const url = new URL(value.trim()); return 'youtube:' + (url.searchParams.get('v') || (url.hostname === 'youtu.be' ? url.pathname.slice(1) : url.pathname) || value.trim()); }
+                catch (_) { return 'youtube:' + value.trim(); }
+            }
+            function currentLyricSource() {
+                if (currentCreatorMode === 'subtitle') return '';
+                const quick = currentCreatorMode === 'easy';
+                const mode = quick ? easyAudioMode : (document.getElementById('btnAudioModeYoutube').classList.contains('active') ? 'youtube' : document.getElementById('btnAudioModeLibrary').classList.contains('active') ? 'library' : 'upload');
+                if (mode === 'youtube') return youtubeLyricKey(document.getElementById(quick ? 'easyYoutubeUrl' : 'youtubeUrl').value);
+                if (mode === 'library') {
+                    const filename = document.getElementById(quick ? 'easyLibraryAudio' : 'libraryAudioSelect').value;
+                    return filename ? `library:${filename}` : '';
+                }
+                return fileLyricKey(document.getElementById(quick ? 'easyAudioFile' : 'audioFile').files?.[0]);
+            }
+            function rememberLyricDraft() {
+                if (!boundLyricSource) return;
+                lyricDrafts.set(boundLyricSource, {lyrics_text: lyricsText.value, lyrics_mode: lyricsMode.value});
+                try { sessionStorage.setItem(draftStorageKey(), JSON.stringify([...lyricDrafts].slice(-100))); } catch (_) {}
+            }
+            window.rememberLyricDraft = rememberLyricDraft;
+            function syncLyricSource() {
+                const key = currentLyricSource();
+                if (key === boundLyricSource) return pendingLyricLoad;
+                rememberLyricDraft();
+                cancelAutomaticLyricsLookup();
+                if (youtubeLyricsTimer) clearTimeout(youtubeLyricsTimer);
+                lastAutoLyricsQuery = '';
+                boundLyricSource = key;
+                const generation = lyricsLookupGeneration;
+                const local = lyricDrafts.get(key);
+                lyricsText.value = local?.lyrics_text || '';
+                lyricsMode.value = local?.lyrics_mode || 'auto';
+                lyricsText.disabled = !key;
+                btnSaveLyrics.disabled = !key;
+                btnClearLyrics.disabled = !key;
+                const filename = key.startsWith('library:') ? key.slice(8) : key.startsWith('upload:') ? key.slice(7).split(':').slice(0,-2).join(':') : 'vídeo selecionado';
+                document.getElementById('lyricsSourceLabel').textContent = key ? `Guia de ${filename}. Cada item já enviado à fila mantém sua própria cópia. Em lotes, esta guia se aplica somente a este arquivo.` : 'Selecione a música para vincular uma letra.';
+                updateLyricsBadge(lyricsText.value);
+                lyricsSearchResults?.replaceChildren();
+                setLyricsSearchStatus('');
+                pendingLyricLoad = key && !local ? (async () => {
+                    try {
+                        const response = await authFetch('/api/lyrics?source_key=' + encodeURIComponent(key));
+                        const data = await response.json();
+                        if (!response.ok || generation !== lyricsLookupGeneration || key !== boundLyricSource) return;
+                        lyricsText.value = data.lyrics_text || '';
+                        lyricsMode.value = data.lyrics_mode || 'auto';
+                        updateLyricsBadge(lyricsText.value);
+                        rememberLyricDraft();
+                    } catch (_) {}
+                })() : Promise.resolve();
+                return pendingLyricLoad;
+            }
+            window.onLyricSourceChange = async () => {
+                await syncLyricSource();
+                if (!boundLyricSource || lyricsText.value.trim() || lyricsMode.value !== 'auto') return;
+                const quick = currentCreatorMode === 'easy';
+                const url = document.getElementById(quick ? 'easyYoutubeUrl' : 'youtubeUrl').value;
+                if (boundLyricSource.startsWith('youtube:')) scheduleYoutubeLyricsIdentification(url);
+                else autoLookupLyricsForSong(getSuggestedLyricsQuery());
+            };
+            window.attachLyricDraft = (formData, file) => {
+                rememberLyricDraft();
+                const key = file ? fileLyricKey(file) : formData.get('library_audio') ? `library:${formData.get('library_audio')}` : youtubeLyricKey(formData.get('youtube_url'));
+                const draft = lyricDrafts.get(key);
+                formData.set('lyrics_text', draft?.lyrics_text || '');
+                formData.set('lyrics_mode', draft?.lyrics_mode || 'auto');
+                formData.set('lyrics_selected', String(Boolean(draft && (draft.lyrics_text.trim() || draft.lyrics_mode === 'manual'))));
+                formData.set('lyrics_source_key', key);
+            };
+            for (const id of ['audioFile', 'libraryAudioSelect', 'youtubeUrl', 'easyAudioFile', 'easyLibraryAudio', 'easyYoutubeUrl']) {
+                const input = document.getElementById(id);
+                input?.addEventListener('change', () => window.onLyricSourceChange());
+                if (input?.type === 'url') input.addEventListener('input', () => window.onLyricSourceChange());
+            }
+            for (const id of ['btnAudioModeUpload', 'btnAudioModeYoutube', 'btnAudioModeLibrary']) document.getElementById(id)?.addEventListener('click', () => window.onLyricSourceChange());
+            // Blank forms never restore a guide belonging to the previous video.
+            lyricsText.disabled = !currentLyricSource();
+            btnSaveLyrics.disabled = !currentLyricSource();
+            btnClearLyrics.disabled = !currentLyricSource();
 
             function setLyricsPanel(open) {
                 if (!lyricsContent || !btnToggleLyrics) return;
@@ -5242,7 +5406,7 @@
                 if (!lyricsBadge) return;
                 if (txt && txt.trim()) {
                     const wordCount = txt.trim().split(/\s+/).filter(Boolean).length;
-                    lyricsBadge.innerHTML = `✓ Letra salva no servidor (${wordCount} palavras) &nbsp;—&nbsp; será usada como guia pelo Whisper AI`;
+                    lyricsBadge.textContent = `✓ Guia desta mídia (${wordCount} palavras). A fila guarda uma cópia ao enviar.`;
                     lyricsBadge.style.display = 'block';
                 } else {
                     lyricsBadge.style.display = 'none';
@@ -5273,6 +5437,12 @@
 
             if (btnSaveLyrics) {
                 btnSaveLyrics.onclick = async () => {
+                    const key = currentLyricSource();
+                    await syncLyricSource();
+                    if (!key || key !== boundLyricSource) return;
+                    cancelAutomaticLyricsLookup();
+                    lyricsMode.value = 'manual';
+                    rememberLyricDraft();
                     const txt = lyricsText ? lyricsText.value.trim() : '';
                     if (!txt) {
                         alert("Digite ou cole a letra da música antes de salvar.");
@@ -5285,14 +5455,14 @@
                         const res = await authFetch('/api/lyrics', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ lyrics_text: txt })
+                            body: JSON.stringify({ source_key: key, lyrics_text: txt, lyrics_mode: 'manual' })
                         });
                         if (!res.ok) throw new Error('Erro ao salvar no servidor.');
-                        updateLyricsBadge(txt);
+                        if (key === boundLyricSource) updateLyricsBadge(txt);
                     } catch (e) {
                         alert('Erro ao salvar letra: ' + e.message);
                     } finally {
-                        btnSaveLyrics.disabled = false;
+                        btnSaveLyrics.disabled = !boundLyricSource;
                         btnSaveLyrics.innerHTML = '💾 Salvar';
                     }
                 };
@@ -5300,12 +5470,20 @@
 
             if (btnClearLyrics) {
                 btnClearLyrics.onclick = async () => {
-                    if (!confirm('Limpar a letra salva no servidor?')) return;
-                    try {
-                        await authFetch('/api/lyrics', { method: 'DELETE' });
-                    } catch (e) { /* ignora */ }
-                    if (lyricsText) lyricsText.value = '';
+                    const key = currentLyricSource();
+                    await syncLyricSource();
+                    if (!key || key !== boundLyricSource) return;
+                    cancelAutomaticLyricsLookup();
+                    if (youtubeLyricsTimer) clearTimeout(youtubeLyricsTimer);
+                    lyricsText.value = '';
+                    lyricsMode.value = 'manual';
+                    rememberLyricDraft();
                     updateLyricsBadge('');
+                    setLyricsSearchStatus('Guia limpa somente desta mídia. Os itens já enviados à fila mantêm suas letras.');
+                    try {
+                        const response = await authFetch('/api/lyrics?source_key=' + encodeURIComponent(key), { method: 'DELETE' });
+                        if (!response.ok) throw new Error('Não foi possível limpar a cópia salva.');
+                    } catch (error) { if (key === boundLyricSource) setLyricsSearchStatus(error.message, true); }
                 };
             }
             const btnOpenResultLibrary = document.getElementById('btnOpenResultLibrary');
@@ -5326,6 +5504,10 @@
             }
 
             function getSuggestedLyricsQuery() {
+                if (currentCreatorMode === 'easy') {
+                    const filename = easyAudioMode === 'library' ? document.getElementById('easyLibraryAudio').value : document.getElementById('easyAudioFile').files?.[0]?.name || '';
+                    return filename.replace(/\.[^/.]+$/, '').replace(/_+/g, ' ').trim();
+                }
                 const selectedPreset = document.getElementById('libraryAudioHidden')?.value || '';
                 const libraryAudio = document.getElementById('libraryAudioSelect')?.value || '';
                 const uploadedAudio = document.getElementById('audioFile')?.files?.[0]?.name || '';
@@ -5340,12 +5522,13 @@
             }
 
             async function importOnlineLyrics(result, button = null, lookupContext = null) {
-                if (!lyricsText) return false;
+                const requestedSource = currentLyricSource();
+                await syncLyricSource();
+                if (!lyricsText || !requestedSource || requestedSource !== boundLyricSource) return false;
                 if (!lookupContext) cancelAutomaticLyricsLookup();
-                const isCurrentLookup = () => !lookupContext || (
-                    lookupContext.generation === lyricsLookupGeneration
-                    && !lookupContext.signal?.aborted
-                );
+                const key = boundLyricSource;
+                const generation = lookupContext?.generation ?? lyricsLookupGeneration;
+                const isCurrentLookup = () => key === boundLyricSource && generation === lyricsLookupGeneration && !lookupContext?.signal?.aborted;
                 if (button) {
                     button.disabled = true;
                     button.innerText = '⏳ Importando...';
@@ -5379,11 +5562,13 @@
 
                     if (!isCurrentLookup()) return false;
                     lyricsText.value = payload.lyrics_text || '';
+                    if (button) lyricsMode.value = 'manual';
+                    rememberLyricDraft();
                     const saveResponse = await authFetch('/api/lyrics', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         signal: lookupContext?.signal,
-                        body: JSON.stringify({ lyrics_text: lyricsText.value })
+                        body: JSON.stringify({ source_key: key, lyrics_text: lyricsText.value, lyrics_mode: lyricsMode.value })
                     });
                     if (!saveResponse.ok) throw new Error('A letra foi obtida, mas não pôde ser salva localmente.');
                     if (!isCurrentLookup()) return false;
@@ -5405,7 +5590,8 @@
             }
 
             async function autoLookupLyricsForSong(query) {
-                if (!lyricsMode || lyricsMode.value !== 'auto') return;
+                await syncLyricSource();
+                if (!boundLyricSource || !lyricsMode || lyricsMode.value !== 'auto' || lyricsText.value.trim()) return;
                 if (youtubeLyricsTimer) {
                     clearTimeout(youtubeLyricsTimer);
                     youtubeLyricsTimer = null;
@@ -5423,7 +5609,6 @@
                 setLyricsSearchStatus(`Buscando automaticamente a letra de "${query}"...`);
 
                 try {
-                    await authFetch('/api/lyrics', { method: 'DELETE', signal });
                     if (generation !== lyricsLookupGeneration || signal.aborted) return;
                     const response = await authFetch('/api/lyrics/search', {
                         method: 'POST',
@@ -5455,7 +5640,8 @@
             }
 
             async function identifyYoutubeLyrics(url) {
-                if (!lyricsMode || lyricsMode.value !== 'auto') return;
+                await syncLyricSource();
+                if (!boundLyricSource || !lyricsMode || lyricsMode.value !== 'auto' || lyricsText.value.trim()) return;
                 url = String(url || '').trim();
                 if (!url) return;
 
@@ -5469,7 +5655,6 @@
                 clearAutomaticLyricsState('Identificando a música do YouTube...');
 
                 try {
-                    await authFetch('/api/lyrics', { method: 'DELETE', signal });
                     const payload = await fetchYoutubeMetadata(url);
                     if (generation !== lyricsLookupGeneration || signal.aborted) return;
 
@@ -5486,8 +5671,9 @@
                 }
             }
 
-            function scheduleYoutubeLyricsIdentification(url) {
-                if (!lyricsMode || lyricsMode.value !== 'auto') return;
+            async function scheduleYoutubeLyricsIdentification(url) {
+                await syncLyricSource();
+                if (!boundLyricSource || !lyricsMode || lyricsMode.value !== 'auto' || lyricsText.value.trim()) return;
                 if (youtubeLyricsTimer) clearTimeout(youtubeLyricsTimer);
                 cancelAutomaticLyricsLookup();
                 lastAutoLyricsQuery = `pending-youtube:${String(url || '').trim()}`;
@@ -5503,11 +5689,12 @@
 
             if (lyricsMode) {
                 lyricsMode.onchange = () => {
+                    rememberLyricDraft();
                     if (lyricsMode.value === 'manual') {
                         if (youtubeLyricsTimer) clearTimeout(youtubeLyricsTimer);
                         cancelAutomaticLyricsLookup();
                         lastAutoLyricsQuery = '';
-                        setLyricsSearchStatus('Modo manual ativo. A letra digitada será usada como prioridade.');
+                        setLyricsSearchStatus('A guia escolhida ficará vinculada somente a esta mídia. O Whisper define texto e tempos.');
                     } else {
                         lastAutoLyricsQuery = '';
                         const suggestedQuery = getSuggestedLyricsQuery();
@@ -5529,14 +5716,17 @@
 
             if (lyricsText) {
                 lyricsText.addEventListener('input', () => {
+                    cancelAutomaticLyricsLookup();
                     setLyricsSummary(lyricsText.value);
                     if (lyricsText.value.trim() && lyricsMode && lyricsMode.value === 'auto') {
                         if (youtubeLyricsTimer) clearTimeout(youtubeLyricsTimer);
                         cancelAutomaticLyricsLookup();
                         lastAutoLyricsQuery = '';
                         lyricsMode.value = 'manual';
-                        setLyricsSearchStatus('Entrada manual detectada; ela terá prioridade sobre a busca automática.');
+                        setLyricsSearchStatus('Guia desta mídia atualizada. Itens já enviados à fila mantêm suas cópias.');
                     }
+                    rememberLyricDraft();
+                    updateLyricsBadge(lyricsText.value);
                 });
             }
 
@@ -5580,6 +5770,10 @@
                         return;
                     }
 
+                    await syncLyricSource();
+                    const searchSource = boundLyricSource;
+                    cancelAutomaticLyricsLookup();
+                    const searchGeneration = lyricsLookupGeneration;
                     if (lyricsSearchQuery) lyricsSearchQuery.value = query;
                     if (lyricsSearchResults) lyricsSearchResults.replaceChildren();
                     btnSearchLyrics.disabled = true;
@@ -5593,6 +5787,7 @@
                             body: JSON.stringify({ query })
                         });
                         const payload = await response.json();
+                        if (searchSource !== boundLyricSource || searchGeneration !== lyricsLookupGeneration) return;
                         if (!response.ok) throw new Error(payload.detail || 'Não foi possível buscar letras.');
 
                         const results = payload.results || [];
@@ -5850,6 +6045,7 @@
 
             const isAuthenticated = await checkAuth();
             if (!isAuthenticated) return;
+            restoreLyricDrafts();
 
             [
                 ['youtubeUrl', 'youtubeTitleBadge', 'youtubeTitleText'],
@@ -5869,29 +6065,19 @@
             await fetchEasyModeConfig();
             const initialLoads = [
                 loadYoutubePublicationOptions(),
+                fetchSubtitleModeConfig(),
                 fetchTelegramConfig(),
                 fetchProfiles(),
                 loadLibrary(),
                 fetchCacheInfo(),
                 fetchProcessingQueue(),
-                (async () => {
-                    try {
-                        const lyricsRes = await authFetch('/api/lyrics');
-                        if (!lyricsRes.ok) return;
-                        const lyricsData = await lyricsRes.json();
-                        const savedTxt = lyricsData.lyrics_text || '';
-                        const lyricsTextEl = document.getElementById('lyricsText');
-                        if (lyricsTextEl && savedTxt) lyricsTextEl.value = savedTxt;
-                        if (typeof updateLyricsBadge === 'function') updateLyricsBadge(savedTxt);
-                    } catch (error) {
-                        console.warn('Aviso: não foi possível carregar letra salva.', error);
-                    }
-                })(),
+
             ];
             if (currentUser?.role === 'admin') {
                 initialLoads.push(loadYoutubePublisher(), fetchExternalUrlConfig(), fetchUsers(), fetchModelsStatus(), fetchYoutubeToolsStatus(), fetchTranslationSettings());
             }
             await Promise.allSettled(initialLoads);
+            setCreatorMode(currentCreatorMode);
         });
 
         async function deleteUser(username) {
@@ -6193,7 +6379,7 @@
             container.innerHTML = "";
 
             if (!currentSegments || currentSegments.length === 0) {
-                container.innerHTML = "<p style='font-size: 0.82rem; color: var(--text-muted); text-align: center; padding: 1rem;'>Nenhuma estrofe transcrita para editar.</p>";
+                container.innerHTML = "<p style='font-size: 0.82rem; color: var(--text-muted); text-align: center; padding: 1rem;'>Nenhum trecho transcrito para editar.</p>";
                 selectCorrectionSegment(0);
                 return;
             }
@@ -6447,7 +6633,7 @@
 
             document.querySelectorAll('.btn-cancel-task').forEach(btn => {
                 btn.onclick = async () => {
-                    if (!confirm("Deseja realmente cancelar a produção deste vídeo de karaokê?")) return;
+                    if (!confirm("Deseja realmente cancelar a produção deste vídeo?")) return;
                     try {
                         const res = await authFetch('/api/cancel', { method: 'POST' });
                         if (res.ok) {
@@ -6483,7 +6669,7 @@
             const processCard = document.getElementById('processCard');
             const correctionCard = document.getElementById('correctionCard');
             const processStatusTitle = document.getElementById('processStatusTitle');
-            if (processStatusTitle) processStatusTitle.textContent = data.status === 'paused' ? '⏸ Pausado' : '⏳ Produzindo';
+            if (processStatusTitle) processStatusTitle.textContent = data.status === 'paused' ? '⏸ Pausado' : data.process_summary?.mode === 'Legendar vídeo' ? '▤ Legendando' : '⏳ Produzindo';
             const progressPercent = document.getElementById('progressPercent');
             const progressBarFill = document.getElementById('progressBarFill');
             const statusMessage = document.getElementById('statusMessage');
@@ -6627,7 +6813,7 @@
                     const subtitleVideo = data.result_kind === 'subtitle_video';
                     if (subtitleResult) {
                         if (downloadResultTitle) downloadResultTitle.textContent = subtitleVideo ? 'Vídeo e legendas prontos!' : 'Legendas prontas!';
-                        if (downloadResultDescription) downloadResultDescription.textContent = subtitleVideo ? 'Assista ao vídeo ou baixe o MP4 e os arquivos SRT separadamente. Resultados SRT nunca são enviados ao YouTube.' : 'Baixe o SRT original e, quando disponível, a tradução opcional.';
+                        if (downloadResultDescription) downloadResultDescription.textContent = subtitleVideo ? 'Assista ao vídeo ou baixe o MP4 e os arquivos SRT separadamente. O vídeo usa a legenda definida pelo administrador.' : 'Baixe o SRT original e, quando disponível, a tradução opcional.';
                         if (resultVideoPreview && !subtitleVideo) {
                             resultVideoPreview.pause();
                             resultVideoPreview.removeAttribute('src');
@@ -6674,7 +6860,7 @@
                 }
                 if (btnSubmit) { btnSubmit.disabled = false; btnSubmit.innerHTML = '🎬 Criar Karaokê'; }
                 if (easySubmitBtn) { easySubmitBtn.disabled = false; easySubmitBtn.innerHTML = '⚡ Criar meu karaokê'; }
-                if (subtitleSubmitBtn) { subtitleSubmitBtn.disabled = false; subtitleSubmitBtn.innerHTML = '▤ Gerar arquivos SRT'; }
+                if (subtitleSubmitBtn) { subtitleSubmitBtn.disabled = false; subtitleSubmitBtn.innerHTML = '▤ Legendar vídeo'; }
                 isShowingCorrection = false;
                 if (statusChanged && previousStatus !== 'unknown') {
                     await Promise.allSettled([fetchCacheInfo(), loadLibrary()]);
@@ -6687,7 +6873,7 @@
                 setCreationUiLocked(false);
                 if (btnSubmit) { btnSubmit.disabled = false; btnSubmit.innerHTML = '🎬 Criar Karaokê'; }
                 if (easySubmitBtn) { easySubmitBtn.disabled = false; easySubmitBtn.innerHTML = '⚡ Criar meu karaokê'; }
-                if (subtitleSubmitBtn) { subtitleSubmitBtn.disabled = false; subtitleSubmitBtn.innerHTML = '▤ Gerar arquivos SRT'; }
+                if (subtitleSubmitBtn) { subtitleSubmitBtn.disabled = false; subtitleSubmitBtn.innerHTML = '▤ Legendar vídeo'; }
                 isShowingCorrection = false;
             }
         }

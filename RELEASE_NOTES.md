@@ -1,3 +1,12 @@
+# 11.1
+
+- O modo **Legendar vídeo (SRT)** transcreve a fala com Whisper e sempre gera MP4 com legenda embutida. Vídeos mantêm a imagem original; áudios usam o fundo padrão. Mantém áudio completo, tempos das falas e SRTs independentes, sem animação ou separação de vocais.
+- Novos padrões administrativos para cor, fundo, opacidade, tamanho e posição da legenda, e imagem/vídeo/cor de fundo para áudio. A tradução é embutida por padrão quando disponível; a administração pode escolher sempre o idioma original. Cada item copia configurações e fundo ao entrar na fila.
+- Telegram entrega um único vídeo compactado com os links locais e externos disponíveis para vídeo completo, SRT original e SRT traduzido na mesma mensagem. Sem anexos SRT separados. Falhas de tradução geram vídeo com a legenda original; falhas de envio preservam os links. Compactação acompanha progresso e cancelamento.
+- Letras escolhidas ficam vinculadas à mídia nos modos Rápido e Detalhado. Salvar, limpar ou trocar de mídia não altera textos de tarefas anteriores. Cada item guarda sua própria cópia, inclusive letras escolhidas da busca automática. Em lotes, a guia não é copiada para arquivos diferentes. Respostas atrasadas são ignoradas.
+- Vídeos de fundo podem ser baixados durante o processamento, em temporários próprios, com acompanhamento separado e publicação atômica na Biblioteca. Recarregar a lista conserva a seleção do formulário.
+- Testes de fila, tradução, Telegram, FFmpeg real, compactação, interface e cinco larguras de tela. Atualização somente do servidor; Android e configurador Windows existentes são reutilizados.
+
 # 11.0
 
 - Whisper passa a definir as palavras, o ritmo e toda a sincronia do karaokê. Letras externas, inclusive LRC, servem apenas como guia; horários, offsets e quebras de verso do provedor são ignorados. Esta política substitui a prioridade de versos sincronizados das versões 10.x.

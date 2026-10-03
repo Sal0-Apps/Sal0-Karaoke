@@ -13,6 +13,7 @@ from unittest.mock import Mock, patch
 ROOT = Path(__file__).parents[1]
 sys.path.insert(0, str(ROOT / 'app'))
 from subtitle_video import media_has_motion_video, render_audio_subtitle_video
+from subtitle_settings import normalize_subtitle_settings
 
 
 class AudioSubtitleVideoTests(unittest.TestCase):
@@ -40,7 +41,7 @@ class AudioSubtitleVideoTests(unittest.TestCase):
             self.assertGreater(max(raw),180, 'White subtitle text must be rendered on the dark background')
             self.assertFalse((root/'final.rendering.mp4').exists())
 
-    def test_pipeline_keeps_srt_and_sends_video_only_for_audio(self):
+    def test_pipeline_keeps_srt_and_sends_video_for_all_sources(self):
         source=(ROOT/'app/main.py').read_text(); tree=ast.parse(source)
         function=next(n for n in tree.body if isinstance(n,ast.FunctionDef) and n.name=='run_subtitle_srt_pipeline')
         for has_video in (False,True):
@@ -62,18 +63,17 @@ class AudioSubtitleVideoTests(unittest.TestCase):
                     'update_state':state,'cover_full_media_timeline':lambda segments,duration:segments,
                     'write_srt':lambda segments,path:Path(path).write_text('1\n00:00:00,000 --> 00:00:01,000\nHello\n'),
                     'save_srt_result':save_srt,'create_public_download':lambda owner,name:name+'-token',
-                    'media_has_motion_video':lambda path:has_video,'render_audio_subtitle_video':render,
+                    'media_has_motion_video':lambda path:has_video,'render_subtitle_video':render,
+                    'normalize_subtitle_settings':normalize_subtitle_settings,'update_process_summary':Mock(),
                     'save_video_to_history':save_video,'save_result_metadata':metadata,'send_documents_to_targets':documents,'send_video_to_targets':videos}
                 exec(compile(ast.Module(body=[function],type_ignores=[]),'pipeline','exec'),ns)
                 with patch('process_manager.check_cancelled'):
                     ns['run_subtitle_srt_pipeline']('source', 'song','medium',True,'standard',False,'original',{'username':'owner'},str(cache),str(output),str(library),[])
-                self.assertEqual(state.call_args.kwargs['result_kind'],'subtitles' if has_video else 'subtitle_video')
-                self.assertEqual(videos.call_count,0 if has_video else 1)
-                if not has_video:
-                    self.assertTrue(any(c.kwargs.get('stage_progress')==50 for c in state.call_args_list))
-                    self.assertTrue(any(c.kwargs.get('stage_progress')==100 for c in state.call_args_list))
-                    notices = [c for c in ns['notify_targets'].call_args_list if 'Vídeo legendado do áudio' in c.args[1]]
-                    self.assertEqual(len(notices), 1)
-                self.assertEqual(documents.call_args.args[1][0]['public_download_token'],'original.srt-token')
+                self.assertEqual(state.call_args.kwargs['result_kind'],'subtitle_video')
+                self.assertEqual(videos.call_count,1)
+                self.assertTrue(any(c.kwargs.get('stage_progress')==50 for c in state.call_args_list))
+                self.assertTrue(any(c.kwargs.get('stage_progress')==100 for c in state.call_args_list))
+                self.assertEqual(videos.call_args.kwargs['subtitle_downloads'][0]['public_download_token'],'original.srt-token')
+                documents.assert_not_called()
                 self.assertTrue((library/'history'/'original.srt').is_file())
-                self.assertEqual(metadata.call_args.args[2],'original.srt' if has_video else 'video.mp4')
+                self.assertEqual(metadata.call_args.args[2],'video.mp4')
