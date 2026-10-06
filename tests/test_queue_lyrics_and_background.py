@@ -98,6 +98,22 @@ class QueueLyricsTests(unittest.TestCase):
             self.assertEqual(job['lyrics_text'],'')
             self.assertEqual(jobs[0]['process_summary']['mode'],'Legendar vídeo')
 
+    def test_default_original_and_explicit_vocal_sources_are_snapshotted_per_job(self):
+        with tempfile.TemporaryDirectory() as directory:
+            submit,jobs=self.make_submitter(Path(directory))
+            def enqueue(title, **options):
+                submit(current_user={'username':'owner','role':'user'},
+                    audio_file=SimpleNamespace(filename=title,file=io.BytesIO(b'media')),
+                    keep_backing_vocals=True, **options)
+            enqueue('quick.mp4', easy_mode=True, transcribe_source='vocals')
+            enqueue('default.mp4')
+            enqueue('explicit.mp4', transcribe_source='vocals')
+            self.assertEqual([job['pipeline']['transcribe_source'] for job in jobs],
+                             ['original','original','vocals'])
+            self.assertTrue(all(job['pipeline']['keep_backing_vocals'] for job in jobs))
+            self.assertIn('Áudio original', jobs[0]['process_summary']['model'])
+            self.assertIn('Voz principal isolada', jobs[2]['process_summary']['model'])
+
 
 class BackgroundDownloadTests(unittest.TestCase):
     def test_running_job_does_not_block_background_download(self):

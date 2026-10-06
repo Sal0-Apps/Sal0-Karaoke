@@ -38,6 +38,7 @@ jobs:
           python -m unittest discover -s tests -p test_synced_acoustic_animation.py -v
           python -m unittest discover -s tests -p test_synced_preview_layout.py -v
           python -m unittest discover -s tests -p test_processing_flow.py -v
+          python -m unittest discover -s tests -p test_easy_mode_config.py -v
           python -m unittest discover -s tests -p test_queue_lyrics_and_background.py -v
           python -m unittest discover -s tests -p test_display_modes.py -v
           python -m unittest discover -s tests -p test_whisper_cache_reuse.py -v

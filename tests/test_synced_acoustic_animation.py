@@ -26,7 +26,7 @@ from lyric_guide import prepare_lyrics_guide, review_lyrics_with_whisper
 
 
 class SyncedAcousticAnimationTests(unittest.TestCase):
-    def run_stage(self, cache_version=None, verses=None, voice=None, reprocess=False, timing="auto", source_mode="vocals", backing_enabled=False, backing_volume=100):
+    def run_stage(self, cache_version=None, verses=None, voice=None, reprocess=False, timing="auto", source_mode="vocals", backing_enabled=False, backing_volume=100, audio_cache_version=3):
         source = (ROOT / 'app/main.py').read_text()
         stage = source[source.index('            segments = None\n', source.index('# Passo 3: Transcrever vocais')):
                        source.index('            # --- NOVO: Passo de Pausa')]
@@ -40,17 +40,19 @@ class SyncedAcousticAnimationTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder:
             cached = acoustic if cache_version == 3 else lrc
             (Path(folder) / 'synced_acoustic_segments.json').write_text(json.dumps(cached))
-            meta = dict(animation_timing_version=cache_version, vocal_source='lead',
+            vocal_source = 'original' if source_mode == 'original' else 'lead' if backing_enabled else 'all'
+            meta = dict(animation_timing_version=cache_version, vocal_source=vocal_source,
                         transcribe_source=source_mode, whisper_model='medium', enable_vad=False,
-                        transcription_preset='standard', whisper_audio_version=2, whisper_quality_mode='max_quality',
+                        transcription_preset='standard', whisper_audio_version=audio_cache_version, whisper_quality_mode='max_quality',
                         lyrics_hint_hash=hashlib.sha256(' '.join(lyric_text.split()).encode()).hexdigest())
             transcriber = Mock(return_value=acoustic)
             scope = dict(os=os, hashlib=hashlib, json=json, synced_segments=lrc,
                 lyrics_text=lyric_text, cache_dir=folder, cached_meta=meta,
                 prepare_lyrics_guide=prepare_lyrics_guide, review_lyrics_with_whisper=review_lyrics_with_whisper,
-                cache_meta_file=str(Path(folder) / 'cache_meta.json'), vocal_source='lead',
+                cache_meta_file=str(Path(folder) / 'cache_meta.json'), vocal_source=vocal_source,
                 transcribe_source=source_mode, whisper_model='medium', enable_vad=True,
-                transcription_preset='standard', vocals_wav='lead.wav', converted_wav='mix.wav',
+                transcription_preset='standard', vocals_wav='vocals.wav', converted_wav='mix.wav',
+                input_audio_path='original.mp4',
                 pm=SimpleNamespace(check_cancelled=Mock()), update_state=Mock(),
                 notify_targets=Mock(), telegram_targets=[], orig_name='song',
                 telegram_notice=lambda *parts: ' '.join(parts), telegram_escape=str,
@@ -63,14 +65,13 @@ class SyncedAcousticAnimationTests(unittest.TestCase):
                             source.index('    # Obter o lock', source.index('def run_pipeline('))]
             scope['subtitle_only'] = False
             exec(compile(textwrap.dedent(policy), 'full-audio-policy', 'exec'), scope)
-            if backing_enabled:
-                preparation = source[source.index('            if keep_backing_vocals:\n', source.index('# Passo 2:')):
-                                     source.index('            def publish_render_progress', source.index('# Passo 2:'))]
-                preserve = Mock(return_value=('isolated-lead.wav', 'instrumental-with-backing.wav'))
-                scope.update(keep_backing_vocals=True, backing_vocals_volume=backing_volume,
-                             instrumental_wav='clean-instrumental.wav', preserve_backing_vocals=preserve)
-                exec(compile(textwrap.dedent(preparation), 'lead-source-stage', 'exec'), scope)
-                scope['notify_targets'].reset_mock()
+            preparation = source[source.index('            if keep_backing_vocals:\n', source.index('# Passo 2:')):
+                                 source.index('            def publish_render_progress', source.index('# Passo 2:'))]
+            preserve = Mock(return_value=('isolated-lead.wav', 'instrumental-with-backing.wav'))
+            scope.update(keep_backing_vocals=backing_enabled, backing_vocals_volume=backing_volume,
+                         instrumental_wav='clean-instrumental.wav', preserve_backing_vocals=preserve)
+            exec(compile(textwrap.dedent(preparation), 'voice-source-stage', 'exec'), scope)
+            scope['notify_targets'].reset_mock()
             exec(compile(textwrap.dedent(stage), 'transcription-stage', 'exec'), scope)
             scope['first_transcription_calls'] = transcriber.call_count
             if reprocess:
@@ -138,22 +139,58 @@ class SyncedAcousticAnimationTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'Nenhum vocal detectado'):
             self.run_stage(voice=[])
 
-    def test_backing_option_forces_isolated_lead_even_with_original_source_or_zero_gain(self):
+    def test_original_source_is_respected_with_backing_enabled_at_any_gain(self):
         for gain in (0, 100):
             scope, transcriber = self.run_stage(source_mode='original',
                 backing_enabled=True, backing_volume=gain)
-            self.assertEqual(transcriber.call_args.args[0], 'isolated-lead.wav')
+            self.assertEqual(transcriber.call_args.args[0], 'original.mp4')
             self.assertEqual(scope['instrumental_wav'], 'instrumental-with-backing.wav')
-            self.assertEqual(scope['cached_meta']['transcribe_source'], 'vocals')
-            self.assertEqual(scope['cached_meta']['vocal_source'], 'lead')
+            self.assertEqual(scope['cached_meta']['transcribe_source'], 'original')
+            self.assertEqual(scope['cached_meta']['vocal_source'], 'original')
             self.assertEqual(scope['preserve_backing_vocals'].call_args.kwargs['gain'], gain / 100)
 
     def test_old_original_audio_cache_is_replaced_once_then_reused(self):
         scope, transcriber = self.run_stage(cache_version=3, source_mode='original',
-                                           backing_enabled=True, reprocess=True)
+                                           backing_enabled=True, reprocess=True, audio_cache_version=2)
+        self.assertEqual(scope['first_transcription_calls'], 1)
+        transcriber.assert_not_called()
+        self.assertEqual(scope['cached_meta']['transcribe_source'], 'original')
+        self.assertEqual(scope['cached_meta']['whisper_audio_version'], 3)
+
+    def test_original_source_bypasses_demucs_conversion_without_backing(self):
+        scope, transcriber = self.run_stage(source_mode='original')
+        self.assertEqual(transcriber.call_args.args[0], 'original.mp4')
+        scope['preserve_backing_vocals'].assert_not_called()
+
+    def test_explicit_vocal_source_uses_demucs_or_isolated_lead(self):
+        for backing in (False, True):
+            with self.subTest(backing=backing):
+                scope, transcriber = self.run_stage(backing_enabled=backing)
+                self.assertEqual(transcriber.call_args.args[0],
+                                 'isolated-lead.wav' if backing else 'vocals.wav')
+                self.assertEqual(scope['cached_meta']['vocal_source'], 'lead' if backing else 'all')
+
+    def test_guided_retry_uses_the_same_original_audio(self):
+        verses = [dict(start=10, end=13, text='Olá lindo mundo'),
+                  dict(start=13, end=17, text='Outra palavra correta')]
+        scope, transcriber = self.run_stage(source_mode='original', backing_enabled=True, verses=verses)
+        self.assertTrue(scope['guide_report']['retry_attempted'])
+        self.assertEqual(transcriber.call_count, 2)
+        self.assertTrue(all(call.args[0] == 'original.mp4' for call in transcriber.call_args_list))
+        self.assertTrue(all(call.kwargs['enable_vad'] is False for call in transcriber.call_args_list))
+
+    def test_original_cache_is_reused_with_backing_enabled(self):
+        scope, transcriber = self.run_stage(cache_version=3, source_mode='original', backing_enabled=True)
+        transcriber.assert_not_called()
+        self.assertEqual(scope['cached_meta']['vocal_source'], 'original')
+
+    def test_old_separated_vocal_cache_is_upgraded_once_then_reused(self):
+        scope, transcriber = self.run_stage(cache_version=3, source_mode='vocals',
+            backing_enabled=True, reprocess=True, audio_cache_version=2)
         self.assertEqual(scope['first_transcription_calls'], 1)
         transcriber.assert_not_called()
         self.assertEqual(scope['cached_meta']['transcribe_source'], 'vocals')
+        self.assertEqual(scope['cached_meta']['whisper_audio_version'], 3)
 
     def test_recognized_text_is_irrelevant_even_when_all_words_are_wrong(self):
         verses = [dict(start=10, end=13, text='  Olá,  lindo mundo!  ')]
