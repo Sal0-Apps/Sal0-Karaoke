@@ -14,6 +14,7 @@ for (const script of HTML.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/g)) new 
         const page = await browser.newPage({viewport: {width: 390, height: 900}});
         const errors = [], submitted = [], revisions = [];
         let failSecond = true, failReview = false, reviewCache = false, backgroundAuthenticated = false, acousticReview = false;
+        let serverStatus = 'idle';
         await page.addInitScript(() => localStorage.setItem('karaoke_token', 'test-session'));
         page.on('pageerror', error => errors.push(error.message));
         page.on('dialog', dialog => { errors.push('Unexpected blocking dialog: ' + dialog.message()); dialog.dismiss(); });
@@ -38,7 +39,7 @@ for (const script of HTML.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/g)) new 
             }
             let data = {}, status = 200;
             if (url.pathname === '/api/auth_status') data = {status: 'authenticated', username: 'owner', role: 'admin'};
-            if (url.pathname === '/api/status') data = {status: 'idle', progress: 0};
+            if (url.pathname === '/api/status') data = {status: serverStatus, progress: 0};
             if (url.pathname === '/api/easy-mode') data = {enabled: true, font_size: 50, whisper_model: 'medium', background_mode: 'random_library', lyrics_mode: 'auto', enable_vad: true};
             if (url.pathname === '/api/library') data = {audio: [], backgrounds: [], history: [], videos: [], photos: []};
             if (url.pathname === '/api/queue') data = {jobs: []};
@@ -55,7 +56,7 @@ for (const script of HTML.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/g)) new 
             if (url.pathname === '/api/continue_process') {
                 revisions.push(request.postDataJSON());
                 if (failReview) {status = 400; data = {detail: 'Linha 1: tempo rejeitado pelo servidor.'};}
-                else data = {status: 'success'};
+                else {serverStatus = 'processing'; data = {status: 'success'};}
             }
             return route.fulfill({status, contentType: 'application/json', body: JSON.stringify(data)});
         });
@@ -102,6 +103,7 @@ for (const script of HTML.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/g)) new 
         assert((await page.locator('#easyLyricsPolicy').textContent()).includes('O Whisper define'));
         assert.equal(await page.evaluate(() => friendlyStageName('Verifying lyrics with Whisper')), 'Conferindo palavras pela voz');
         reviewCache = true;
+        serverStatus = 'waiting_for_user_correction';
         await page.evaluate(() => loadCorrectionPanel());
         await page.waitForFunction(() => document.getElementById('correctionAudio').readyState > 0);
         assert(backgroundAuthenticated, 'Review background must use the current login token');
@@ -139,6 +141,7 @@ for (const script of HTML.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/g)) new 
         await page.waitForFunction(() => document.getElementById('correctionCard').style.display === 'none');
         assert.equal(revisions.at(-1).segments[0].text, '  Exact lyric  ');
         acousticReview = true;
+        serverStatus = 'waiting_for_user_correction';
         await page.evaluate(() => loadCorrectionPanel());
         await page.waitForFunction(() => document.querySelector('#correctionList textarea').value === 'Exact lyric');
         await page.locator('#correctionList textarea').first().fill('Exact lyrics');

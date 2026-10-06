@@ -1,6 +1,6 @@
 # Manual do Sal0 Karaokê
 
-Este manual descreve os controles disponíveis na distribuição 11.1. Para instalar o servidor, consulte [DEPLOYMENT.md](DEPLOYMENT.md). Para configurar o aparelho, consulte o [guia Android](android/README.md).
+Este manual descreve os controles disponíveis na distribuição 11.2. Para instalar o servidor, consulte [DEPLOYMENT.md](DEPLOYMENT.md). Para configurar o aparelho, consulte o [guia Android](android/README.md).
 
 O Sal0 Karaokê é destinado a uma instalação pessoal, acessada pela rede local ou por VPN, como ZeroTier. O repositório aberto disponibiliza o código e os pacotes; o projeto não opera um serviço público de processamento nem coleta centralmente as mídias das instalações. Não é necessário expor a porta do app à internet. O processamento principal é local, mas as integrações escolhidas podem se comunicar com serviços externos.
 
@@ -67,11 +67,11 @@ Modelos maiores tendem a consumir mais RAM e tempo. Large V3 Turbo, Large V3, Me
 
 ### Letra-guia
 
-1. Abra o bloco **Letra**.
-2. No modo automático, informe título/artista quando necessário e use **Buscar**.
-3. Revise o texto encontrado. Você pode colar uma versão manual, salvar ou limpar o texto.
-4. O texto manual tem prioridade sobre a busca automática.
-5. Se não houver letra, o processo pode seguir apenas com Whisper; o resumo e o Telegram informam essa condição quando aplicável.
+1. Selecione a música e abra **Letra-guia desta mídia** nos modos Rápido ou Detalhado.
+2. **Automática** faz uma tentativa ao selecionar a mídia. A letra só é usada quando título, artista e versão correspondem; uma busca sem correspondência mantém a guia vazia e permite continuar com o Whisper.
+3. Para escolher por conta própria, toque no campo de busca, informe título ou artista e use **Buscar** ou Enter. Você assume o modo **Manual** imediatamente; escolha **Usar esta letra** nos resultados ou cole/edite o texto no campo de guia.
+4. **Salvar** conserva sua escolha. **Limpar** deixa somente esta mídia sem guia, em modo Manual. Atualizações de andamento não interrompem o teclado, apagam resultados nem substituem o que você digitou.
+5. Para repetir a tentativa automática após uma falha, selecione Manual e depois Automática com a guia vazia. Respostas de uma mídia anterior são ignoradas. Guias automáticas da versão anterior passam por nova conferência; guias manuais permanecem.
 
 A letra-guia orienta o contexto e o vocabulário do Whisper. Após a transcrição, cada palavra é conferida: correspondências confiáveis corrigem a grafia sem alterar seus tempos. Trechos ausentes e diferenças permanecem visíveis no relatório local; uma segunda análise da gravação pode recuperar palavras. O processamento não insere automaticamente versos que o Whisper não reconheceu.
 

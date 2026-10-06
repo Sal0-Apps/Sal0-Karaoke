@@ -12,6 +12,7 @@ from unittest.mock import Mock
 ROOT = Path(__file__).parents[1]
 sys.path.insert(0, str(ROOT / "app"))
 from lyrics_sync import parse_lrc, recording_matches
+from lyrics_search import split_search_identity, lyrics_match_score, relevant_lyrics_results, select_automatic_lyrics
 from lyric_guide import prepare_lyrics_guide, verify_lyrics_guide
 from karaoke_generator import generate_ass_karaoke
 from processing_validation import validate_review_segments, validate_processing_options
@@ -32,6 +33,8 @@ def load_function(name, **values):
     scope = dict(HTTPException=HTTPError, Depends=lambda _: None, get_current_user=Mock(),
                  YouTubeSearchRequest=object, re=re, difflib=difflib,
                  logger=logging.getLogger("test"), recording_matches=recording_matches,
+                 split_search_identity=split_search_identity, lyrics_match_score=lyrics_match_score,
+                 relevant_lyrics_results=relevant_lyrics_results, select_automatic_lyrics=select_automatic_lyrics,
                  prepare_lyrics_guide=prepare_lyrics_guide, verify_lyrics_guide=verify_lyrics_guide,
                  validate_review_segments=validate_review_segments,
                  validate_processing_options=validate_processing_options, **values)
