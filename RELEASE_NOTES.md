@@ -1,3 +1,11 @@
+# 11.2
+
+- Corrigido o painel de letra que era removido e recolocado a cada atualização de progresso, fechando o teclado, interrompendo a seleção e deslocando a tela. A posição do painel só muda ao trocar de modo; foco, consulta, texto e resultados permanecem durante o acompanhamento.
+- Busca automática limitada a uma tentativa por mídia, com repetição explícita pelo usuário. Validação compartilhada de título, artista e versão na interface e no processamento. Uma resposta sem relação, como NOKIA/Drake para YOASOBI, é descartada na origem e na lista de resultados; sem correspondência, a guia fica vazia e o Whisper continua disponível.
+- Busca manual aceita título, artista, trechos e pequenas diferenças de escrita. Tocar para buscar ou editar assume o controle imediatamente, cancela a consulta automática e não espera por um rascunho remoto. Resultados, importações e rascunhos atrasados não substituem a escolha atual. Enter também inicia a busca.
+- Padrão Manual do Modo Rápido respeitado, rascunhos de links equivalentes vinculados ao mesmo vídeo e guias automáticas antigas verificadas novamente sem apagar escolhas manuais ou cópias já enfileiradas.
+- Testes de identidade de músicas/provedores, resultados vazios, Unicode, versões, migração de rascunhos e navegador móvel com foco, seleção, rolagem, andamento, buscas lentas e respostas fora de ordem. Mantidos SRT, Telegram, fila por mídia e download de fundos durante tarefas. Atualização somente do servidor.
+
 # 11.1
 
 - O modo **Legendar vídeo (SRT)** transcreve a fala com Whisper e sempre gera MP4 com legenda embutida. Vídeos mantêm a imagem original; áudios usam o fundo padrão. Mantém áudio completo, tempos das falas e SRTs independentes, sem animação ou separação de vocais.

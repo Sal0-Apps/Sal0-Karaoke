@@ -44,6 +44,7 @@ from video_renderer import render_karaoke_video, check_has_video
 from subtitle_video import media_has_motion_video, render_subtitle_video
 from subtitle_settings import normalize_subtitle_settings, load_subtitle_settings, save_subtitle_settings
 from lyric_drafts import read_draft, write_draft, clear_draft
+from lyrics_search import split_search_identity, lyrics_match_score, relevant_lyrics_results, select_automatic_lyrics
 from reprocess_cache import copy_reusable_inputs, youtube_identity, file_fingerprint
 from media_covers import video_thumbnail
 from lyrics_sync import recording_matches, require_acoustic_word_timing, anchor_synced_animation
@@ -2323,6 +2324,7 @@ class LyricsModel(BaseModel):
 
 class LyricsSearchRequest(BaseModel):
     query: str
+    automatic: bool = False
 
 
 class LyricsFetchRequest(BaseModel):
@@ -2403,13 +2405,8 @@ def _lyrics_provider_get(url: str, params: dict = None, provider: str = "lyrics"
 
 
 def _lyrics_ovh_query_parts(query: str) -> tuple[str, str] | None:
-    """Extract artist and title from the common 'artist - title' format."""
-    parts = re.split(r"\s+[\-–—|]\s+", (query or "").strip(), maxsplit=1)
-    if len(parts) != 2:
-        return None
-    artist, title = (part.strip() for part in parts)
-    return (artist, title) if artist and title else None
-
+    """Recognize artist/title separators used in filenames and YouTube titles."""
+    return split_search_identity(query)
 
 def _search_lrclib(query: str) -> list[dict]:
     payload = _lyrics_provider_get(
@@ -2524,13 +2521,18 @@ def _musixmatch_record(artist: str, title: str) -> dict | None:
         lyrics = lyrics_body.get("lyrics", {}) if isinstance(lyrics_body, dict) else {}
         lyrics_text = str(lyrics.get("lyrics_body") or "").strip() if isinstance(lyrics, dict) else ""
 
-    if not lyrics_text:
+    if not lyrics_text or not track.get("track_name") or not track.get("artist_name"):
         return None
-    return {
-        "track_name": track.get("track_name") or title,
-        "artist_name": track.get("artist_name") or artist or "Artista desconhecido",
-        "lyrics_text": lyrics_text
+    record = {
+        "track_name": track["track_name"],
+        "artist_name": track["artist_name"],
+        "lyrics_text": lyrics_text,
     }
+    query = f"{artist} - {title}" if artist else title
+    if not lyrics_match_score(query, record, automatic=bool(artist)):
+        logger.info("Musixmatch returned an unrelated track; ignoring the result.")
+        return None
+    return record
 
 
 def _search_musixmatch(query: str) -> list[dict]:
@@ -2589,46 +2591,21 @@ def search_lyrics_providers(query: str) -> list[dict]:
                 results.extend(future.result())
             except Exception as exc:
                 logger.info("Lyrics provider failed: %s", type(exc).__name__)
-    return results
+    return relevant_lyrics_results(query, results)
 
 
 def find_lyrics_automatically(query: str, duration: float | None = None) -> tuple[str, dict | None]:
-    """Busca a melhor letra disponível sem tornar a internet obrigatória ao pipeline."""
+    """Use a confirmed song guide; an unmatched provider result stays empty."""
     query = (query or "").strip()
     if len(query) < 2:
         return "", None
-
-    payload = search_lyrics_providers(query)
-
-    query_normalized = re.sub(r"\s+", " ", query.lower()).strip()
-    best_match = None
-    best_score = -1.0
-    for item in payload:
-        if not isinstance(item, dict) or item.get("instrumental") or not item.get("has_lyrics"):
-            continue
-        lyrics_text = prepare_lyrics_guide(item.get("lyrics_text") or item.get("synced_lyrics"))
-        if not lyrics_text:
-            continue
-
-        candidate_name = " ".join([
-            str(item.get("track_name") or ""),
-            str(item.get("artist_name") or "")
-        ]).lower()
-        score = difflib.SequenceMatcher(None, query_normalized, candidate_name).ratio()
-        if item.get("synced_lyrics") and recording_matches(query, item, duration, check_duration=False):
-            score += 1.0
-        if score > best_score:
-            best_match = (lyrics_text, item)
-            best_score = score
-
-    if not best_match or best_score < 0.45:
-        logger.info("Nenhuma letra online encontrada para a música selecionada.")
+    record = select_automatic_lyrics(query, search_lyrics_providers(query))
+    if not record:
+        logger.info("Nenhuma letra online compatível com a música selecionada.")
         return "", None
-
-    lyrics_text, record = best_match
-    return lyrics_text, {
-        "track_name": record.get("track_name") or "Faixa sem título",
-        "artist_name": record.get("artist_name") or "Artista desconhecido",
+    return record["lyrics_text"], {
+        "track_name": record["track_name"],
+        "artist_name": record["artist_name"],
         "synced_lyrics": record.get("synced_lyrics") or "",
         "duration": record.get("duration"),
         "provider": record.get("provider"),
@@ -2637,22 +2614,24 @@ def find_lyrics_automatically(query: str, duration: float | None = None) -> tupl
 
 @app.post("/api/lyrics/search")
 def search_lyrics_online(data: LyricsSearchRequest, current_user: dict = Depends(get_current_user)):
-    """Pesquisa provedores públicos e devolve apenas metadados para escolha do usuário."""
+    """Manual choices are relevant results; automatic choices need a song match."""
     query = data.query.strip()
     if not 2 <= len(query) <= 160:
         raise HTTPException(status_code=400, detail="Informe entre 2 e 160 caracteres para buscar a letra.")
-
-    provider_results = search_lyrics_providers(query)
+    provider_results = relevant_lyrics_results(query, search_lyrics_providers(query))
     results = [
         {key: value for key, value in item.items() if key not in {"lyrics_text", "synced_lyrics"}}
         for item in provider_results
     ]
-    return {
+    response = {
         "provider": "LRCLIB + Lyrics.ovh + Musixmatch",
         "results": results,
         "online_unavailable": not results,
-        "message": "Nenhuma fonte online respondeu. Você ainda pode colar a letra manualmente." if not results else ""
+        "message": "Nenhuma letra correspondente encontrada. Você pode tentar outro título/artista, colar uma guia ou continuar somente com o Whisper." if not results else "",
     }
+    if data.automatic:
+        response["automatic_match"] = select_automatic_lyrics(query, provider_results)
+    return response
 
 
 @app.post("/api/lyrics/fetch")

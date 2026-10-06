@@ -127,14 +127,14 @@ Em **Playlist de cada usuário**, a administração define uma playlist válida 
 
 ## Início rápido com Docker
 
-A versão de distribuição desta documentação é **11.1**. O título e o rodapé da página mostram apenas o nome da aplicação. A versão do servidor pode ser consultada no Manual; a versão do APK aparece nas configurações nativas.
+A versão de distribuição desta documentação é **11.2**. O título e o rodapé da página mostram apenas o nome da aplicação. A versão do servidor pode ser consultada no Manual; a versão do APK aparece nas configurações nativas.
 
 Crie um arquivo `compose.yaml`:
 
 ```yaml
 services:
   karaoke-app:
-    image: ghcr.io/sal0-apps/sal0-karaoke:11.1
+    image: ghcr.io/sal0-apps/sal0-karaoke:11.2
     container_name: karaoke-app
     ports:
       - "7885:7860"

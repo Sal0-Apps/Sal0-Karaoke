@@ -2724,7 +2724,7 @@
                 </ol>
                 <p>A API tem cota gratuita e pode limitar projetos sem auditoria a vídeos privados. Guarde a autorização como uma senha. Backing vocals e vídeo do modo SRT mostram porcentagem da etapa e avisam o avanço no Telegram; o LibreTranslate informa apenas início e término.</p>
             </details>
-            <p class="compact-note">Versão do servidor: 11.1. A transcrição é local; fontes, modelos e integrações podem acessar serviços externos. Use conteúdo autorizado.</p>
+            <p class="compact-note">Versão do servidor: 11.2. A transcrição é local; fontes, modelos e integrações podem acessar serviços externos. Use conteúdo autorizado.</p>
             <p class="compact-note">Use o servidor pela rede local ou VPN. A busca/importação do YouTube não concede direitos sobre a mídia. OAuth autoriza o acesso ao canal, não o uso de músicas. Confira as permissões do conteúdo e os termos do YouTube antes de importar ou publicar. Não listado permite acesso a quem tiver o link; resultados SRT nunca vão ao YouTube.</p>
             <p class="compact-note"><a href="https://www.youtube.com/static?template=terms" target="_blank" rel="noopener noreferrer">Termos do YouTube</a> · <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer">Privacidade do Google</a> · <a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener noreferrer">Revogar acesso ao canal</a></p>
         </div>
@@ -2819,6 +2819,7 @@
 
         function setCreatorMode(mode) {
             if (mode === 'easy' && easyModeConfig && !easyModeConfig.enabled) mode = 'advanced';
+            const modeChanged = currentCreatorMode !== mode;
             currentCreatorMode = mode;
             const easyForm = document.getElementById('easyModeForm');
             const advancedForm = document.getElementById('karaokêForm');
@@ -2836,9 +2837,13 @@
             advancedButton?.setAttribute('aria-selected', String(mode === 'advanced'));
             subtitleButton?.setAttribute('aria-selected', String(mode === 'subtitle'));
             const panel = document.getElementById('lyricsCard');
-            if (mode === 'easy') document.querySelector('.quick-create-action')?.before(panel);
-            else document.getElementById('lyricsPanelHome')?.after(panel);
-            window.onLyricSourceChange?.();
+            const action = document.querySelector('.quick-create-action');
+            const home = document.getElementById('lyricsPanelHome');
+            // Moving a focused subtree closes the mobile keyboard, even when
+            // it is inserted back into the same place. Polling must be idempotent.
+            if (panel && mode === 'easy' && action && action.previousElementSibling !== panel) action.before(panel);
+            else if (panel && mode !== 'easy' && home && home.nextElementSibling !== panel) home.after(panel);
+            if (modeChanged) window.onLyricSourceChange?.();
         }
 
         document.querySelectorAll('[role="tablist"]').forEach(tablist => {
@@ -4863,7 +4868,6 @@
                     document.getElementById('libraryAudioHidden').value = '';
                     const youtubeInput = document.getElementById('youtubeUrl');
                     if (youtubeInput) youtubeInput.value = '';
-                    autoLookupLyricsForSong(getSuggestedLyricsQuery());
                 };
             }
             if (btnAudioModeYoutube) {
@@ -4876,7 +4880,6 @@
                     audioUploadContainer.style.display = 'none';
                     audioLibraryContainer.style.display = 'none';
                     document.getElementById('libraryAudioHidden').value = '';
-                    scheduleYoutubeLyricsIdentification(document.getElementById('youtubeUrl')?.value || '');
                 };
             }
             if (btnAudioModeLibrary) {
@@ -4888,7 +4891,6 @@
                     audioLibraryContainer.style.display = 'block';
                     audioUploadContainer.style.display = 'none';
                     audioYoutubeContainer.style.display = 'none';
-                    autoLookupLyricsForSong(getSuggestedLyricsQuery());
                 };
             }
 
@@ -4948,7 +4950,6 @@
                         const badge = document.getElementById('audioBadge');
                         badge.innerText = files.length > 1 ? `✓ ${files.length} vídeos prontos para envio` : `✓ Arquivo carregado: ${fname}`;
                         badge.style.display = 'inline-block';
-                        autoLookupLyricsForSong(getSuggestedLyricsQuery());
                     }
                 };
             }
@@ -4958,7 +4959,6 @@
                 libraryAudioSelect.onchange = () => {
                     const hiddenLib = document.getElementById('libraryAudioHidden');
                     if (hiddenLib) hiddenLib.value = libraryAudioSelect.value || '';
-                    autoLookupLyricsForSong(getSuggestedLyricsQuery());
                 };
             }
 
@@ -5277,7 +5277,8 @@
             const btnToggleLyrics = document.getElementById('btnToggleLyrics');
             const lyricsSummary = document.getElementById('lyricsSummary');
             const appNotice = document.getElementById('appNotice');
-            let lastAutoLyricsQuery = '';
+            const autoLyricsAttempts = new Set();
+            let lyricDraftController = null;
             let lyricsLookupGeneration = 0;
             let autoLyricsController = null;
             let youtubeLyricsTimer = null;
@@ -5287,14 +5288,25 @@
             let pendingLyricLoad = Promise.resolve();
             const draftStorageKey = () => `sal0-lyric-drafts:${currentUser?.username || ''}`;
             function restoreLyricDrafts() {
-                try { for (const [key, value] of JSON.parse(sessionStorage.getItem(draftStorageKey()) || '[]')) lyricDrafts.set(key, value); } catch (_) {}
+                try {
+                    for (const [key, value] of JSON.parse(sessionStorage.getItem(draftStorageKey()) || '[]')) {
+                        if (value.lyrics_mode === 'auto' && value.lyrics_policy_version !== 2) continue;
+                        lyricDrafts.set(key, value);
+                    }
+                } catch (_) {}
             }
 
             function fileLyricKey(file) { return file ? `upload:${file.name}:${file.size}:${file.lastModified}` : ''; }
             function youtubeLyricKey(value) {
                 if (!value?.trim()) return '';
-                try { const url = new URL(value.trim()); return 'youtube:' + (url.searchParams.get('v') || (url.hostname === 'youtu.be' ? url.pathname.slice(1) : url.pathname) || value.trim()); }
-                catch (_) { return 'youtube:' + value.trim(); }
+                try {
+                    const url = new URL(value.trim());
+                    if (/^(?:www\.|m\.|music\.)?youtube\.com$|^youtu\.be$/i.test(url.hostname)) {
+                        const id = url.searchParams.get('v') || (url.hostname === 'youtu.be' ? url.pathname.split('/')[1] : url.pathname.match(/^\/(?:shorts|embed|live)\/([^/]+)/)?.[1]);
+                        if (/^[\w-]{11}$/.test(id || '')) return 'youtube:' + id;
+                    }
+                } catch (_) {}
+                return 'youtube:' + value.trim();
             }
             function currentLyricSource() {
                 if (currentCreatorMode === 'subtitle') return '';
@@ -5309,7 +5321,7 @@
             }
             function rememberLyricDraft() {
                 if (!boundLyricSource) return;
-                lyricDrafts.set(boundLyricSource, {lyrics_text: lyricsText.value, lyrics_mode: lyricsMode.value});
+                lyricDrafts.set(boundLyricSource, {lyrics_text: lyricsText.value, lyrics_mode: lyricsMode.value, search_query: lyricsSearchQuery?.value || '', lyrics_policy_version: 2});
                 try { sessionStorage.setItem(draftStorageKey(), JSON.stringify([...lyricDrafts].slice(-100))); } catch (_) {}
             }
             window.rememberLyricDraft = rememberLyricDraft;
@@ -5318,13 +5330,13 @@
                 if (key === boundLyricSource) return pendingLyricLoad;
                 rememberLyricDraft();
                 cancelAutomaticLyricsLookup();
-                if (youtubeLyricsTimer) clearTimeout(youtubeLyricsTimer);
-                lastAutoLyricsQuery = '';
                 boundLyricSource = key;
                 const generation = lyricsLookupGeneration;
                 const local = lyricDrafts.get(key);
                 lyricsText.value = local?.lyrics_text || '';
-                lyricsMode.value = local?.lyrics_mode || 'auto';
+                const defaultMode = currentCreatorMode === 'easy' && easyModeConfig?.lyrics_mode === 'manual' ? 'manual' : 'auto';
+                lyricsMode.value = local?.lyrics_mode || defaultMode;
+                lyricsSearchQuery.value = local?.search_query || '';
                 lyricsText.disabled = !key;
                 btnSaveLyrics.disabled = !key;
                 btnClearLyrics.disabled = !key;
@@ -5333,25 +5345,29 @@
                 updateLyricsBadge(lyricsText.value);
                 lyricsSearchResults?.replaceChildren();
                 setLyricsSearchStatus('');
-                pendingLyricLoad = key && !local ? (async () => {
+                const controller = key && !local ? new AbortController() : null;
+                lyricDraftController = controller;
+                pendingLyricLoad = controller ? (async () => {
                     try {
-                        const response = await authFetch('/api/lyrics?source_key=' + encodeURIComponent(key));
+                        const response = await authFetch('/api/lyrics?source_key=' + encodeURIComponent(key), {signal: controller.signal});
                         const data = await response.json();
                         if (!response.ok || generation !== lyricsLookupGeneration || key !== boundLyricSource) return;
                         lyricsText.value = data.lyrics_text || '';
-                        lyricsMode.value = data.lyrics_mode || 'auto';
+                        lyricsMode.value = data.has_draft === false ? defaultMode : data.lyrics_mode || defaultMode;
                         updateLyricsBadge(lyricsText.value);
                         rememberLyricDraft();
                     } catch (_) {}
+                    finally { if (lyricDraftController === controller) lyricDraftController = null; }
                 })() : Promise.resolve();
                 return pendingLyricLoad;
             }
             window.onLyricSourceChange = async () => {
+                const key = currentLyricSource();
                 await syncLyricSource();
-                if (!boundLyricSource || lyricsText.value.trim() || lyricsMode.value !== 'auto') return;
+                if (!key || key !== boundLyricSource || key !== currentLyricSource() || lyricsText.value.trim() || lyricsMode.value !== 'auto' || autoLyricsAttempts.has(key)) return;
                 const quick = currentCreatorMode === 'easy';
                 const url = document.getElementById(quick ? 'easyYoutubeUrl' : 'youtubeUrl').value;
-                if (boundLyricSource.startsWith('youtube:')) scheduleYoutubeLyricsIdentification(url);
+                if (key.startsWith('youtube:')) scheduleYoutubeLyricsIdentification(url);
                 else autoLookupLyricsForSong(getSuggestedLyricsQuery());
             };
             window.attachLyricDraft = (formData, file) => {
@@ -5431,16 +5447,31 @@
 
             function cancelAutomaticLyricsLookup() {
                 lyricsLookupGeneration += 1;
+                if (youtubeLyricsTimer) clearTimeout(youtubeLyricsTimer);
+                youtubeLyricsTimer = null;
                 if (autoLyricsController) autoLyricsController.abort();
                 autoLyricsController = null;
+                if (lyricDraftController) lyricDraftController.abort();
+                lyricDraftController = null;
+                btnSearchLyrics.disabled = false;
+                btnSearchLyrics.innerText = '🔎 Buscar';
+            }
+
+            function takeManualLyricsControl() {
+                cancelAutomaticLyricsLookup();
+                if (boundLyricSource) {
+                    lyricsMode.value = 'manual';
+                    rememberLyricDraft();
+                }
             }
 
             if (btnSaveLyrics) {
                 btnSaveLyrics.onclick = async () => {
                     const key = currentLyricSource();
-                    await syncLyricSource();
-                    if (!key || key !== boundLyricSource) return;
-                    cancelAutomaticLyricsLookup();
+                    const load = syncLyricSource();
+                    takeManualLyricsControl();
+                    await load;
+                    if (!key || key !== boundLyricSource || key !== currentLyricSource()) return;
                     lyricsMode.value = 'manual';
                     rememberLyricDraft();
                     const txt = lyricsText ? lyricsText.value.trim() : '';
@@ -5471,9 +5502,10 @@
             if (btnClearLyrics) {
                 btnClearLyrics.onclick = async () => {
                     const key = currentLyricSource();
-                    await syncLyricSource();
-                    if (!key || key !== boundLyricSource) return;
-                    cancelAutomaticLyricsLookup();
+                    const load = syncLyricSource();
+                    takeManualLyricsControl();
+                    await load;
+                    if (!key || key !== boundLyricSource || key !== currentLyricSource()) return;
                     if (youtubeLyricsTimer) clearTimeout(youtubeLyricsTimer);
                     lyricsText.value = '';
                     lyricsMode.value = 'manual';
@@ -5523,9 +5555,10 @@
 
             async function importOnlineLyrics(result, button = null, lookupContext = null) {
                 const requestedSource = currentLyricSource();
-                await syncLyricSource();
-                if (!lyricsText || !requestedSource || requestedSource !== boundLyricSource) return false;
-                if (!lookupContext) cancelAutomaticLyricsLookup();
+                const load = syncLyricSource();
+                if (!lookupContext) takeManualLyricsControl();
+                await load;
+                if (!lyricsText || !requestedSource || requestedSource !== boundLyricSource || requestedSource !== currentLyricSource()) return false;
                 const key = boundLyricSource;
                 const generation = lookupContext?.generation ?? lyricsLookupGeneration;
                 const isCurrentLookup = () => key === boundLyricSource && generation === lyricsLookupGeneration && !lookupContext?.signal?.aborted;
@@ -5579,7 +5612,7 @@
                     setLyricsSearchStatus('Letra importada como guia. O Whisper define os tempos e confere as palavras com esse texto.');
                     return true;
                 } catch (error) {
-                    if (error.name === 'AbortError') return false;
+                    if (error.name === 'AbortError' || !isCurrentLookup()) return false;
                     setLyricsSearchStatus(`Erro ao importar a letra: ${error.message}`, true);
                     if (button) {
                         button.disabled = false;
@@ -5589,143 +5622,112 @@
                 }
             }
 
-            async function autoLookupLyricsForSong(query) {
-                await syncLyricSource();
-                if (!boundLyricSource || !lyricsMode || lyricsMode.value !== 'auto' || lyricsText.value.trim()) return;
-                if (youtubeLyricsTimer) {
-                    clearTimeout(youtubeLyricsTimer);
-                    youtubeLyricsTimer = null;
-                }
-                query = (query || '').trim();
-                const sourceKey = `song:${normalizeLyricsSource(query)}`;
-                if (query.length < 2 || sourceKey === lastAutoLyricsQuery) return;
-                lastAutoLyricsQuery = sourceKey;
+            function automaticLyricsContext(key) {
                 cancelAutomaticLyricsLookup();
-                const generation = lyricsLookupGeneration;
                 autoLyricsController = new AbortController();
-                const signal = autoLyricsController.signal;
-                clearAutomaticLyricsState(`Buscando automaticamente a letra de "${query}"...`);
-                if (lyricsSearchQuery) lyricsSearchQuery.value = query;
-                setLyricsSearchStatus(`Buscando automaticamente a letra de "${query}"...`);
+                return {key, generation: lyricsLookupGeneration, signal: autoLyricsController.signal};
+            }
 
+            function isAutomaticLyricsCurrent(context) {
+                return context.key === boundLyricSource && context.key === currentLyricSource()
+                    && context.generation === lyricsLookupGeneration && !context.signal.aborted
+                    && lyricsMode.value === 'auto' && !lyricsText.value.trim();
+            }
+
+            async function autoLookupLyricsForSong(query, context = null) {
+                const key = currentLyricSource();
+                await syncLyricSource();
+                if (!key || key !== boundLyricSource || lyricsMode.value !== 'auto' || lyricsText.value.trim()) return;
+                query = (query || '').trim();
+                if (query.length < 2) return;
+                if (!context) {
+                    if (autoLyricsAttempts.has(key)) return;
+                    autoLyricsAttempts.add(key);
+                    context = automaticLyricsContext(key);
+                }
+                if (!isAutomaticLyricsCurrent(context)) return;
+                const {generation, signal} = context;
+                clearAutomaticLyricsState(`Buscando automaticamente a letra de "${query}"...`);
+                lyricsSearchQuery.value = query;
                 try {
-                    if (generation !== lyricsLookupGeneration || signal.aborted) return;
                     const response = await authFetch('/api/lyrics/search', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        signal,
-                        body: JSON.stringify({ query })
+                        method: 'POST', headers: {'Content-Type': 'application/json'}, signal,
+                        body: JSON.stringify({query, automatic: true})
                     });
                     const payload = await response.json();
+                    if (!isAutomaticLyricsCurrent(context)) return;
                     if (!response.ok) throw new Error(payload.detail || 'Busca indisponível.');
-                    if (generation !== lyricsLookupGeneration || signal.aborted) return;
-                    const result = (payload.results || []).find(item => item.has_lyrics && !item.instrumental);
+                    // The server validates artist/title before selecting a guide.
+                    // A provider's first/chart result is never an automatic choice.
+                    const result = payload.automatic_match;
                     if (!result) {
-                        setLyricsSearchStatus('Nenhuma letra automática encontrada; você pode preencher manualmente.', true);
-                        showLyricsNotice('ℹ️ Não encontrei uma letra agora. Você pode adicionar uma quando quiser.', true);
+                        setLyricsSearchStatus('Nenhuma letra correspondente encontrada. Você pode buscar ou colar uma guia, ou continuar somente com o Whisper.');
                         return;
                     }
-                    const imported = await importOnlineLyrics(result, null, { generation, signal });
-                    if (imported) {
-                        setLyricsSearchStatus(`Letra encontrada para ${result.track_name} — ${result.artist_name}.`);
-                        showLyricsNotice(`✓ Letra encontrada para ${result.track_name}.`);
-                    }
+                    const imported = await importOnlineLyrics(result, null, context);
+                    if (imported) setLyricsSearchStatus(`Letra encontrada para ${result.track_name} — ${result.artist_name}.`);
                 } catch (error) {
-                    if (error.name === 'AbortError') return;
-                    setLyricsSearchStatus('Não foi possível buscar a letra automaticamente. Você pode inserir a letra manualmente.', true);
-                    showLyricsNotice('ℹ️ A busca de letra não respondeu. Você pode adicionar uma manualmente.', true);
+                    if (error.name === 'AbortError' || !isAutomaticLyricsCurrent(context)) return;
+                    setLyricsSearchStatus('A busca automática está indisponível. Você pode buscar manualmente, colar uma guia ou continuar somente com o Whisper.');
                 } finally {
                     if (generation === lyricsLookupGeneration) autoLyricsController = null;
                 }
             }
 
-            async function identifyYoutubeLyrics(url) {
-                await syncLyricSource();
-                if (!boundLyricSource || !lyricsMode || lyricsMode.value !== 'auto' || lyricsText.value.trim()) return;
-                url = String(url || '').trim();
-                if (!url) return;
-
-                const sourceKey = `youtube:${url}`;
-                if (sourceKey === lastAutoLyricsQuery) return;
-                lastAutoLyricsQuery = sourceKey;
-                cancelAutomaticLyricsLookup();
-                const generation = lyricsLookupGeneration;
-                autoLyricsController = new AbortController();
-                const signal = autoLyricsController.signal;
-                clearAutomaticLyricsState('Identificando a música do YouTube...');
-
+            async function identifyYoutubeLyrics(url, context) {
+                if (!isAutomaticLyricsCurrent(context)) return;
                 try {
                     const payload = await fetchYoutubeMetadata(url);
-                    if (generation !== lyricsLookupGeneration || signal.aborted) return;
-
+                    if (!isAutomaticLyricsCurrent(context)) return;
                     const title = String(payload.lyrics_query || payload.title || '').trim();
                     if (!title) throw new Error('O vídeo não informou um título.');
-                    if (lyricsSearchQuery) lyricsSearchQuery.value = title;
-                    lastAutoLyricsQuery = '';
-                    await autoLookupLyricsForSong(title);
+                    await autoLookupLyricsForSong(title, context);
                 } catch (error) {
-                    if (error.name === 'AbortError') return;
-                    setLyricsSearchStatus('Não consegui identificar esse link agora. Ao iniciar o processo, o título será verificado novamente.', true);
+                    if (error.name === 'AbortError' || !isAutomaticLyricsCurrent(context)) return;
+                    setLyricsSearchStatus('Não consegui identificar esse link. Você pode buscar pelo título e artista, colar uma guia ou continuar somente com o Whisper.');
                 } finally {
-                    if (generation === lyricsLookupGeneration) autoLyricsController = null;
+                    if (context.generation === lyricsLookupGeneration) autoLyricsController = null;
                 }
             }
 
             async function scheduleYoutubeLyricsIdentification(url) {
+                const key = currentLyricSource();
                 await syncLyricSource();
-                if (!boundLyricSource || !lyricsMode || lyricsMode.value !== 'auto' || lyricsText.value.trim()) return;
-                if (youtubeLyricsTimer) clearTimeout(youtubeLyricsTimer);
-                cancelAutomaticLyricsLookup();
-                lastAutoLyricsQuery = `pending-youtube:${String(url || '').trim()}`;
-                clearAutomaticLyricsState(
-                    url ? 'Identificando a nova música do YouTube...' : 'Cole um link para buscar a letra automaticamente.'
-                );
-                if (!String(url || '').trim()) return;
+                if (!/^youtube:[\w-]{11}$/.test(key) || key !== boundLyricSource || lyricsMode.value !== 'auto' || lyricsText.value.trim() || autoLyricsAttempts.has(key)) return;
+                autoLyricsAttempts.add(key);
+                const context = automaticLyricsContext(key);
+                clearAutomaticLyricsState('Identificando a música do YouTube...');
                 youtubeLyricsTimer = setTimeout(() => {
-                    lastAutoLyricsQuery = '';
-                    identifyYoutubeLyrics(url);
+                    youtubeLyricsTimer = null;
+                    identifyYoutubeLyrics(url, context);
                 }, 650);
             }
 
             if (lyricsMode) {
+                // Native select menus must also remain usable during a lookup.
+                lyricsMode.addEventListener('focus', cancelAutomaticLyricsLookup);
                 lyricsMode.onchange = () => {
+                    cancelAutomaticLyricsLookup();
                     rememberLyricDraft();
                     if (lyricsMode.value === 'manual') {
-                        if (youtubeLyricsTimer) clearTimeout(youtubeLyricsTimer);
-                        cancelAutomaticLyricsLookup();
-                        lastAutoLyricsQuery = '';
-                        setLyricsSearchStatus('A guia escolhida ficará vinculada somente a esta mídia. O Whisper define texto e tempos.');
+                        setLyricsSearchStatus('Busque, cole ou edite a guia desta mídia. Sem guia, o Whisper transcreve normalmente.');
                     } else {
-                        lastAutoLyricsQuery = '';
-                        const suggestedQuery = getSuggestedLyricsQuery();
-                        const youtubeActive = document.getElementById('btnAudioModeYoutube')?.classList.contains('active');
-                        const youtubeUrl = document.getElementById('youtubeUrl')?.value || '';
-                        if (suggestedQuery) autoLookupLyricsForSong(suggestedQuery);
-                        else if (youtubeActive && youtubeUrl.trim()) scheduleYoutubeLyricsIdentification(youtubeUrl);
-                        else clearAutomaticLyricsState('Selecione uma música para buscar a letra automaticamente.');
+                        autoLyricsAttempts.delete(boundLyricSource);
+                        window.onLyricSourceChange();
                     }
                 };
             }
 
-            const youtubeLyricsInput = document.getElementById('youtubeUrl');
-            if (youtubeLyricsInput) {
-                youtubeLyricsInput.addEventListener('input', () => {
-                    scheduleYoutubeLyricsIdentification(youtubeLyricsInput.value);
-                });
-            }
-
+            lyricsSearchQuery?.addEventListener('focus', takeManualLyricsControl);
+            lyricsSearchQuery?.addEventListener('input', takeManualLyricsControl);
+            lyricsSearchQuery?.addEventListener('keydown', event => {
+                if (event.key === 'Enter') {event.preventDefault();btnSearchLyrics.click();}
+            });
             if (lyricsText) {
+                lyricsText.addEventListener('focus', takeManualLyricsControl);
                 lyricsText.addEventListener('input', () => {
-                    cancelAutomaticLyricsLookup();
-                    setLyricsSummary(lyricsText.value);
-                    if (lyricsText.value.trim() && lyricsMode && lyricsMode.value === 'auto') {
-                        if (youtubeLyricsTimer) clearTimeout(youtubeLyricsTimer);
-                        cancelAutomaticLyricsLookup();
-                        lastAutoLyricsQuery = '';
-                        lyricsMode.value = 'manual';
-                        setLyricsSearchStatus('Guia desta mídia atualizada. Itens já enviados à fila mantêm suas cópias.');
-                    }
-                    rememberLyricDraft();
+                    takeManualLyricsControl();
+                    setLyricsSearchStatus('Guia desta mídia atualizada. Itens já enviados à fila mantêm suas cópias.');
                     updateLyricsBadge(lyricsText.value);
                 });
             }
@@ -5766,46 +5768,49 @@
                 btnSearchLyrics.onclick = async () => {
                     const query = (lyricsSearchQuery?.value || getSuggestedLyricsQuery()).trim();
                     if (!query) {
-                        setLyricsSearchStatus('Informe título e artista, ou selecione/envie uma música para usar o nome do arquivo.', true);
+                        setLyricsSearchStatus('Informe o título ou artista para buscar uma letra.', true);
                         return;
                     }
-
-                    await syncLyricSource();
-                    const searchSource = boundLyricSource;
-                    cancelAutomaticLyricsLookup();
+                    const searchSource = currentLyricSource();
+                    const load = syncLyricSource();
+                    takeManualLyricsControl();
                     const searchGeneration = lyricsLookupGeneration;
-                    if (lyricsSearchQuery) lyricsSearchQuery.value = query;
-                    if (lyricsSearchResults) lyricsSearchResults.replaceChildren();
+                    await load;
+                    if (searchSource !== boundLyricSource || searchGeneration !== lyricsLookupGeneration) return;
+                    autoLyricsController = new AbortController();
+                    const signal = autoLyricsController.signal;
+                    const isCurrent = () => searchSource === boundLyricSource && searchGeneration === lyricsLookupGeneration && !signal.aborted;
+                    lyricsSearchQuery.value = query;
+                    lyricsSearchResults.replaceChildren();
                     btnSearchLyrics.disabled = true;
                     btnSearchLyrics.innerText = '⏳ Buscando...';
                     setLyricsSearchStatus('Buscando opções de letra online...');
-
                     try {
                         const response = await authFetch('/api/lyrics/search', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ query })
+                            method: 'POST', headers: {'Content-Type': 'application/json'}, signal,
+                            body: JSON.stringify({query, automatic: false})
                         });
                         const payload = await response.json();
-                        if (searchSource !== boundLyricSource || searchGeneration !== lyricsLookupGeneration) return;
+                        if (!isCurrent()) return;
                         if (!response.ok) throw new Error(payload.detail || 'Não foi possível buscar letras.');
-
                         const results = payload.results || [];
                         if (!results.length) {
-                            setLyricsSearchStatus(payload.message || 'Nenhuma letra encontrada. Tente título e artista mais específicos.', true);
+                            setLyricsSearchStatus(payload.message || 'Nenhuma letra correspondente encontrada. Tente outro título/artista, cole uma guia ou continue somente com o Whisper.');
                             return;
                         }
                         renderLyricsSearchResults(results);
                         setLyricsSearchStatus(`${results.length} resultado(s) encontrado(s). Escolha a versão correta da música.`);
                     } catch (error) {
-                        setLyricsSearchStatus(`Erro na busca de letras: ${error.message}`, true);
+                        if (error.name !== 'AbortError' && isCurrent()) setLyricsSearchStatus(`Erro na busca de letras: ${error.message}`, true);
                     } finally {
-                        btnSearchLyrics.disabled = false;
-                    btnSearchLyrics.innerText = '🔎 Buscar';
+                        if (isCurrent()) {
+                            autoLyricsController = null;
+                            btnSearchLyrics.disabled = false;
+                            btnSearchLyrics.innerText = '🔎 Buscar';
+                        }
                     }
                 };
             }
-
 
             const btnSaveProfile = document.getElementById('btnSaveProfile');
             if (btnSaveProfile) {

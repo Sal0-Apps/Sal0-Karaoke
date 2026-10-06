@@ -34,6 +34,7 @@ jobs:
           python -m unittest discover -s tests -p "test_subtitle*.py" -v
           python -m unittest discover -s tests -p "test_backing*.py" -v
           python -m unittest discover -s tests -p test_automatic_lyrics_and_search.py -v
+          python -m unittest discover -s tests -p test_lyrics_search_validation.py -v
           python -m unittest discover -s tests -p test_synced_acoustic_animation.py -v
           python -m unittest discover -s tests -p test_synced_preview_layout.py -v
           python -m unittest discover -s tests -p test_processing_flow.py -v
@@ -50,6 +51,7 @@ jobs:
           NODE_PATH=/tmp/sal0-ui/node_modules node tests/browser_creation_review.cjs
           NODE_PATH=/tmp/sal0-ui/node_modules node tests/browser_queue_creation.cjs
           NODE_PATH=/tmp/sal0-ui/node_modules node tests/browser_subtitle_lyrics.cjs
+          NODE_PATH=/tmp/sal0-ui/node_modules node tests/browser_lyrics_search.cjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -59,4 +61,5 @@ jobs:
             creation-review-*.png
             queue-creation-*.png
             subtitle-*.png
+            lyrics-search-*.png
           if-no-files-found: ignore
