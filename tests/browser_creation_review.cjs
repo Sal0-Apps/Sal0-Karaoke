@@ -15,9 +15,17 @@ for (const script of HTML.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/g)) new 
         const errors = [], submitted = [], revisions = [];
         let failSecond = true, failReview = false, reviewCache = false, backgroundAuthenticated = false, acousticReview = false;
         let serverStatus = 'idle';
+        let quickSettings = {config_version: 3, enabled: true, font_size: 50, whisper_model: 'medium', background_mode: 'random_library', lyrics_mode: 'auto', enable_vad: true, transcribe_source: 'original'};
+        const savedQuickSettings = [];
+        let savingQuickSettings = false;
+        const saveConfirmations = [];
         await page.addInitScript(() => localStorage.setItem('karaoke_token', 'test-session'));
         page.on('pageerror', error => errors.push(error.message));
-        page.on('dialog', dialog => { errors.push('Unexpected blocking dialog: ' + dialog.message()); dialog.dismiss(); });
+        page.on('dialog', dialog => {
+            if (savingQuickSettings && dialog.message() === 'Modo Rápido atualizado para todas as contas.') saveConfirmations.push(dialog.message());
+            else errors.push('Unexpected blocking dialog: ' + dialog.message());
+            dialog.dismiss();
+        });
         await page.route('**/*', async route => {
             const request = route.request(), url = new URL(request.url());
             if (url.hostname !== 'karaoke.test') return route.abort();
@@ -40,7 +48,13 @@ for (const script of HTML.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/g)) new 
             let data = {}, status = 200;
             if (url.pathname === '/api/auth_status') data = {status: 'authenticated', username: 'owner', role: 'admin'};
             if (url.pathname === '/api/status') data = {status: serverStatus, progress: 0};
-            if (url.pathname === '/api/easy-mode') data = {enabled: true, font_size: 50, whisper_model: 'medium', background_mode: 'random_library', lyrics_mode: 'auto', enable_vad: true};
+            if (url.pathname === '/api/easy-mode') {
+                if (request.method() === 'POST') {
+                    quickSettings = request.postDataJSON();
+                    savedQuickSettings.push(quickSettings);
+                }
+                data = quickSettings;
+            }
             if (url.pathname === '/api/library') data = {audio: [], backgrounds: [], history: [], videos: [], photos: []};
             if (url.pathname === '/api/queue') data = {jobs: []};
             if (url.pathname === '/api/cache_info') data = {has_cache: reviewCache, bg_is_video: false, audio_filename: 'review.wav'};
@@ -62,6 +76,26 @@ for (const script of HTML.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/g)) new 
         });
         await page.goto('http://karaoke.test');
         await page.locator('[data-quick-source="upload"]').waitFor();
+        await page.waitForFunction(() => easyModeConfig.whisper_model === 'medium');
+        assert.equal(await page.locator('#transcribeSource').inputValue(), 'original');
+        assert.equal(await page.locator('#easyModeSource').inputValue(), 'original');
+        assert((await page.locator('#easySummaryModel').textContent()).includes('Áudio original'));
+        await page.locator('#tabBtnSettings').click();
+        savingQuickSettings = true;
+        for (const source of ['vocals', 'original']) {
+            await page.locator('#easyModeSource').selectOption(source);
+            const confirmed = page.waitForEvent('dialog');
+            await page.locator('#btnSaveEasyMode').click();
+            await confirmed;
+            await page.waitForFunction(source => easyModeConfig.transcribe_source === source, source);
+            const saved = savedQuickSettings.at(-1);
+            assert.equal(saved.config_version, 3);
+            assert.equal(saved.transcribe_source, source);
+            assert((await page.locator('#easySummaryModel').textContent()).includes(source === 'original' ? 'Áudio original' : 'Vocais separados'));
+        }
+        assert.equal(saveConfirmations.length, 2);
+        savingQuickSettings = false;
+        await page.locator('#tabBtnCreate').click();
         for (const width of [320, 360, 390, 768, 1440]) {
             await page.setViewportSize({width, height: 900});
             assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'Horizontal overflow at ' + width);

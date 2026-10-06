@@ -127,14 +127,14 @@ Em **Playlist de cada usuário**, a administração define uma playlist válida 
 
 ## Início rápido com Docker
 
-A versão de distribuição desta documentação é **11.2**. O título e o rodapé da página mostram apenas o nome da aplicação. A versão do servidor pode ser consultada no Manual; a versão do APK aparece nas configurações nativas.
+A versão de distribuição desta documentação é **11.3**. O título e o rodapé da página mostram apenas o nome da aplicação. A versão do servidor pode ser consultada no Manual; a versão do APK aparece nas configurações nativas.
 
 Crie um arquivo `compose.yaml`:
 
 ```yaml
 services:
   karaoke-app:
-    image: ghcr.io/sal0-apps/sal0-karaoke:11.2
+    image: ghcr.io/sal0-apps/sal0-karaoke:11.3
     container_name: karaoke-app
     ports:
       - "7885:7860"
@@ -202,6 +202,6 @@ Pausas, pontuação e inícios de frase organizam o texto reconhecido pelo Whisp
 ### Whisper com conferência da letra-guia
 
 
-O Whisper fornece as palavras, o ritmo e os tempos da gravação em todos os karaokês. Letras manuais ou encontradas online, inclusive LRC, servem apenas como guia: seus horários, offsets e quebras de verso não controlam a legenda. A guia orienta o contexto e o vocabulário do modelo; depois, todas as palavras reconhecidas são comparadas. Correspondências confiáveis recebem a grafia e pontuação da guia, sem mover os tempos. Palavras ausentes ou sem correspondência permanecem registradas como diferenças. Uma segunda análise local do áudio completo pode recuperar essas palavras; o resultado só substitui o primeiro quando melhora a correspondência sem perda relevante de confiança acústica. A guia não cria palavras nem tempos sem reconhecimento na voz. Com backing vocals ativos, o Whisper recebe a voz principal isolada, incluindo silêncios e notas sustentadas, sem VAD no karaokê. A preparação mantém PCM float32 e a duração integral; o modelo escolhido usa precisão máxima. A abertura com o título permanece fora do relógio da música. Vídeos existentes precisam ser refeitos para aplicar a 11.0.
+O Whisper fornece as palavras, o ritmo e os tempos da gravação em todos os karaokês. Letras manuais ou encontradas online, inclusive LRC, servem apenas como guia: seus horários, offsets e quebras de verso não controlam a legenda. A guia orienta o contexto e o vocabulário do modelo; depois, todas as palavras reconhecidas são comparadas. Correspondências confiáveis recebem a grafia e pontuação da guia, sem mover os tempos. Palavras ausentes ou sem correspondência permanecem registradas como diferenças. Uma segunda análise local do áudio completo pode recuperar essas palavras; o resultado só substitui o primeiro quando melhora a correspondência sem perda relevante de confiança acústica. A guia não cria palavras nem tempos sem reconhecimento na voz. O padrão é enviar o arquivo original diretamente ao Whisper, mesmo com backing vocals ativos. A separação serve para montar o instrumental do vídeo e só alimenta o reconhecimento quando a fonte Vocais separados é escolhida explicitamente. Para o modelo, o FFmpeg apenas decodifica a fonte em PCM float32 mono/16 kHz, preservando a duração, os silêncios e as notas sustentadas, sem filtros extras ou VAD no karaokê; o modelo escolhido usa precisão máxima. A abertura com o título permanece fora do relógio da música. Vídeos existentes precisam ser refeitos para aplicar a 11.0.
 
 Downloads novos selecionam o melhor vídeo e áudio disponíveis no YouTube, sem teto de 1080p, inclusive para fundos. Isso pode aumentar o espaço e o tempo necessários. Os arquivos já em cache não ganham qualidade retroativamente; para substituir um download antigo, solicite novamente o link. A separação trabalha em PCM float32 a 44,1 kHz, a cópia de análise Whisper usa PCM float32 mono a 16 kHz e o vídeo exporta AAC a 320 kbps. A precisão máxima do Whisper é aplicada ao modelo escolhido, com maior custo em CPU/RAM. Mais precisão numérica e qualidade de origem não garantem transcrição perfeita nem restauram detalhes ausentes na fonte. O cache da análise é preservado entre tarefas compatíveis, incluindo letras sincronizadas e SRT; a revisão e a renderização continuam independentes.

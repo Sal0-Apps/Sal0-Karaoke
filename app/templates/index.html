@@ -2025,8 +2025,8 @@
                             <div class="form-group">
                                 <span class="label">Fonte da Transcrição</span>
                                 <select id="transcribeSource" name="transcribe_source" class="select-input">
-                                    <option value="vocals" selected>Vocais (Demucs)</option>
-                                    <option value="original">Áudio Original (com backing vocals ativos, usa voz principal)</option>
+                                    <option value="original" selected>Áudio original (sem separação)</option>
+                                    <option value="vocals">Vocais separados (Demucs)</option>
                                 </select>
                             </div>
 
@@ -2382,10 +2382,11 @@
                         <div class="form-group"><span class="label">Modo Rápido disponível</span><select id="easyModeEnabled" class="select-input"><option value="true">Sim</option><option value="false">Não</option></select></div>
                         <div class="form-group"><span class="label">Modelo Whisper</span><select id="easyModeModel" class="select-input"><option value="large-v3-turbo">Large V3 Turbo</option><option value="large-v3">Large V3</option><option value="medium">Medium</option><option value="small">Small</option><option value="tiny">Tiny</option></select></div>
                         <div class="form-group"><span class="label">Perfil da voz</span><select id="easyModePreset" class="select-input"><option value="difficult">Voz difícil</option><option value="karaoke">Karaokê equilibrado</option><option value="continuous">Canto contínuo</option><option value="fast">Criação rápida</option></select></div>
-                        <div class="form-group"><span class="label">Fonte da transcrição</span><select id="easyModeSource" class="select-input"><option value="original">Áudio original</option><option value="vocals" selected>Vocais separados pelo Demucs</option></select></div>
+                        <div class="form-group"><span class="label">Fonte da transcrição</span><select id="easyModeSource" class="select-input"><option value="original" selected>Áudio original (sem separação)</option><option value="vocals">Vocais separados pelo Demucs</option></select></div>
                         <div class="form-group"><span class="label">Áudio para canto</span><select id="easyModeEnableVad" class="select-input" disabled><option value="false">Completo, sem cortes de silêncio</option></select></div>
                         <div class="form-group"><span class="label">Busca automática de letra</span><select id="easyModeLyricsMode" class="select-input"><option value="auto">Buscar automaticamente</option><option value="manual">Não buscar</option></select></div>
                     </div>
+                    <p class="compact-note">Áudio original mantém a gravação completa para o Whisper, mesmo com backing vocals ativados. A separação continua preparando o instrumental do vídeo.</p>
                 </details>
 
                 <details class="easy-config-group" open>
@@ -2724,7 +2725,7 @@
                 </ol>
                 <p>A API tem cota gratuita e pode limitar projetos sem auditoria a vídeos privados. Guarde a autorização como uma senha. Backing vocals e vídeo do modo SRT mostram porcentagem da etapa e avisam o avanço no Telegram; o LibreTranslate informa apenas início e término.</p>
             </details>
-            <p class="compact-note">Versão do servidor: 11.2. A transcrição é local; fontes, modelos e integrações podem acessar serviços externos. Use conteúdo autorizado.</p>
+            <p class="compact-note">Versão do servidor: 11.3. A transcrição é local; fontes, modelos e integrações podem acessar serviços externos. Use conteúdo autorizado.</p>
             <p class="compact-note">Use o servidor pela rede local ou VPN. A busca/importação do YouTube não concede direitos sobre a mídia. OAuth autoriza o acesso ao canal, não o uso de músicas. Confira as permissões do conteúdo e os termos do YouTube antes de importar ou publicar. Não listado permite acesso a quem tiver o link; resultados SRT nunca vão ao YouTube.</p>
             <p class="compact-note"><a href="https://www.youtube.com/static?template=terms" target="_blank" rel="noopener noreferrer">Termos do YouTube</a> · <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer">Privacidade do Google</a> · <a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener noreferrer">Revogar acesso ao canal</a></p>
         </div>
@@ -2808,11 +2809,11 @@
         }
 
         const easyModeClientDefaults = {
-            config_version: 2, enabled: true, whisper_model: 'large-v3-turbo', font_size: 50, text_color: '#008080',
+            config_version: 3, enabled: true, whisper_model: 'large-v3-turbo', font_size: 50, text_color: '#008080',
             text_position: 'middle', subtitle_mode: 'syllable', words_per_line: 0, max_chars_line: 0,
             break_on_punctuation: true, enable_vad: false, transcription_preset: 'difficult',
             background_mode: 'random_library', random_backgrounds: [], random_background_owner: '',
-            transcribe_source: 'vocals', show_next_line_preview: true,
+            transcribe_source: 'original', show_next_line_preview: true,
             show_instrumental: true, lyrics_mode: 'auto', enable_correction: false,
             keep_first_line_visible: false, save_to_library: true, only_remove_vocals: false,
         };
@@ -3034,7 +3035,7 @@
             const preset = document.getElementById('easySummaryPreset');
             const lyrics = document.getElementById('easySummaryLyrics');
             const review = document.getElementById('easySummaryReview');
-            if (model) model.textContent = `🤖 ${String(config.whisper_model || 'large-v3-turbo').replaceAll('-', ' ')}`;
+            if (model) model.textContent = `🤖 ${String(config.whisper_model || 'large-v3-turbo').replaceAll('-', ' ')} · ${config.transcribe_source === 'vocals' ? 'Vocais separados' : 'Áudio original'}`;
             if (font) font.textContent = `🔤 Letra ${config.font_size || 50}`;
             if (preset) preset.textContent = `🎙️ ${presetLabels[config.transcription_preset] || 'Voz difícil'}`;
             if (lyrics) lyrics.textContent = config.lyrics_mode === 'auto' ? '🔎 Letra automática' : '🎵 Sem busca de letra';
@@ -4615,7 +4616,7 @@
                 const button = document.getElementById('btnSaveEasyMode');
                 const boolValue = id => document.getElementById(id)?.value === 'true';
                 const payload = {
-                    config_version: 2,
+                    config_version: 3,
                     enabled: boolValue('easyModeEnabled'),
                     whisper_model: document.getElementById('easyModeModel')?.value || 'large-v3-turbo',
                     font_size: Number(document.getElementById('easyModeFontSize')?.value || 50),
@@ -4629,7 +4630,7 @@
                     transcription_preset: document.getElementById('easyModePreset')?.value || 'difficult',
                     background_mode: document.getElementById('easyModeBackgroundMode')?.value || 'random_library',
                     random_backgrounds: [...easyRandomBackgroundSelection],
-                    transcribe_source: document.getElementById('easyModeSource')?.value || 'vocals',
+                    transcribe_source: document.getElementById('easyModeSource')?.value || 'original',
                     show_next_line_preview: boolValue('easyModeNextPreview'),
                     show_instrumental: boolValue('easyModeInstrumental'),
                     lyrics_mode: document.getElementById('easyModeLyricsMode')?.value || 'auto',
@@ -5855,7 +5856,7 @@
                         transcription_preset: getVal('transcriptionPreset', 'karaoke'),
                         enable_correction: getBool('enableCorrection', false),
                         show_instrumental: getBool('showInstrumental', true),
-                        transcribe_source: getVal('transcribeSource', 'vocals'),
+                        transcribe_source: getVal('transcribeSource', 'original'),
                         show_next_line_preview: getBool('showNextLinePreview', false),
                         keep_first_line_visible: getBool('keepFirstLineVisible', false),
                         save_to_library: getBool('saveToLibrary', true),

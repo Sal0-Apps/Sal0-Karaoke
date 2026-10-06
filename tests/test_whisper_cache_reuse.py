@@ -53,6 +53,17 @@ class WhisperCacheReuseTests(unittest.TestCase):
             scope['whisper_model'] = 'large-v3'
             exec(code, scope)
             self.assertEqual(set(load(folder)['completed_stages']), set(names[:3]))
+            restore()
+            scope['transcribe_source'] = 'original'
+            exec(code, scope)
+            self.assertEqual(set(load(folder)['completed_stages']), set(names[:3]))
+            restore()
+            # Once original is selected, backing changes the mix, not recognition.
+            scope['keep_backing_vocals'] = False
+            exec(code, scope)
+            self.assertEqual(set(load(folder)['completed_stages']), set(names))
+            self.assertEqual((root/'vocals.wav').read_text(), 'preserved')
+            self.assertEqual((root/'transcribed_segments.json').read_text(), 'preserved')
 
     def test_display_update_rebuilds_render_without_losing_recognition_or_review(self):
         load = load_function('load_stage_checkpoints', os=os, json=json)

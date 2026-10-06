@@ -1561,7 +1561,7 @@ class ExternalUrlModel(BaseModel):
 
 EASY_MODE_FILE = "/data/output/easy_mode.json"
 EASY_MODE_DEFAULTS = {
-    "config_version": 2,
+    "config_version": 3,
     "enabled": True,
     "whisper_model": "large-v3-turbo",
     "font_size": 50,
@@ -1576,7 +1576,7 @@ EASY_MODE_DEFAULTS = {
     "background_mode": "random_library",
     "random_backgrounds": [],
     "random_background_owner": "",
-    "transcribe_source": "vocals",
+    "transcribe_source": "original",
     "show_next_line_preview": True,
     "show_instrumental": True,
     "lyrics_mode": "auto",
@@ -1588,7 +1588,7 @@ EASY_MODE_DEFAULTS = {
 
 
 class EasyModeModel(BaseModel):
-    config_version: int = 2
+    config_version: int = 3
     enabled: bool = True
     whisper_model: str = "large-v3-turbo"
     font_size: int = 50
@@ -1603,7 +1603,7 @@ class EasyModeModel(BaseModel):
     background_mode: str = "random_library"
     random_backgrounds: list[str] = Field(default_factory=list)
     random_background_owner: str = ""
-    transcribe_source: str = "vocals"
+    transcribe_source: str = "original"
     show_next_line_preview: bool = True
     show_instrumental: bool = True
     lyrics_mode: str = "auto"
@@ -1672,13 +1672,15 @@ def load_easy_mode_config() -> dict:
     try:
         with open(EASY_MODE_FILE, "r", encoding="utf-8") as file:
             saved_config = json.load(file)
-        if int(saved_config.get("config_version", 0) or 0) < EASY_MODE_DEFAULTS["config_version"]:
-            # A configuração já aprovada pelo administrador é preservada. Somente
-            # o novo padrão de fundo passa a usar a coleção aleatória.
-            saved_config["config_version"] = EASY_MODE_DEFAULTS["config_version"]
+        saved_version = int(saved_config.get("config_version", 0) or 0)
+        if saved_version < 2:
             saved_config["background_mode"] = "random_library"
             saved_config.setdefault("random_backgrounds", [])
             saved_config.setdefault("random_background_owner", "")
+        if saved_version < 3:
+            # Restore the original recording once; preserve all other admin choices.
+            # A subsequent explicit choice of separated vocals remains supported.
+            saved_config["transcribe_source"] = "original"
         return normalize_easy_mode_config(saved_config)
     except Exception as exc:
         logger.warning("Não foi possível carregar o Modo Rápido: %s", exc)
@@ -2773,7 +2775,7 @@ class ProfileModel(BaseModel):
     break_on_punctuation: bool = True
     background_mode: str = "original"
     show_instrumental: bool = True
-    transcribe_source: str = "vocals"
+    transcribe_source: str = "original"
     show_next_line_preview: bool = False
     keep_first_line_visible: bool = False
     enable_correction: bool = False
@@ -2799,7 +2801,7 @@ BUILTIN_PROFILES = {
         "break_on_punctuation": True,
         "background_mode": "original",
         "show_instrumental": True,
-        "transcribe_source": "vocals",
+        "transcribe_source": "original",
         "show_next_line_preview": False,
         "keep_first_line_visible": False,
         "enable_correction": False,
@@ -2821,7 +2823,7 @@ BUILTIN_PROFILES = {
         "break_on_punctuation": True,
         "background_mode": "original",
         "show_instrumental": True,
-        "transcribe_source": "vocals",
+        "transcribe_source": "original",
         "show_next_line_preview": True,
         "keep_first_line_visible": False,
         "enable_correction": False,
@@ -2865,7 +2867,7 @@ BUILTIN_PROFILES = {
         "break_on_punctuation": True,
         "background_mode": "original",
         "show_instrumental": True,
-        "transcribe_source": "vocals",
+        "transcribe_source": "original",
         "show_next_line_preview": False,
         "keep_first_line_visible": False,
         "enable_correction": False,
@@ -2883,7 +2885,7 @@ PROFILE_DEFAULT_FIELDS = {
     "break_on_punctuation": True,
     "background_mode": "original",
     "show_instrumental": True,
-    "transcribe_source": "vocals",
+    "transcribe_source": "original",
     "show_next_line_preview": False,
     "keep_first_line_visible": False,
     "enable_correction": False,
@@ -4019,7 +4021,7 @@ def process_karaoke(
     transcription_preset: str = Form("karaoke"),
     background_mode: str = Form("image"),
     show_instrumental: bool = Form(True),
-    transcribe_source: str = Form("vocals"),
+    transcribe_source: str = Form("original"),
     show_next_line_preview: bool = Form(False),
     lyrics_text: str = Form(None),
     lyrics_mode: str = Form("auto"),
@@ -4530,7 +4532,9 @@ def process_karaoke(
             f"SRT · {translation_language.upper() if translation_language != 'original' else 'idioma original'}"
             if subtitle_only else lyrics_summary
         ),
-        "model": model_labels.get(whisper_model, whisper_model),
+        "model": (model_labels.get(whisper_model, whisper_model) + " · " +
+                  ("Áudio original" if transcribe_source == "original" else
+                   "Voz principal isolada" if keep_backing_vocals else "Vocais separados")),
         "mode": "Legendar vídeo" if subtitle_only else ("Modo Rápido" if easy_mode else "Modo Detalhado"),
         "background": "Vídeo original · fundo padrão para áudio" if subtitle_only else background_summary,
     }
@@ -5139,7 +5143,7 @@ def run_pipeline(
     transcription_preset: str = "karaoke",
     background_mode: str = "original",
     show_instrumental: bool = True,
-    transcribe_source: str = "vocals",
+    transcribe_source: str = "original",
     show_next_line_preview: bool = False,
     lyrics_text: str = None,
     lyrics_mode: str = "auto",
@@ -5502,8 +5506,9 @@ def run_pipeline(
         clock_hash = hashlib.sha256(json.dumps({"lyrics_policy_version": GUIDE_POLICY_VERSION,
             "lyrics": prepare_lyrics_guide(lyrics_text), "whisper_model": whisper_model,
             "transcription_preset": transcription_preset,
-            "voice_source": "lead" if keep_backing_vocals else transcribe_source,
-            "audio_hash": new_audio_hash}, sort_keys=True).encode()).hexdigest()
+            "voice_source": ("original" if transcribe_source == "original" else
+                             "lead" if keep_backing_vocals else "all"),
+            "whisper_audio_version": 3, "audio_hash": new_audio_hash}, sort_keys=True).encode()).hexdigest()
         if cached_meta.get("lyrics_clock_hash") != clock_hash:
             checkpoints = load_stage_checkpoints(cache_dir)
             for stage in ("transcription_reviewed", "subtitles_generated", "video_rendered"):
@@ -5589,10 +5594,10 @@ def run_pipeline(
                     vocals_wav, instrumental_wav, cache_dir,
                     gain=backing_vocals_volume / 100, update_callback=update_state,
                 )
-            vocal_source = "lead" if keep_backing_vocals else "all"
-            if keep_backing_vocals:
-                # Rendering keeps the backing stem; Whisper only gets isolated lead.
-                transcribe_source = "vocals"
+            # Backing preservation changes the rendered instrumental, not the
+            # chosen recording for recognition. Original bypasses every stem.
+            vocal_source = ("original" if transcribe_source == "original" else
+                            "lead" if keep_backing_vocals else "all")
 
 
             def publish_render_progress(percent: int):
@@ -5681,7 +5686,9 @@ def run_pipeline(
             segments = None
             lyrics_text = prepare_lyrics_guide(lyrics_text)
             segments_cache_file = os.path.join(cache_dir, "transcribed_segments.json")
-            transcribe_audio = vocals_wav if transcribe_source == "vocals" else converted_wav
+            # Decode the original file directly, with no Demucs conversion,
+            # lead separation, filters or silence cuts before Whisper.
+            transcribe_audio = vocals_wav if transcribe_source == "vocals" else input_audio_path
             lyrics_hint_hash = hashlib.sha256(" ".join((lyrics_text or "").split()).encode("utf-8")).hexdigest()
             whisper_meta_file = os.path.join(cache_dir, "whisper_cache_meta.json")
             if os.path.isfile(whisper_meta_file):
@@ -5703,7 +5710,7 @@ def run_pipeline(
 
             if (os.path.exists(segments_cache_file) and
                 cached_meta.get("animation_timing_version") == 3 and
-                cached_meta.get("whisper_audio_version") == 2 and
+                cached_meta.get("whisper_audio_version") == 3 and
                 cached_meta.get("whisper_quality_mode") == "max_quality" and
                 cached_meta.get("vocal_source", "all") == vocal_source and
                 cached_meta.get("transcribe_source") == transcribe_source and
@@ -5747,12 +5754,13 @@ def run_pipeline(
                         "✍️",
                         "Transcrição com Whisper",
                         f"🤖 Modelo: <b>{telegram_escape(whisper_model)}</b>",
-                        "🎤 Medindo os tempos das palavras cantadas na gravação.",
+                        ("🎤 Áudio original completo, sem separação de vocais."
+                         if transcribe_source == "original" else
+                         "🎤 Vocais separados, conforme a fonte escolhida."),
                         "📊 Progresso geral inicial: <b>65%</b>",
                     ),
                 )
 
-                transcribe_audio = vocals_wav if transcribe_source == "vocals" else converted_wav
                 logger.info(f"Fonte de transcrição escolhida: {transcribe_audio} (Modo: {transcribe_source})")
 
                 # Verificar status do modelo Whisper com is_model_downloaded() para exibir a mensagem correta na UI
@@ -5804,7 +5812,7 @@ def run_pipeline(
                         import json
                         json.dump(segments, f, indent=4)
                     cached_meta["animation_timing_version"] = 3
-                    cached_meta["whisper_audio_version"] = 2
+                    cached_meta["whisper_audio_version"] = 3
                     cached_meta["whisper_quality_mode"] = "max_quality"
                     cached_meta["vocal_source"] = vocal_source
                     cached_meta["transcribe_source"] = transcribe_source
@@ -5845,7 +5853,7 @@ def run_pipeline(
                 segments, guide_report = review_lyrics_with_whisper(lyrics_text, segments, cache_dir,
                     context={key: cached_meta.get(key) for key in (
                         "audio_hash", "vocal_source", "transcribe_source", "whisper_model",
-                        "whisper_quality_mode", "transcription_preset")},
+                        "whisper_quality_mode", "whisper_audio_version", "transcription_preset")},
                     retry=retry_guided_transcription, cancel=pm.check_cancelled)
                 unresolved = guide_report["unmatched_words"] + guide_report["missing_guide_words"]
                 detail = (f'{guide_report["checked_words"]} palavras conferidas · '

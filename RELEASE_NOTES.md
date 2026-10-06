@@ -1,3 +1,10 @@
+# 11.3
+
+- Restaurado o áudio original como padrão de reconhecimento no Modo Rápido, no Modo Detalhado e nos perfis integrados. O arquivo original segue diretamente para a decodificação do Whisper, sem passar pelo WAV intermediário do Demucs nem pela separação de voz principal. Somente a conversão exigida pelo modelo para PCM float32 mono/16 kHz; sem filtros extras, cortes de silêncio ou VAD no karaokê.
+- Backing vocals não substituem mais a fonte selecionada. A separação continua montando o instrumental do vídeo; escolher explicitamente Vocais separados ainda envia os vocais do Demucs ou a voz principal isolada ao Whisper. A conferência com letra-guia e sua segunda análise usam a mesma fonte selecionada e o áudio completo.
+- Configurações antigas do Modo Rápido migram uma vez para Áudio original, preservando modelo, visual, fundos e demais escolhas. Novas escolhas explícitas de Vocais separados são mantidas. Perfis personalizados já salvos continuam respeitados. A fonte efetiva aparece nos resumos e no aviso de transcrição.
+- Cache de reconhecimento anterior é refeito uma vez; o cache novo continua reutilizável. Mudanças de fonte e versão de preparação invalidam revisão, legenda e vídeo, preservando o original e a separação já realizada. Use Refazer para aplicar a correção a resultados concluídos. Atualização somente do servidor, sem mudanças nos clientes Android ou Windows.
+
 # 11.2
 
 - Corrigido o painel de letra que era removido e recolocado a cada atualização de progresso, fechando o teclado, interrompendo a seleção e deslocando a tela. A posição do painel só muda ao trocar de modo; foco, consulta, texto e resultados permanecem durante o acompanhamento.

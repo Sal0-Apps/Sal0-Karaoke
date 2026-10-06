@@ -1,4 +1,5 @@
 import ast
+import json
 import logging
 import os
 import random
@@ -7,6 +8,7 @@ import shutil
 import tempfile
 import unittest
 from pathlib import Path
+from test_automatic_lyrics_and_search import load_function
 
 
 MAIN_PATH = Path(__file__).parents[1] / "app" / "main.py"
@@ -64,7 +66,8 @@ class EasyModeConfigTests(unittest.TestCase):
         self.assertEqual(defaults["whisper_model"], "large-v3-turbo")
         self.assertEqual(config["font_size"], 50)
         self.assertEqual(config["transcription_preset"], "difficult")
-        self.assertEqual(config["transcribe_source"], "vocals")
+        self.assertEqual(config["transcribe_source"], "original")
+        self.assertEqual(config["config_version"], 3)
         self.assertEqual(config["text_color"], "#008080")
         self.assertEqual(config["text_position"], "middle")
         self.assertEqual(config["background_mode"], "random_library")
@@ -74,6 +77,55 @@ class EasyModeConfigTests(unittest.TestCase):
         self.assertTrue(config["show_next_line_preview"])
         self.assertFalse(config["enable_correction"])
         self.assertTrue(config["save_to_library"])
+
+    def load_saved_config(self, folder, saved=None):
+        file = Path(folder) / 'easy_mode.json'
+        if saved is not None:
+            file.write_text(json.dumps(saved))
+        defaults, normalize = load_normalizer()
+        load = load_function('load_easy_mode_config', os=os, json=json,
+            EASY_MODE_FILE=str(file), EASY_MODE_DEFAULTS=defaults,
+            normalize_easy_mode_config=normalize)
+        return load(), file, load
+
+    def test_v2_migrates_audio_only_and_keeps_admin_background_and_visual(self):
+        with tempfile.TemporaryDirectory() as folder:
+            saved = dict(config_version=2, transcribe_source='vocals', whisper_model='medium',
+                font_size=44, text_color='#123456', background_mode='color',
+                random_backgrounds=['stage.mp4'], random_background_owner='admin',
+                lyrics_mode='manual', enable_correction=True, save_to_library=False)
+            config, _, _ = self.load_saved_config(folder, saved)
+            self.assertEqual(config['transcribe_source'], 'original')
+            self.assertEqual(config['config_version'], 3)
+            self.assertEqual({key: config[key] for key in saved if key not in ('config_version', 'transcribe_source')},
+                             {key: value for key, value in saved.items() if key not in ('config_version', 'transcribe_source')})
+
+    def test_new_explicit_vocals_choice_survives_saving_and_reloading(self):
+        with tempfile.TemporaryDirectory() as folder:
+            config, file, load = self.load_saved_config(folder,
+                dict(config_version=2, transcribe_source='vocals', background_mode='original'))
+            config['transcribe_source'] = 'vocals'
+            file.write_text(json.dumps(config))
+            self.assertEqual(load()['transcribe_source'], 'vocals')
+            self.assertEqual(load()['background_mode'], 'original')
+            self.assertEqual(load()['config_version'], 3)
+
+    def test_old_background_migration_and_fresh_defaults_are_preserved(self):
+        with tempfile.TemporaryDirectory() as folder:
+            config, _, _ = self.load_saved_config(folder)
+            self.assertEqual(config['transcribe_source'], 'original')
+            config, _, _ = self.load_saved_config(folder,
+                dict(config_version=1, transcribe_source='vocals', background_mode='color'))
+            self.assertEqual(config['background_mode'], 'random_library')
+            self.assertEqual(config['transcribe_source'], 'original')
+
+    def test_corrupt_saved_config_still_uses_original_defaults(self):
+        with tempfile.TemporaryDirectory() as folder:
+            _, file, load = self.load_saved_config(folder)
+            file.write_text('not json')
+            self.assertEqual(load()['transcribe_source'], 'original')
+            file.write_text('[]')
+            self.assertEqual(load()['transcribe_source'], 'original')
 
     def test_invalid_admin_values_are_safely_normalized(self):
         _, normalize = load_normalizer()
