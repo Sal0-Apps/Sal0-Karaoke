@@ -921,6 +921,11 @@
         .yt-status[data-kind="success"] { border: 1px solid #4ade80; color: #bbf7d0; }
         .yt-status[data-kind="error"] { border: 1px solid #fb7185; color: #fecdd3; }
         .yt-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+        #youtubeToolsSection .input-text, #ytDeviceSetup .input-text { max-width:100%; min-width:0; margin-bottom:.6rem; }
+        #youtubeToolsSection button { min-height:44px; }
+        #youtubePublisherSection a:not(.btn-primary), #youtubeToolsSection a { color:#69d8ff; text-decoration:underline; }
+        #ytDevicePanel[hidden], #ytDeviceCodeArea[hidden] { display:none; }
+        @media(max-width:640px) { #ytDeviceCodeArea .yt-actions > a { width:100%; } }
         .yt-fields, .yt-user-controls { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 16px; }
         .yt-wide { grid-column: 1 / -1; }
         .yt-user-list { display: grid; gap: 16px; margin: 16px 0; }
@@ -1622,6 +1627,7 @@
             </div>
 
             <p id="creationFeedback" class="flow-feedback" role="status" aria-live="polite"></p>
+            <button type="button" id="btnResolveYoutube" class="btn-secondary" hidden>Resolver acesso ao YouTube</button>
             <form id="easyModeForm">
                 <div class="card easy-hero">
                     <div class="easy-hero-head">
@@ -2244,7 +2250,33 @@
                 <section class="yt-panel" aria-labelledby="ytConnectionHeading">
                     <h3 id="ytConnectionHeading">1. Conexão do canal</h3>
                     <p id="ytPublishChannel" class="yt-status" role="status">Verificando conexão do canal…</p>
-                    <div class="yt-actions"><button type="button" id="ytPublishConnect" class="btn-secondary">Conectar pelo Google</button><button type="button" id="ytPublishRefresh" class="btn-secondary">Verificar conexão e atualizar playlists</button></div>
+                    <p class="compact-note">Conecte pelo celular, na rede local ou pelo endereço externo do app. A aprovação acontece no navegador do Google; não precisa abrir portas nem usar um computador.</p>
+                    <div class="yt-actions"><button type="button" id="ytDeviceReconnect" class="btn-primary">Reconectar canal pelo celular</button><button type="button" id="ytPublishRefresh" class="btn-secondary">Verificar e renovar conexão</button><button type="button" id="ytPublishConnect" class="btn-secondary" style="display:none">Conectar pelo navegador (HTTPS)</button></div>
+                    <details id="ytDeviceSetup" class="yt-defaults"><summary>Configurar conexão pelo celular (uma vez)</summary>
+                        <ol class="youtube-auth-steps">
+                            <li>Abra a <a href="https://console.cloud.google.com/apis/library/youtube.googleapis.com" target="_blank" rel="noopener noreferrer">YouTube Data API v3</a> no navegador do celular e ative-a no seu projeto.</li>
+                            <li>Em <a href="https://console.cloud.google.com/auth/clients" target="_blank" rel="noopener noreferrer">Google Auth Platform → Clientes</a>, crie uma credencial do tipo <strong>TVs e dispositivos com entrada limitada</strong>. Use a visualização para computador do navegador se o Google pedir. A credencial de aplicativo para computador do assistente antigo não serve para este método.</li>
+                            <li>Escolha o JSON baixado ou copie ID e chave nos campos abaixo. Depois disso, use apenas Reconectar canal pelo celular.</li>
+                        </ol>
+                        <label for="ytDeviceClientFile" class="label">JSON da credencial Google</label><input id="ytDeviceClientFile" type="file" accept=".json,application/json" class="input-text">
+                        <details><summary>Prefiro colar ID e chave</summary>
+                            <label for="ytDeviceClientId" class="label">ID do cliente</label><input id="ytDeviceClientId" class="input-text" maxlength="4096" autocapitalize="none" autocomplete="off" spellcheck="false">
+                            <label for="ytDeviceClientSecret" class="label">Chave secreta</label><input id="ytDeviceClientSecret" type="password" class="input-text" maxlength="4096" autocomplete="off">
+                        </details>
+                        <button type="button" id="ytDeviceConfigure" class="btn-secondary">Salvar credencial e gerar código</button>
+                    </details>
+                    <div id="ytDevicePanel" class="yt-panel" hidden>
+                        <div id="ytDeviceCodeArea" hidden>
+                            <label for="ytDeviceCode" class="label">Código para informar no Google</label><input id="ytDeviceCode" class="input-text" readonly aria-describedby="ytDeviceExpires" style="font:700 1.25rem monospace;letter-spacing:.08em;text-align:center">
+                            <div class="yt-actions" style="margin-top:.7rem"><button type="button" id="ytDeviceCopy" class="btn-secondary">Copiar código</button><a id="ytDeviceGoogle" href="https://www.google.com/device" target="_blank" rel="noopener noreferrer" class="btn-primary" style="display:block;text-align:center">Abrir Google no navegador</a></div>
+                            <p id="ytDeviceExpires" class="compact-note"></p>
+                            <p class="compact-note">Se o navegador não abrir, acesse <strong>google.com/device</strong> no Chrome ou Firefox do celular. Escolha a conta do seu canal e permita o acesso ao YouTube.</p>
+                        </div>
+                        <p id="ytDeviceMessage" class="yt-status" role="status" aria-live="polite"></p>
+                        <button type="button" id="ytDeviceCancel" class="btn-secondary" hidden>Cancelar este código</button>
+                    </div>
+                    <p class="compact-note">A renovação do acesso é automática enquanto o Google permitir. Se a autorização expirar em sete dias, confira <a href="https://console.cloud.google.com/auth/audience" target="_blank" rel="noopener noreferrer">Público do projeto Google</a>: projetos externos em Teste têm essa limitação. A aprovação pode voltar a ser exigida se você revogar o acesso.</p>
+                    <details id="ytDesktopFallback"><summary>Já tenho um arquivo do assistente antigo</summary>
                 <details id="ytConnectionGuide" style="margin:.7rem 0"><summary>Ainda não tenho o arquivo de autorização</summary>
                     <p class="compact-note">Faça uma vez no computador. Seu servidor continua em HTTP. Não precisa contratar serviços nem cadastrar cobrança.</p>
                     <ol class="youtube-auth-steps">
@@ -2260,6 +2292,7 @@
                     <input type="file" id="ytDesktopAuthorization" accept=".json,application/json" class="input-text">
                     <button type="button" id="ytDesktopImport" class="btn-secondary">Conectar meu canal</button>
                     <p class="compact-note">O arquivo permite acesso ao canal. Guarde como uma senha. A API tem uma cota de uso; ao atingir o limite, aguarde a renovação. Não há compra automática de cota.</p>
+                    </details>
                     <p id="ytConnectionMessage" class="yt-status" role="status" aria-live="polite" hidden></p>
 
                 </section>
@@ -2314,10 +2347,26 @@
 
             <div class="card" id="youtubeToolsSection">
                 <div class="card-header">
-                    <span class="card-title">▶️ Compatibilidade com YouTube</span>
+                    <span class="card-title">YouTube · Downloads</span>
                     <button type="button" id="btnUpdateYoutubeTools" class="btn-secondary">↻ Atualizar mecanismo</button>
                 </div>
-                <p class="compact-note">O YouTube altera seus mecanismos com frequência. A atualização é instalada no volume persistente do servidor e continua disponível após reiniciar o contêiner.</p>
+                <p class="compact-note">Downloads e publicação usam conexões diferentes. Para publicar, reconecte o canal acima. Para baixar, teste o link e renove a sessão abaixo quando o YouTube pedir login. Tudo pode ser feito pelo celular, mesmo pela rede externa.</p>
+                <p id="youtubeSessionStatus" class="yt-status" role="status">Verificando sessão de downloads…</p>
+                <label for="youtubeTestUrl" class="label">Link do vídeo para testar</label><input id="youtubeTestUrl" type="url" class="input-text" placeholder="https://www.youtube.com/watch?v=…" autocomplete="off" inputmode="url">
+                <button type="button" id="btnTestYoutubeAccess" class="btn-primary">Testar link</button>
+                <details id="youtubeCookiesGuide" class="yt-defaults"><summary>Renovar sessão de downloads pelo celular</summary>
+                    <ol class="youtube-auth-steps">
+                        <li>No <strong>Firefox para Android</strong>, instale a extensão <a href="https://addons.mozilla.org/pt-BR/android/addon/cookies-txt/" target="_blank" rel="noopener noreferrer">cookies.txt</a>. Em suas permissões, permita funcionar em navegação privativa.</li>
+                        <li>Abra uma aba privativa, entre no YouTube e faça login. Na mesma aba, acesse <a href="https://www.youtube.com/robots.txt" target="_blank" rel="noopener noreferrer">youtube.com/robots.txt</a>.</li>
+                        <li>Abra a extensão e exporte os cookies do site em formato Netscape. Feche a aba privativa e escolha o arquivo cookies.txt abaixo.</li>
+                    </ol>
+                    <p class="compact-note">O arquivo dá acesso à sessão; mantenha-o privado. O servidor guarda apenas os cookies do YouTube e Google. Não precisa informar sua senha aqui. <a href="https://github.com/yt-dlp/yt-dlp/wiki/Extractors#exporting-youtube-cookies" target="_blank" rel="noopener noreferrer">Instruções do mecanismo de download</a>.</p>
+                    <label for="youtubeCookiesFile" class="label">Arquivo cookies.txt (até 512 KB)</label><input id="youtubeCookiesFile" type="file" accept=".txt,text/plain" class="input-text">
+                    <details><summary>Colar o conteúdo do arquivo</summary><label for="youtubeCookiesText" class="label">Cookies no formato Netscape</label><textarea id="youtubeCookiesText" class="input-text" rows="5" maxlength="524288" autocapitalize="none" autocomplete="off" spellcheck="false"></textarea></details>
+                    <div class="yt-actions"><button type="button" id="btnSaveYoutubeCookies" class="btn-primary">Salvar sessão</button><button type="button" id="btnClearYoutubeCookies" class="btn-secondary">Remover sessão de downloads</button></div>
+                </details>
+                <p id="youtubeAccessMessage" class="yt-status" role="status" aria-live="polite" hidden></p>
+                <p class="compact-note">Atualizar o mecanismo pode corrigir mudanças do YouTube. A instalação pode começar durante uma tarefa; só a aplicação da atualização aguarda downloads ativos.</p>
                 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr)); gap: 0.7rem; margin-top: 0.8rem;">
                     <div style="background: var(--input-bg); border: 1px solid var(--glass-border); border-radius: 10px; padding: 0.8rem;">
                         <span class="label">yt-dlp</span>
@@ -2707,7 +2756,7 @@
                     <li><strong>Modelos Whisper:</strong> o administrador instala modelos em Ajustes. Os modelos baixados ficam disponíveis para as contas.</li>
                     <li><strong>Perfil global do Modo Rápido:</strong> configure transcrição, visual, revisão e coleção de fundos; salve ao terminar.</li>
                     <li><strong>Usuários:</strong> crie contas comuns ou administrativas. Excluir uma conta não equivale a apagar automaticamente todos os seus arquivos.</li>
-                    <li><strong>YouTube:</strong> se um link autorizado falhar, consulte <strong>Ajustes → Compatibilidade com YouTube → Atualizar mecanismo</strong> como administrador e tente novamente. A atualização pode não resolver restrições do provedor.</li>
+                    <li><strong>YouTube:</strong> se um link autorizado falhar, consulte <strong>Ajustes → YouTube · Downloads → Testar link / Renovar sessão / Atualizar mecanismo</strong> como administrador e tente novamente. A atualização pode não resolver restrições do provedor.</li>
                     <li><strong>Tradução:</strong> atualize o container e os modelos do LibreTranslate no CasaOS/Docker e use <strong>Testar e atualizar idiomas</strong> no Karaokê. O botão verifica a API; não atualiza outro container. Confira PT-BR, chave, tradução de arquivos habilitada, limite de upload e tempo limite se houver falha.</li>
                     <li><strong>Sem conexão:</strong> confirme servidor, porta, rede e certificado HTTPS. No APK, use a faixa inferior para revisar os endereços.</li>
                     <li><strong>Memória ou lentidão:</strong> confira espaço e RAM; um modelo menor pode ajudar na transcrição, com possível perda de qualidade. O Demucs usa CPU e pode levar mais tempo que o vídeo.</li>
@@ -2717,15 +2766,15 @@
             <details>
                 <summary>10. Conectar e publicar no YouTube</summary>
                 <ol>
-                    <li>Em <strong>Ajustes → Publicar no YouTube → Conexão do canal</strong>, abra o guia de autorização. Habilite a YouTube Data API v3 no projeto Google, adicione sua conta como usuário de teste e baixe uma credencial de aplicativo para computador.</li>
-                    <li>Abra o assistente no computador, escolha a credencial e autorize no navegador do Google. Baixe <strong>youtube-autorizacao.json</strong>, importe no Karaokê e toque em <strong>Conectar meu canal</strong>. Confira a confirmação com o nome do canal. O servidor pode continuar em HTTP; não exige serviço pago.</li>
+                    <li>Em <strong>Ajustes → YouTube · Administração → Conexão do canal</strong>, configure uma vez uma credencial Google do tipo <strong>TVs e dispositivos com entrada limitada</strong>, pelo navegador do celular. Ative a YouTube Data API v3 no mesmo projeto.</li>
+                    <li>Toque em <strong>Reconectar canal pelo celular</strong>, copie o código e abra <strong>google.com/device</strong> no navegador. Escolha sua conta e permita o acesso. Volte ao app e confira o nome do canal. Funciona pela rede local ou externa; não precisa de um PC ou retorno HTTPS. Projetos em Teste podem exigir nova aprovação em sete dias.</li>
                     <li>Em <strong>Playlist de cada usuário</strong>, defina uma playlist válida de cada conta. O envio fica bloqueado enquanto o perfil não tiver playlist. Para o administrador, abra <strong>Padrões de publicação do administrador → Playlist padrão do administrador</strong>. O envio começa marcado para todas as contas. A privacidade automática é <strong>Não listado</strong>. Salve e confira a confirmação.</li>
                     <li>No modo Rápido ou Detalhado, marque <strong>Publicar no YouTube</strong> somente quando quiser enviar esse vídeo. Desmarcado, não há publicação. Uma playlist no perfil é obrigatória; sem ela, o vídeo não é enviado. O administrador pode trocar o destino por vídeo no modo rápido.</li>
                     <li>Use <strong>Publicar um vídeo já pronto</strong> para revisar título, capa, playlist e privacidade de um resultado existente. Acompanhe erros e links no histórico de publicações.</li>
                 </ol>
                 <p>A API tem cota gratuita e pode limitar projetos sem auditoria a vídeos privados. Guarde a autorização como uma senha. Backing vocals e vídeo do modo SRT mostram porcentagem da etapa e avisam o avanço no Telegram; o LibreTranslate informa apenas início e término.</p>
             </details>
-            <p class="compact-note">Versão do servidor: 11.3. A transcrição é local; fontes, modelos e integrações podem acessar serviços externos. Use conteúdo autorizado.</p>
+            <p class="compact-note">Versão do servidor: 11.4. A transcrição é local; fontes, modelos e integrações podem acessar serviços externos. Use conteúdo autorizado.</p>
             <p class="compact-note">Use o servidor pela rede local ou VPN. A busca/importação do YouTube não concede direitos sobre a mídia. OAuth autoriza o acesso ao canal, não o uso de músicas. Confira as permissões do conteúdo e os termos do YouTube antes de importar ou publicar. Não listado permite acesso a quem tiver o link; resultados SRT nunca vão ao YouTube.</p>
             <p class="compact-note"><a href="https://www.youtube.com/static?template=terms" target="_blank" rel="noopener noreferrer">Termos do YouTube</a> · <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer">Privacidade do Google</a> · <a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener noreferrer">Revogar acesso ao canal</a></p>
         </div>
@@ -2865,6 +2914,8 @@
             const message = document.getElementById('creationFeedback');
             message.dataset.kind = kind;
             message.textContent = text;
+            const repair = document.getElementById('btnResolveYoutube');
+            if (repair) repair.hidden = !(kind === 'error' && currentUser?.role === 'admin' && /youtube|cookies|sessão de downloads|mecanismo/i.test(text));
             message.scrollIntoView({behavior: 'smooth', block: 'nearest'});
         }
 
@@ -3832,6 +3883,7 @@
                     : (update.message || 'Mecanismo pronto para uso.');
                 message.style.color = update.status === 'error' ? '#fca5a5' : 'var(--text-muted)';
             }
+            renderYoutubeAccess(data?.access);
             if (button) {
                 button.disabled = update.status === 'updating';
                 button.textContent = update.status === 'updating' ? '⏳ Atualizando...' : '↻ Atualizar mecanismo';
@@ -3866,8 +3918,8 @@
                 if (!response.ok) throw new Error(data.detail || 'Não foi possível iniciar a atualização.');
                 await fetchYoutubeToolsStatus();
             } catch (error) {
-                alert(`Erro ao atualizar o mecanismo do YouTube: ${error.message}`);
                 await fetchYoutubeToolsStatus();
+                ytNotice('youtubeToolsMessage', error.message, 'error');
             }
         }
 
@@ -7045,7 +7097,10 @@
             let result;
             try { result = await response.json(); }
             catch { throw new Error('O servidor não retornou uma resposta válida. Verifique a conexão e tente novamente.'); }
-            if (!response.ok) throw new Error(typeof result.detail === 'string' ? result.detail : 'Não foi possível concluir a solicitação (HTTP ' + response.status + ').');
+            if (!response.ok) {
+                const error = new Error(typeof result.detail === 'string' ? result.detail : 'Não foi possível concluir a solicitação (HTTP ' + response.status + ').');
+                error.recovery = response.headers.get('X-YouTube-Recovery'); throw error;
+            }
             return result;
         }
         function youtubeSelectedVideo() {
@@ -7066,7 +7121,7 @@
             for (const job of [...jobs].reverse()) {
                 const row = document.createElement('div');
                 const text = document.createElement('p');
-                const labels = { queued: 'Na fila', uploading: 'Enviando', finalizing: 'Aplicando capa e playlist', done: 'Concluído', error: 'Precisa de atenção' };
+                const labels = { queued: 'Na fila', uploading: 'Enviando', finalizing: 'Aplicando capa e playlist', done: 'Concluído', error: 'Precisa de atenção', auth_required: 'Aguardando reconexão do canal' };
                 text.textContent = `${job.title} · ${labels[job.status] || job.status} · ${job.progress || 0}% · ${job.actual_privacy || job.privacy}`;
                 row.append(text);
                 if (job.error) { const error = document.createElement('p'); error.className = 'compact-note'; error.textContent = job.error; row.append(error); }
@@ -7074,6 +7129,10 @@
                     const link = document.createElement('a');
                     link.href = 'https://www.youtube.com/watch?v=' + job.video_id;
                     link.target = '_blank'; link.rel = 'noopener noreferrer'; link.textContent = 'Abrir vídeo'; row.append(link);
+                }
+                if (job.status === 'auth_required') {
+                    const reconnect = document.createElement('button'); reconnect.type = 'button'; reconnect.className = 'btn-secondary'; reconnect.textContent = 'Reconectar canal';
+                    reconnect.onclick = () => openYoutubeRecovery('youtubePublisherSection'); row.append(reconnect);
                 }
                 if (job.status === 'error') {
                     const retry = document.createElement('button'); retry.type = 'button'; retry.className = 'btn-secondary'; retry.textContent = 'Retomar mesma publicação';
@@ -7143,9 +7202,13 @@
         async function loadYoutubePublisher(full = true) {
             if (currentUser?.role !== 'admin' || youtubeSettingsBusy) return;
             try {
+                const deviceGeneration = youtubeDeviceGeneration;
                 const status = await ytRequest('status');
                 youtubeChannelConnected = !!status.connected;
-                ytNotice('ytPublishChannel', status.connected ? '✓ Canal conectado: ' + status.channel_title : 'Canal não conectado. Importe a autorização para concluir.', status.connected ? 'success' : 'info');
+                ytNotice('ytPublishChannel', status.connected ? '✓ Canal conectado: ' + status.channel_title : (status.message || 'Canal não conectado. Use Reconectar canal pelo celular.'), status.connected ? 'success' : status.recovery === 'auth_required' ? 'error' : 'info');
+                if (!youtubeDeviceSetupSeen) { ytElement('ytDeviceSetup').open = !status.device_configured; youtubeDeviceSetupSeen = true; }
+                if (deviceGeneration === youtubeDeviceGeneration) renderYoutubeDevice(status.device_session);
+                ytElement('ytDeviceReconnect').onclick = () => status.device_configured ? startYoutubeDevice(true) : (ytElement('ytDeviceSetup').open = true, ytElement('ytDeviceSetup').scrollIntoView({behavior:'smooth',block:'nearest'}));
                 ytElement('ytPublishConnect').style.display = status.web_configured ? '' : 'none';
                 renderYoutubePublicationJobs(status.jobs || []);
                 if (!full) return;
@@ -7158,7 +7221,10 @@
                     try {
                         const result = await ytRequest('playlists'); playlists = result.playlists || []; youtubePlaylistsAvailable = true;
                         ytNotice('ytPlaylistStatus', playlists.length ? playlists.length + ' playlists disponíveis. Escolha uma para cada usuário abaixo.' : 'Este canal ainda não possui playlists. Você pode publicar sem playlist ou criar uma no YouTube.', 'info');
-                    } catch (error) { ytNotice('ytPlaylistStatus', 'Canal conectado, mas as playlists não carregaram: ' + error.message, 'error'); }
+                    } catch (error) {
+                        if (error.recovery === 'auth_required') { youtubeChannelConnected = false; ytNotice('ytPublishChannel', error.message, 'error'); }
+                        ytNotice('ytPlaylistStatus', 'Não foi possível carregar as playlists: ' + error.message, 'error');
+                    }
                 } else { ytNotice('ytPlaylistStatus', 'Conecte o canal primeiro. Depois as playlists aparecerão aqui.', 'info'); }
                 for (const id of ['ytPublishPlaylist', 'ytDefaultPlaylist']) {
                     const select = ytElement(id); select.replaceChildren(new Option('Defina uma playlist', ''));
@@ -7177,6 +7243,170 @@
                 resetYoutubeCover();
             } catch (error) { ytNotice('ytPublishChannel', 'Não foi possível atualizar o painel: ' + error.message, 'error'); }
         }
+        // Consent is for the headless server; the Google page opens on the phone.
+        let youtubeDeviceSession = null;
+        let youtubeDeviceGeneration = 0;
+        let youtubeDeviceTimer = null;
+        let youtubeDeviceBusy = false;
+        let youtubeDevicePolling = false;
+        let youtubeDeviceSetupSeen = false;
+        function openYoutubeRecovery(section = 'youtubeToolsSection') {
+            switchTab('settings');
+            document.getElementById(section)?.scrollIntoView({behavior:'smooth', block:'start'});
+        }
+        function renderYoutubeAccess(access) {
+            if (!access) return;
+            const labels = {anonymous:'Sem sessão salva. Vídeos públicos podem funcionar sem login.', saved:'Sessão salva. Use Testar link para conferir o acesso.', expired:'A sessão salva expirou. Renove abaixo pelo celular.', invalid:'A sessão salva precisa ser substituída por um cookies.txt válido.'};
+            ytNotice('youtubeSessionStatus', labels[access.session_state] || labels.anonymous,
+                ['expired','invalid'].includes(access.session_state) ? 'error' : 'info');
+        }
+        async function youtubeToolsRequest(path, options = {}) {
+            const response = await authFetch('/api/youtube-tools/' + path, options);
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) throw new Error(typeof data.detail === 'string' ? data.detail : 'Não foi possível concluir. Confira sua conexão e tente novamente.');
+            return data;
+        }
+        function renderYoutubeDevice(session) {
+            if (youtubeDeviceBusy) return;
+            const justConnected = session?.status === 'connected' && youtubeDeviceSession?.status === 'pending';
+            const sameSession = session?.session_id === youtubeDeviceSession?.session_id;
+            // A delayed status response cannot undo a confirmed terminal state.
+            if (sameSession && youtubeDeviceSession && youtubeDeviceSession.status !== 'pending' && session?.status === 'pending') return;
+            if (!sameSession || (youtubeDeviceSession?.status === 'pending' && session?.status !== 'pending')) {
+                youtubeDeviceGeneration++; youtubeDevicePolling = false;
+                clearTimeout(youtubeDeviceTimer); youtubeDeviceTimer = null;
+            }
+            youtubeDeviceSession = session || null;
+            const pending = session?.status === 'pending';
+            ytElement('ytDevicePanel').hidden = !session;
+            ytElement('ytDeviceCodeArea').hidden = !pending;
+            ytElement('ytDeviceCancel').hidden = !pending;
+            ytElement('ytDeviceReconnect').disabled = pending;
+            ytElement('ytDeviceConfigure').disabled = pending;
+            if (!session) return;
+            if (!pending) ytNotice('ytConnectionMessage', session.message, session.status === 'connected' ? 'success' : 'error');
+            ytElement('ytDeviceCode').value = session.user_code || '';
+            const link = ytElement('ytDeviceGoogle');
+            // Accept only Google's consent pages, including in restored sessions.
+            let valid = false;
+            try { const url = new URL(session.verification_url); valid = url.protocol === 'https:' && ['google.com','www.google.com','accounts.google.com'].includes(url.hostname); } catch {}
+            link.href = valid ? session.verification_url : 'https://www.google.com/device';
+            ytNotice('ytDeviceMessage', session.message || 'Aguardando autorização.', session.status === 'connected' ? 'success' : ['error','expired'].includes(session.status) ? 'error' : 'info');
+            ytElement('ytDeviceExpires').textContent = pending ? 'O código vale até ' + new Date(session.expires_at * 1000).toLocaleTimeString('pt-BR', {hour:'2-digit',minute:'2-digit'}) + '. Depois de aprovar, volte ao app.' : '';
+            if (justConnected) {
+                // Either the approval poll or a status refresh can finish first.
+                setTimeout(async () => { await loadYoutubePublisher(); await loadYoutubePublicationOptions(); }, 0);
+            }
+            if (pending && !youtubeDeviceTimer && !youtubeDevicePolling) {
+                const generation = youtubeDeviceGeneration, sessionId = session.session_id;
+                youtubeDeviceTimer = setTimeout(async () => {
+                    youtubeDeviceTimer = null;
+                    if (generation !== youtubeDeviceGeneration) return;
+                    youtubeDevicePolling = true;
+                    try {
+                        const result = await ytRequest('device/poll', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({session_id:sessionId})});
+                        if (generation !== youtubeDeviceGeneration) return;
+                        youtubeDevicePolling = false;
+                        renderYoutubeDevice(result);
+
+                    } catch (error) {
+                        if (generation !== youtubeDeviceGeneration) return;
+                        youtubeDevicePolling = false;
+                        ytNotice('ytDeviceMessage', error.message + ' A consulta será tentada novamente.', 'error');
+                        renderYoutubeDevice({...youtubeDeviceSession, interval:15, message:error.message + ' Tentaremos novamente.'});
+                    }
+                }, Math.max(5, Number(session.interval) || 5) * 1000);
+            }
+        }
+        async function startYoutubeDevice(useSaved) {
+            if (youtubeDeviceBusy) return;
+            const generation = ++youtubeDeviceGeneration;
+            clearTimeout(youtubeDeviceTimer); youtubeDeviceTimer = null;
+            youtubeDeviceBusy = true;
+            const button = ytElement(useSaved ? 'ytDeviceReconnect' : 'ytDeviceConfigure');
+            button.disabled = true;
+            ytNotice('ytConnectionMessage', 'Preparando um código de autorização no Google…');
+            try {
+                let credentials;
+                if (!useSaved) {
+                    const file = ytElement('ytDeviceClientFile').files[0];
+                    if (file) {
+                        if (file.size > 32768) throw new Error('O JSON da credencial deve ter até 32 KB.');
+                        try { credentials = JSON.parse(await file.text()); } catch { throw new Error('Escolha o JSON da credencial Google.'); }
+                    } else credentials = {client_id:ytElement('ytDeviceClientId').value.trim(), client_secret:ytElement('ytDeviceClientSecret').value.trim()};
+                }
+                const result = await ytRequest('device/start', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(credentials ? {credentials} : {})});
+                if (generation !== youtubeDeviceGeneration) return;
+                ytElement('ytDeviceClientFile').value = '';
+                ytElement('ytDeviceClientSecret').value = '';
+                ytElement('ytDeviceSetup').open = false;
+                youtubeDeviceBusy = false;
+                renderYoutubeDevice(result);
+                ytNotice('ytConnectionMessage', 'Código pronto. Abra o Google no navegador do celular e aprove o acesso.');
+                ytElement('ytDevicePanel').scrollIntoView({behavior:'smooth', block:'nearest'});
+            } catch (error) {
+                ytNotice('ytConnectionMessage', error.message, 'error');
+                if (error.recovery === 'configure_client') ytElement('ytDeviceSetup').open = true;
+            } finally { youtubeDeviceBusy = false; button.disabled = youtubeDeviceSession?.status === 'pending'; }
+        }
+        document.addEventListener('DOMContentLoaded', () => {
+            ytElement('btnResolveYoutube').onclick = () => openYoutubeRecovery();
+            ytElement('ytDeviceReconnect').onclick = () => startYoutubeDevice(true);
+            ytElement('ytDeviceConfigure').onclick = () => startYoutubeDevice(false);
+            ytElement('ytDeviceCopy').onclick = async () => {
+                const code = ytElement('ytDeviceCode');
+                try {
+                    if (navigator.clipboard && window.isSecureContext) await navigator.clipboard.writeText(code.value);
+                    else { code.select(); if (!document.execCommand('copy')) throw new Error('copy'); }
+                    ytNotice('ytDeviceMessage', 'Código copiado. Abra o Google e cole no campo de autorização.');
+                } catch { code.select(); ytNotice('ytDeviceMessage', 'Selecione e copie o código acima.'); }
+            };
+            ytElement('ytDeviceCancel').onclick = async () => {
+                const sessionId = youtubeDeviceSession?.session_id;
+                youtubeDeviceGeneration++; clearTimeout(youtubeDeviceTimer); youtubeDeviceTimer = null;
+                const button = ytElement('ytDeviceCancel'); button.disabled = true;
+                try {
+                    await ytRequest('device/cancel', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({session_id:sessionId})});
+                    renderYoutubeDevice(null); ytNotice('ytConnectionMessage', 'Código cancelado. Você pode gerar outro quando precisar.');
+                } catch (error) { ytNotice('ytConnectionMessage', error.message, 'error'); renderYoutubeDevice(youtubeDeviceSession); }
+                finally { button.disabled = false; }
+            };
+            ytElement('btnSaveYoutubeCookies').onclick = async () => {
+                const button = ytElement('btnSaveYoutubeCookies'); button.disabled = true;
+                ytNotice('youtubeAccessMessage', 'Salvando a sessão de downloads…');
+                try {
+                    const file = ytElement('youtubeCookiesFile').files[0];
+                    const text = ytElement('youtubeCookiesText').value.trim();
+                    if (!file && !text) throw new Error('Escolha cookies.txt ou cole seu conteúdo.');
+                    const selected = file || new File([text], 'cookies.txt', {type:'text/plain'});
+                    if (selected.size > 512 * 1024) throw new Error('O arquivo deve ter até 512 KB.');
+                    const form = new FormData(); form.set('cookies_file', selected);
+                    renderYoutubeAccess(await youtubeToolsRequest('cookies', {method:'POST', body:form}));
+                    ytElement('youtubeCookiesFile').value = ''; ytElement('youtubeCookiesText').value = '';
+                    ytNotice('youtubeAccessMessage', 'Sessão salva. Teste o link desejado antes de repetir a tarefa.', 'success');
+                } catch (error) { ytNotice('youtubeAccessMessage', error.message, 'error'); }
+                finally { button.disabled = false; }
+            };
+            ytElement('btnClearYoutubeCookies').onclick = async () => {
+                const button = ytElement('btnClearYoutubeCookies'); button.disabled = true;
+                try { renderYoutubeAccess(await youtubeToolsRequest('cookies', {method:'DELETE'})); ytNotice('youtubeAccessMessage', 'Sessão de downloads removida. A conexão do canal foi mantida.'); }
+                catch (error) { ytNotice('youtubeAccessMessage', error.message, 'error'); }
+                finally { button.disabled = false; }
+            };
+            ytElement('btnTestYoutubeAccess').onclick = async () => {
+                const button = ytElement('btnTestYoutubeAccess'); button.disabled = true;
+                ytNotice('youtubeAccessMessage', 'Consultando o vídeo no YouTube…');
+                try {
+                    const url = ytElement('youtubeTestUrl').value.trim();
+                    if (!url) throw new Error('Cole o link de um vídeo do YouTube.');
+                    const result = await youtubeToolsRequest('test', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({url})});
+                    renderYoutubeAccess(result.access);
+                    ytNotice('youtubeAccessMessage', result.title + '. ' + result.message, 'success');
+                } catch (error) { ytNotice('youtubeAccessMessage', error.message, 'error'); }
+                finally { button.disabled = false; }
+            };
+        });
+
         document.addEventListener('DOMContentLoaded', () => {
             const downloadYoutubeHelper = async (windows) => {
                 try {
@@ -7212,7 +7442,12 @@
                 try { const result = await ytRequest('connect', { method: 'POST' }); window.location.assign(result.url); }
                 catch (error) { ytMessage(error.message); }
             };
-            ytElement('ytPublishRefresh').onclick = () => loadYoutubePublisher();
+            ytElement('ytPublishRefresh').onclick = async () => {
+                const button = ytElement('ytPublishRefresh'); button.disabled = true;
+                try { await ytRequest('verify-connection', {method:'POST'}); await loadYoutubePublisher(); }
+                catch (error) { ytNotice('ytConnectionMessage', error.message, 'error'); }
+                finally { button.disabled = false; }
+            };
             ytElement('ytPublishVideo').onchange = () => {
                 const video = youtubeSelectedVideo();
                 ytElement('ytPublishTitle').value = video ? video.filename.replace(/\.mp4$/i, '').slice(0, 100) : '';

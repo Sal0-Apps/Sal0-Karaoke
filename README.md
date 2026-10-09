@@ -121,20 +121,22 @@ No Android, **Configurações do app** fica na faixa inferior, inclusive quando 
 
 ## Publicação no YouTube
 
-O administrador conecta o canal em **Ajustes → Publicar no YouTube**, verifica a confirmação com o nome do canal e carrega as playlists. A autorização gratuita usa um assistente no computador e o navegador do Google; o servidor pode continuar em HTTP. Não exige serviço pago nem contratação de HTTPS. Consulte o [tutorial de conexão](UPDATES_AUTOMATIC_KARAOKE.md#conectar-o-canal-sem-https-no-servidor).
+O administrador conecta ou reconecta o canal em **Ajustes → YouTube · Administração → Reconectar canal pelo celular**. O servidor mostra um código; a aprovação acontece em `google.com/device`, no navegador do celular, mesmo ao acessar o app pelo endereço externo ou VPN. Na primeira configuração, cadastre uma credencial Google do tipo **TVs e dispositivos com entrada limitada**, pelo próprio painel. As próximas reconexões reutilizam essa credencial. O assistente de computador permanece como alternativa. Consulte o [tutorial de conexão](MANUAL.md#conectar-ou-reconectar-o-canal-pelo-celular).
+
+Em **Ajustes → YouTube · Downloads**, o administrador pode testar um link, atualizar o mecanismo e renovar a sessão com cookies.txt, inclusive exportando pelo Firefox para Android. A sessão de downloads é independente da autorização para publicar no canal. Atualizações são preparadas durante outras tarefas e aplicadas quando os downloads ativos terminarem.
 
 Em **Playlist de cada usuário**, a administração define uma playlist válida para cada conta. A playlist do administrador fica em **Padrões de publicação do administrador**. Com o canal conectado e uma playlist definida no perfil, **Publicar no YouTube** começa marcado para todos os usuários, inclusive contas novas e configurações antigas, e a publicação automática usa **Não listado**. A playlist do perfil é obrigatória: sem ela, a interface e o servidor bloqueiam a publicação. No modo rápido, o administrador pode escolher outra playlist para aquele vídeo, com a do perfil selecionada por padrão. O envio continua opcional por vídeo: desmarcado, nada é publicado. Título e capa automática ficam definidos antes da publicação. Vídeos prontos também podem ser publicados pelo painel administrativo, com outra privacidade escolhida explicitamente. O [manual](MANUAL.md#youtube-e-publicação-por-usuário) explica configuração e falhas comuns.
 
 ## Início rápido com Docker
 
-A versão de distribuição desta documentação é **11.3**. O título e o rodapé da página mostram apenas o nome da aplicação. A versão do servidor pode ser consultada no Manual; a versão do APK aparece nas configurações nativas.
+A versão de distribuição desta documentação é **11.4**. O título e o rodapé da página mostram apenas o nome da aplicação. A versão do servidor pode ser consultada no Manual; a versão do APK aparece nas configurações nativas.
 
 Crie um arquivo `compose.yaml`:
 
 ```yaml
 services:
   karaoke-app:
-    image: ghcr.io/sal0-apps/sal0-karaoke:11.3
+    image: ghcr.io/sal0-apps/sal0-karaoke:11.4
     container_name: karaoke-app
     ports:
       - "7885:7860"

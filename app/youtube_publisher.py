@@ -14,6 +14,7 @@ from urllib.parse import urlencode, urlparse
 import requests
 from media_covers import video_thumbnail
 from result_publication import youtube_eligible
+from youtube_device_auth import AuthorizationError, DeviceAuthorization, DEVICE_SCOPE, oauth_error
 
 API = 'https://www.googleapis.com/youtube/v3'
 UPLOAD = 'https://www.googleapis.com/upload/youtube/v3'
@@ -22,8 +23,7 @@ PRIVACY = {'private', 'unlisted', 'public'}
 CHUNK = 8 * 1024 * 1024
 
 
-class PublicationError(Exception):
-    pass
+PublicationError = AuthorizationError
 
 
 def uploaded_offset(response):
@@ -53,6 +53,59 @@ class YouTubePublisher:
         self.lock = threading.RLock()
         self.worker_lock = threading.Lock()
         self.oauth_states = {}
+        self._device = None
+
+    @property
+    def device(self):
+        if self._device is None or self._device.root != self.root:
+            self._device = DeviceAuthorization(self.root, write_private_json, self.accept_device_token)
+        return self._device
+
+    def save_authorization(self, token):
+        """A renewal of the same channel must not be blocked by its own queue."""
+        with self.lock:
+            jobs = self.read('jobs.json', [])
+            if any(job.get('channel_id') != token['channel_id'] and
+                   job.get('status') in {'queued', 'uploading', 'finalizing', 'auth_required'} for job in jobs):
+                raise PublicationError('Há envios pendentes para outro canal. Reconecte a mesma conta para retomá-los.')
+            token.pop('auth_error', None)
+            token.pop('refresh_retry_at', None)
+            token['checked_at'] = time.time()
+            self.save('token.json', token)
+            resumed = False
+            for job in jobs:
+                # Keep the resumable session and any confirmed video ID intact.
+                if job.get('status') == 'auth_required' and job.get('channel_id') == token['channel_id']:
+                    job.update(status='queued', error=None)
+                    resumed = True
+            if resumed:
+                self.save('jobs.json', jobs)
+                self.start()
+
+    def accept_device_token(self, token, config):
+        if not token.get('access_token') or not token.get('refresh_token'):
+            raise PublicationError('O Google não concedeu a autorização completa. Gere outro código.', 'auth_required')
+        scopes = token.get('scope', '')
+        if DEVICE_SCOPE not in str(scopes).split():
+            raise PublicationError('Permita o acesso ao YouTube solicitado pelo Google e tente novamente.', 'auth_required')
+        expires_at = token.get('expires_at', time.time() + token.get('expires_in', 3600))
+        if expires_at <= time.time() + 60:
+            response = requests.post('https://oauth2.googleapis.com/token', data={
+                **config, 'refresh_token': token['refresh_token'], 'grant_type': 'refresh_token'}, timeout=20)
+            if response.status_code != 200:
+                raise oauth_error(response)
+            updated = response.json()
+            if not updated.get('access_token'):
+                raise PublicationError('O Google não retornou um acesso válido. Tente reconectar.', 'auth_required')
+            token.update(updated)
+            expires_at = time.time() + updated.get('expires_in', 3600)
+            token['expires_at'] = expires_at
+        item = self.confirm_channel(token['access_token'])
+        token.update(channel_id=item['id'], channel_title=item['snippet']['title'],
+            expires_at=expires_at,
+            oauth_client=config, authorization_method='device')
+        self.save_authorization(token)
+        return token['channel_title']
 
     def read(self, name, default=None):
         try:
@@ -99,6 +152,8 @@ class YouTubePublisher:
         response = requests.post('https://oauth2.googleapis.com/token', data={
             **config, 'code': code, 'code_verifier': pending['verifier'], 'grant_type': 'authorization_code'}, timeout=30)
         if response.status_code != 200:
+            if response.status_code == 401:
+                raise PublicationError('O Google recusou o acesso ao canal. Use Reconectar canal no app.', 'auth_required')
             raise PublicationError('O Google não autorizou a conexão. Tente novamente.')
         token = response.json()
         if not token.get('refresh_token') or not token.get('access_token'):
@@ -111,16 +166,15 @@ class YouTubePublisher:
         token['channel_id'] = item['id']
         token['channel_title'] = item['snippet']['title']
         token['expires_at'] = time.time() + token.get('expires_in', 3600)
-        with self.lock:
-            if any(j.get('status') in {'queued', 'uploading', 'finalizing'} for j in self.read('jobs.json', [])):
-                raise PublicationError('Aguarde os envios pendentes antes de trocar a conexão do canal.')
-            self.save('token.json', token)
+        self.save_authorization(token)
         return token['channel_title']
 
     def confirm_channel(self, access_token):
         response = requests.get(API + '/channels', params={'part': 'snippet', 'mine': 'true'},
             headers={'Authorization': 'Bearer ' + access_token}, timeout=30)
         if response.status_code != 200:
+            if response.status_code == 401:
+                raise PublicationError('O Google recusou o acesso ao canal. Use Reconectar canal no app.', 'auth_required')
             reason = ''
             try:
                 reason = response.json().get('error', {}).get('errors', [{}])[0].get('reason', '')
@@ -160,40 +214,99 @@ class YouTubePublisher:
             if info.status_code != 200:
                 raise PublicationError('Não foi possível validar as permissões no Google. Tente novamente.')
             scopes = info.json().get('scope', '')
-        if SCOPE not in str(scopes).split():
+        if not {SCOPE, DEVICE_SCOPE}.intersection(str(scopes).split()):
             raise PublicationError('A autorização não permite gerenciar vídeos e playlists. Gere um novo arquivo no assistente e permita o acesso solicitado.')
         item = self.confirm_channel(token['access_token'])
         token.update(refresh_token=data['refresh_token'], channel_id=item['id'],
             channel_title=item['snippet']['title'], expires_at=time.time() + token.get('expires_in', 3600),
             desktop_client={key: data[key] for key in ('client_id', 'client_secret')})
-        with self.lock:
-            if any(j.get('status') in {'queued', 'uploading', 'finalizing'} for j in self.read('jobs.json', [])):
-                raise PublicationError('Aguarde os envios pendentes antes de trocar a conexão do canal.')
-            self.save('token.json', token)
+        self.save_authorization(token)
         return token['channel_title']
 
-    def token(self):
+    def token(self, force_refresh=False):
         with self.lock:
             token = self.read('token.json')
             if not token.get('refresh_token'):
                 raise PublicationError('Conecte o canal do YouTube no painel administrativo.')
-            if token.get('expires_at', 0) <= time.time() + 60:
-                config = token.get('desktop_client') or self.client_config()
+            if token.get('auth_error') and not force_refresh:
+                raise PublicationError(token['auth_error'], 'auth_required')
+            if token.get('refresh_retry_at', 0) > time.time() and not force_refresh:
+                raise PublicationError('O Google não respondeu à renovação. Use Verificar e renovar para tentar novamente.', 'retry_later')
+            if force_refresh or token.get('expires_at', 0) <= time.time() + 60:
+                config = token.get('oauth_client') or token.get('desktop_client') or self.client_config()
                 response = requests.post('https://oauth2.googleapis.com/token', data={
                     'client_id': config['client_id'], 'client_secret': config['client_secret'],
                     'refresh_token': token['refresh_token'], 'grant_type': 'refresh_token'}, timeout=30)
                 if response.status_code != 200:
-                    raise PublicationError('A conexão do YouTube expirou. Reconecte o canal.')
+                    error = oauth_error(response)
+                    if error.kind == 'auth_required':
+                        token['auth_error'] = str(error)
+                    else:
+                        token['refresh_retry_at'] = time.time() + 60
+                    self.save('token.json', token)
+                    raise error
                 updated = response.json()
+                if not updated.get('access_token'):
+                    raise PublicationError('O Google não retornou uma autorização válida. Tente verificar novamente.', 'retry_later')
                 token.update(updated)
                 token['expires_at'] = time.time() + updated.get('expires_in', 3600)
+                token['checked_at'] = time.time()
+                token.pop('auth_error', None)
+                token.pop('refresh_retry_at', None)
                 self.save('token.json', token)
             return token
 
+    def connection_status(self, force=False):
+        # Do not overwrite a newly approved grant with a delayed check result.
+        with self.lock:
+            return self._connection_status(force)
+
+    def _connection_status(self, force=False):
+        saved = self.read('token.json')
+        result = dict(connected=False, channel_title=saved.get('channel_title', ''),
+            connection_state='not_connected', message='Conecte seu canal para publicar vídeos.', recovery='connect')
+        if not saved.get('refresh_token'):
+            return result
+        try:
+            token = self.token(force_refresh=force)
+            if force:
+                item = self.confirm_channel(token['access_token'])
+                if item['id'] != token.get('channel_id'):
+                    raise PublicationError('A conta autorizada mudou de canal. Reconecte e confira o destino.', 'auth_required')
+                self.save_authorization(token)
+            result.update(connected=True, channel_title=token.get('channel_title', ''),
+                connection_state='connected', message='Canal conectado: ' + token.get('channel_title', ''), recovery=None)
+        except PublicationError as error:
+            if error.kind == 'auth_required':
+                latest = self.read('token.json')
+                latest['auth_error'] = str(error)
+                self.save('token.json', latest)
+            result.update(connection_state=error.kind, message=str(error), recovery=error.kind)
+        except requests.RequestException:
+            latest = self.read('token.json')
+            latest['refresh_retry_at'] = time.time() + 60
+            self.save('token.json', latest)
+            result.update(connection_state='network_error', message='O Google não respondeu. Sua autorização foi preservada; tente Verificar e renovar.', recovery='retry_later')
+        return result
+
+    def authenticated_request(self, method, url, timeout, **kwargs):
+        headers = dict(kwargs.pop('headers', {}))
+        body = kwargs.get('data')
+        body_position = body.tell() if hasattr(body, 'tell') and hasattr(body, 'seek') else None
+        for attempt in range(2):
+            if attempt and body_position is not None:
+                body.seek(body_position)
+            headers['Authorization'] = 'Bearer ' + self.token(force_refresh=bool(attempt))['access_token']
+            response = requests.request(method, url, headers=headers, timeout=timeout, **kwargs)
+            if response.status_code != 401:
+                return response
+        token = self.read('token.json')
+        token['auth_error'] = 'O Google recusou o acesso ao canal. Use Reconectar canal no app.'
+        self.save('token.json', token)
+        raise PublicationError(token['auth_error'], 'auth_required')
+
     def api(self, method, path, **kwargs):
-        headers = kwargs.pop('headers', {})
-        headers['Authorization'] = 'Bearer ' + self.token()['access_token']
-        response = requests.request(method, API + path, headers=headers, timeout=(15, 60), **kwargs)
+        response = self.authenticated_request(method, API + path, (15, 60), **kwargs)
         if response.status_code >= 400:
             try:
                 reason = response.json()['error']['errors'][0]['reason']
@@ -282,6 +395,8 @@ class YouTubePublisher:
         token = self.read('token.json')
         if not token.get('channel_id') or not token.get('refresh_token'):
             raise PublicationError('O administrador precisa conectar o canal do YouTube.')
+        if token.get('auth_error'):
+            raise PublicationError(token['auth_error'], 'auth_required')
         if len(title) > 100 or '<' in title or '>' in title:
             raise PublicationError('Título do YouTube inválido.')
         return {'privacy': settings['privacy'], 'title_template': settings['title_template'],
@@ -293,14 +408,22 @@ class YouTubePublisher:
         token = self.read('token.json')
         admin = user.get('role') == 'admin'
         assignment = settings['user_assignments'].get(user.get('username'), {})
-        enabled = bool(token.get('channel_id') and token.get('refresh_token'))
+        enabled = bool(token.get('channel_id') and token.get('refresh_token') and not token.get('auth_error'))
         playlist_id = settings['playlist_id'] if admin else assignment.get('playlist_id', '')
-        playlists = self.playlists() if enabled and admin else ([{'id': playlist_id,
-            'title': assignment.get('playlist_title', playlist_id)}] if enabled and playlist_id else [])
+        error = None
+        try:
+            playlists = self.playlists() if enabled and admin else ([{'id': playlist_id,
+                'title': assignment.get('playlist_title', playlist_id)}] if enabled and playlist_id else [])
+        except (PublicationError, requests.RequestException) as failure:
+            playlists = []
+            error = str(failure) if isinstance(failure, PublicationError) else 'O YouTube não respondeu agora.'
+            if getattr(failure, 'kind', '') == 'auth_required':
+                enabled = False
         return {'enabled': enabled, 'playlists': playlists, 'allow_no_playlist': False, 'can_choose_playlist': admin, 'can_publish': bool(enabled and playlist_id and any(p['id'] == playlist_id for p in playlists)),
                 'playlist_id': playlist_id, 'default_publish': bool(enabled and playlist_id and any(p['id'] == playlist_id for p in playlists)),
                 'privacy': settings['privacy'], 'channel_title': token.get('channel_title', ''),
-                'title_template': settings['title_template']}
+                'title_template': settings['title_template'], 'connection_message': error,
+                'needs_reconnection': bool(token.get('auth_error') or (error and not enabled))}
 
     def enqueue(self, video, title, privacy='unlisted', playlist_id='', thumbnail=None, channel_id=None, requester=None):
         video = Path(video).resolve()
@@ -374,9 +497,7 @@ class YouTubePublisher:
         parsed = urlparse(url)
         if parsed.scheme != 'https' or parsed.hostname != 'www.googleapis.com':
             raise PublicationError('Sessão de envio inválida.')
-        headers = kwargs.pop('headers', {})
-        headers['Authorization'] = 'Bearer ' + self.token()['access_token']
-        return requests.request(method, url, headers=headers, timeout=(15, 120), **kwargs)
+        return self.authenticated_request(method, url, (15, 120), **kwargs)
 
     def upload_video(self, job):
         if job.get('video_id'):
@@ -493,7 +614,7 @@ class YouTubePublisher:
                     self.publish(job)
                 except Exception as error:
                     message = str(error) if isinstance(error, PublicationError) else 'Falha de comunicação com o YouTube. Retome a tarefa pelo painel.'
-                    self.checkpoint(job, status='error', error=message)
+                    self.checkpoint(job, status='auth_required' if getattr(error, 'kind', '') == 'auth_required' else 'error', error=message)
         finally:
             self.worker_lock.release()
             # An enqueue can race the worker's final empty-queue check.
@@ -527,7 +648,7 @@ def install_routes(app, get_current_user, require_admin, resolve_video, check_ad
         try:
             return action()
         except PublicationError as error:
-            raise HTTPException(400, str(error))
+            raise HTTPException(400, str(error), headers={'X-YouTube-Recovery': error.kind})
         except requests.RequestException:
             raise HTTPException(502, 'O YouTube não respondeu. Tente novamente.')
 
@@ -559,11 +680,28 @@ def install_routes(app, get_current_user, require_admin, resolve_video, check_ad
 
     @app.get('/api/admin/youtube/status')
     def status(user=Depends(admin)):
-        token = publisher.read('token.json')
         return {'configured': True, 'web_configured': all(os.environ.get(k) for k in ('YOUTUBE_CLIENT_ID', 'YOUTUBE_CLIENT_SECRET', 'YOUTUBE_REDIRECT_URI')),
-                'connected': bool(token.get('refresh_token')), 'channel_title': token.get('channel_title', ''),
+                **publisher.connection_status(), 'device_configured': publisher.device.configured(),
+                'device_session': publisher.device.status(user['username']),
                 'settings': publisher.settings(user['username']),
                 'jobs': [publisher.public_job(j) for j in publisher.read('jobs.json', [])][-30:]}
+
+    @app.post('/api/admin/youtube/verify-connection')
+    def verify_connection(user=Depends(admin)):
+        return publisher.connection_status(force=True)
+
+    @app.post('/api/admin/youtube/device/start')
+    def device_start(options: dict, user=Depends(admin)):
+        return guarded(lambda: publisher.device.start(user['username'], options.get('credentials')))
+
+    @app.post('/api/admin/youtube/device/poll')
+    def device_poll(options: dict, user=Depends(admin)):
+        check_admin(user['username'])
+        return guarded(lambda: publisher.device.poll(user['username'], options.get('session_id', '')))
+
+    @app.post('/api/admin/youtube/device/cancel')
+    def device_cancel(options: dict, user=Depends(admin)):
+        return guarded(lambda: (publisher.device.cancel(user['username'], options.get('session_id')) or {'status': 'cancelled'}))
 
     @app.post('/api/admin/youtube/connect')
     def connect(user=Depends(admin)):

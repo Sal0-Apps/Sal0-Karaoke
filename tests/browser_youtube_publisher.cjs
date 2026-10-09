@@ -40,6 +40,7 @@ assert(!(await page.locator('#ytPublishVideo').textContent()).includes('unknown.
 await page.locator('.yt-user-row').first().waitFor();
 assert.equal(await page.locator('.yt-user-row').count(),2);
 assert(await page.locator('#yt-user-playlist-0').isDisabled());
+await page.locator('#ytDesktopFallback').evaluate(el => el.open = true);
 await page.locator('#ytDesktopAuthorization').setInputFiles({name:'youtube-autorizacao.json',mimeType:'application/json',buffer:Buffer.from('{}')});
 await page.locator('#ytDesktopImport').click();
 assert(await page.locator('#ytDesktopImport').isDisabled());
@@ -58,7 +59,7 @@ assert(!(await page.locator('#easyYoutubePublish').isChecked()));
 assert((await page.locator('#easyYoutubePublicationNote').textContent()).includes('bloqueada'));
 const bob=page.locator('.yt-user-row[data-username="bob"]');
 await bob.locator('[data-field="playlist"]').selectOption('PL-two');
-await page.locator('.yt-defaults summary').click();
+await page.locator('#youtubePublisherSection .yt-defaults').filter({has:page.locator('#ytDefaultPrivacy')}).locator('summary').click();
 assert(await page.locator('#ytDefaultPrivacy').isDisabled());
 assert.equal(await page.locator('#ytDefaultPrivacy').inputValue(),'unlisted');
 await page.locator('#ytDefaultPlaylist').selectOption('PL-two');

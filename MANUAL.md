@@ -1,6 +1,6 @@
 # Manual do Sal0 Karaokê
 
-Este manual descreve os controles disponíveis na distribuição 11.3. Para instalar o servidor, consulte [DEPLOYMENT.md](DEPLOYMENT.md). Para configurar o aparelho, consulte o [guia Android](android/README.md).
+Este manual descreve os controles disponíveis na distribuição 11.4. Para instalar o servidor, consulte [DEPLOYMENT.md](DEPLOYMENT.md). Para configurar o aparelho, consulte o [guia Android](android/README.md).
 
 O Sal0 Karaokê é destinado a uma instalação pessoal, acessada pela rede local ou por VPN, como ZeroTier. O repositório aberto disponibiliza o código e os pacotes; o projeto não opera um serviço público de processamento nem coleta centralmente as mídias das instalações. Não é necessário expor a porta do app à internet. O processamento principal é local, mas as integrações escolhidas podem se comunicar com serviços externos.
 
@@ -276,11 +276,18 @@ Em **Ajustes → Modelos Whisper**, consulte os modelos disponíveis e os já ba
 
 Abra os grupos de transcrição, visual e fluxo. Configure modelo, perfil da voz, origem do áudio, VAD, busca de letra, estilo, fonte, versos, fundo, revisão e salvamento. Marque os fundos da coleção aleatória e salve em **Salvar perfil do Modo Rápido**. **Restaurar padrão** permite voltar aos valores iniciais; confira a tela e salve a configuração desejada.
 
-### Compatibilidade com YouTube
+### Downloads do YouTube e renovação de sessão
 
-Em **Ajustes → Compatibilidade com YouTube**, consulte as versões exibidas. O administrador pode usar **Atualizar mecanismo** para instalar uma atualização do `yt-dlp` no volume persistente.
+Em **Ajustes → YouTube · Downloads**, cole o link e toque em **Testar link**. O teste consulta o vídeo com o mecanismo do servidor; não inicia o processamento nem comprova que o arquivo completo já foi baixado. Se o YouTube mudou seu mecanismo, use **Atualizar mecanismo**. A instalação é preparada em separado, inclusive durante Demucs ou Whisper, e somente a aplicação aguarda downloads ativos. O servidor seleciona a versão mais recente entre a imagem Docker e o volume persistente.
 
-Prefira fazer isso sem downloads em execução. Aguarde a conclusão e teste novamente o link autorizado. A atualização não garante acesso a mídias privadas, restritas, removidas ou bloqueadas pelo serviço. Ela também não atualiza automaticamente todos os componentes do servidor.
+Quando o serviço pedir login, abra **Renovar sessão de downloads pelo celular**:
+
+1. No Firefox para Android, instale [cookies.txt](https://addons.mozilla.org/pt-BR/android/addon/cookies-txt/) e permita a extensão em navegação privativa.
+2. Em uma aba privativa, faça login no YouTube. Na mesma aba, abra `https://www.youtube.com/robots.txt`.
+3. Exporte os cookies do site em formato Netscape pela extensão e feche a aba privativa. As [instruções do yt-dlp](https://github.com/yt-dlp/yt-dlp/wiki/Extractors#exporting-youtube-cookies) explicam como evitar a rotação da sessão exportada.
+4. No app, escolha cookies.txt ou cole o conteúdo e toque em **Salvar sessão**. Depois teste o link e repita a tarefa desejada. Tudo funciona pelo endereço externo do app, sem acesso local ao servidor.
+
+Os cookies dão acesso à sessão e devem ficar privados. São guardados com permissão 0600; somente domínios do YouTube e Google são aceitos. Um arquivo inválido não substitui o anterior. **Remover sessão de downloads** não desconecta o canal nem altera playlists. Uma sessão expirada pode ser dispensada para vídeos públicos, com uma tentativa limitada sem login. A atualização e o login não tornam acessíveis vídeos removidos ou restrições que sua conta não pode satisfazer.
 
 ### Usuários
 
@@ -326,15 +333,21 @@ A instalação prioriza processamento local, mas pode acessar serviços externos
 
 Os três modos e as entradas do YouTube na Biblioteca permitem pesquisar por nome, com miniaturas, título, canal e duração. A seleção preenche o link; a busca não inicia um processamento ou publicação sozinha.
 
-### Conectar o canal em HTTP, gratuitamente
+### Conectar ou reconectar o canal pelo celular
 
-1. No Google Cloud, habilite **YouTube Data API v3** no mesmo projeto da credencial. Configure o público e, se estiver em teste, adicione sua conta em **Usuários de teste**.
-2. Crie um cliente OAuth do tipo **Aplicativo para computador** e baixe seu JSON.
-3. No Karaokê, abra **Ajustes → Publicar no YouTube → Conexão do canal** e o guia **Ainda não tenho o arquivo de autorização**. Baixe o assistente Windows; em Linux/macOS, use a alternativa Python indicada.
-4. Abra o assistente no computador, escolha o JSON, prepare a conexão e autorize no navegador do Google. Mantenha o assistente aberto e baixe **youtube-autorizacao.json** ao concluir.
-5. Importe esse arquivo no Karaokê e toque em **Conectar meu canal**. Aguarde a confirmação **Canal conectado**, com o nome do canal. **Verificar conexão e atualizar playlists** confere o acesso e carrega as playlists.
+1. Acesse o app pela rede local, endereço externo ou VPN e entre como administrador. Abra **Ajustes → YouTube · Administração → Conexão do canal**.
+2. Na primeira vez, abra **Configurar conexão pelo celular (uma vez)**. No navegador do celular, ative **YouTube Data API v3** no projeto Google, configure o público do app e crie um cliente OAuth do tipo **TVs e dispositivos com entrada limitada**. Use a visualização para computador do navegador se necessário; não é necessário usar um PC.
+3. Baixe o JSON dessa credencial ou copie ID e chave. Escolha o arquivo ou cole os campos no app e toque em **Salvar credencial e gerar código**. A credencial antiga de aplicativo para computador não serve para este fluxo; o Google valida o tipo antes de salvá-la.
+4. Toque em **Copiar código** e **Abrir Google no navegador**. Se o navegador não abrir, acesse `google.com/device` no Chrome ou Firefox. Escolha a conta do canal, informe o código e permita o acesso ao YouTube. Volte ao app: ele consulta a aprovação e confirma o nome do canal.
+5. Nas próximas vezes, use apenas **Reconectar canal pelo celular**. **Verificar e renovar conexão** testa a renovação automática e consulta o canal. A conexão é preservada se houver falha temporária de rede; autorização recusada fica identificada como precisando de reconexão.
 
-O retorno do Google ocorre no próprio computador. O servidor continua em HTTP e não precisa de variáveis OAuth no Compose para este método. Guarde o JSON de autorização como uma senha. Se aparecer `access_denied`, confira o usuário de teste; se o painel pedir a API, ative-a no projeto correto. Erros de conexão e carregamento aparecem na própria seção, sem esconder a configuração dos usuários.
+O método autoriza o servidor sem navegador, usando a página oficial do Google no celular; dispensa HTTPS de retorno, portas adicionais, variáveis OAuth no Compose e o assistente Windows. Código pendente continua disponível ao reabrir o app. É possível cancelar ou gerar outro após expirar. Tokens e credenciais ficam privados em `/data/youtube`, com permissão 0600; a tela recebe somente o código para o usuário e o endereço do Google.
+
+Projetos externos com público em **Teste** expiram a autorização após sete dias para os escopos do YouTube. Confira [Google Auth Platform → Público](https://console.cloud.google.com/auth/audience) e as condições para colocar seu projeto em produção. Isso não elimina a possibilidade de revogação, exigências de verificação ou nova aprovação da conta. O app renova tokens automaticamente enquanto o Google permitir, mas não pode aprovar o acesso por você. [Documentação Google](https://developers.google.com/identity/protocols/oauth2).
+
+Reconectar o **mesmo canal** mantém playlists, tarefas e pontos de retomada. Envios que aguardam autorização retomam após a confirmação, sem iniciar outra publicação para um vídeo já enviado. Trocar para outro canal continua bloqueado enquanto houver envios pendentes para o anterior. Cota da API e sessão de downloads são tratadas separadamente da conexão do canal.
+
+O grupo **Já tenho um arquivo do assistente antigo** preserva a importação de `youtube-autorizacao.json` e os assistentes anteriores. A conexão web com retorno HTTPS permanece disponível quando configurada no servidor.
 
 ### Playlists e publicação padrão de todas as contas
 

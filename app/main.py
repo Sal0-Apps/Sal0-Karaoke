@@ -3,6 +3,7 @@ socket.setdefaulttimeout(120)  # Timeout de 120s para impedir travamentos de soc
 import os
 import sys
 import importlib
+import importlib.machinery
 import uuid
 import shutil
 import logging
@@ -47,6 +48,10 @@ from lyric_drafts import read_draft, write_draft, clear_draft
 from lyrics_search import split_search_identity, lyrics_match_score, relevant_lyrics_results, select_automatic_lyrics
 from reprocess_cache import copy_reusable_inputs, youtube_identity, file_fingerprint
 from media_covers import video_thumbnail
+from youtube_download_access import (
+    DOWNLOAD_ACCESS, DownloadAccessError, extract_youtube_info, package_version, version_key,
+    install_routes as install_youtube_download_routes,
+)
 from lyrics_sync import recording_matches, require_acoustic_word_timing, anchor_synced_animation
 from lyric_guide import prepare_lyrics_guide, verify_lyrics_guide, review_lyrics_with_whisper, GUIDE_POLICY_VERSION
 from backing_vocals import preserve_backing_vocals
@@ -157,16 +162,21 @@ class YtDlpLogAdapter:
 
 
 def load_yt_dlp(force_reload: bool = False):
-    """Carrega primeiro a cópia persistente atualizada pelo administrador, quando disponível."""
-    if os.path.isdir(YT_DLP_RUNTIME_DIR) and YT_DLP_RUNTIME_DIR not in sys.path:
-        sys.path.insert(0, YT_DLP_RUNTIME_DIR)
-
-    if force_reload:
+    """Choose the newest available engine; an old volume cannot shadow a new image."""
+    paths = [path for path in sys.path if path != YT_DLP_RUNTIME_DIR]
+    image_spec = importlib.machinery.PathFinder.find_spec("yt_dlp", paths)
+    image_dir = os.path.dirname(image_spec.origin) if image_spec and image_spec.origin else ""
+    saved_version = package_version(os.path.join(YT_DLP_RUNTIME_DIR, "yt_dlp", "version.py"))
+    image_version = package_version(os.path.join(image_dir, "version.py")) if image_dir else ""
+    prefer_saved = bool(saved_version and (not image_version or version_key(saved_version) >= version_key(image_version)))
+    sys.path[:] = ([YT_DLP_RUNTIME_DIR] if prefer_saved else []) + paths
+    current = sys.modules.get("yt_dlp")
+    current_saved = bool(current and str(getattr(current, "__file__", "")).startswith(YT_DLP_RUNTIME_DIR + os.sep))
+    if force_reload or (current is not None and current_saved != prefer_saved):
         for module_name in tuple(sys.modules):
-            if module_name == "yt_dlp" or module_name.startswith("yt_dlp."):
+            if module_name == "yt_dlp" or module_name.startswith("yt_dlp.") or module_name == "yt_dlp_ejs" or module_name.startswith("yt_dlp_ejs."):
                 sys.modules.pop(module_name, None)
         importlib.invalidate_caches()
-
     return importlib.import_module("yt_dlp")
 
 
@@ -238,13 +248,16 @@ def download_youtube(url: str, cache_dir: str) -> tuple[str, str]:
             }
             try:
                 logger.info("Download do YouTube: tentativa %s de %s.", attempt, len(formats))
-                with yt_dlp.YoutubeDL(options) as ydl:
-                    info = ydl.extract_info(url, download=True)
+                info = extract_youtube_info(yt_dlp, url, options)
                 title = str((info or {}).get("title") or title)
                 return find_downloaded_file(cache_dir, "original_input"), title
+            except InterruptedError:
+                raise
             except Exception as exc:
                 last_error = exc
                 logger.warning("Tentativa %s do download do YouTube falhou: %s", attempt, exc)
+                if isinstance(exc, DownloadAccessError) and exc.recovery in {"renew_cookies", "check_video"}:
+                    break
 
         raise RuntimeError(f"Não foi possível baixar o vídeo do YouTube: {last_error}")
 
@@ -424,44 +437,45 @@ def run_yt_dlp_update():
             YT_DLP_STAGING_DIR,
             "yt-dlp[default]",
         ]
+        result = subprocess.run(
+            command,
+            capture_output=True,
+            text=True,
+            timeout=900,
+            check=False,
+        )
+        if result.returncode != 0:
+            details = (result.stderr or result.stdout or "Falha não especificada.").strip()
+            raise RuntimeError(details[-3000:])
+
+        validation = subprocess.run(
+            [
+                sys.executable,
+                "-c",
+                (
+                    "import sys; "
+                    f"sys.path.insert(0, {YT_DLP_STAGING_DIR!r}); "
+                    "from yt_dlp.version import __version__; print(__version__)"
+                ),
+            ],
+            capture_output=True,
+            text=True,
+            timeout=30,
+            check=False,
+        )
+        if validation.returncode != 0 or not (validation.stdout or "").strip():
+            raise RuntimeError((validation.stderr or "O pacote baixado não pôde ser validado.")[-3000:])
+
+        with yt_dlp_update_lock:
+            yt_dlp_update_state["message"] = "Atualização preparada. Aguardando downloads ativos para aplicar com segurança..."
         with yt_dlp_operation_lock:
-            result = subprocess.run(
-                command,
-                capture_output=True,
-                text=True,
-                timeout=900,
-                check=False,
-            )
-            if result.returncode != 0:
-                details = (result.stderr or result.stdout or "Falha não especificada.").strip()
-                raise RuntimeError(details[-3000:])
-
-            validation = subprocess.run(
-                [
-                    sys.executable,
-                    "-c",
-                    (
-                        "import sys; "
-                        f"sys.path.insert(0, {YT_DLP_STAGING_DIR!r}); "
-                        "from yt_dlp.version import __version__; print(__version__)"
-                    ),
-                ],
-                capture_output=True,
-                text=True,
-                timeout=30,
-                check=False,
-            )
-            if validation.returncode != 0 or not (validation.stdout or "").strip():
-                raise RuntimeError((validation.stderr or "O pacote baixado não pôde ser validado.")[-3000:])
-
             if os.path.isdir(YT_DLP_BACKUP_DIR):
                 shutil.rmtree(YT_DLP_BACKUP_DIR)
             had_previous_runtime = os.path.isdir(YT_DLP_RUNTIME_DIR)
             if had_previous_runtime:
                 os.replace(YT_DLP_RUNTIME_DIR, YT_DLP_BACKUP_DIR)
-            os.replace(YT_DLP_STAGING_DIR, YT_DLP_RUNTIME_DIR)
-
             try:
+                os.replace(YT_DLP_STAGING_DIR, YT_DLP_RUNTIME_DIR)
                 load_yt_dlp(force_reload=True)
                 installed_version = yt_dlp_version()
             except Exception:
@@ -499,8 +513,10 @@ def run_yt_dlp_update():
 def get_youtube_tools_status(current_user: dict = Depends(get_current_user)):
     require_admin(current_user)
     try:
+        engine = load_yt_dlp()
         installed_version = yt_dlp_version()
     except Exception as exc:
+        engine = None
         installed_version = None
         logger.warning("Não foi possível consultar a versão do yt-dlp: %s", exc)
 
@@ -509,18 +525,16 @@ def get_youtube_tools_status(current_user: dict = Depends(get_current_user)):
 
     return {
         "yt_dlp_version": installed_version,
-        "source": "persistent" if os.path.isfile(os.path.join(YT_DLP_RUNTIME_DIR, "yt_dlp", "__init__.py")) else "image",
+        "source": "persistent" if str(getattr(engine, "__file__", "")).startswith(YT_DLP_RUNTIME_DIR + os.sep) else "image",
         "deno_version": deno_runtime_version(),
         "update": update_snapshot,
+        "access": DOWNLOAD_ACCESS.status(),
     }
 
 
 @app.post("/api/youtube-tools/update")
 def update_youtube_tools(current_user: dict = Depends(get_current_user)):
     require_admin(current_user)
-    if processing_lock.locked():
-        raise HTTPException(status_code=409, detail="Aguarde o processamento atual terminar antes de atualizar.")
-
     with yt_dlp_update_lock:
         if yt_dlp_update_state.get("status") == "updating":
             return {"status": "updating"}
@@ -1893,8 +1907,7 @@ def search_youtube(data: YouTubeSearchRequest, current_user: dict = Depends(get_
                 "extractor_retries": 1,
                 "playlistend": 6,
             }
-            with yt_dlp.YoutubeDL(options) as ydl:
-                info = ydl.extract_info(f"ytsearch6:{query}", download=False)
+            info = extract_youtube_info(yt_dlp, f"ytsearch6:{query}", options)
         results = []
         for entry in (info or {}).get("entries", []) or []:
             if not isinstance(entry, dict):
@@ -1912,6 +1925,8 @@ def search_youtube(data: YouTubeSearchRequest, current_user: dict = Depends(get_
         return {"results": results}
     except HTTPException:
         raise
+    except DownloadAccessError as exc:
+        raise HTTPException(status_code=502, detail=str(exc), headers={"X-YouTube-Recovery": exc.recovery})
     except Exception as exc:
         logger.info("YouTube search unavailable: %s", type(exc).__name__)
         raise HTTPException(status_code=502, detail="A busca no YouTube não respondeu. Tente novamente ou cole o link.")
@@ -1935,8 +1950,7 @@ def get_youtube_metadata(
                 "skip_download": True,
                 "socket_timeout": 20,
             }
-            with yt_dlp.YoutubeDL(options) as ydl:
-                info = ydl.extract_info(url, download=False)
+            info = extract_youtube_info(yt_dlp, url, options)
         title = str((info or {}).get("title") or "").strip()
         if not title:
             raise HTTPException(status_code=404, detail="Não foi possível identificar o título desse vídeo.")
@@ -1951,6 +1965,8 @@ def get_youtube_metadata(
         }
     except HTTPException:
         raise
+    except DownloadAccessError as exc:
+        raise HTTPException(status_code=502, detail=str(exc), headers={"X-YouTube-Recovery": exc.recovery})
     except Exception as exc:
         logger.info("Não foi possível identificar metadados do YouTube: %s", type(exc).__name__)
         raise HTTPException(status_code=502, detail="Não foi possível identificar esse vídeo agora.")
@@ -2211,14 +2227,17 @@ def download_bg_youtube(url: str, cache_dir: str) -> tuple[str, str]:
             }
             try:
                 logger.info("Download do fundo do YouTube: tentativa %s de %s.", attempt, len(formats))
-                with yt_dlp.YoutubeDL(options) as ydl:
-                    info = ydl.extract_info(url, download=True)
+                info = extract_youtube_info(yt_dlp, url, options)
                 title = str((info or {}).get("title") or title)
                 raw_file = find_downloaded_file(cache_dir, "bg_yt_raw")
                 break
+            except InterruptedError:
+                raise
             except Exception as exc:
                 last_error = exc
                 logger.warning("Tentativa %s do fundo do YouTube falhou: %s", attempt, exc)
+                if isinstance(exc, DownloadAccessError) and exc.recovery in {"renew_cookies", "check_video"}:
+                    break
 
         if not raw_file:
             raise RuntimeError(f"Não foi possível baixar o fundo do YouTube: {last_error}")
@@ -6173,3 +6192,14 @@ def check_youtube_oauth_admin(username):
 from pathlib import Path
 youtube_publisher = install_youtube_publisher(
     app, get_current_user, require_admin, resolve_youtube_publication_video, check_youtube_oauth_admin, user_from_username)
+
+
+def probe_youtube_download_access(url):
+    with yt_dlp_operation_lock:
+        return extract_youtube_info(load_yt_dlp(), url, {
+            **youtube_download_options(), "skip_download": True, "socket_timeout": 20,
+            "retries": 1, "extractor_retries": 1,
+        })
+
+
+install_youtube_download_routes(app, get_current_user, require_admin, probe_youtube_download_access)
