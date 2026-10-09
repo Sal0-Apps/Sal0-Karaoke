@@ -2299,7 +2299,8 @@
                 <section class="yt-panel" aria-labelledby="ytUsersHeading">
                     <h3 id="ytUsersHeading">2. Playlist de cada usuário</h3>
                     <p class="compact-note">A publicação começa marcada para todas as contas, com privacidade Não listado. Defina a playlist de destino de cada pessoa; ela pode desmarcar o envio em um vídeo específico.</p>
-                    <p id="ytPlaylistStatus" class="yt-status" role="status"></p>
+                    <button type="button" id="ytPlaylistsRefresh" class="btn-secondary">Atualizar playlists</button>
+                    <p id="ytPlaylistStatus" class="yt-status" role="status" aria-live="polite"></p>
                     <div id="ytUserAssignments" class="yt-user-list"></div>
                     <details class="yt-defaults"><summary>Padrões de publicação do administrador</summary>
                         <div class="yt-fields">
@@ -2774,7 +2775,7 @@
                 </ol>
                 <p>A API tem cota gratuita e pode limitar projetos sem auditoria a vídeos privados. Guarde a autorização como uma senha. Backing vocals e vídeo do modo SRT mostram porcentagem da etapa e avisam o avanço no Telegram; o LibreTranslate informa apenas início e término.</p>
             </details>
-            <p class="compact-note">Versão do servidor: 11.4. A transcrição é local; fontes, modelos e integrações podem acessar serviços externos. Use conteúdo autorizado.</p>
+            <p class="compact-note">Versão do servidor: 11.4.1. A transcrição é local; fontes, modelos e integrações podem acessar serviços externos. Use conteúdo autorizado.</p>
             <p class="compact-note">Use o servidor pela rede local ou VPN. A busca/importação do YouTube não concede direitos sobre a mídia. OAuth autoriza o acesso ao canal, não o uso de músicas. Confira as permissões do conteúdo e os termos do YouTube antes de importar ou publicar. Não listado permite acesso a quem tiver o link; resultados SRT nunca vão ao YouTube.</p>
             <p class="compact-note"><a href="https://www.youtube.com/static?template=terms" target="_blank" rel="noopener noreferrer">Termos do YouTube</a> · <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer">Privacidade do Google</a> · <a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener noreferrer">Revogar acesso ao canal</a></p>
         </div>
@@ -7086,6 +7087,8 @@
         let youtubeCoverObjectUrl = null;
         let youtubePreviewRevision = 0;
         let youtubePreviewReady = false;
+        let youtubePublisherRequest = null;
+        let youtubePlaylistChannel = '';
         const ytElement = id => document.getElementById(id);
         function ytMessage(message) { const el = ytElement('ytPublishMessage'); if (el) el.textContent = message; }
         function ytNotice(id, message, kind = 'info') {
@@ -7093,15 +7096,25 @@
             el.textContent = message; el.dataset.kind = kind; el.hidden = !message;
         }
         async function ytRequest(path, options = {}) {
-            const response = await authFetch('/api/admin/youtube/' + path, options);
-            let result;
-            try { result = await response.json(); }
-            catch { throw new Error('O servidor não retornou uma resposta válida. Verifique a conexão e tente novamente.'); }
-            if (!response.ok) {
-                const error = new Error(typeof result.detail === 'string' ? result.detail : 'Não foi possível concluir a solicitação (HTTP ' + response.status + ').');
-                error.recovery = response.headers.get('X-YouTube-Recovery'); throw error;
+            const reading = !options.method || options.method.toUpperCase() === 'GET';
+            for (let attempt = 0; attempt < (reading ? 2 : 1); attempt++) {
+                const response = await authFetch('/api/admin/youtube/' + path, options);
+                let result;
+                try {
+                    result = await response.json();
+                    if (!result || typeof result !== 'object' || Array.isArray(result)) throw new Error();
+                } catch {
+                    if (reading && !attempt && response.status >= 500) continue;
+                    throw new Error(response.status >= 500
+                        ? 'Falha no servidor ou na conexão externa (HTTP ' + response.status + '). Toque em Atualizar playlists ou Verificar e renovar para tentar novamente.'
+                        : 'A resposta do servidor não pôde ser lida (HTTP ' + response.status + '). Confira o acesso ao app e tente novamente.');
+                }
+                if (!response.ok) {
+                    const error = new Error(typeof result.detail === 'string' ? result.detail : 'Não foi possível concluir a solicitação (HTTP ' + response.status + ').');
+                    error.recovery = response.headers.get('X-YouTube-Recovery'); throw error;
+                }
+                return result;
             }
-            return result;
         }
         function youtubeSelectedVideo() {
             const index = ytElement('ytPublishVideo').value;
@@ -7199,11 +7212,21 @@
             }
             return assignments;
         }
-        async function loadYoutubePublisher(full = true) {
-            if (currentUser?.role !== 'admin' || youtubeSettingsBusy) return;
+        function loadYoutubePublisher(full = true) {
+            if (currentUser?.role !== 'admin' || youtubeSettingsBusy) return Promise.resolve();
+            if (youtubePublisherRequest) return full
+                ? youtubePublisherRequest.then(() => loadYoutubePublisher(true)) : youtubePublisherRequest;
+            youtubePublisherRequest = refreshYoutubePublisher(full).finally(() => { youtubePublisherRequest = null; });
+            return youtubePublisherRequest;
+        }
+        async function refreshYoutubePublisher(full) {
+            const refreshButton = ytElement('ytPlaylistsRefresh');
+            if (full) { refreshButton.disabled = true; refreshButton.textContent = '⏳ Buscando playlists…'; ytElement('ytPublishSave').disabled = true; }
             try {
                 const deviceGeneration = youtubeDeviceGeneration;
                 const status = await ytRequest('status');
+                const channel = status.channel_id || status.channel_title || '';
+                const sameChannel = !!channel && channel === youtubePlaylistChannel;
                 youtubeChannelConnected = !!status.connected;
                 ytNotice('ytPublishChannel', status.connected ? '✓ Canal conectado: ' + status.channel_title : (status.message || 'Canal não conectado. Use Reconectar canal pelo celular.'), status.connected ? 'success' : status.recovery === 'auth_required' ? 'error' : 'info');
                 if (!youtubeDeviceSetupSeen) { ytElement('ytDeviceSetup').open = !status.device_configured; youtubeDeviceSetupSeen = true; }
@@ -7215,24 +7238,36 @@
                 if (status.connected) ytElement('ytConnectionGuide').open = false;
                 ytElement('ytDefaultPrivacy').value = 'unlisted';
                 ytElement('ytPublishPrivacy').value = 'unlisted';
-                ytElement('ytPublishTemplate').value = status.settings.title_template;
                 let playlists = []; youtubePlaylistsAvailable = false;
                 if (status.connected) {
                     try {
-                        const result = await ytRequest('playlists'); playlists = result.playlists || []; youtubePlaylistsAvailable = true;
-                        ytNotice('ytPlaylistStatus', playlists.length ? playlists.length + ' playlists disponíveis. Escolha uma para cada usuário abaixo.' : 'Este canal ainda não possui playlists. Você pode publicar sem playlist ou criar uma no YouTube.', 'info');
+                        const result = await ytRequest('playlists');
+                        if (!Array.isArray(result.playlists) || result.playlists.some(p => !p || typeof p.id !== 'string' || typeof p.title !== 'string')) throw new Error('A lista de playlists veio incompleta. Tente atualizar novamente.');
+                        playlists = result.playlists; youtubePlaylistsAvailable = true;
+                        ytNotice('ytPlaylistStatus', playlists.length ? playlists.length + ' playlists disponíveis. Escolha uma para cada usuário abaixo.' : 'Este canal ainda não possui playlists. Crie uma no YouTube e toque em Atualizar playlists para habilitar a publicação.', 'info');
                     } catch (error) {
                         if (error.recovery === 'auth_required') { youtubeChannelConnected = false; ytNotice('ytPublishChannel', error.message, 'error'); }
                         ytNotice('ytPlaylistStatus', 'Não foi possível carregar as playlists: ' + error.message, 'error');
                     }
                 } else { ytNotice('ytPlaylistStatus', 'Conecte o canal primeiro. Depois as playlists aparecerão aqui.', 'info'); }
+                const keepDraft = sameChannel && !!ytElement('ytUserAssignments').children.length;
+                const assignments = { ...(status.settings.user_assignments || {}) };
+                if (keepDraft) for (const [name, value] of Object.entries(readYoutubeUserAssignments())) assignments[name] = { ...assignments[name], ...value };
+                ytElement('ytPublishTemplate').value = keepDraft ? ytElement('ytPublishTemplate').value : status.settings.title_template;
                 for (const id of ['ytPublishPlaylist', 'ytDefaultPlaylist']) {
-                    const select = ytElement(id); select.replaceChildren(new Option('Defina uma playlist', ''));
-                    playlists.forEach(playlist => select.add(new Option(playlist.title, playlist.id)));
-                    if (status.settings.playlist_id && !playlists.some(p => p.id === status.settings.playlist_id)) select.add(new Option('Destino salvo · ' + status.settings.playlist_id, status.settings.playlist_id));
-                    select.value = status.settings.playlist_id || ''; select.disabled = !youtubePlaylistsAvailable;
+                    const select = ytElement(id);
+                    const selected = keepDraft ? select.value : (status.settings.playlist_id || '');
+                    if (youtubePlaylistsAvailable || !keepDraft) {
+                        select.replaceChildren(new Option('Defina uma playlist', ''));
+                        playlists.forEach(playlist => select.add(new Option(playlist.title, playlist.id)));
+                        if (selected && !playlists.some(p => p.id === selected)) select.add(new Option('Destino salvo · ' + selected, selected));
+                        select.value = selected;
+                    }
+                    select.disabled = !youtubePlaylistsAvailable;
                 }
-                await renderYoutubeUserAssignments(status.settings.user_assignments || {}, playlists);
+                if (youtubePlaylistsAvailable || !keepDraft) await renderYoutubeUserAssignments(assignments, playlists);
+                else for (const select of ytElement('ytUserAssignments').querySelectorAll('select')) select.disabled = true;
+                youtubePlaylistChannel = status.connected ? channel : '';
                 ytElement('ytPublishSave').disabled = !status.connected || !youtubePlaylistsAvailable;
                 const response = await authFetch('/api/admin/results');
                 if (!response.ok) throw new Error('Não foi possível carregar os vídeos finalizados.');
@@ -7242,6 +7277,7 @@
                 youtubePublishVideos.forEach((video, index) => select.add(new Option(video.filename + ' · ' + video.owner, String(index))));
                 resetYoutubeCover();
             } catch (error) { ytNotice('ytPublishChannel', 'Não foi possível atualizar o painel: ' + error.message, 'error'); }
+            finally { if (full) { refreshButton.disabled = false; refreshButton.textContent = 'Atualizar playlists'; } }
         }
         // Consent is for the headless server; the Google page opens on the phone.
         let youtubeDeviceSession = null;
@@ -7442,6 +7478,7 @@
                 try { const result = await ytRequest('connect', { method: 'POST' }); window.location.assign(result.url); }
                 catch (error) { ytMessage(error.message); }
             };
+            ytElement('ytPlaylistsRefresh').onclick = () => loadYoutubePublisher(true);
             ytElement('ytPublishRefresh').onclick = async () => {
                 const button = ytElement('ytPublishRefresh'); button.disabled = true;
                 try { await ytRequest('verify-connection', {method:'POST'}); await loadYoutubePublisher(); }

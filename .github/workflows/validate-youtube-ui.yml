@@ -18,7 +18,7 @@ jobs:
         with:
           python-version: '3.12'
       - run: |
-          python -m pip install requests==2.34.2 fastapi==0.142.2 starlette==1.7.0 python-multipart==0.0.32 jinja2==3.1.6 httpx numpy
+          python -m pip install requests==2.34.2 fastapi==0.142.2 starlette==1.7.0 python-multipart==0.0.32 jinja2==3.1.6 httpx numpy "yt-dlp[default]"
           if ! command -v ffmpeg >/dev/null || ! command -v ffprobe >/dev/null; then
             sudo timeout 240 apt-get update -qq
             sudo timeout 240 apt-get install -y ffmpeg

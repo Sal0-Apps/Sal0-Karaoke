@@ -43,6 +43,64 @@ if __name__ == '__main__':
     unittest.main()
 
 class ConnectionLifecycleTests(YouTubeRecoveryTests):
+    def test_mutating_requests_are_not_repeated_for_invalid_replies_or_network_errors(self):
+        import requests
+        from youtube_publisher import PublicationError
+        self.token['expires_at'] = time.time() + 3600; self.publisher.save('token.json', self.token)
+        for failure in (reply(None), requests.ConnectionError('offline')):
+            with patch('youtube_publisher.requests.request', side_effect=[failure]) as request:
+                with self.assertRaises(PublicationError): self.publisher.api('POST', '/playlistItems', json={})
+            request.assert_called_once()
+
+    def test_playlist_read_recovers_from_a_temporary_invalid_google_response(self):
+        self.token['expires_at'] = time.time() + 3600; self.publisher.save('token.json', self.token)
+        invalid = SimpleNamespace(status_code=200, json=lambda: (_ for _ in ()).throw(ValueError('private upstream body')))
+        with patch('youtube_publisher.requests.request', side_effect=[invalid, reply({'items':[{'id':'PL-one','snippet':{'title':'Minha playlist'}}]})]) as request:
+            response = TestClient(self.client.app, raise_server_exceptions=False).get('/api/admin/youtube/playlists')
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(response.json()['playlists'], [{'id':'PL-one','title':'Minha playlist'}])
+        self.assertEqual(request.call_count, 2)
+        self.assertNotIn('private upstream body', response.text)
+
+    def test_invalid_playlist_shapes_never_become_plain_server_errors_or_empty_success(self):
+        self.token['expires_at'] = time.time() + 3600; self.publisher.save('token.json', self.token)
+        self.publisher.save('settings.json', {'defaults':{'playlist_id':'PL-saved'}})
+        for payload in (None, [], {'items':None}, {'items':[{}]}, {'items':[{'id':'PL-one','snippet':None}]}, {'items':[], 'nextPageToken':[]}):
+            with self.subTest(payload=payload), patch('youtube_publisher.requests.request', return_value=reply(payload)) as request:
+                response = TestClient(self.client.app, raise_server_exceptions=False).get('/api/admin/youtube/playlists')
+            self.assertIn(response.status_code, (400, 502, 503), response.text)
+            self.assertIn('application/json', response.headers.get('content-type', ''))
+            self.assertNotIn('playlists', response.json())
+            self.assertEqual(request.call_count, 2)
+        self.assertEqual(self.publisher.read('settings.json')['defaults']['playlist_id'], 'PL-saved')
+        self.assertEqual(self.publisher.read('token.json')['refresh_token'], 'private-refresh')
+
+    def test_invalid_refresh_payload_preserves_authorization_and_returns_status_json(self):
+        with patch('youtube_publisher.requests.post', return_value=reply(None)):
+            response = TestClient(self.client.app, raise_server_exceptions=False).get('/api/admin/youtube/status')
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(response.json()['connection_state'], 'retry_later')
+        self.assertEqual(self.publisher.read('token.json')['refresh_token'], 'private-refresh')
+        self.assertNotIn('auth_error', self.publisher.read('token.json'))
+
+    def test_unexpected_endpoint_error_returns_a_private_diagnostic_code(self):
+        with patch.object(self.publisher, 'connection_status', side_effect=TypeError('private-token')), patch('youtube_publisher.logger') as logger:
+            response = TestClient(self.client.app, raise_server_exceptions=False).get('/api/admin/youtube/status')
+        self.assertEqual(response.status_code, 500)
+        self.assertIn('application/json', response.headers.get('content-type', ''))
+        self.assertIn('Código', response.json()['detail'])
+        self.assertNotIn('private-token', response.text)
+        self.assertNotIn('private-token', str(logger.error.call_args))
+        logger.error.assert_called_once()
+
+    def test_repeated_playlist_page_token_is_rejected_without_endless_requests(self):
+        import requests
+        self.token['expires_at'] = time.time() + 3600; self.publisher.save('token.json', self.token)
+        with patch('youtube_publisher.requests.request', side_effect=[reply({'items':[], 'nextPageToken':'same'})]*2+[requests.ConnectionError('loop stopped')]) as request:
+            response = TestClient(self.client.app, raise_server_exceptions=False).get('/api/admin/youtube/playlists')
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(request.call_count, 2)
+
     def test_revocation_is_cached_but_verify_can_force_a_real_renewal(self):
         with patch('youtube_publisher.requests.post', return_value=reply({'error':'invalid_grant'},400)) as post:
             for _ in range(3):
