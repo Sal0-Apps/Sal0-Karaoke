@@ -16,17 +16,20 @@ from lyrics_search import split_search_identity, lyrics_match_score, relevant_ly
 from lyric_guide import prepare_lyrics_guide, verify_lyrics_guide
 from karaoke_generator import generate_ass_karaoke
 from processing_validation import validate_review_segments, validate_processing_options
+from youtube_download_access import DownloadAccessError, YouTubeDownloadAccess
 import tempfile
 import subprocess
 
 
 class HTTPError(Exception):
-    def __init__(self, status_code, detail):
+    def __init__(self, status_code, detail, headers=None):
         self.status_code = status_code
+        self.headers = headers or {}
         super().__init__(detail)
 
 
 def load_function(name, **values):
+    access = YouTubeDownloadAccess(tempfile.mkdtemp(prefix='sal0-youtube-test-'))
     tree = ast.parse((ROOT / "app/main.py").read_text())
     selected = next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == name)
     selected.decorator_list = []
@@ -38,6 +41,8 @@ def load_function(name, **values):
                  prepare_lyrics_guide=prepare_lyrics_guide, verify_lyrics_guide=verify_lyrics_guide,
                  validate_review_segments=validate_review_segments,
                  validate_processing_options=validate_processing_options, **values)
+    scope.setdefault('DownloadAccessError', DownloadAccessError)
+    scope.setdefault('extract_youtube_info', access.extract_info)
     exec(compile(ast.Module(body=[selected], type_ignores=[]), "main.py", "exec"), scope)
     return scope[name]
 

@@ -25,7 +25,7 @@ Crie uma pasta própria para a instalação e salve nela o arquivo `compose.yaml
 ```yaml
 services:
   karaoke-app:
-    image: ghcr.io/sal0-apps/sal0-karaoke:11.3
+    image: ghcr.io/sal0-apps/sal0-karaoke:11.4
     container_name: karaoke-app
     ports:
       - "7885:7860"
@@ -70,6 +70,12 @@ Somente `/data` deve receber o volume persistente. Não monte um diretório vazi
 | `/data/users.json` e `/data/sessions.json` | Contas e sessões |
 
 O backup deve incluir o volume inteiro. Copiar apenas resultados não preserva contas, fila, configurações ou checkpoints. Não adicione `data`, backups, logs, chaves Android ou credenciais ao Git.
+
+## Reconexões do YouTube na 11.4
+
+Não há mudança nos aplicativos Android ou Windows. O volume `/data` conserva credenciais, playlists e fila. Após atualizar o servidor, abra **Ajustes → YouTube · Administração** no celular, pela conexão local ou externa do app. Cadastre uma vez uma credencial Google do tipo **TVs e dispositivos com entrada limitada** no painel; nas próximas expirações use **Reconectar canal pelo celular** e aprove o código no Google. Não exige variáveis OAuth nem portas adicionais. O [manual](MANUAL.md#conectar-ou-reconectar-o-canal-pelo-celular) inclui os passos e a limitação de sete dias de projetos Google em Teste.
+
+Em **YouTube · Downloads**, teste links, atualize o mecanismo e renove a sessão por cookies.txt, inclusive pelo Firefox Android. A renovação do canal não autentica downloads; remover a sessão de downloads não desconecta o canal.
 
 ## Atualizar com uma tarefa em andamento
 

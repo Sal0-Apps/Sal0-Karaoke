@@ -1,3 +1,13 @@
+# 11.4
+
+- Reconexão do canal no próprio app pelo celular, em rede local ou externa: código do Google para autorizar o servidor sem navegador, aprovação em google.com/device e acompanhamento no painel. Credencial de TVs e dispositivos com entrada limitada configurável uma vez por JSON ou ID/chave; futuras reconexões a reutilizam. Não exige retorno HTTPS, PC ou alteração dos clientes Android/Windows.
+- Estado da conexão acompanha a renovação real, identifica autorização revogada/expirada e preserva tokens em falhas temporárias de rede. Verificar e renovar consulta o canal; HTTP 401 permite uma renovação automática e uma única repetição, inclusive preservando o corpo do envio de capa.
+- Reconectar o mesmo canal preserva playlists, fila, sessão de upload e ID de vídeo confirmado. Envios pausados por autorização retomam após a conexão; troca para outro canal é bloqueada com envios pendentes. Código pendente e aprovação recebida sobrevivem a reinício ou falha de consulta do canal, sem expor tokens e chaves na interface.
+- Downloads têm painel próprio para testar link, importar/colar cookies.txt e remover a sessão. Guia para exportar pelo Firefox Android. Cookies privados são validados, limitados aos domínios YouTube/Google e usados em cópias descartáveis; um download antigo não sobrescreve a sessão recém-renovada. Autorização do canal permanece independente.
+- Busca, metadados, músicas e fundos compartilham a mesma sessão. Falhas indicam ação de recuperação; tentativa sem cookies limitada para vídeos públicos. Cancelamento continua propagado. Remover cookies não revoga o canal nem altera playlists.
+- Correção da seleção do yt-dlp: arquivos antigos no volume não se sobrepõem a uma imagem mais nova. Atualização preparada sem bloquear downloads durante a instalação; a troca final aguarda operações ativas e restaura a versão anterior se falhar.
+- Testes de revogação, 401, rede, consentimento Google, intervalo/expiração, acesso administrativo, retomada sem duplicação, privacidade/rotação de cookies, escolha/atualização do mecanismo e navegador móvel pela URL externa. Campos e teclado preservados durante consultas. Mantidos áudio original do Whisper, SRT, letras por item e download de fundos durante tarefas.
+
 # 11.3
 
 - Restaurado o áudio original como padrão de reconhecimento no Modo Rápido, no Modo Detalhado e nos perfis integrados. O arquivo original segue diretamente para a decodificação do Whisper, sem passar pelo WAV intermediário do Demucs nem pela separação de voz principal. Somente a conversão exigida pelo modelo para PCM float32 mono/16 kHz; sem filtros extras, cortes de silêncio ou VAD no karaokê.
