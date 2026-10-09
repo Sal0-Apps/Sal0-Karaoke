@@ -43,6 +43,26 @@ if __name__ == '__main__':
     unittest.main()
 
 class ConnectionLifecycleTests(YouTubeRecoveryTests):
+    def test_status_polling_does_not_postpone_the_automatic_refresh_retry(self):
+        self.token['expires_at'] = 0; self.publisher.save('token.json', self.token)
+        with patch('youtube_publisher.time.time', return_value=1000) as clock, patch('youtube_publisher.requests.post',
+                side_effect=[reply(None), reply({'access_token':'renewed', 'expires_in':3600})]) as refresh:
+            first = self.client.get('/api/admin/youtube/status').json()
+            self.assertEqual(first['connection_state'], 'retry_later')
+            deadline = self.publisher.read('token.json')['refresh_retry_at']
+            for moment in (1005, 1020, 1059):
+                clock.return_value = moment
+                self.assertFalse(self.client.get('/api/admin/youtube/status').json()['connected'])
+                self.assertEqual(self.publisher.read('token.json')['refresh_retry_at'], deadline)
+            refresh.assert_called_once()
+            clock.return_value = deadline + 1
+            recovered = self.client.get('/api/admin/youtube/status').json()
+            self.assertTrue(recovered['connected'])
+            self.assertEqual(refresh.call_count, 2)
+        saved = self.publisher.read('token.json')
+        self.assertEqual(saved['refresh_token'], 'private-refresh')
+        self.assertNotIn('refresh_retry_at', saved); self.assertNotIn('auth_error', saved)
+
     def test_mutating_requests_are_not_repeated_for_invalid_replies_or_network_errors(self):
         import requests
         from youtube_publisher import PublicationError
