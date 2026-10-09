@@ -1,6 +1,6 @@
 # Manual do Sal0 Karaokê
 
-Este manual descreve os controles disponíveis na distribuição 11.4. Para instalar o servidor, consulte [DEPLOYMENT.md](DEPLOYMENT.md). Para configurar o aparelho, consulte o [guia Android](android/README.md).
+Este manual descreve os controles disponíveis na distribuição 11.4.1. Para instalar o servidor, consulte [DEPLOYMENT.md](DEPLOYMENT.md). Para configurar o aparelho, consulte o [guia Android](android/README.md).
 
 O Sal0 Karaokê é destinado a uma instalação pessoal, acessada pela rede local ou por VPN, como ZeroTier. O repositório aberto disponibiliza o código e os pacotes; o projeto não opera um serviço público de processamento nem coleta centralmente as mídias das instalações. Não é necessário expor a porta do app à internet. O processamento principal é local, mas as integrações escolhidas podem se comunicar com serviços externos.
 
@@ -279,6 +279,10 @@ Abra os grupos de transcrição, visual e fluxo. Configure modelo, perfil da voz
 ### Downloads do YouTube e renovação de sessão
 
 Em **Ajustes → YouTube · Downloads**, cole o link e toque em **Testar link**. O teste consulta o vídeo com o mecanismo do servidor; não inicia o processamento nem comprova que o arquivo completo já foi baixado. Se o YouTube mudou seu mecanismo, use **Atualizar mecanismo**. A instalação é preparada em separado, inclusive durante Demucs ou Whisper, e somente a aplicação aguarda downloads ativos. O servidor seleciona a versão mais recente entre a imagem Docker e o volume persistente.
+
+Na 11.4.1, pastas de pacotes antigos ainda ocupadas não bloqueiam uma atualização nem fazem uma instalação concluída aparecer como falha. Cada tentativa usa uma pasta nova; a versão anterior é restaurada se a ativação falhar. Se aparecer o erro `Directory not empty` na 11.4, atualize primeiro o servidor e repita **Atualizar mecanismo**. Não é necessário apagar pastas nem reconectar o canal.
+
+Use **Atualizar playlists**, junto da seleção de destinos, para consultar novamente a lista sem gerar uma nova autorização. As escolhas ainda não salvas do mesmo canal permanecem. Se a resposta estiver indisponível, a tela informa o erro e permite uma nova tentativa; uma falha não é tratada como ausência de playlists. **Verificar e renovar conexão** continua disponível para testar a autorização. Erros internos incluem um código para localizar o diagnóstico em **Logs atuais**, no próprio app, sem expor credenciais.
 
 Quando o serviço pedir login, abra **Renovar sessão de downloads pelo celular**:
 

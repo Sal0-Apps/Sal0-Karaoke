@@ -2,12 +2,14 @@
 import base64
 import hashlib
 import json
+import logging
 import os
 import re
 import secrets
 import subprocess
 import threading
 import time
+import traceback
 from pathlib import Path
 from urllib.parse import urlencode, urlparse
 
@@ -24,6 +26,17 @@ CHUNK = 8 * 1024 * 1024
 
 
 PublicationError = AuthorizationError
+logger = logging.getLogger(__name__)
+
+
+def json_object(response):
+    try:
+        payload = response.json()
+    except (ValueError, TypeError):
+        payload = None
+    if not isinstance(payload, dict):
+        raise PublicationError('O Google retornou uma resposta inválida. Tente atualizar o painel novamente.', 'retry_later')
+    return payload
 
 
 def uploaded_offset(response):
@@ -94,7 +107,7 @@ class YouTubePublisher:
                 **config, 'refresh_token': token['refresh_token'], 'grant_type': 'refresh_token'}, timeout=20)
             if response.status_code != 200:
                 raise oauth_error(response)
-            updated = response.json()
+            updated = json_object(response)
             if not updated.get('access_token'):
                 raise PublicationError('O Google não retornou um acesso válido. Tente reconectar.', 'auth_required')
             token.update(updated)
@@ -155,7 +168,7 @@ class YouTubePublisher:
             if response.status_code == 401:
                 raise PublicationError('O Google recusou o acesso ao canal. Use Reconectar canal no app.', 'auth_required')
             raise PublicationError('O Google não autorizou a conexão. Tente novamente.')
-        token = response.json()
+        token = json_object(response)
         if not token.get('refresh_token') or not token.get('access_token'):
             raise PublicationError('A conexão não concedeu acesso permanente. Reconecte o canal.')
         channel = requests.get(API + '/channels', params={'part': 'snippet', 'mine': 'true'},
@@ -187,7 +200,11 @@ class YouTubePublisher:
             if reason == 'quotaExceeded':
                 raise PublicationError('A cota diária da API do YouTube foi atingida. Aguarde a renovação e tente novamente.')
             raise PublicationError(f'O Google não confirmou o canal (HTTP {response.status_code}). Confira se a YouTube Data API v3 está ativa no projeto da credencial.')
-        items = response.json().get('items', [])
+        items = json_object(response).get('items', [])
+        if not isinstance(items, list) or (items and (not isinstance(items[0], dict) or
+                not isinstance(items[0].get('id'), str) or not isinstance(items[0].get('snippet'), dict) or
+                not isinstance(items[0]['snippet'].get('title'), str))):
+            raise PublicationError('O Google não retornou dados válidos do canal. Tente verificar novamente.', 'retry_later')
         if not items:
             raise PublicationError('A conta autorizada não possui um canal disponível. Abra o YouTube com essa conta, crie ou selecione seu canal e autorize novamente.')
         return items[0]
@@ -203,7 +220,7 @@ class YouTubePublisher:
             **{key: data[key] for key in keys}, 'grant_type': 'refresh_token'}, timeout=30)
         if response.status_code != 200:
             raise PublicationError('O Google recusou a autorização. Gere um novo arquivo no computador.')
-        token = response.json()
+        token = json_object(response)
         if not isinstance(token.get('access_token'), str) or not token['access_token']:
             raise PublicationError('O Google não retornou uma autorização válida. Gere um novo arquivo no assistente.')
         # Refresh replies can omit scope. Confirm it with Google rather than rejecting
@@ -245,7 +262,7 @@ class YouTubePublisher:
                         token['refresh_retry_at'] = time.time() + 60
                     self.save('token.json', token)
                     raise error
-                updated = response.json()
+                updated = json_object(response)
                 if not updated.get('access_token'):
                     raise PublicationError('O Google não retornou uma autorização válida. Tente verificar novamente.', 'retry_later')
                 token.update(updated)
@@ -263,7 +280,7 @@ class YouTubePublisher:
 
     def _connection_status(self, force=False):
         saved = self.read('token.json')
-        result = dict(connected=False, channel_title=saved.get('channel_title', ''),
+        result = dict(connected=False, channel_title=saved.get('channel_title', ''), channel_id=saved.get('channel_id', ''),
             connection_state='not_connected', message='Conecte seu canal para publicar vídeos.', recovery='connect')
         if not saved.get('refresh_token'):
             return result
@@ -280,6 +297,10 @@ class YouTubePublisher:
             if error.kind == 'auth_required':
                 latest = self.read('token.json')
                 latest['auth_error'] = str(error)
+                self.save('token.json', latest)
+            elif error.kind == 'retry_later':
+                latest = self.read('token.json')
+                latest['refresh_retry_at'] = time.time() + 60
                 self.save('token.json', latest)
             result.update(connection_state=error.kind, message=str(error), recovery=error.kind)
         except requests.RequestException:
@@ -305,26 +326,60 @@ class YouTubePublisher:
         self.save('token.json', token)
         raise PublicationError(token['auth_error'], 'auth_required')
 
-    def api(self, method, path, **kwargs):
-        response = self.authenticated_request(method, API + path, (15, 60), **kwargs)
-        if response.status_code >= 400:
+    def api(self, method, path, validate=None, **kwargs):
+        reading = method.upper() == 'GET'
+        for attempt in range(2 if reading else 1):
             try:
-                reason = response.json()['error']['errors'][0]['reason']
-            except (ValueError, KeyError, IndexError):
-                reason = 'apiError'
-            raise PublicationError(f'YouTube: {reason} (HTTP {response.status_code}).')
-        return response.json()
+                response = self.authenticated_request(method, API + path, (10, 15) if reading else (15, 60), **kwargs)
+                if response.status_code >= 400:
+                    if reading and attempt == 0 and response.status_code >= 500:
+                        continue
+                    try:
+                        reason = response.json()['error']['errors'][0]['reason']
+                    except (ValueError, TypeError, AttributeError, KeyError, IndexError):
+                        reason = 'apiError'
+                    messages = {
+                        'quotaExceeded':'A cota diária do YouTube foi atingida. Aguarde a renovação; sua conexão foi preservada.',
+                        'accessNotConfigured':'Ative a YouTube Data API v3 no projeto Google da credencial.',
+                        'serviceDisabled':'Ative a YouTube Data API v3 no projeto Google da credencial.',
+                        'insufficientPermissions':'O Google não permitiu consultar ou gerenciar playlists. Reconecte e permita o acesso solicitado.',
+                    }
+                    raise PublicationError(messages.get(str(reason), f'O YouTube recusou a solicitação (HTTP {response.status_code}).'))
+                payload = json_object(response)
+                if validate:
+                    validate(payload)
+                return payload
+            except requests.RequestException:
+                if not reading or attempt:
+                    raise PublicationError('O YouTube não respondeu. Tente atualizar o painel novamente.', 'retry_later') from None
+            except PublicationError as error:
+                if not reading or attempt or error.kind != 'retry_later':
+                    raise
+
+    @staticmethod
+    def validate_playlist_page(payload):
+        items = payload.get('items', [])
+        if not isinstance(items, list) or any(not isinstance(item, dict) or
+                not isinstance(item.get('id'), str) or not item['id'] or
+                not isinstance(item.get('snippet'), dict) or
+                not isinstance(item['snippet'].get('title'), str) for item in items):
+            raise PublicationError('O YouTube retornou dados inválidos das playlists. Toque em Atualizar playlists para tentar novamente.', 'retry_later')
+        if payload.get('nextPageToken') is not None and not isinstance(payload['nextPageToken'], str):
+            raise PublicationError('O YouTube retornou uma paginação inválida. Tente atualizar as playlists novamente.', 'retry_later')
 
     def playlists(self):
-        result, page = [], None
+        result, page, seen = [], None, set()
         while True:
-            payload = self.api('GET', '/playlists', params={
+            payload = self.api('GET', '/playlists', validate=self.validate_playlist_page, params={
                 'part': 'snippet,status', 'mine': 'true', 'maxResults': 50,
                 **({'pageToken': page} if page else {})})
             result.extend({'id': item['id'], 'title': item['snippet']['title']} for item in payload.get('items', []))
             page = payload.get('nextPageToken')
             if not page:
                 return result
+            if page in seen:
+                raise PublicationError('O YouTube repetiu uma página de playlists. Tente atualizar as playlists novamente.', 'retry_later')
+            seen.add(page)
 
     def settings(self, username):
         settings = self.read('settings.json')
@@ -651,6 +706,15 @@ def install_routes(app, get_current_user, require_admin, resolve_video, check_ad
             raise HTTPException(400, str(error), headers={'X-YouTube-Recovery': error.kind})
         except requests.RequestException:
             raise HTTPException(502, 'O YouTube não respondeu. Tente novamente.')
+        except HTTPException:
+            raise
+        except Exception as error:
+            diagnostic = secrets.token_hex(4)
+            locations = ' → '.join(f'{Path(frame.filename).name}:{frame.lineno} {frame.name}'
+                                   for frame in traceback.extract_tb(error.__traceback__)[-8:])
+            logger.error('Falha interna YouTube [%s] %s; %s', diagnostic, type(error).__name__, locations)
+            raise HTTPException(500, 'Não foi possível concluir a consulta no servidor. Tente atualizar o painel. Código: ' + diagnostic + '.',
+                                headers={'X-YouTube-Diagnostic':diagnostic}) from None
 
     @app.get('/api/youtube/publication-options')
     def quick_options(user=Depends(get_current_user)):
@@ -680,15 +744,15 @@ def install_routes(app, get_current_user, require_admin, resolve_video, check_ad
 
     @app.get('/api/admin/youtube/status')
     def status(user=Depends(admin)):
-        return {'configured': True, 'web_configured': all(os.environ.get(k) for k in ('YOUTUBE_CLIENT_ID', 'YOUTUBE_CLIENT_SECRET', 'YOUTUBE_REDIRECT_URI')),
+        return guarded(lambda: {'configured': True, 'web_configured': all(os.environ.get(k) for k in ('YOUTUBE_CLIENT_ID', 'YOUTUBE_CLIENT_SECRET', 'YOUTUBE_REDIRECT_URI')),
                 **publisher.connection_status(), 'device_configured': publisher.device.configured(),
                 'device_session': publisher.device.status(user['username']),
                 'settings': publisher.settings(user['username']),
-                'jobs': [publisher.public_job(j) for j in publisher.read('jobs.json', [])][-30:]}
+                'jobs': [publisher.public_job(j) for j in publisher.read('jobs.json', [])][-30:]})
 
     @app.post('/api/admin/youtube/verify-connection')
     def verify_connection(user=Depends(admin)):
-        return publisher.connection_status(force=True)
+        return guarded(lambda: publisher.connection_status(force=True))
 
     @app.post('/api/admin/youtube/device/start')
     def device_start(options: dict, user=Depends(admin)):

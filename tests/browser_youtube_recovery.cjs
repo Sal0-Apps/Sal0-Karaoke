@@ -115,8 +115,20 @@ for(const match of HTML.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/g)) new Fu
   failLink=false;await page.locator('#btnTestYoutubeAccess').click();await page.waitForFunction(()=>document.getElementById('youtubeAccessMessage').dataset.kind==='success');
   assert((await page.locator('#youtubeAccessMessage').textContent()).includes('Vídeo teste'));
   processing=true;await page.locator('#btnUpdateYoutubeTools').click();
-  await page.waitForFunction(()=>document.getElementById('btnUpdateYoutubeTools').disabled);
+  await page.waitForFunction(()=>document.getElementById('btnUpdateYoutubeTools').textContent==='⏳ Atualizando...');
   assert.equal(updates.length,1);assert.equal(await page.locator('#easyYoutubeUrl').inputValue(),'https://youtu.be/abcdefghijk');
+  updating=false;await page.clock.runFor(2600);
+  await page.waitForFunction(()=>!document.getElementById('btnUpdateYoutubeTools').disabled);
+  assert.equal(await page.locator('#btnUpdateYoutubeTools').textContent(),'↻ Atualizar mecanismo');
+  assert((await page.locator('#youtubeToolsMessage').textContent()).includes('Pronto para uso'));
+  assert((await page.locator('#youtubeSessionStatus').textContent()).includes('Sessão salva'));
+  assert(connected);assert.equal(await page.locator('#youtubeTestUrl').inputValue(),'https://youtu.be/abcdefghijk');
+  await page.locator('#youtubeCookiesGuide').screenshot({path:'youtube-recovery-downloads.png'});
+  await page.locator('#btnUpdateYoutubeTools').click();
+  await page.waitForFunction(()=>document.getElementById('btnUpdateYoutubeTools').textContent==='⏳ Atualizando...');
+  assert.equal(updates.length,2);
+  updating=false;await page.clock.runFor(2600);
+  await page.waitForFunction(()=>!document.getElementById('btnUpdateYoutubeTools').disabled);
   await page.locator('#btnClearYoutubeCookies').click();await page.waitForFunction(()=>document.getElementById('youtubeAccessMessage').textContent.includes('conexão do canal foi mantida'));
   assert(connected);assert.equal(sessionState,'anonymous');
   for(const width of [320,360,390,768,1440]){

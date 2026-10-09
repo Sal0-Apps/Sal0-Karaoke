@@ -5,6 +5,7 @@ for(const match of HTML.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/g)) new Fu
 const browser=await chromium.launch({headless:true});const page=await browser.newPage();
 const errors=[];page.on('pageerror',e=>errors.push(e.message));
 let connected=false,failImport=true,failPlaylists=false,saved=null,srtDone=false,srtRendering=false;
+let htmlPlaylists=0,htmlStatus=false,holdStatus=false,heldStatus=null,statusRequests=0,notifyHeldStatus;
 await page.route('**/*',async route=>{
  const request=route.request(),u=new URL(request.url());if(u.hostname==='i.ytimg.com')return route.fulfill({contentType:'image/png',body:Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGMQkFD/DwAB2gFPHkSsgQAAAABJRU5ErkJggg==','base64')});if(u.hostname!=='karaoke.test')return route.abort();
  if(u.pathname==='/')return route.fulfill({contentType:'text/html',body:HTML});
@@ -19,13 +20,19 @@ await page.route('**/*',async route=>{
  if(u.pathname==='/api/admin/results')data={results:[{kind:'video',filename:'karaoke.mp4',owner:'owner',owner_key:'__admin__',youtube_eligible:true},{kind:'video',filename:'srt-result.mp4',owner:'owner',owner_key:'__admin__',youtube_eligible:false},{kind:'video',filename:'unknown.mp4',owner:'owner',owner_key:'__admin__'}]};
  if(u.pathname==='/api/library')data={audio:[],backgrounds:[],history:[],videos:[],photos:[]};
  if(u.pathname==='/api/queue')data={jobs:[]};
- if(u.pathname==='/api/admin/youtube/status')data={configured:true,web_configured:false,connected,channel_title:'Canal teste',jobs:[],settings:{privacy:'private',playlist_id:'',title_template:'{title} | Karaokê',users_can_publish:true,user_assignments:{alice:{enabled:true,playlist_id:'PL-one',default_publish:false}}}};
+ if(u.pathname==='/api/admin/youtube/status'){
+  statusRequests++;
+  if(htmlStatus)return route.fulfill({status:503,contentType:'text/html',body:'<h1>private proxy page</h1>'});
+  data={configured:true,web_configured:false,connected,channel_id:'channel-one',channel_title:'Canal teste',jobs:[],settings:{privacy:'private',playlist_id:'',title_template:'{title} | Karaokê',users_can_publish:true,user_assignments:{alice:{enabled:true,playlist_id:'PL-one',default_publish:false}}}};
+  if(holdStatus){heldStatus=()=>route.fulfill({contentType:'application/json',body:JSON.stringify(data)});notifyHeldStatus();return;}
+ }
  if(u.pathname==='/api/admin/youtube/import-authorization'){
   await new Promise(r=>setTimeout(r,350));
   if(failImport){status=400;data={detail:'Ative a YouTube Data API v3 no mesmo projeto Google da credencial.'}}
   else{connected=true;data={channel_title:'Canal teste'}}
  }
  if(u.pathname==='/api/admin/youtube/playlists'){
+  if(htmlPlaylists>0){htmlPlaylists--;return route.fulfill({status:503,contentType:'text/html',body:'<h1>private proxy page</h1>'});}
   if(failPlaylists){status=400;data={detail:'YouTube: quotaExceeded (HTTP 403).'}}
   else data={playlists:[{id:'PL-one',title:'Playlist Alice'},{id:'PL-two',title:'Playlist Bob'}]};
  }
@@ -63,6 +70,19 @@ await page.locator('#youtubePublisherSection .yt-defaults').filter({has:page.loc
 assert(await page.locator('#ytDefaultPrivacy').isDisabled());
 assert.equal(await page.locator('#ytDefaultPrivacy').inputValue(),'unlisted');
 await page.locator('#ytDefaultPlaylist').selectOption('PL-two');
+await page.locator('#ytPublishTemplate').fill('{title} · Cantar');
+htmlPlaylists=1;await page.locator('#ytPlaylistsRefresh').click();
+await page.waitForFunction(()=>!document.getElementById('ytPlaylistsRefresh').disabled);
+assert.equal(await page.locator('#ytDefaultPlaylist').inputValue(),'PL-two');
+assert.equal(await bob.locator('[data-field="playlist"]').inputValue(),'PL-two');
+assert.equal(await page.locator('#ytPublishTemplate').inputValue(),'{title} · Cantar');
+assert.equal(await page.locator('#ytPlaylistStatus').getAttribute('data-kind'),'info');
+const beforeStatus=statusRequests;holdStatus=true;const statusArrived=new Promise(resolve=>{notifyHeldStatus=resolve;});
+await page.evaluate(()=>{window.pendingYoutubeStatus=Promise.all(Array.from({length:6},()=>loadYoutubePublisher(false)));});
+await page.waitForFunction(()=>youtubePublisherRequest!==null);
+await statusArrived;await page.waitForTimeout(100);
+assert.equal(statusRequests,beforeStatus+1,'Status polls overlap');
+holdStatus=false;await heldStatus();await page.evaluate(()=>window.pendingYoutubeStatus);
 await page.locator('#ytPublishSave').click();
 await page.waitForFunction(()=>document.getElementById('ytUsersMessage').dataset.kind==='success');
 assert.equal(saved.default_publish,true);assert.equal(saved.playlist_id,'PL-two');
@@ -78,11 +98,22 @@ for(const width of [360,390,768,1440]){
  assert(Math.abs(boxes.panel-boxes.grid)<2);
  await page.screenshot({path:'youtube-admin-'+width+'.png',fullPage:false});
 }
-failPlaylists=true;await page.locator('#ytPublishRefresh').click();
+failPlaylists=true;await page.locator('#ytPlaylistsRefresh').click();
 await page.waitForFunction(()=>document.getElementById('ytPlaylistStatus').dataset.kind==='error');
 assert.equal(await page.locator('.yt-user-row').count(),2);
 assert((await page.locator('#ytPublishChannel').textContent()).includes('Canal conectado'));
 assert(await page.locator('#ytPublishSave').isDisabled());
+assert.equal(await bob.locator('[data-field="playlist"]').inputValue(),'PL-two');
+failPlaylists=false;await page.locator('#ytPlaylistsRefresh').click();
+await page.waitForFunction(()=>document.getElementById('ytPlaylistStatus').dataset.kind==='info'&&!document.getElementById('ytPlaylistsRefresh').disabled);
+assert(!(await page.locator('#ytPublishSave').isDisabled()));
+htmlStatus=true;await page.locator('#ytPlaylistsRefresh').click();
+await page.waitForFunction(()=>document.getElementById('ytPublishChannel').textContent.includes('HTTP 503'));
+assert(!(await page.locator('#ytPlaylistsRefresh').isDisabled()));
+assert(!(await page.locator('#ytPublishChannel').textContent()).includes('private proxy page'));
+htmlStatus=false;await page.locator('#ytPlaylistsRefresh').click();
+await page.waitForFunction(()=>document.getElementById('ytPublishChannel').dataset.kind==='success'&&!document.getElementById('ytPlaylistsRefresh').disabled);
+assert.equal(await page.locator('#ytDefaultPlaylist').inputValue(),'PL-two');
 await page.locator('#tabBtnCreate').click();
 await page.locator('#btnCreatorEasy').click();
 await page.locator('#easyYoutubePlaylist').selectOption('PL-one');

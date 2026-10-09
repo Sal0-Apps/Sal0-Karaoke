@@ -1,3 +1,13 @@
+# 11.4.1
+
+- Corrigido o erro `Directory not empty` ao atualizar o mecanismo de downloads pelo app. A limpeza de pacotes antigos deixa de bloquear a instalação ou transformar uma atualização já aplicada em erro. Falhas persistentes de limpeza são registradas e tentadas novamente depois.
+- Cada instalação usa uma pasta temporária exclusiva, sem depender de pastas residuais da tentativa anterior. Troca e restauração usam renomeações; uma falha ao carregar o pacote novo restaura a versão anterior mesmo se a remoção de arquivos não funcionar. Uma troca interrompida antes da instalação pode recuperar a cópia anterior ao carregar o mecanismo.
+- Consultas de versão não interferem na troca do mecanismo e permanecem disponíveis durante downloads. Uma nova atualização só pode iniciar depois da finalização da tentativa anterior, evitando apagar seu temporário.
+- Testes reproduzem o erro da foto, mudanças de diretório durante a limpeza, resíduos ocupados, repetição, restauração, reinício e preservação de cookies/credenciais. O painel no celular acompanha o término e libera novas tentativas. Verificação do yt-dlp real na imagem de distribuição.
+- Corrigido o tratamento de respostas inválidas na consulta de canal e playlists: leituras transitórias têm uma única repetição, respostas e páginas são validadas e erros mantêm formato JSON. Falhas internas retornam um código de diagnóstico; o log registra classe/localização sem conteúdo de respostas, tokens ou chaves. Envios e demais operações de escrita não são repetidos automaticamente.
+- **Atualizar playlists** fica junto da seleção dos destinos, sem forçar uma reconexão. Consultas de status são agrupadas para evitar sobreposição; atualizações preservam alterações ainda não salvas do mesmo canal. Falhas não apagam seleções nem confundem uma resposta inválida com lista vazia. Canal, sessão e destinos salvos ficam preservados.
+- Atualização somente do servidor. Mantidos a reconexão do canal pelo celular, os aplicativos Android/Windows existentes, o áudio original do Whisper, as letras por item, as legendas e o download de fundos durante tarefas.
+
 # 11.4
 
 - Reconexão do canal no próprio app pelo celular, em rede local ou externa: código do Google para autorizar o servidor sem navegador, aprovação em google.com/device e acompanhamento no painel. Credencial de TVs e dispositivos com entrada limitada configurável uma vez por JSON ou ID/chave; futuras reconexões a reutilizam. Não exige retorno HTTPS, PC ou alteração dos clientes Android/Windows.

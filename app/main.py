@@ -48,6 +48,7 @@ from lyric_drafts import read_draft, write_draft, clear_draft
 from lyrics_search import split_search_identity, lyrics_match_score, relevant_lyrics_results, select_automatic_lyrics
 from reprocess_cache import copy_reusable_inputs, youtube_identity, file_fingerprint
 from media_covers import video_thumbnail
+from youtube_engine_runtime import EngineRuntime
 from youtube_download_access import (
     DOWNLOAD_ACCESS, DownloadAccessError, extract_youtube_info, package_version, version_key,
     install_routes as install_youtube_download_routes,
@@ -145,6 +146,7 @@ YT_DLP_RUNTIME_DIR = "/data/output/yt_dlp_runtime"
 YT_DLP_STAGING_DIR = "/data/output/yt_dlp_runtime_staging"
 YT_DLP_BACKUP_DIR = "/data/output/yt_dlp_runtime_previous"
 yt_dlp_operation_lock = threading.RLock()
+yt_dlp_import_lock = threading.RLock()
 
 
 class YtDlpLogAdapter:
@@ -163,27 +165,30 @@ class YtDlpLogAdapter:
 
 def load_yt_dlp(force_reload: bool = False):
     """Choose the newest available engine; an old volume cannot shadow a new image."""
-    paths = [path for path in sys.path if path != YT_DLP_RUNTIME_DIR]
-    image_spec = importlib.machinery.PathFinder.find_spec("yt_dlp", paths)
-    image_dir = os.path.dirname(image_spec.origin) if image_spec and image_spec.origin else ""
-    saved_version = package_version(os.path.join(YT_DLP_RUNTIME_DIR, "yt_dlp", "version.py"))
-    image_version = package_version(os.path.join(image_dir, "version.py")) if image_dir else ""
-    prefer_saved = bool(saved_version and (not image_version or version_key(saved_version) >= version_key(image_version)))
-    sys.path[:] = ([YT_DLP_RUNTIME_DIR] if prefer_saved else []) + paths
-    current = sys.modules.get("yt_dlp")
-    current_saved = bool(current and str(getattr(current, "__file__", "")).startswith(YT_DLP_RUNTIME_DIR + os.sep))
-    if force_reload or (current is not None and current_saved != prefer_saved):
-        for module_name in tuple(sys.modules):
-            if module_name == "yt_dlp" or module_name.startswith("yt_dlp.") or module_name == "yt_dlp_ejs" or module_name.startswith("yt_dlp_ejs."):
-                sys.modules.pop(module_name, None)
-        importlib.invalidate_caches()
-    return importlib.import_module("yt_dlp")
+    with yt_dlp_import_lock:
+        EngineRuntime(YT_DLP_RUNTIME_DIR, YT_DLP_STAGING_DIR, YT_DLP_BACKUP_DIR).recover()
+        paths = [path for path in sys.path if path != YT_DLP_RUNTIME_DIR]
+        image_spec = importlib.machinery.PathFinder.find_spec("yt_dlp", paths)
+        image_dir = os.path.dirname(image_spec.origin) if image_spec and image_spec.origin else ""
+        saved_version = package_version(os.path.join(YT_DLP_RUNTIME_DIR, "yt_dlp", "version.py"))
+        image_version = package_version(os.path.join(image_dir, "version.py")) if image_dir else ""
+        prefer_saved = bool(saved_version and (not image_version or version_key(saved_version) >= version_key(image_version)))
+        sys.path[:] = ([YT_DLP_RUNTIME_DIR] if prefer_saved else []) + paths
+        current = sys.modules.get("yt_dlp")
+        current_saved = bool(current and str(getattr(current, "__file__", "")).startswith(YT_DLP_RUNTIME_DIR + os.sep))
+        if force_reload or (current is not None and current_saved != prefer_saved):
+            for module_name in tuple(sys.modules):
+                if module_name == "yt_dlp" or module_name.startswith("yt_dlp.") or module_name == "yt_dlp_ejs" or module_name.startswith("yt_dlp_ejs."):
+                    sys.modules.pop(module_name, None)
+            importlib.invalidate_caches()
+        return importlib.import_module("yt_dlp")
 
 
 def yt_dlp_version() -> str:
-    load_yt_dlp()
-    version_module = importlib.import_module("yt_dlp.version")
-    return str(getattr(version_module, "__version__", "desconhecida"))
+    with yt_dlp_import_lock:
+        load_yt_dlp()
+        version_module = importlib.import_module("yt_dlp.version")
+        return str(getattr(version_module, "__version__", "desconhecida"))
 
 
 def youtube_download_options(outtmpl: str | None = None) -> dict:
@@ -418,10 +423,10 @@ def run_yt_dlp_update():
             "error": None,
         })
 
+    storage = EngineRuntime(YT_DLP_RUNTIME_DIR, YT_DLP_STAGING_DIR, YT_DLP_BACKUP_DIR)
+    staging = None
     try:
-        if os.path.isdir(YT_DLP_STAGING_DIR):
-            shutil.rmtree(YT_DLP_STAGING_DIR)
-        os.makedirs(YT_DLP_STAGING_DIR, exist_ok=True)
+        staging = storage.prepare()
         command = [
             sys.executable,
             "-m",
@@ -429,12 +434,13 @@ def run_yt_dlp_update():
             "install",
             "--disable-pip-version-check",
             "--no-cache-dir",
+            "--no-compile",
             "--upgrade",
             "--upgrade-strategy",
             "eager",
             "--pre",
             "--target",
-            YT_DLP_STAGING_DIR,
+            staging,
             "yt-dlp[default]",
         ]
         result = subprocess.run(
@@ -454,7 +460,7 @@ def run_yt_dlp_update():
                 "-c",
                 (
                     "import sys; "
-                    f"sys.path.insert(0, {YT_DLP_STAGING_DIR!r}); "
+                    f"sys.path.insert(0, {staging!r}); "
                     "from yt_dlp.version import __version__; print(__version__)"
                 ),
             ],
@@ -468,60 +474,48 @@ def run_yt_dlp_update():
 
         with yt_dlp_update_lock:
             yt_dlp_update_state["message"] = "Atualização preparada. Aguardando downloads ativos para aplicar com segurança..."
-        with yt_dlp_operation_lock:
-            if os.path.isdir(YT_DLP_BACKUP_DIR):
-                shutil.rmtree(YT_DLP_BACKUP_DIR)
-            had_previous_runtime = os.path.isdir(YT_DLP_RUNTIME_DIR)
-            if had_previous_runtime:
-                os.replace(YT_DLP_RUNTIME_DIR, YT_DLP_BACKUP_DIR)
-            try:
-                os.replace(YT_DLP_STAGING_DIR, YT_DLP_RUNTIME_DIR)
+        with yt_dlp_operation_lock, yt_dlp_import_lock:
+            def reload_engine():
                 load_yt_dlp(force_reload=True)
-                installed_version = yt_dlp_version()
-            except Exception:
-                if os.path.isdir(YT_DLP_RUNTIME_DIR):
-                    shutil.rmtree(YT_DLP_RUNTIME_DIR)
-                if had_previous_runtime and os.path.isdir(YT_DLP_BACKUP_DIR):
-                    os.replace(YT_DLP_BACKUP_DIR, YT_DLP_RUNTIME_DIR)
-                load_yt_dlp(force_reload=True)
-                raise
+                return yt_dlp_version()
+            installed_version = storage.activate(staging, reload_engine)
 
-            if os.path.isdir(YT_DLP_BACKUP_DIR):
-                shutil.rmtree(YT_DLP_BACKUP_DIR)
-
-        with yt_dlp_update_lock:
-            yt_dlp_update_state.update({
-                "status": "done",
-                "message": "Mecanismo do YouTube atualizado e pronto para uso.",
-                "error": None,
-                "version": installed_version,
-            })
+        completion = {
+            "status": "done",
+            "message": "Mecanismo do YouTube atualizado e pronto para uso.",
+            "error": None,
+            "version": installed_version,
+        }
         logger.info("yt-dlp atualizado em armazenamento persistente para %s.", installed_version)
     except Exception as exc:
-        if os.path.isdir(YT_DLP_STAGING_DIR):
-            shutil.rmtree(YT_DLP_STAGING_DIR, ignore_errors=True)
         logger.error("Falha ao atualizar yt-dlp: %s", exc)
-        with yt_dlp_update_lock:
-            yt_dlp_update_state.update({
-                "status": "error",
-                "message": "A atualização não foi concluída.",
-                "error": str(exc),
-            })
+        completion = {
+            "status": "error",
+            "message": "A atualização não foi concluída.",
+            "error": str(exc),
+        }
+    finally:
+        if staging:
+            storage.cleanup(staging)
+        storage.cleanup_obsolete()
+    # Keep the worker reserved through cleanup so a retry cannot lose its staging.
+    with yt_dlp_update_lock:
+        yt_dlp_update_state.update(completion)
 
 
 @app.get("/api/youtube-tools/status")
 def get_youtube_tools_status(current_user: dict = Depends(get_current_user)):
     require_admin(current_user)
-    try:
-        engine = load_yt_dlp()
-        installed_version = yt_dlp_version()
-    except Exception as exc:
-        engine = None
-        installed_version = None
-        logger.warning("Não foi possível consultar a versão do yt-dlp: %s", exc)
-
-    with yt_dlp_update_lock:
-        update_snapshot = dict(yt_dlp_update_state)
+    with yt_dlp_import_lock:
+        try:
+            engine = load_yt_dlp()
+            installed_version = yt_dlp_version()
+        except Exception as exc:
+            engine = None
+            installed_version = None
+            logger.warning("Não foi possível consultar a versão do yt-dlp: %s", exc)
+        with yt_dlp_update_lock:
+            update_snapshot = dict(yt_dlp_update_state)
 
     return {
         "yt_dlp_version": installed_version,
