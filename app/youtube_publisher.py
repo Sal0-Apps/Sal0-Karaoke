@@ -300,8 +300,9 @@ class YouTubePublisher:
                 self.save('token.json', latest)
             elif error.kind == 'retry_later':
                 latest = self.read('token.json')
-                latest['refresh_retry_at'] = time.time() + 60
-                self.save('token.json', latest)
+                if latest.get('refresh_retry_at', 0) <= time.time():
+                    latest['refresh_retry_at'] = time.time() + 60
+                    self.save('token.json', latest)
             result.update(connection_state=error.kind, message=str(error), recovery=error.kind)
         except requests.RequestException:
             latest = self.read('token.json')

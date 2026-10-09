@@ -1,3 +1,9 @@
+# 11.4.2
+
+- Corrigida a recuperação automática após falhas temporárias na renovação do Google: consultas de status preservam o prazo da próxima tentativa, sem estendê-lo a cada atualização da tela. O acesso volta a ser renovado ao terminar o intervalo; a verificação manual continua disponível.
+- Inclui as correções da 11.4.1 para o erro `Directory not empty`, atualização segura do yt-dlp, consulta de canal/playlists, preservação dos destinos e o botão Atualizar playlists no celular.
+- Teste com relógio controlado confirma uma única solicitação durante o intervalo e renovação automática ao expirar, sem perda de autorização. Atualização somente do servidor; clientes Android e Windows existentes são reutilizados.
+
 # 11.4.1
 
 - Corrigido o erro `Directory not empty` ao atualizar o mecanismo de downloads pelo app. A limpeza de pacotes antigos deixa de bloquear a instalação ou transformar uma atualização já aplicada em erro. Falhas persistentes de limpeza são registradas e tentadas novamente depois.
