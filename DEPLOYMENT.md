@@ -25,7 +25,7 @@ Crie uma pasta própria para a instalação e salve nela o arquivo `compose.yaml
 ```yaml
 services:
   karaoke-app:
-    image: ghcr.io/sal0-apps/sal0-karaoke:11.4.2
+    image: ghcr.io/sal0-apps/sal0-karaoke:12.0
     container_name: karaoke-app
     ports:
       - "7885:7860"
@@ -71,13 +71,17 @@ Somente `/data` deve receber o volume persistente. Não monte um diretório vazi
 
 O backup deve incluir o volume inteiro. Copiar apenas resultados não preserva contas, fila, configurações ou checkpoints. Não adicione `data`, backups, logs, chaves Android ou credenciais ao Git.
 
-## Reconexões do YouTube na 11.4.2
+## Mensagens do Telegram na 12.0
+
+Atualize apenas a imagem do servidor, mantendo os volumes e o APK existente. O token e o Chat ID salvos continuam disponíveis. Em **Ajustes → Telegram**, use **Verificar conexão** e **Enviar mensagem de teste** para confirmar o destino sem processar um vídeo. Falhas mostram a ação necessária no próprio painel; se houver erro de rede, confira o acesso do contêiner a `api.telegram.org`, internet e DNS do servidor. Nenhuma porta de entrada ou webhook adicional é necessário para enviar as mensagens.
+
+## Reconexões do YouTube na 12.0
 
 Não há mudança nos aplicativos Android ou Windows. O volume `/data` conserva credenciais, playlists e fila. Após atualizar o servidor, abra **Ajustes → YouTube · Administração** no celular, pela conexão local ou externa do app. Cadastre uma vez uma credencial Google do tipo **TVs e dispositivos com entrada limitada** no painel; nas próximas expirações use **Reconectar canal pelo celular** e aprove o código no Google. Não exige variáveis OAuth nem portas adicionais. O [manual](MANUAL.md#conectar-ou-reconectar-o-canal-pelo-celular) inclui os passos e a limitação de sete dias de projetos Google em Teste.
 
 Em **YouTube · Downloads**, teste links, atualize o mecanismo e renove a sessão por cookies.txt, inclusive pelo Firefox Android. A renovação do canal não autentica downloads; remover a sessão de downloads não desconecta o canal.
 
-A 11.4.2 inclui a correção do erro `Directory not empty` durante a atualização do mecanismo. Atualize a imagem do servidor para esta versão; depois use **Atualizar mecanismo** e **Testar link** no painel. Pastas residuais de pacotes não exigem exclusão manual. A conexão já aprovada com o canal e a sessão de downloads são preservadas.
+A 12.0 inclui a correção do erro `Directory not empty` durante a atualização do mecanismo. Atualize a imagem do servidor para esta versão; depois use **Atualizar mecanismo** e **Testar link** no painel. Pastas residuais de pacotes não exigem exclusão manual. A conexão já aprovada com o canal e a sessão de downloads são preservadas.
 
 ## Atualizar com uma tarefa em andamento
 

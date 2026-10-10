@@ -1,6 +1,6 @@
 # Manual do Sal0 Karaokê
 
-Este manual descreve os controles disponíveis na distribuição 11.4.2. Para instalar o servidor, consulte [DEPLOYMENT.md](DEPLOYMENT.md). Para configurar o aparelho, consulte o [guia Android](android/README.md).
+Este manual descreve os controles disponíveis na distribuição 12.0. Para instalar o servidor, consulte [DEPLOYMENT.md](DEPLOYMENT.md). Para configurar o aparelho, consulte o [guia Android](android/README.md).
 
 O Sal0 Karaokê é destinado a uma instalação pessoal, acessada pela rede local ou por VPN, como ZeroTier. O repositório aberto disponibiliza o código e os pacotes; o projeto não opera um serviço público de processamento nem coleta centralmente as mídias das instalações. Não é necessário expor a porta do app à internet. O processamento principal é local, mas as integrações escolhidas podem se comunicar com serviços externos.
 
@@ -129,7 +129,9 @@ Este modo legenda a fala, preservando o áudio completo. Sempre cria um MP4 com 
 6. Decida se a mídia de entrada deve ser salva na Biblioteca e toque em **Legendar vídeo**.
 7. Assista ao vídeo e baixe o MP4, o SRT original e, quando disponível, o traduzido.
 
-Em **Ajustes → Legendar vídeo · padrão do servidor**, o administrador configura cor, tamanho e posição do texto, cor e opacidade do fundo da legenda, e cor/imagem/vídeo de fundo para entradas de áudio. Imagens e vídeos vêm da Biblioteca do administrador. Um vídeo de origem sempre tem prioridade sobre esse fundo. Áudios geram vídeos em 1280×720; vídeos mantêm suas dimensões e proporções, com ajuste mínimo de dimensões ímpares para codificação. Cada novo item guarda uma cópia das configurações e do fundo, sem mudar itens que já estão na fila.
+O painel **Legendas dos vídeos** começa recolhido e mostra um resumo dos padrões salvos. Toque em **Personalizar legendas** para abrir os ajustes de aparência, idioma e fundo, com uma prévia de cores e posição. Fechar os ajustes preserva a edição; **Salvar padrões de legendagem** aplica as mudanças aos próximos itens da fila.
+
+Em **Ajustes → Legendas dos vídeos → Personalizar legendas**, o administrador configura cor, tamanho e posição do texto, cor e opacidade do fundo da legenda, e cor/imagem/vídeo de fundo para entradas de áudio. Imagens e vídeos vêm da Biblioteca do administrador. Um vídeo de origem sempre tem prioridade sobre esse fundo. Áudios geram vídeos em 1280×720; vídeos mantêm suas dimensões e proporções, com ajuste mínimo de dimensões ímpares para codificação. Cada novo item guarda uma cópia das configurações e do fundo, sem mudar itens que já estão na fila.
 
 **Legenda embutida no vídeo** usa a tradução quando disponível por padrão. O administrador pode escolher **Sempre no idioma original**; o SRT traduzido continua disponível para download. Se a tradução falhar ou não for solicitada, o vídeo usa o SRT original. A legenda respeita os tempos das falas e não preenche silêncios. A tradução preserva esses tempos. O áudio é transcrito diretamente da mídia original, sem recompressão intermediária para MP3.
 
@@ -244,7 +246,12 @@ Na conclusão da tarefa, os botões da tela dão acesso ao MP4 ou aos SRTs. No A
 3. Obtenha o Chat ID do destino por um meio de confiança. O nome do grupo ou usuário não substitui automaticamente o identificador esperado.
 4. Em **Ajustes → Telegram → Editar**, informe token e Chat ID.
 5. Toque em **Salvar Telegram**.
-6. Processe uma mídia pequena autorizada para conferir as notificações.
+6. Toque em **Verificar conexão** para consultar o bot, o destino e as permissões. Essa verificação não envia mensagens.
+7. Toque em **Enviar mensagem de teste**. Aguarde a confirmação e confira a mensagem no Telegram; nenhum vídeo precisa ser processado para testar.
+
+O painel distingue configuração salva de conexão verificada. Ele mostra a última tentativa de envio e informa como corrigir token, Chat ID, permissões ou conexão do servidor. A internet e o DNS relevantes para o envio são os do servidor, mesmo se você acessar o app pela rede móvel. Em conversa privada, inicie o bot; em grupos/canais, permita mensagens e vídeos. Uma migração oficial do grupo para supergrupo atualiza o destino automaticamente. Edições não salvas desabilitam a verificação e o teste até salvar ou fechar a edição.
+
+Os avisos seguem a ordem de cada destino e respeitam pausas solicitadas pelo Telegram, com tentativas limitadas. Uma confirmação de leitura perdida por timeout não provoca uma cópia automática da mesma mensagem. Se o vídeo for recusado, o app mantém a indicação de falha do anexo mesmo quando a mensagem com os links for entregue. O histórico exibido se refere ao funcionamento desde a inicialização atual do servidor.
 
 Cada conta pode ter uma configuração própria. O bot administrativo também pode receber os avisos de trabalhos dos perfis sob sua gestão, conforme as configurações existentes.
 
