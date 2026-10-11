@@ -8,6 +8,8 @@ O código original é software livre sob a [licença MIT](LICENSE). Dependência
 
 O Sal0 Karaokê é destinado a uma instalação pessoal, acessada pela rede local ou por VPN, como ZeroTier. O repositório aberto disponibiliza o código e os pacotes; o projeto não opera um serviço público de processamento nem coleta centralmente as mídias das instalações. Não é necessário expor a porta do app à internet. O processamento principal é local, mas as integrações escolhidas podem se comunicar com serviços externos.
 
+Na **12.1**, todos os painéis de Ajustes começam recolhidos, com resumos de status e **Recolher todos**. Vídeos publicados no YouTube passam a ter **Assistir no YouTube** na mensagem do Telegram, inclusive quando o upload termina depois da prévia.
+
 ## Documentação
 
 - [Manual completo: recursos e tutoriais](MANUAL.md)
@@ -37,7 +39,7 @@ A tradução depende do LibreTranslate configurado pelo administrador, com padr�
 
 ### Configurar e manter a tradução
 
-Em **Ajustes → Tradução de SRT · LibreTranslate**, salve a URL base da sua instância, a chave de API se exigida, o tempo limite para enviar o SRT completo. Use **Testar e atualizar idiomas** para consultar os idiomas instalados e verificar uma tradução automática para PT-BR. A configuração fica em `/data/output/libretranslate.json`.
+Em **Ajustes → Tradução das legendas**, salve a URL base da sua instância, a chave de API se exigida, o tempo limite para enviar o SRT completo. Use **Testar e atualizar idiomas** para consultar os idiomas instalados e verificar uma tradução automática para PT-BR. A configuração fica em `/data/output/libretranslate.json`.
 
 O cliente envia o **arquivo SRT completo** à [API oficial `/translate_file`](https://docs.libretranslate.com/api/operations/translate_file/), baixa o resultado e verifica a quantidade e os tempos das legendas antes de disponibilizá-lo. A instância deve permitir tradução de arquivos e ter `pt-BR` instalado. O tempo limite padrão é de 1.800 segundos por requisição, configurável até 7.200 segundos. A API não informa percentual interno de tradução. Erros temporários têm até três tentativas, sempre preservando o original.
 
@@ -123,22 +125,22 @@ No Android, **Configurações do app** fica na faixa inferior, inclusive quando 
 
 ## Publicação no YouTube
 
-O administrador conecta ou reconecta o canal em **Ajustes → YouTube · Administração → Reconectar canal pelo celular**. O servidor mostra um código; a aprovação acontece em `google.com/device`, no navegador do celular, mesmo ao acessar o app pelo endereço externo ou VPN. Na primeira configuração, cadastre uma credencial Google do tipo **TVs e dispositivos com entrada limitada**, pelo próprio painel. As próximas reconexões reutilizam essa credencial. O assistente de computador permanece como alternativa. Consulte o [tutorial de conexão](MANUAL.md#conectar-ou-reconectar-o-canal-pelo-celular).
+O administrador conecta ou reconecta o canal em **Ajustes → Canal e publicação no YouTube → Reconectar canal pelo celular**. O servidor mostra um código; a aprovação acontece em `google.com/device`, no navegador do celular, mesmo ao acessar o app pelo endereço externo ou VPN. Na primeira configuração, cadastre uma credencial Google do tipo **TVs e dispositivos com entrada limitada**, pelo próprio painel. As próximas reconexões reutilizam essa credencial. O assistente de computador permanece como alternativa. Consulte o [tutorial de conexão](MANUAL.md#conectar-ou-reconectar-o-canal-pelo-celular).
 
-Em **Ajustes → YouTube · Downloads**, o administrador pode testar um link, atualizar o mecanismo e renovar a sessão com cookies.txt, inclusive exportando pelo Firefox para Android. A sessão de downloads é independente da autorização para publicar no canal. Atualizações são preparadas durante outras tarefas e aplicadas quando os downloads ativos terminarem.
+Em **Ajustes → Downloads do YouTube**, o administrador pode testar um link, atualizar o mecanismo e renovar a sessão com cookies.txt, inclusive exportando pelo Firefox para Android. A sessão de downloads é independente da autorização para publicar no canal. Atualizações são preparadas durante outras tarefas e aplicadas quando os downloads ativos terminarem.
 
 Em **Playlist de cada usuário**, a administração define uma playlist válida para cada conta. A playlist do administrador fica em **Padrões de publicação do administrador**. Com o canal conectado e uma playlist definida no perfil, **Publicar no YouTube** começa marcado para todos os usuários, inclusive contas novas e configurações antigas, e a publicação automática usa **Não listado**. A playlist do perfil é obrigatória: sem ela, a interface e o servidor bloqueiam a publicação. No modo rápido, o administrador pode escolher outra playlist para aquele vídeo, com a do perfil selecionada por padrão. O envio continua opcional por vídeo: desmarcado, nada é publicado. Título e capa automática ficam definidos antes da publicação. Vídeos prontos também podem ser publicados pelo painel administrativo, com outra privacidade escolhida explicitamente. O [manual](MANUAL.md#youtube-e-publicação-por-usuário) explica configuração e falhas comuns.
 
 ## Início rápido com Docker
 
-A versão de distribuição desta documentação é **12.0**. O título e o rodapé da página mostram apenas o nome da aplicação. A versão do servidor pode ser consultada no Manual; a versão do APK aparece nas configurações nativas.
+A versão de distribuição desta documentação é **12.1**. O título e o rodapé da página mostram apenas o nome da aplicação. A versão do servidor pode ser consultada no Manual; a versão do APK aparece nas configurações nativas.
 
 Crie um arquivo `compose.yaml`:
 
 ```yaml
 services:
   karaoke-app:
-    image: ghcr.io/sal0-apps/sal0-karaoke:12.0
+    image: ghcr.io/sal0-apps/sal0-karaoke:12.1
     container_name: karaoke-app
     ports:
       - "7885:7860"

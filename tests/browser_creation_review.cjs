@@ -81,6 +81,8 @@ for (const script of HTML.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/g)) new 
         assert.equal(await page.locator('#easyModeSource').inputValue(), 'original');
         assert((await page.locator('#easySummaryModel').textContent()).includes('Áudio original'));
         await page.locator('#tabBtnSettings').click();
+        await page.locator('#easyModeSettingsSection > summary').click();
+        await page.locator('#easyModeSettingsSection .easy-config-group').first().locator('summary').click();
         savingQuickSettings = true;
         for (const source of ['vocals', 'original']) {
             await page.locator('#easyModeSource').selectOption(source);

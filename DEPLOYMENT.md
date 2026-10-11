@@ -25,7 +25,7 @@ Crie uma pasta própria para a instalação e salve nela o arquivo `compose.yaml
 ```yaml
 services:
   karaoke-app:
-    image: ghcr.io/sal0-apps/sal0-karaoke:12.0
+    image: ghcr.io/sal0-apps/sal0-karaoke:12.1
     container_name: karaoke-app
     ports:
       - "7885:7860"
@@ -56,7 +56,7 @@ Somente `/data` deve receber o volume persistente. Não monte um diretório vazi
 | `/data/library/videos/` | Originais da Biblioteca principal |
 | `/data/library/photos/` | Imagens e vídeos de fundo |
 | `/data/library/history/` | Resultados finais |
-| `/data/output/models/whisper/` | Modelos Whisper baixados |
+| `/data/output/models/whisper/` | Modelos de reconhecimento baixados |
 | `/data/output/profiles.json` | Perfis da instalação principal |
 | `/data/output/telegram.json` | Configuração principal do Telegram |
 | `/data/output/external_url.json` | Endereço externo usado pelos links |
@@ -71,17 +71,19 @@ Somente `/data` deve receber o volume persistente. Não monte um diretório vazi
 
 O backup deve incluir o volume inteiro. Copiar apenas resultados não preserva contas, fila, configurações ou checkpoints. Não adicione `data`, backups, logs, chaves Android ou credenciais ao Git.
 
-## Mensagens do Telegram na 12.0
+## Mensagens do Telegram na 12.1
 
-Atualize apenas a imagem do servidor, mantendo os volumes e o APK existente. O token e o Chat ID salvos continuam disponíveis. Em **Ajustes → Telegram**, use **Verificar conexão** e **Enviar mensagem de teste** para confirmar o destino sem processar um vídeo. Falhas mostram a ação necessária no próprio painel; se houver erro de rede, confira o acesso do contêiner a `api.telegram.org`, internet e DNS do servidor. Nenhuma porta de entrada ou webhook adicional é necessário para enviar as mensagens.
+Atualize apenas a imagem do servidor, mantendo os volumes e o APK existente. O token e o Chat ID salvos continuam disponíveis. Em **Ajustes → Meu bot do Telegram**, use **Verificar conexão** e **Enviar mensagem de teste** para confirmar o destino sem processar um vídeo. Falhas mostram a ação necessária no próprio painel; se houver erro de rede, confira o acesso do contêiner a `api.telegram.org`, internet e DNS do servidor. Nenhuma porta de entrada ou webhook adicional é necessário para enviar as mensagens.
 
-## Reconexões do YouTube na 12.0
+Publicações confirmadas no YouTube acrescentam **Assistir no YouTube** à mensagem do resultado no Telegram. O vínculo entre vídeo e mensagem fica em `/data/output/telegram-results/`, no volume persistente. Todos os painéis de Ajustes começam recolhidos; abra o painel desejado antes de usar os controles.
 
-Não há mudança nos aplicativos Android ou Windows. O volume `/data` conserva credenciais, playlists e fila. Após atualizar o servidor, abra **Ajustes → YouTube · Administração** no celular, pela conexão local ou externa do app. Cadastre uma vez uma credencial Google do tipo **TVs e dispositivos com entrada limitada** no painel; nas próximas expirações use **Reconectar canal pelo celular** e aprove o código no Google. Não exige variáveis OAuth nem portas adicionais. O [manual](MANUAL.md#conectar-ou-reconectar-o-canal-pelo-celular) inclui os passos e a limitação de sete dias de projetos Google em Teste.
+## Reconexões do YouTube na 12.1
 
-Em **YouTube · Downloads**, teste links, atualize o mecanismo e renove a sessão por cookies.txt, inclusive pelo Firefox Android. A renovação do canal não autentica downloads; remover a sessão de downloads não desconecta o canal.
+Não há mudança nos aplicativos Android ou Windows. O volume `/data` conserva credenciais, playlists e fila. Após atualizar o servidor, abra **Ajustes → Canal e publicação no YouTube** no celular, pela conexão local ou externa do app. Cadastre uma vez uma credencial Google do tipo **TVs e dispositivos com entrada limitada** no painel; nas próximas expirações use **Reconectar canal pelo celular** e aprove o código no Google. Não exige variáveis OAuth nem portas adicionais. O [manual](MANUAL.md#conectar-ou-reconectar-o-canal-pelo-celular) inclui os passos e a limitação de sete dias de projetos Google em Teste.
 
-A 12.0 inclui a correção do erro `Directory not empty` durante a atualização do mecanismo. Atualize a imagem do servidor para esta versão; depois use **Atualizar mecanismo** e **Testar link** no painel. Pastas residuais de pacotes não exigem exclusão manual. A conexão já aprovada com o canal e a sessão de downloads são preservadas.
+Em **Downloads do YouTube**, teste links, atualize o mecanismo e renove a sessão por cookies.txt, inclusive pelo Firefox Android. A renovação do canal não autentica downloads; remover a sessão de downloads não desconecta o canal.
+
+A 12.1 mantém a correção do erro `Directory not empty` durante a atualização do mecanismo. Atualize a imagem do servidor para esta versão; depois use **Atualizar mecanismo** e **Testar link** no painel. Pastas residuais de pacotes não exigem exclusão manual. A conexão já aprovada com o canal e a sessão de downloads são preservadas.
 
 ## Atualizar com uma tarefa em andamento
 
@@ -140,7 +142,7 @@ Informar uma URL no APK ou nos Ajustes não configura roteador, firewall, DNS, c
 
 ## Modelos e mecanismos externos
 
-O build tenta preparar modelos e fundos. Falhas externas podem deixar modelos indisponíveis até a instalação posterior. Consulte **Ajustes → Modelos Whisper** como administrador.
+O build tenta preparar modelos e fundos. Falhas externas podem deixar modelos indisponíveis até a instalação posterior. Consulte **Ajustes → Modelos de reconhecimento** como administrador.
 
 A atualização de `yt-dlp` pela interface é armazenada em `/data/output/yt_dlp_runtime`. Ela pode sobreviver à troca da imagem e não equivale à atualização de todas as dependências. Teste os recursos utilizados após alterações.
 

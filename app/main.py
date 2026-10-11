@@ -50,6 +50,7 @@ from reprocess_cache import copy_reusable_inputs, youtube_identity, file_fingerp
 from media_covers import video_thumbnail
 from youtube_engine_runtime import EngineRuntime
 from telegram_delivery import TelegramDelivery
+from telegram_results import ResultNotifications
 from youtube_download_access import (
     DOWNLOAD_ACCESS, DownloadAccessError, extract_youtube_info, package_version, version_key,
     install_routes as install_youtube_download_routes,
@@ -1430,6 +1431,7 @@ def telegram_notice(icon: str, heading: str, *lines: str) -> str:
 
 
 TELEGRAM_DELIVERY = TelegramDelivery()
+TELEGRAM_RESULTS = ResultNotifications(TELEGRAM_DELIVERY)
 
 
 def _send_telegram_notification_worker(token: str, chat_id: str, message: str) -> bool:
@@ -4714,10 +4716,16 @@ def send_telegram_video_flow(
     subtitle_downloads: list[dict] = None,
     embedded_subtitle: str = "",
     prepared_preview: str = None,
+    result_video: str = "",
 ):
     """Envia um único vídeo com todos os links antes de liberar a tarefa."""
     if not token or not chat_id:
         return False
+
+    def send_result_notice(message):
+        if result_video:
+            return TELEGRAM_RESULTS.send_message(result_video, token, chat_id, message).ok
+        return _send_telegram_notification_worker(token, chat_id, message)
 
     limit_50mb = 50 * 1024 * 1024
     compressed_target = 46 * 1024 * 1024
@@ -4792,8 +4800,12 @@ def send_telegram_video_flow(
                                  stage_detail="Aguardando confirmação de entrega antes do próximo item")
                 completion_caption = telegram_notice("✅", "Vídeo legendado concluído" if subtitle_downloads is not None else "Karaokê concluído", *caption_lines)
                 import process_manager as pm
-                sent = TELEGRAM_DELIVERY.send_video(token, chat_id, upload_path, completion_caption,
-                                                     cancelled=pm.check_cancelled)
+                if result_video:
+                    sent = TELEGRAM_RESULTS.send_video(result_video, token, chat_id, upload_path,
+                                                       completion_caption, cancelled=pm.check_cancelled)
+                else:
+                    sent = TELEGRAM_DELIVERY.send_video(token, chat_id, upload_path, completion_caption,
+                                                        cancelled=pm.check_cancelled)
                 success = sent.ok
 
         if success:
@@ -4806,18 +4818,14 @@ def send_telegram_video_flow(
         ]
         if download_block:
             fallback_lines.extend(["", "📥 <b>Download do arquivo original sem compressão</b>", download_block])
-        return _send_telegram_notification_worker(
-            token,
-            chat_id,
+        return send_result_notice(
             telegram_notice("✅", "Vídeo legendado concluído" if subtitle_downloads is not None else "Karaokê concluído", *fallback_lines),
         )
     except InterruptedError:
         raise
     except Exception as exc:
         logger.error("Erro ao concluir a entrega ao Telegram (%s).", type(exc).__name__)
-        return _send_telegram_notification_worker(
-            token,
-            chat_id,
+        return send_result_notice(
             telegram_notice(
                 "⚠️",
                 "Resultado salvo; envio pendente",
@@ -4839,6 +4847,7 @@ def send_video_to_targets(
     processing_seconds: float = 0,
     subtitle_downloads: list[dict] = None,
     embedded_subtitle: str = "",
+    result_video: str = "",
 ):
     """Entrega o resultado a todos os bots antes de liberar o próximo item da fila."""
     if not targets:
@@ -4851,6 +4860,7 @@ def send_video_to_targets(
                 public_download_token=public_download_token, base_url=base_url, external_url=external_url,
                 processing_seconds=processing_seconds, subtitle_downloads=subtitle_downloads,
                 embedded_subtitle=embedded_subtitle, prepared_preview=preview,
+                result_video=result_video,
             )
     if subtitle_downloads is None:
         deliver()
@@ -5711,6 +5721,7 @@ def run_pipeline(
                     telegram_base_url,
                     telegram_external_url,
                     total_processing_seconds,
+                    result_video=os.path.join(library_dir, "history", history_filename),
                 )
                 update_state(
                     "done",
@@ -6059,6 +6070,7 @@ def run_pipeline(
                 telegram_base_url,
                 telegram_external_url,
                 total_processing_seconds,
+                result_video=os.path.join(library_dir, "history", history_filename),
             )
             update_state(
                 "done",
@@ -6212,8 +6224,26 @@ def check_youtube_oauth_admin(username):
 
 
 from pathlib import Path
+def notify_youtube_publication(job):
+    if job.get("status") != "done" or not re.fullmatch(r"[A-Za-z0-9_-]{11}", str(job.get("video_id") or "")):
+        return False
+    video = Path(job["video"]).resolve()
+    owner = None
+    for username, record in load_users().items():
+        candidate = {"username": username, "role": record.get("role", "user")}
+        history = (Path(get_user_paths(candidate)["library"]) / "history").resolve()
+        if video.parent == history:
+            owner = candidate
+            break
+    if not owner:
+        return True
+    return TELEGRAM_RESULTS.published(str(video), job["video_id"], job.get("title", ""),
+        get_notification_targets(owner), automatic=bool(job.get("automatic")))
+
+
 youtube_publisher = install_youtube_publisher(
-    app, get_current_user, require_admin, resolve_youtube_publication_video, check_youtube_oauth_admin, user_from_username)
+    app, get_current_user, require_admin, resolve_youtube_publication_video, check_youtube_oauth_admin, user_from_username,
+    on_published=notify_youtube_publication)
 
 
 def probe_youtube_download_access(url):

@@ -229,7 +229,7 @@ class TelegramDelivery:
                     return result
                 if data["ok"]:
                     answer = data.get("result")
-                    required = "message_id" if method.startswith("send") else "id" if method in {"getMe", "getChat"} else "status"
+                    required = "message_id" if method.startswith(("send", "edit")) else "id" if method in {"getMe", "getChat"} else "status"
                     valid = isinstance(answer, dict)
                     if valid and required in {"id", "message_id"}:
                         valid = isinstance(answer.get(required), int) and not isinstance(answer[required], bool)
@@ -242,6 +242,11 @@ class TelegramDelivery:
                     if valid:
                         return Result(True, "delivered" if not reading else "verified", "Mensagem confirmada pelo Telegram." if not reading else "Bot e destino verificados.", answer)
                     return result
+                description = str(data.get("description", "")).lower()
+                if method.startswith('edit') and 'message is not modified' in description:
+                    return Result(True, 'delivered', 'A mensagem já contém o link do YouTube.')
+                if method.startswith('edit') and ('message to edit not found' in description or "message can't be edited" in description):
+                    return Result(False, 'message_unavailable', 'A mensagem original não está mais disponível para atualização.')
                 result = self._error(data, response.status_code)
                 params = data.get("parameters")
                 params = params if isinstance(params, dict) else {}
@@ -304,6 +309,20 @@ class TelegramDelivery:
             self._record(lane, result, "sendVideo")
             return result
         return self._submit(token, chat, send).result()
+
+    def edit_message(self, token, chat, message_id, markup, video=False):
+        def edit(lane):
+            text, entities = next(formatted_parts(markup, 1024 if video else 4096), ('', []))
+            method = 'editMessageCaption' if video else 'editMessageText'
+            body = {'message_id': message_id,
+                    'caption' if video else 'text': text,
+                    'caption_entities' if video else 'entities': entities}
+            if not video:
+                body['link_preview_options'] = {'is_disabled': True}
+            result = self._request(lane, method, body)
+            self._record(lane, result, method)
+            return result
+        return self._submit(token, chat, edit).result()
 
     def verify(self, token, chat):
         if not token or not chat:

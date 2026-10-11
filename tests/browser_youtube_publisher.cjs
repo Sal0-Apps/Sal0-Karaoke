@@ -40,6 +40,9 @@ await page.route('**/*',async route=>{
  return route.fulfill({status,contentType:'application/json',body:JSON.stringify(data)});
 });
 await page.goto('http://karaoke.test');await page.locator('#tabBtnSettings').click();
+await page.locator('#youtubePublisherSection > summary').click();
+await page.locator('#ytConnectionHeading').click();
+await page.locator('#ytUsersHeading').click();
 await page.waitForFunction(()=>document.querySelectorAll('#ytPublishVideo option').length===2);
 assert((await page.locator('#ytPublishVideo').textContent()).includes('karaoke.mp4'));
 assert(!(await page.locator('#ytPublishVideo').textContent()).includes('srt-result.mp4'));
