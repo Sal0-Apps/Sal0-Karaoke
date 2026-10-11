@@ -912,7 +912,7 @@
             gap: 1rem;
             align-items: stretch;
         }
-        .settings-grid > .card { height: 100%; margin: 0; min-width: 0; }
+        .settings-grid > .card { grid-column: 1 / -1; align-self: start; height: auto; margin: 0; min-width: 0; }
 
         #youtubePublisherSection .yt-panel { min-width: 0; border: 1px solid var(--glass-border); border-radius: 14px; padding: clamp(16px, 2vw, 24px); margin-top: 16px; }
         #youtubePublisherSection h3 { font-size: 1.12rem; margin: 0 0 12px; }
@@ -958,6 +958,32 @@
         #subtitleModeSettingsSection input[type="color"]::-webkit-color-swatch { border:1px solid var(--glass-border); border-radius:6px; }
         .subtitle-style-sample { display:flex; justify-content:center; align-items:center; min-height:110px; margin:.8rem 0; padding:1rem; border-radius:10px; overflow-wrap:anywhere; text-align:center; }
         .subtitle-style-sample span { max-width:100%; padding:.2em .4em; border-radius:3px; }
+
+        .subtitle-settings-head { align-items:center; flex-wrap:wrap; gap:1rem; margin-bottom:.8rem; }
+        .subtitle-settings-head .card-title { margin:0; font-size:clamp(1rem,1.2vw,1.2rem); line-height:1.4; }
+        .subtitle-settings-head .btn-primary { width:auto; min-width:210px; min-height:48px; padding:.7rem 1rem; font-size:.9rem; }
+        .subtitle-settings-summary { display:flex; flex-wrap:wrap; gap:.5rem; margin:.8rem 0 0; }
+        .subtitle-settings-summary span { padding:.4rem .65rem; background:var(--input-bg); border:1px solid var(--glass-border); border-radius:9px; color:var(--text-main); font-size:.8rem; overflow-wrap:anywhere; max-width:100%; }
+        #subtitleModeSettingsBody[hidden] { display:none; }
+        .subtitle-settings-body { margin-top:1.25rem; border-top:1px solid var(--glass-border); padding-top:1.25rem; }
+        .subtitle-settings-layout { display:grid; grid-template-columns:minmax(0,1.4fr) minmax(0,1fr); gap:1rem; align-items:start; }
+        .subtitle-settings-controls { display:grid; gap:1rem; min-width:0; }
+        .subtitle-settings-group { padding:1rem; border:1px solid var(--glass-border); border-radius:12px; background:var(--input-bg); min-width:0; }
+        .subtitle-settings-group h3 { margin:0 0 .8rem; font-size:.95rem; color:var(--text-main); line-height:1.4; }
+        .subtitle-settings-group .compact-note { margin:.65rem 0 0; }
+        .subtitle-settings-fields { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:1rem; }
+        .subtitle-settings-wide { grid-column:1 / -1; }
+        .subtitle-settings-preview { display:grid; gap:1rem; min-width:0; }
+        .subtitle-settings-preview .subtitle-style-sample { aspect-ratio:16 / 9; min-height:150px; width:100%; margin:0; padding:1rem; background:var(--input-bg); }
+        .subtitle-settings-preview .subtitle-style-sample span { font-family:Arial,sans-serif; line-height:1.3; }
+        .subtitle-settings-preview h3 { margin:0 0 .7rem; font-size:.95rem; }
+        .subtitle-settings-note { border-left:3px solid var(--accent); padding:.8rem 1rem; background:var(--input-bg); border-radius:0 9px 9px 0; }
+        .subtitle-settings-note p { margin:.4rem 0; color:var(--text-muted); font-size:.82rem; line-height:1.5; }
+        .subtitle-settings-actions { display:flex; flex-wrap:wrap; align-items:center; gap:1rem; margin-top:1.25rem; }
+        .subtitle-settings-actions .btn-primary { width:auto; min-height:48px; padding:.7rem 1.1rem; }
+        .subtitle-settings-actions .compact-note { flex:1 1 200px; margin:0; }
+        @media (max-width:1000px) { .subtitle-settings-layout { grid-template-columns:minmax(0,1fr); } .subtitle-settings-preview { grid-template-columns:repeat(2,minmax(0,1fr)); align-items:start; } }
+        @media (max-width:620px) { .subtitle-settings-fields, .subtitle-settings-preview { grid-template-columns:minmax(0,1fr); } .subtitle-settings-head .btn-primary, .subtitle-settings-actions .btn-primary { width:100%; } }
 
         .progress-copy {
             display: grid;
@@ -2382,22 +2408,58 @@
             </div>
 
             <div class="card" id="subtitleModeSettingsSection" style="display:none;">
-                <div class="card-header"><span class="card-title">Legendar vídeo · padrão do servidor</span></div>
-                <p class="compact-note">Estas opções valem para novos itens da fila. O vídeo original sempre é mantido como fundo; o fundo abaixo é usado somente para arquivos de áudio.</p>
-                <div class="easy-config-fields">
-                    <div class="form-group"><label class="label" for="srtTextColor">Cor da legenda</label><input id="srtTextColor" type="color" value="#ffffff" class="input-text"></div>
-                    <div class="form-group"><label class="label" for="srtBoxColor">Cor do fundo da legenda</label><input id="srtBoxColor" type="color" value="#000000" class="input-text"></div>
-                    <div class="form-group"><label class="label" for="srtBoxOpacity">Opacidade do fundo da legenda (%)</label><input id="srtBoxOpacity" type="number" min="0" max="100" value="65" class="input-text"></div>
-                    <div class="form-group"><label class="label" for="srtFontSize">Tamanho da legenda</label><input id="srtFontSize" type="number" min="12" max="72" value="24" class="input-text"></div>
-                    <div class="form-group"><label class="label" for="srtTextPosition">Posição</label><select id="srtTextPosition" class="select-input"><option value="bottom">Embaixo</option><option value="middle">Centro</option><option value="top">Em cima</option></select></div>
-                    <div class="form-group"><label class="label" for="srtVideoSubtitleSource">Legenda embutida no vídeo</label><select id="srtVideoSubtitleSource" class="select-input"><option value="translated">Traduzida quando disponível (padrão)</option><option value="original">Sempre no idioma original</option></select></div>
-                    <div class="form-group"><label class="label" for="srtBackgroundColor">Cor de fundo para arquivos de áudio</label><input id="srtBackgroundColor" type="color" value="#101827" class="input-text"></div>
-                    <div class="form-group"><label class="label" for="srtBackgroundFile">Imagem ou vídeo de fundo para áudio</label><select id="srtBackgroundFile" class="select-input"><option value="">Usar a cor de fundo</option></select><p class="compact-note">Escolha um fundo da sua Biblioteca. Ele será copiado para cada tarefa.</p></div>
+                <div class="card-header subtitle-settings-head">
+                    <h2 class="card-title">Legendas dos vídeos</h2>
+                    <button type="button" id="btnToggleSubtitleSettings" class="btn-primary" aria-expanded="false" aria-controls="subtitleModeSettingsBody">Personalizar legendas ▾</button>
                 </div>
-                <p class="compact-note">Prévia das cores da legenda</p>
-                <div id="subtitleStyleSample" class="subtitle-style-sample"><span>Exemplo de legenda</span></div>
-                <button type="button" class="btn-primary" id="btnSaveSubtitleMode">Salvar padrão de legendagem</button>
-                <p id="subtitleSettingsMessage" class="compact-note" aria-live="polite"></p>
+                <p class="compact-note">Padrões do modo <strong>Legendar vídeo</strong> para todas as contas. Abra os ajustes para mudar aparência, idioma e fundo.</p>
+                <div id="subtitleSettingsSummary" class="subtitle-settings-summary" aria-label="Padrões salvos da legendagem"></div>
+                <div id="subtitleModeSettingsBody" class="subtitle-settings-body" hidden>
+                    <div class="subtitle-settings-layout">
+                        <div class="subtitle-settings-controls">
+                            <section class="subtitle-settings-group" aria-labelledby="subtitleAppearanceHeading">
+                                <h3 id="subtitleAppearanceHeading">Aparência da legenda</h3>
+                                <div class="subtitle-settings-fields">
+                                    <div class="form-group"><label class="label" for="srtTextColor">Cor do texto</label><input id="srtTextColor" type="color" value="#ffffff" class="input-text"></div>
+                                    <div class="form-group"><label class="label" for="srtBoxColor">Fundo atrás do texto</label><input id="srtBoxColor" type="color" value="#000000" class="input-text"></div>
+                                    <div class="form-group"><label class="label" for="srtBoxOpacity">Opacidade desse fundo (%)</label><input id="srtBoxOpacity" type="number" min="0" max="100" value="65" class="input-text"></div>
+                                    <div class="form-group"><label class="label" for="srtFontSize">Tamanho do texto</label><input id="srtFontSize" type="number" min="12" max="72" value="24" class="input-text"></div>
+                                    <div class="form-group subtitle-settings-wide"><label class="label" for="srtTextPosition">Posição da legenda</label><select id="srtTextPosition" class="select-input"><option value="bottom">Embaixo</option><option value="middle">Centro</option><option value="top">Em cima</option></select></div>
+                                </div>
+                            </section>
+                            <section class="subtitle-settings-group" aria-labelledby="subtitleLanguageHeading">
+                                <h3 id="subtitleLanguageHeading">Idioma exibido no vídeo</h3>
+                                <label class="label" for="srtVideoSubtitleSource">Legenda que será embutida</label>
+                                <select id="srtVideoSubtitleSource" class="select-input"><option value="translated">Traduzida quando disponível</option><option value="original">Sempre no idioma original</option></select>
+                                <p class="compact-note">Se a tradução não estiver disponível, o vídeo usa a legenda original. Os arquivos SRT continuam separados para download.</p>
+                            </section>
+                            <section class="subtitle-settings-group" aria-labelledby="subtitleBackgroundHeading">
+                                <h3 id="subtitleBackgroundHeading">Fundo para arquivos de áudio</h3>
+                                <div class="subtitle-settings-fields">
+                                    <div class="form-group subtitle-settings-wide"><label class="label" for="srtBackgroundFile">Imagem ou vídeo da Biblioteca</label><select id="srtBackgroundFile" class="select-input"><option value="">Usar apenas uma cor</option></select></div>
+                                    <div class="form-group subtitle-settings-wide"><label class="label" for="srtBackgroundColor">Cor quando nenhum fundo é escolhido</label><input id="srtBackgroundColor" type="color" value="#101827" class="input-text"></div>
+                                </div>
+                                <p class="compact-note">Ao legendar um vídeo, a imagem original é o fundo. Estas opções criam o fundo somente quando a entrada é um áudio.</p>
+                            </section>
+                        </div>
+                        <aside class="subtitle-settings-preview" aria-label="Prévia e aplicação dos padrões">
+                            <div>
+                                <h3>Prévia da legenda</h3>
+                                <div id="subtitleStyleSample" class="subtitle-style-sample"><span>A legenda aparece assim no vídeo</span></div>
+                                <p class="compact-note">Prévia ilustrativa das cores e da posição; o vídeo final usa a mídia e o tamanho de texto definidos.</p>
+                            </div>
+                            <div class="subtitle-settings-note">
+                                <strong>Quando esses padrões são usados?</strong>
+                                <p>Após salvar, eles valem para os próximos itens adicionados à fila.</p>
+                                <p>Cada tarefa já na fila mantém seus próprios ajustes.</p>
+                            </div>
+                        </aside>
+                    </div>
+                    <div class="subtitle-settings-actions">
+                        <button type="button" class="btn-primary" id="btnSaveSubtitleMode">Salvar padrões de legendagem</button>
+                        <p id="subtitleSettingsMessage" class="compact-note" role="status" aria-live="polite"></p>
+                    </div>
+                </div>
             </div>
 
             <div class="card" id="translationToolsSection" style="display: none;">
@@ -2485,7 +2547,7 @@
                 <p id="telegramScopeText" class="compact-note">Este bot recebe apenas as suas criações.</p>
 
                 <div id="telegramConfiguredBadge" style="display: none; background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.3); padding: 0.6rem 1rem; border-radius: var(--radius-sm); color: #34d399; font-size: 0.85rem; align-items: center; justify-content: space-between; margin-bottom: 1rem;">
-                    <span>✓ Bot configurado e ativo</span>
+                    <span>✓ Configuração salva</span>
                 </div>
 
                 <div id="telegramInputsDiv" class="form-grid">
@@ -2501,6 +2563,13 @@
                         <button type="button" id="btnSaveTelegram" class="btn-primary">💾 Salvar Telegram</button>
                     </div>
                 </div>
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:0.75rem;margin-top:1rem;">
+                    <button type="button" id="btnVerifyTelegram" class="btn-secondary">Verificar conexão</button>
+                    <button type="button" id="btnTestTelegram" class="btn-primary">Enviar mensagem de teste</button>
+                </div>
+                <p class="compact-note">O teste envia uma única mensagem ao destino salvo. Em grupos, permita mensagens e vídeos; em conversa privada, inicie o bot primeiro.</p>
+                <div id="telegramDeliveryStatus" class="compact-note" role="status" aria-live="polite" style="overflow-wrap:anywhere;"></div>
+                <div id="telegramFeedback" role="status" aria-live="polite" style="overflow-wrap:anywhere;"></div>
             </div>
 
             <!-- IP Externo / Acesso Remoto -->
@@ -2699,7 +2768,7 @@
                     <li>Ajuste modelo, leitura da fala, VAD e revisão se necessário. Toque em <strong>Legendar vídeo</strong>.</li>
                     <li>Assista ou baixe o <strong>vídeo legendado</strong>, o <strong>SRT original</strong> e a tradução disponível. No Telegram chega somente o vídeo compactado, com links locais e externos para os três arquivos na própria mensagem.</li>
                 </ol>
-                <p>Este modo usa o áudio original completo e o Whisper para reconhecer a fala. Sempre cria MP4 com legendas embutidas: vídeos mantêm sua imagem; áudios usam o fundo padrão. Em <strong>Ajustes → Legendar vídeo · padrão do servidor</strong>, o administrador configura estilo e fundo e escolhe a legenda embutida. O padrão usa a tradução disponível; sem tradução, usa o original. Os SRTs mantêm os tempos das falas, sem preencher silêncios.</p>
+                <p>Este modo usa o áudio original completo e o Whisper para reconhecer a fala. Sempre cria MP4 com legendas embutidas: vídeos mantêm sua imagem; áudios usam o fundo padrão. Em <strong>Ajustes → Legendas dos vídeos → Personalizar legendas</strong>, o administrador configura estilo e fundo e escolhe a legenda embutida. O padrão usa a tradução disponível; sem tradução, usa o original. Os SRTs mantêm os tempos das falas, sem preencher silêncios.</p>
             </details>
             <details>
                 <summary>4. Adicionar e organizar a fila</summary>
@@ -2737,7 +2806,7 @@
                 <summary>7. Receber resultados no Telegram</summary>
                 <ol>
                     <li>Crie um bot pelo <strong>@BotFather</strong> e inicie uma conversa com o bot, ou adicione-o ao grupo desejado.</li>
-                    <li>Em <strong>Ajustes → Telegram → Editar</strong>, informe o token do bot e o Chat ID do destino. Salve. Em grupos, permita o envio de mensagens e arquivos.</li>
+                    <li>Em <strong>Ajustes → Telegram → Editar</strong>, informe o token do bot e o Chat ID do destino. Salve. Use <strong>Verificar conexão</strong> para consultar o bot e o destino, ou <strong>Enviar mensagem de teste</strong> para confirmar a entrega sem criar um vídeo. Em grupos, permita mensagens e vídeos.</li>
                     <li>Confira as notificações de etapas e o aviso sobre a letra-guia. O resultado inclui o tempo de processamento e os links disponíveis.</li>
                 </ol>
                 <p>O servidor envia o MP4. Na legendagem SRT, envia somente uma cópia compactada, com os links dos SRTs e do vídeo completo na própria mensagem. No karaokê, compacta quando necessário; o original permanece na Biblioteca. A fila aguarda a tentativa de entrega terminar. Limites e falhas do Telegram podem impedir o anexo; nesse caso, use os links disponíveis. Proteja tokens e links.</p>
@@ -2775,7 +2844,7 @@
                 </ol>
                 <p>A API tem cota gratuita e pode limitar projetos sem auditoria a vídeos privados. Guarde a autorização como uma senha. Backing vocals e vídeo do modo SRT mostram porcentagem da etapa e avisam o avanço no Telegram; o LibreTranslate informa apenas início e término.</p>
             </details>
-            <p class="compact-note">Versão do servidor: 11.4.2. A transcrição é local; fontes, modelos e integrações podem acessar serviços externos. Use conteúdo autorizado.</p>
+            <p class="compact-note">Versão do servidor: 12.0. A transcrição é local; fontes, modelos e integrações podem acessar serviços externos. Use conteúdo autorizado.</p>
             <p class="compact-note">Use o servidor pela rede local ou VPN. A busca/importação do YouTube não concede direitos sobre a mídia. OAuth autoriza o acesso ao canal, não o uso de músicas. Confira as permissões do conteúdo e os termos do YouTube antes de importar ou publicar. Não listado permite acesso a quem tiver o link; resultados SRT nunca vão ao YouTube.</p>
             <p class="compact-note"><a href="https://www.youtube.com/static?template=terms" target="_blank" rel="noopener noreferrer">Termos do YouTube</a> · <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer">Privacidade do Google</a> · <a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener noreferrer">Revogar acesso ao canal</a></p>
         </div>
@@ -3165,6 +3234,8 @@
             const rgb = [1,3,5].map(offset => parseInt(color.slice(offset,offset+2),16));
             const opacity = Math.max(0,Math.min(100,Number(document.getElementById('srtBoxOpacity').value)||0));
             sample.style.backgroundColor = document.getElementById('srtBackgroundColor').value;
+            const position = document.getElementById('srtTextPosition').value;
+            sample.style.alignItems = position === 'top' ? 'flex-start' : position === 'middle' ? 'center' : 'flex-end';
             text.style.color = document.getElementById('srtTextColor').value;
             text.style.backgroundColor = `rgba(${rgb.join(',')},${opacity/100})`;
             text.style.fontSize = `${Math.max(12,Math.min(72,Number(document.getElementById('srtFontSize').value)||24))}px`;
@@ -3176,6 +3247,10 @@
                 if (config[key] !== undefined) document.getElementById(id).value = String(config[key]);
             }
             updateSubtitleStyleSample();
+            const summary = document.getElementById('subtitleSettingsSummary');
+            const position = {bottom:'Embaixo',middle:'Centro',top:'Em cima'}[config.text_position] || 'Embaixo';
+            const labels = [config.video_subtitle_source === 'original' ? 'Idioma original' : 'Tradução quando disponível', `Legenda: ${position}`, `Texto: ${config.font_size || 24}`];
+            if (summary) summary.replaceChildren(...labels.map(label => { const item = document.createElement('span'); item.textContent = label; return item; }));
             const source = config.video_subtitle_source === 'original' ? 'idioma original' : 'tradução quando disponível';
             document.getElementById('subtitleVisualSummary').textContent = `Legenda embutida: ${source}. Estilo e fundo definidos pelo administrador.`;
         }
@@ -4120,29 +4195,89 @@
             return `${(value / (1024 * 1024)).toFixed(1)} MB`;
         }
 
-        // FUNÇÃO PARA CARREGAR CONFIGURAÇÃO DO TELEGRAM
+        let telegramRequestPending = false;
+        let telegramStatusPending = false;
+        let telegramEditing = false;
+        let telegramConfigured = false;
+
+        function telegramFeedback(message, error = false) {
+            const element = document.getElementById('telegramFeedback');
+            if (!element) return;
+            element.textContent = message;
+            element.style.color = error ? 'var(--danger)' : 'var(--text-primary)';
+        }
+
+        function renderTelegramDelivery(data = {}) {
+            const element = document.getElementById('telegramDeliveryStatus');
+            if (!element) return;
+            const messages = [data.detail || 'Configuração salva. Verifique a conexão.'];
+            const last = data.last_delivery;
+            if (last?.at) {
+                const when = new Date(last.at * 1000).toLocaleString('pt-BR');
+                messages.push(`${last.ok ? 'Último envio confirmado' : 'Último envio não confirmado'}: ${when}.`);
+                if (!last.ok && last.detail !== data.detail) messages.push(last.detail);
+            }
+            if (last?.ok === false && data.last_success_at) messages.push(`Última entrega confirmada: ${new Date(data.last_success_at * 1000).toLocaleString('pt-BR')}.`);
+            if (data.last_video_delivery?.ok === false) messages.push(`Vídeo não confirmado: ${data.last_video_delivery.detail}`);
+            if (data.pending > 0) messages.push(`${data.pending} envio(s) aguardando confirmação.`);
+            element.textContent = messages.join(' ');
+        }
+
+        function updateTelegramButtons() {
+            for (const id of ['btnSaveTelegram', 'btnEditTelegram', 'btnVerifyTelegram', 'btnTestTelegram']) {
+                const button = document.getElementById(id);
+                if (button) button.disabled = telegramRequestPending || (['btnVerifyTelegram', 'btnTestTelegram'].includes(id) && (telegramEditing || !telegramConfigured));
+            }
+        }
+
+        async function telegramRequest(path = '', options = {}) {
+            const response = await authFetch('/api/telegram' + path, options);
+            const data = await response.json().catch(() => null);
+            if (!data || Array.isArray(data) || typeof data !== 'object') throw new Error(`O servidor não retornou uma resposta válida (HTTP ${response.status}). Tente novamente.`);
+            if (!response.ok) throw new Error(data.detail || 'Não foi possível acessar o Telegram.');
+            return data;
+        }
+
         async function fetchTelegramConfig() {
             try {
-                const res = await authFetch('/api/telegram');
-                if (res.ok) {
-                    const data = await res.json();
-                    const tokenInput = document.getElementById('telegramTokenInput');
-                    const chatIdInput = document.getElementById('telegramChatIdInput');
-                    const badge = document.getElementById('telegramConfiguredBadge');
-                    const inputsDiv = document.getElementById('telegramInputsDiv');
-
-                    if (tokenInput) tokenInput.value = data.telegram_token || '';
-                    if (chatIdInput) chatIdInput.value = data.telegram_chat_id || '';
-
-                    if (data.telegram_token && data.telegram_chat_id) {
-                        if (badge) badge.style.display = 'flex';
-                        if (inputsDiv) inputsDiv.style.display = 'none';
-                    } else {
-                        if (badge) badge.style.display = 'none';
-                        if (inputsDiv) inputsDiv.style.display = 'grid';
-                    }
+                const data = await telegramRequest();
+                telegramConfigured = !!(data.telegram_token && data.telegram_chat_id);
+                if (!telegramEditing) {
+                    document.getElementById('telegramTokenInput').value = data.telegram_token || '';
+                    document.getElementById('telegramChatIdInput').value = data.telegram_chat_id || '';
+                    document.getElementById('telegramConfiguredBadge').style.display = telegramConfigured ? 'flex' : 'none';
+                    document.getElementById('telegramInputsDiv').style.display = telegramConfigured ? 'none' : 'grid';
                 }
-            } catch (e) { console.error("Erro ao carregar Telegram:", e); }
+                renderTelegramDelivery(data.delivery);
+                updateTelegramButtons();
+            } catch (error) { telegramFeedback(error.message, true); }
+        }
+
+        async function fetchTelegramDeliveryStatus() {
+            if (telegramStatusPending || telegramRequestPending) return;
+            telegramStatusPending = true;
+            try { renderTelegramDelivery(await telegramRequest('/status')); }
+            catch (error) { renderTelegramDelivery({detail:error.message}); }
+            finally { telegramStatusPending = false; }
+        }
+
+        async function runTelegramCheck(path, buttonId, loading) {
+            if (telegramRequestPending || telegramEditing) return;
+            telegramRequestPending = true;
+            updateTelegramButtons();
+            const button = document.getElementById(buttonId), original = button.textContent;
+            button.textContent = loading;
+            telegramFeedback(loading);
+            try {
+                const data = await telegramRequest(path, {method:'POST'});
+                telegramFeedback(data.ok && path === '/test' ? 'Mensagem de teste enviada. Confira no Telegram.' : (data.detail || 'O envio não foi confirmado.'), !data.ok);
+                await fetchTelegramConfig();
+            } catch (error) { telegramFeedback(error.message, true); }
+            finally {
+                telegramRequestPending = false;
+                button.textContent = original;
+                updateTelegramButtons();
+            }
         }
 
         // FUNÇÃO PARA CARREGAR IP EXTERNO
@@ -4644,6 +4779,14 @@
             });
 
             document.getElementById('btnUpdateYoutubeTools')?.addEventListener('click', updateYoutubeTools);
+
+            document.getElementById('btnToggleSubtitleSettings')?.addEventListener('click', () => {
+                const body = document.getElementById('subtitleModeSettingsBody');
+                const button = document.getElementById('btnToggleSubtitleSettings');
+                body.hidden = !body.hidden;
+                button.setAttribute('aria-expanded', String(!body.hidden));
+                button.textContent = body.hidden ? 'Personalizar legendas ▾' : 'Fechar ajustes ▴';
+            });
 
             for (const id of Object.values(subtitleSettingFields)) document.getElementById(id)?.addEventListener('input', updateSubtitleStyleSample);
             updateSubtitleStyleSample();
@@ -5958,33 +6101,36 @@
                 };
             }
 
-            // Salvar Telegram
-            const btnEditTelegram = document.getElementById('btnEditTelegram');
-            if (btnEditTelegram) {
-                btnEditTelegram.onclick = () => {
-                    const inputsDiv = document.getElementById('telegramInputsDiv');
-                    if (inputsDiv) inputsDiv.style.display = inputsDiv.style.display === 'none' ? 'grid' : 'none';
-                };
-            }
-
-            const btnSaveTelegram = document.getElementById('btnSaveTelegram');
-            if (btnSaveTelegram) {
-                btnSaveTelegram.onclick = async () => {
-                    const token = document.getElementById('telegramTokenInput').value.trim();
-                    const chatId = document.getElementById('telegramChatIdInput').value.trim();
-                    try {
-                        const res = await authFetch('/api/telegram', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ telegram_token: token, telegram_chat_id: chatId })
-                        });
-                        if (res.ok) {
-                            alert("Configurações do Telegram salvas!");
-                            await fetchTelegramConfig();
-                        }
-                    } catch (e) { alert("Erro ao salvar Telegram: " + e.message); }
-                };
-            }
+            const editTelegram = document.getElementById('btnEditTelegram');
+            editTelegram.onclick = () => {
+                telegramEditing = !telegramEditing;
+                document.getElementById('telegramInputsDiv').style.display = telegramEditing || !telegramConfigured ? 'grid' : 'none';
+                editTelegram.textContent = telegramEditing ? 'Fechar edição' : '✏️ Editar';
+                telegramFeedback(telegramEditing ? 'Salve suas alterações antes de verificar ou testar o destino.' : '');
+                updateTelegramButtons();
+            };
+            document.getElementById('btnSaveTelegram').onclick = async () => {
+                if (telegramRequestPending) return;
+                telegramRequestPending = true;
+                updateTelegramButtons();
+                const button = document.getElementById('btnSaveTelegram');
+                button.textContent = 'Salvando…';
+                try {
+                    const data = await telegramRequest('', {method:'POST', headers:{'Content-Type':'application/json'},
+                        body:JSON.stringify({telegram_token:document.getElementById('telegramTokenInput').value.trim(),
+                                             telegram_chat_id:document.getElementById('telegramChatIdInput').value.trim()})});
+                    telegramEditing = false;
+                    editTelegram.textContent = '✏️ Editar';
+                    await fetchTelegramConfig();
+                    telegramFeedback(data.detail || 'Configuração salva. Envie uma mensagem de teste para confirmar.');
+                } catch (error) { telegramFeedback(error.message, true); }
+                finally { telegramRequestPending = false; button.textContent = '💾 Salvar Telegram'; updateTelegramButtons(); }
+            };
+            document.getElementById('btnVerifyTelegram').onclick = () => runTelegramCheck('/verify', 'btnVerifyTelegram', 'Verificando conexão…');
+            document.getElementById('btnTestTelegram').onclick = () => runTelegramCheck('/test', 'btnTestTelegram', 'Aguardando confirmação do Telegram…');
+            setInterval(() => {
+                if (!document.hidden && document.getElementById('settingsTabContent')?.style.display !== 'none') fetchTelegramDeliveryStatus();
+            }, 10000);
 
             // Salvar External URL
             const btnEditExternalUrl = document.getElementById('btnEditExternalUrl');

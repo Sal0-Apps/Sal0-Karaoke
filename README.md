@@ -31,7 +31,7 @@ Dentro da aplicação, o botão **Manual** abre tutoriais curtos, organizados em
 | Detalhado | Controlar reconhecimento, versos, visual e revisão | Fonte, perfil, modelo Whisper, letra-guia, fundo e ajustes avançados | MP4 de karaokê; a opção de somente remover vocais gera vídeo instrumental sem legenda |
 | Legendar vídeo (SRT) | Legendar a fala de áudio ou vídeo com Whisper | Fonte, modelo, leitura da fala, VAD, revisão e idioma da tradução opcional | MP4 com legenda embutida, SRT original e tradução opcional |
 
-**Legendar vídeo** transcreve a fala usando o áudio original completo, sem Demucs nem animação de karaokê. Sempre gera um MP4: entradas de vídeo mantêm a imagem original; áudio e capas incorporadas usam um fundo padrão. Em **Ajustes → Legendar vídeo · padrão do servidor**, o administrador escolhe cor, fundo e posição da legenda, fundo para áudio e qual SRT embutir. A tradução é usada por padrão quando disponível; pode-se escolher sempre o idioma original. As configurações e o fundo ficam copiados em cada novo item da fila.
+**Legendar vídeo** transcreve a fala usando o áudio original completo, sem Demucs nem animação de karaokê. Sempre gera um MP4: entradas de vídeo mantêm a imagem original; áudio e capas incorporadas usam um fundo padrão. Em **Ajustes → Legendas dos vídeos → Personalizar legendas**, o administrador escolhe cor, fundo e posição da legenda, fundo para áudio e qual SRT embutir. A tradução é usada por padrão quando disponível; pode-se escolher sempre o idioma original. As configurações e o fundo ficam copiados em cada novo item da fila.
 
 A tradução depende do LibreTranslate configurado pelo administrador, com padrão de detecção automática → português do Brasil (`pt-BR`). O SRT original é salvo primeiro; se a tradução falhar, o vídeo ainda é criado com a legenda original. MP4 e SRTs ficam disponíveis na interface e Biblioteca. No Telegram chega somente o vídeo compactado, com links locais e externos disponíveis para o vídeo completo, SRT original e SRT traduzido na mesma mensagem. Os SRTs não são enviados como anexos separados. Não há limite fixo de duração imposto pelo modo; os recursos do servidor limitam a operação.
 
@@ -115,6 +115,8 @@ Refazer um karaokê pelo cache reaproveita apenas insumos compatíveis, não a r
 
 Cada conta pode configurar seu bot e destinatário. As mensagens intermediárias informam as etapas e a situação da letra-guia. A conclusão informa o tempo de processamento e os links local/externo disponíveis. Na legendagem SRT, somente o vídeo compactado é anexado, com os links do vídeo completo e dos SRTs na mesma mensagem.
 
+Em **Ajustes → Telegram**, salve o token e o Chat ID e use **Verificar conexão** ou **Enviar mensagem de teste** pelo celular. O painel mostra confirmação e ações para corrigir falhas de token, destino, permissão e rede; salvar credenciais não comprova entrega. Avisos e resultados seguem a ordem do destino e respeitam pausas temporárias do Telegram.
+
 Quando o vídeo excede o limite adotado pelo envio, o servidor tenta criar uma prévia compactada apenas para o Telegram. O original salvo permanece intacto. Falhas de rede, limites da API e erros de compressão podem impedir o anexo; o envio direto não é garantido para toda mídia.
 
 No Android, **Configurações do app** fica na faixa inferior, inclusive quando o servidor está offline. Ela permite alterar Wi-Fi e endereços de conexão. Os recursos de criação e Telegram são configurados na aba **Ajustes** da página. Os downloads vão para a pasta **Downloads**, com tratamento de nomes UTF-8 e sufixos para evitar sobrescritas.
@@ -129,14 +131,14 @@ Em **Playlist de cada usuário**, a administração define uma playlist válida 
 
 ## Início rápido com Docker
 
-A versão de distribuição desta documentação é **11.4.2**. O título e o rodapé da página mostram apenas o nome da aplicação. A versão do servidor pode ser consultada no Manual; a versão do APK aparece nas configurações nativas.
+A versão de distribuição desta documentação é **12.0**. O título e o rodapé da página mostram apenas o nome da aplicação. A versão do servidor pode ser consultada no Manual; a versão do APK aparece nas configurações nativas.
 
 Crie um arquivo `compose.yaml`:
 
 ```yaml
 services:
   karaoke-app:
-    image: ghcr.io/sal0-apps/sal0-karaoke:11.4.2
+    image: ghcr.io/sal0-apps/sal0-karaoke:12.0
     container_name: karaoke-app
     ports:
       - "7885:7860"

@@ -8,7 +8,7 @@ const srtDefaults = {text_color:'#FFFFFF',box_color:'#000000',box_opacity:65,fon
     const browser = await chromium.launch({headless:true});
     try {
         const page = await browser.newPage({viewport:{width:390,height:900}});
-        let config = {...srtDefaults}, delayedDraft, delayedFetch, holdDraft = false, holdFetch = false;
+        let config = {...srtDefaults}, configSaves = 0, delayedDraft, delayedFetch, holdDraft = false, holdFetch = false;
         const errors = [], drafts = new Map(), submissions = [], deletes = [], backgroundPolls = [];
         const jobs = [{id:'active',title:'Processando A',status:'processing',owner_username:'owner'}];
         await page.addInitScript(() => localStorage.setItem('karaoke_token','session'));
@@ -26,7 +26,7 @@ const srtDefaults = {text_color:'#FFFFFF',box_color:'#000000',box_opacity:65,fon
             if(url.pathname==='/api/queue')return reply({jobs});
             if(url.pathname==='/api/easy-mode')return reply({enabled:true,whisper_model:'large-v3-turbo',lyrics_mode:'auto',background_mode:'original'});
             if(url.pathname==='/api/subtitle-mode'){
-                if(request.method()==='POST')config={...request.postDataJSON()};
+                if(request.method()==='POST'){config={...request.postDataJSON()};configSaves++;}
                 return reply(request.method()==='POST'?{status:'success',config}:config);
             }
             if(url.pathname==='/api/library')return reply({videos:['A.mp4','B.mp4','C.mp4','D.mp4'],photos:['bg.mp4'],history:[]});
@@ -145,17 +145,50 @@ const srtDefaults = {text_color:'#FFFFFF',box_color:'#000000',box_opacity:65,fon
 
         await page.locator('#tabBtnSettings').click();
         assert(await page.locator('#subtitleModeSettingsSection').isVisible());
+        assert(!(await page.locator('#subtitleModeSettingsBody').isVisible()),'Settings must start collapsed');
+        assert.equal(await page.locator('#btnToggleSubtitleSettings').getAttribute('aria-expanded'),'false');
+        await page.locator('#btnToggleSubtitleSettings').focus();
+        await page.keyboard.press('Enter');
+        assert(await page.locator('#subtitleModeSettingsBody').isVisible());
         await page.locator('#srtVideoSubtitleSource').selectOption('original');
         await page.locator('#srtBackgroundFile').selectOption('bg.mp4');
-        await page.locator('#srtTextColor').fill('#ffcc00');await page.locator('#btnSaveSubtitleMode').click();
+        await page.locator('#srtTextColor').fill('#ffcc00');
+        await page.locator('#srtTextPosition').selectOption('top');
+        assert.equal(await page.locator('#subtitleStyleSample').evaluate(el=>getComputedStyle(el).alignItems),'flex-start');
+        await page.locator('#btnToggleSubtitleSettings').click();
+        assert(!(await page.locator('#subtitleModeSettingsBody').isVisible()));
+        assert.equal(configSaves,0,'Opening or closing cannot save changes');
+        await page.locator('#btnToggleSubtitleSettings').click();
+        assert.equal(await page.locator('#srtTextColor').inputValue(),'#ffcc00','Closing cannot discard an edit');
+        await page.locator('#btnSaveSubtitleMode').click();
         await page.waitForFunction(()=>document.getElementById('subtitleSettingsMessage').textContent.includes('Padrão salvo'));
         assert.equal(config.video_subtitle_source,'original');assert.equal(config.background_file,'bg.mp4');
-        for(const width of [320,360,390,768,1440]){
+        assert.equal(config.text_position,'top');assert.equal(config.text_color,'#ffcc00');assert.equal(configSaves,1);
+        assert((await page.locator('#subtitleSettingsSummary').textContent()).includes('Idioma original'));
+        for(const width of [320,360,390,768,900,1024,1440,1920]){
             await page.setViewportSize({width,height:900});
             assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'Overflow at '+width);
+            const sizes=await page.evaluate(()=>({
+                panel:document.getElementById('subtitleModeSettingsSection').getBoundingClientRect().width,
+                grid:document.querySelector('.settings-grid').getBoundingClientRect().width,
+                field:document.getElementById('srtVideoSubtitleSource').getBoundingClientRect().width,
+                toggle:document.getElementById('btnToggleSubtitleSettings').getBoundingClientRect().height
+            }));
+            assert(sizes.panel>=sizes.grid-2,'Settings squeezed into one column at '+width);
+            assert(sizes.field>=140,'Field too narrow to read at '+width);
+            assert(sizes.toggle>=44,'Toggle touch target too small at '+width);
         }
         await page.setViewportSize({width:390,height:900});
         await page.locator('#subtitleModeSettingsSection').screenshot({path:'subtitle-admin-mobile.png'});
+        await page.setViewportSize({width:1440,height:1000});
+        await page.locator('#subtitleModeSettingsSection').screenshot({path:'subtitle-admin-desktop.png'});
+        await page.locator('#btnToggleTheme').click();
+        assert.equal(await page.locator('html').getAttribute('data-theme'),'light');
+        await page.locator('#subtitleModeSettingsSection').screenshot({path:'subtitle-admin-light.png'});
+        await page.locator('#btnToggleSubtitleSettings').click();
+        await page.locator('#subtitleModeSettingsSection').screenshot({path:'subtitle-admin-collapsed.png'});
+        await page.reload();await page.locator('#tabBtnSettings').click();
+        assert(!(await page.locator('#subtitleModeSettingsBody').isVisible()),'Reload must start collapsed');
 
         // A background download remains available while the active task is running.
         await page.locator('#tabBtnLibrary').click();await page.locator('#libraryImports > summary').click();await page.locator('#libBgYoutubeUrl').fill('https://youtu.be/abcdefghijk');
@@ -163,6 +196,6 @@ const srtDefaults = {text_color:'#FFFFFF',box_color:'#000000',box_opacity:65,fon
         await page.waitForFunction(()=>document.getElementById('bgYtSelectedText').textContent.includes('new-bg.mp4'));
         assert.deepEqual(backgroundPolls,['background-id']);
         assert.deepEqual(errors,[]);
-        console.log('SRT defaults, source-specific guides, queue snapshots, batches, delayed responses and background downloads passed.');
+        console.log('SRT defaults, collapsed responsive settings, source-specific guides, queue snapshots, batches, delayed responses and background downloads passed.');
     } finally {await browser.close();}
 })().catch(error=>{console.error(error);process.exit(1);});

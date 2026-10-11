@@ -33,6 +33,7 @@ jobs:
           python -m unittest discover -s tests -p test_youtube_recovery.py -v
           python -m unittest discover -s tests -p test_youtube_download_access.py -v
           python -m unittest discover -s tests -p test_youtube_engine_recovery.py -v
+          python -m unittest discover -s tests -p test_telegram_delivery.py -v
           python -m unittest discover -s tests -p test_srt_youtube_block.py -v
           python -m unittest discover -s tests -p test_random_video_background.py -v
           python -m unittest discover -s tests -p "test_subtitle*.py" -v
@@ -54,6 +55,7 @@ jobs:
           /tmp/sal0-ui/node_modules/.bin/playwright install --with-deps chromium
           NODE_PATH=/tmp/sal0-ui/node_modules node tests/browser_youtube_publisher.cjs
           NODE_PATH=/tmp/sal0-ui/node_modules node tests/browser_youtube_recovery.cjs
+          NODE_PATH=/tmp/sal0-ui/node_modules node tests/browser_telegram_delivery.cjs
           NODE_PATH=/tmp/sal0-ui/node_modules node tests/browser_creation_review.cjs
           NODE_PATH=/tmp/sal0-ui/node_modules node tests/browser_queue_creation.cjs
           NODE_PATH=/tmp/sal0-ui/node_modules node tests/browser_subtitle_lyrics.cjs
@@ -65,6 +67,7 @@ jobs:
           path: |
             youtube-admin-*.png
             youtube-recovery-*.png
+            telegram-delivery-*.png
             creation-review-*.png
             queue-creation-*.png
             subtitle-*.png

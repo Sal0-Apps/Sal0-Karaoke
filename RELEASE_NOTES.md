@@ -1,3 +1,14 @@
+# 12.0
+
+- Corrigido o painel de legendagem que ficava espremido em uma coluna no desktop. **Legendas dos vídeos** passa a ocupar a largura disponível e começa recolhido, com **Personalizar legendas** em destaque e resumo dos padrões salvos. Ajustes agrupados por aparência, idioma e fundo, prévia de cores/posição e botão de salvamento claro; organização adaptada ao celular e aos temas claro/escuro. Fechar e abrir preserva a edição, sem mudar tarefas já na fila.
+- Telegram: avisos e resultados seguem uma fila por bot/destino, preservando a ordem das etapas e evitando rajadas. O processamento local continua independente dos avisos intermediários; a entrega final aguarda as mensagens anteriores antes de liberar o próximo trabalho.
+- Respostas são confirmadas pelo conteúdo da API e pelo identificador da mensagem; HTTP 200 sozinho não significa entrega. Limites temporários têm espera e tentativas limitadas; troca oficial de grupo para supergrupo atualiza o Chat ID sem trocar o bot. Reenvio de vídeo reabre o arquivo completo. Timeouts de confirmação não repetem uma escrita automaticamente.
+- Formatação enviada por entidades com posições Unicode válidas, mensagens longas divididas dentro do limite e títulos compactos nas legendas dos vídeos. Mantidos um único vídeo compactado e todos os links locais/externos dos SRTs no modo Legendar vídeo; originais permanecem intactos na Biblioteca.
+- Em Ajustes → Telegram, **Verificar conexão** consulta bot, destino e permissões sem enviar mensagens. **Enviar mensagem de teste** envia uma única mensagem ao destino salvo e mostra a confirmação ou uma ação para corrigir token, Chat ID, permissões ou conexão do servidor. Configuração salva deixa de ser apresentada como bot ativo sem verificação.
+- Painel mostra a última tentativa, a última entrega confirmada e falhas de anexo mesmo quando a mensagem com links chegou. Consultas de status não alteram campos, seleção ou teclado; verificações ficam indisponíveis enquanto há edição não salva ou outra tentativa em curso.
+- Configuração gravada de forma atômica, leitura compatível com Chat IDs numéricos antigos e destino pessoal preservado. Respostas e registros de erro não incluem tokens, conteúdo privado de respostas ou URLs de autenticação.
+- Testes de fila, concorrência, limites, migração, timeout, Unicode, isolamento entre usuários, APIs e navegador em cinco larguras. Atualização somente do servidor; áudio original do Whisper, YouTube e clientes Android/Windows existentes são preservados.
+
 # 11.4.2
 
 - Corrigida a recuperação automática após falhas temporárias na renovação do Google: consultas de status preservam o prazo da próxima tentativa, sem estendê-lo a cada atualização da tela. O acesso volta a ser renovado ao terminar o intervalo; a verificação manual continua disponível.

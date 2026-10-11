@@ -49,6 +49,7 @@ from lyrics_search import split_search_identity, lyrics_match_score, relevant_ly
 from reprocess_cache import copy_reusable_inputs, youtube_identity, file_fingerprint
 from media_covers import video_thumbnail
 from youtube_engine_runtime import EngineRuntime
+from telegram_delivery import TelegramDelivery
 from youtube_download_access import (
     DOWNLOAD_ACCESS, DownloadAccessError, extract_youtube_info, package_version, version_key,
     install_routes as install_youtube_download_routes,
@@ -1428,59 +1429,27 @@ def telegram_notice(icon: str, heading: str, *lines: str) -> str:
     return header if not details else f"{header}\n\n" + "\n".join(details)
 
 
+TELEGRAM_DELIVERY = TelegramDelivery()
+
+
 def _send_telegram_notification_worker(token: str, chat_id: str, message: str) -> bool:
-    try:
-        url = f"https://api.telegram.org/bot{token}/sendMessage"
-        payload = {
-            "chat_id": chat_id,
-            "text": message,
-            "parse_mode": "HTML"
-        }
-        response = requests.post(url, json=payload, timeout=10)
-        if not response.ok:
-            logger.error("Telegram rejeitou a notificação: HTTP %s (%s)", response.status_code, response.text[:300])
-            return False
-        return True
-    except Exception as e:
-        logger.error(f"Erro ao enviar notificação para o Telegram: {e}")
-        return False
+    return TELEGRAM_DELIVERY.send_message(token, chat_id, message).ok
 
 
 def send_telegram_notification(token: str, chat_id: str, message: str):
-    """Envia uma atualização intermediária sem bloquear o pipeline."""
-    if not token or not chat_id:
-        return
-    threading.Thread(
-        target=_send_telegram_notification_worker,
-        args=(token, chat_id, message),
-        daemon=True
-    ).start()
+    """Queue each destination in order without blocking local processing."""
+    if token and chat_id:
+        TELEGRAM_DELIVERY.enqueue_message(token, chat_id, message)
+
 
 def send_telegram_video(token: str, chat_id: str, video_path: str, caption: str = ""):
-    """Envia o vídeo final gerado diretamente para o chat do Telegram."""
-    if not token or not chat_id or not os.path.exists(video_path):
-        return
-    try:
-        url = f"https://api.telegram.org/bot{token}/sendVideo"
-        with open(video_path, "rb") as video_file:
-            files = {"video": video_file}
-            data = {
-                "chat_id": chat_id,
-                "caption": caption,
-                "parse_mode": "HTML"
-            }
-            # Timeout longo para upload (90 segundos)
-            response = requests.post(url, data=data, files=files, timeout=90)
-            if response.status_code == 200:
-                logger.info("Vídeo de karaokê enviado com sucesso para o Telegram.")
-            else:
-                # Log sem expor dados sensíveis da resposta do Telegram
-                logger.error(f"Erro do Telegram ao enviar vídeo: HTTP {response.status_code}")
-    except Exception as e:
-        logger.error(f"Falha ao enviar vídeo de karaokê para o Telegram: {e}")
+    if token and chat_id and os.path.isfile(video_path):
+        return TELEGRAM_DELIVERY.send_video(token, chat_id, video_path, caption).ok
+    return False
 
 # Bot do Telegram por usuário; o arquivo legado continua sendo o bot do administrador.
 TELEGRAM_FILE = "/data/output/telegram.json"
+telegram_config_lock = threading.RLock()
 
 class TelegramModel(BaseModel):
     telegram_token: str
@@ -1491,18 +1460,61 @@ def telegram_file_for_user(user: dict) -> str:
 
 
 def load_telegram_config(user: dict = None) -> dict:
-    """Carrega somente o bot pertencente ao usuário informado."""
+    """Read a personal bot, accepting numeric IDs from older configurations."""
+    empty = {"telegram_token": "", "telegram_chat_id": ""}
     if not user:
-        return {"telegram_token": "", "telegram_chat_id": ""}
+        return empty
     telegram_file = telegram_file_for_user(user)
     if not os.path.exists(telegram_file):
-        return {"telegram_token": "", "telegram_chat_id": ""}
+        return empty
     try:
-        with open(telegram_file, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except Exception as e:
-        logger.error(f"Erro ao carregar configurações do Telegram: {e}")
-        return {"telegram_token": "", "telegram_chat_id": ""}
+        with telegram_config_lock, open(telegram_file, "r", encoding="utf-8") as file:
+            data = json.load(file)
+        if not isinstance(data, dict):
+            raise ValueError("invalid configuration")
+        return {"telegram_token": str(data.get("telegram_token") or "").strip(),
+                "telegram_chat_id": str(data.get("telegram_chat_id") or "").strip()}
+    except Exception:
+        logger.error("Não foi possível ler a configuração pessoal do Telegram.")
+        return {**empty, "config_error": "Não foi possível ler a configuração. Salve novamente o token e o Chat ID."}
+
+
+def write_telegram_config(telegram_file: str, data: dict):
+    """Replace credentials atomically; a running task never sees a partial save."""
+    with telegram_config_lock:
+        os.makedirs(os.path.dirname(telegram_file), exist_ok=True)
+        descriptor, temporary = tempfile.mkstemp(prefix=".telegram-", dir=os.path.dirname(telegram_file))
+        try:
+            with os.fdopen(descriptor, "w", encoding="utf-8") as file:
+                json.dump(data, file, ensure_ascii=False, indent=2)
+            os.replace(temporary, telegram_file)
+        finally:
+            if os.path.exists(temporary):
+                os.unlink(temporary)
+
+
+def persist_telegram_chat_migration(token: str, old_chat: str, new_chat: str):
+    """Save an official group-to-supergroup migration only for matching destinations."""
+    with telegram_config_lock:
+        owners = [{"username": name, "role": record.get("role", "user")}
+                  for name, record in load_users().items()]
+        paths = {telegram_file_for_user(owner): owner for owner in owners}
+        paths.setdefault(TELEGRAM_FILE, {"username": "", "role": "admin"})
+        for path, owner in paths.items():
+            config = load_telegram_config(owner)
+            if config["telegram_token"] == token and config["telegram_chat_id"] == old_chat:
+                try:
+                    write_telegram_config(path, {"telegram_token": token, "telegram_chat_id": new_chat})
+                except OSError:
+                    logger.warning("Chat atualizado no envio; não foi possível salvar o novo destino do Telegram.")
+
+
+TELEGRAM_DELIVERY.on_migrate = persist_telegram_chat_migration
+
+
+def masked_telegram_token(token: str) -> str:
+    return token[:6] + "***" + token[-4:] if len(token) > 12 else "***" if token else ""
+
 
 def get_notification_targets(owner: dict | None) -> list[dict]:
     """Notifica o bot pessoal do dono e todos os administradores configurados."""
@@ -1533,32 +1545,58 @@ def notify_targets(targets: list[dict], message: str):
 
 @app.get("/api/telegram")
 def get_telegram_config(current_user: dict = Depends(get_current_user)):
-    """Retorna apenas o bot pessoal da conta autenticada."""
     config = load_telegram_config(current_user)
-    # Mascarar token parcialmente na resposta para não expor o valor completo
-    token = config.get("telegram_token", "")
-    if token and len(token) > 8:
-        config["telegram_token"] = token[:6] + "***" + token[-4:]
-    return config
+    token = config["telegram_token"]
+    delivery = TELEGRAM_DELIVERY.status(token, config["telegram_chat_id"])
+    if config.get("config_error"):
+        delivery = {"state": "config_error", "detail": config["config_error"], "pending": 0}
+    return {"telegram_token": masked_telegram_token(token), "telegram_chat_id": config["telegram_chat_id"],
+            "configured": bool(token and config["telegram_chat_id"]), "delivery": delivery}
+
+
+@app.get("/api/telegram/status")
+def get_telegram_delivery_status(current_user: dict = Depends(get_current_user)):
+    return get_telegram_config(current_user)["delivery"]
+
 
 @app.post("/api/telegram")
 def save_telegram_config(config: TelegramModel, current_user: dict = Depends(get_current_user)):
-    """Salva apenas o bot pessoal da conta autenticada."""
-    try:
-        telegram_file = telegram_file_for_user(current_user)
+    with telegram_config_lock:
         previous = load_telegram_config(current_user)
-        submitted_token = config.telegram_token.strip()
-        if "***" in submitted_token:
-            submitted_token = previous.get("telegram_token", "")
-        os.makedirs(os.path.dirname(telegram_file), exist_ok=True)
-        with open(telegram_file, "w", encoding="utf-8") as f:
-            json.dump({
-                "telegram_token": submitted_token,
-                "telegram_chat_id": config.telegram_chat_id.strip()
-            }, f, indent=4, ensure_ascii=False)
-        return {"status": "success"}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Erro ao salvar configurações do Telegram: {e}")
+        token = config.telegram_token.strip()
+        chat = config.telegram_chat_id.strip().replace("−", "-")
+        if "***" in token:
+            if token != masked_telegram_token(previous["telegram_token"]) or not previous["telegram_token"]:
+                raise HTTPException(status_code=400, detail="Informe um token completo do BotFather.")
+            token = previous["telegram_token"]
+        if token and (len(token) > 200 or not re.fullmatch(r"[0-9]+:[A-Za-z0-9_-]+", token)):
+            raise HTTPException(status_code=400, detail="O token deve ser copiado completo do BotFather, incluindo os números antes dos dois-pontos.")
+        if chat and (len(chat) > 100 or not re.fullmatch(r"-?[0-9]+|@[A-Za-z][A-Za-z0-9_]{4,}", chat)):
+            raise HTTPException(status_code=400, detail="Use o Chat ID numérico completo (incluindo o sinal de menos em grupos) ou @nome do canal.")
+        if bool(token) != bool(chat):
+            raise HTTPException(status_code=400, detail="Informe o token e o Chat ID juntos, ou deixe ambos vazios para desativar.")
+        try:
+            write_telegram_config(telegram_file_for_user(current_user), {"telegram_token": token, "telegram_chat_id": chat})
+        except OSError:
+            raise HTTPException(status_code=500, detail="Não foi possível salvar a configuração do Telegram. Confira o volume do servidor e tente novamente.")
+    return {"status": "success", "detail": "Configuração salva. Verifique a conexão ou envie uma mensagem de teste."}
+
+
+@app.post("/api/telegram/verify")
+def verify_telegram_connection(current_user: dict = Depends(get_current_user)):
+    config = load_telegram_config(current_user)
+    return TELEGRAM_DELIVERY.verify(config["telegram_token"], config["telegram_chat_id"]).public()
+
+
+@app.post("/api/telegram/test")
+def test_telegram_delivery(current_user: dict = Depends(get_current_user)):
+    """Send only when the signed-in owner presses the explicit test button."""
+    config = load_telegram_config(current_user)
+    result = TELEGRAM_DELIVERY.send_message(config["telegram_token"], config["telegram_chat_id"],
+        telegram_notice("✅", "Teste do Sal0 Karaokê", "O servidor conseguiu enviar esta mensagem ao seu destino.",
+                        "Você receberá aqui os avisos de processamento e os resultados."))
+    return result.public()
+
 
 # Gerenciamento de Configuração de IP/URL Externa
 EXTERNAL_URL_FILE = "/data/output/external_url.json"
@@ -4738,7 +4776,7 @@ def send_telegram_video_flow(
                     "🎥 Vídeo original anexado a esta mensagem."
                 )
                 caption_lines = [
-                    f"🎵 <b>{telegram_escape(orig_name)}</b>",
+                    f"🎵 <b>{telegram_escape(str(orig_name)[:100])}</b>",
                     preview_status,
                     f"⏱ Tempo total de processamento: <b>{telegram_escape(duration_text)}</b>",
                 ]
@@ -4753,26 +4791,16 @@ def send_telegram_video_flow(
                     update_state("processing", "Sending subtitle video to Telegram", 99,
                                  stage_detail="Aguardando confirmação de entrega antes do próximo item")
                 completion_caption = telegram_notice("✅", "Vídeo legendado concluído" if subtitle_downloads is not None else "Karaokê concluído", *caption_lines)
-                with open(upload_path, "rb") as video_file:
-                    response = requests.post(
-                        f"https://api.telegram.org/bot{token}/sendVideo",
-                        data={
-                            "chat_id": chat_id,
-                            "caption": completion_caption,
-                            "parse_mode": "HTML",
-                        },
-                        files={"video": (os.path.basename(upload_path), video_file, "video/mp4")},
-                        timeout=300,
-                    )
-                    success = response.status_code == 200
-                    if not success:
-                        logger.error("Telegram recusou o vídeo com HTTP %s.", response.status_code)
+                import process_manager as pm
+                sent = TELEGRAM_DELIVERY.send_video(token, chat_id, upload_path, completion_caption,
+                                                     cancelled=pm.check_cancelled)
+                success = sent.ok
 
         if success:
             return True
 
         fallback_lines = [
-            f"🎵 <b>{telegram_escape(orig_name)}</b>",
+            f"🎵 <b>{telegram_escape(str(orig_name)[:100])}</b>",
             "⚠️ Não foi possível anexar a prévia, mas o original está salvo na Biblioteca.",
             f"⏱ Tempo total de processamento: <b>{telegram_escape(duration_text)}</b>",
         ]
@@ -4786,7 +4814,7 @@ def send_telegram_video_flow(
     except InterruptedError:
         raise
     except Exception as exc:
-        logger.error("Erro ao concluir a entrega ao Telegram: %s", exc)
+        logger.error("Erro ao concluir a entrega ao Telegram (%s).", type(exc).__name__)
         return _send_telegram_notification_worker(
             token,
             chat_id,

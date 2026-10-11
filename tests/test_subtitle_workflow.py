@@ -16,6 +16,7 @@ ROOT = Path(__file__).parents[1]
 sys.path.insert(0, str(ROOT / 'app'))
 from subtitle_settings import load_subtitle_settings, normalize_subtitle_settings, save_subtitle_settings
 from subtitle_video import render_subtitle_video
+from telegram_delivery import TelegramDelivery
 from test_automatic_lyrics_and_search import load_function, HTTPError
 
 
@@ -197,7 +198,7 @@ class SubtitleTelegramTests(unittest.TestCase):
         def post(url, **kwargs):
             if request_error: raise RuntimeError('network')
             posts.append((url,kwargs['data'],kwargs['files']['video'][1].read()))
-            return Mock(status_code=200)
+            return Mock(status_code=200, json=lambda: {'ok':True,'result':{'message_id':42}})
         def compress(source,destination,target,**kwargs):
             self.assertEqual(kwargs['max_video_kbps'],1800)
             Path(destination).write_bytes(b'compressed')
@@ -206,7 +207,8 @@ class SubtitleTelegramTests(unittest.TestCase):
         flow=load_function('send_telegram_video_flow', os=os,tempfile=tempfile,
             format_processing_duration=lambda _: '1 min',telegram_escape=lambda x:html.escape(str(x),quote=True),
             telegram_notice=lambda icon,title,*parts:title+'\n'+'\n'.join(parts),update_state=Mock(),
-            compress_video_for_telegram=compress,requests=Mock(post=post),_send_telegram_notification_worker=fallback)
+            compress_video_for_telegram=compress,TELEGRAM_DELIVERY=TelegramDelivery(post=post,sleep=lambda _:None),
+            _send_telegram_notification_worker=fallback)
         return flow,posts,fallback
 
     def deliver(self,flow,root):
@@ -226,10 +228,12 @@ class SubtitleTelegramTests(unittest.TestCase):
         url,data,body=posts[0]
         self.assertTrue(url.endswith('/sendVideo'))
         self.assertEqual(body,b'compressed')
-        self.assertEqual(data['caption'].count('<a href='),6)
+        links=[entity for entity in json.loads(data['caption_entities']) if entity['type']=='text_link']
+        self.assertEqual(len(links),6)
+        self.assertEqual(len({entity['url'] for entity in links}),6)
         self.assertIn('Vídeo legendado concluído',data['caption'])
         self.assertNotIn('Karaokê',data['caption'])
-        self.assertIn('A &lt;speech&gt;',data['caption'])
+        self.assertIn('A <speech>',data['caption'])
         fallback.assert_not_called()
 
     def test_failure_keeps_all_download_links_in_fallback(self):

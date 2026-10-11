@@ -99,8 +99,11 @@ const correct = {id:1, provider:'LRCLIB', track_name:'Tracing A Dream', artist_n
         // Explicit automatic retry can import the confirmed song, using the returned text.
         automaticMatch={...correct,lyrics_text:'Confirmed automatic guide'};
         await page.locator('#lyricsMode').selectOption('manual');
+        const automaticSaved=page.waitForResponse(response=>response.url().endsWith('/api/lyrics')&&
+            response.request().method()==='POST'&&response.request().postDataJSON()?.lyrics_text==='Confirmed automatic guide');
         await page.locator('#lyricsMode').selectOption('auto');
         await page.waitForFunction(()=>document.getElementById('lyricsText').value==='Confirmed automatic guide');
+        assert( (await automaticSaved).ok(), 'Automatic guide was not saved');
         assert.equal(saves.at(-1).lyrics_text,'Confirmed automatic guide');
 
         // A pending draft cannot overwrite typing; manual search need not wait for it.

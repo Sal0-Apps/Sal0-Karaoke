@@ -54,6 +54,10 @@ Com o canal conectado e uma playlist definida no perfil, a publicação começa 
 O modo rápido e o modo completo mostram a playlist atribuída e um título opcional. A conta comum não pode trocar para outra playlist pela API. O modelo `{title} | Karaokê`, a capa automática e a privacidade **Não listado** são aplicados na conclusão. O administrador também pode salvar sua playlist no grupo **Padrões de publicação do administrador**. A conta e a atribuição são verificadas novamente antes do envio; alterações podem bloquear tarefas já agendadas. O administrador pode selecionar qualquer playlist do canal ou nenhuma para seus próprios vídeos e pode publicar resultados existentes no painel.
 O app envia primeiro como privado, aplica a capa e a playlist e só então solicita a privacidade escolhida. Erros de capa, playlist ou privacidade aparecem na fila com um botão para retomar a mesma publicação. O identificador do vídeo e a sessão de envio são persistidos. Cópias idênticas de um vídeo no mesmo canal, usuário, playlist e privacidade reutilizam a publicação existente para evitar duplicação. O link fica disponível assim que o YouTube confirma o envio.
 
+### Recuperar mensagens do Telegram (12.0)
+
+Atualize somente o servidor, mantendo o APK e os volumes. Em **Ajustes → Telegram**, **Verificar conexão** consulta o bot e o destino; **Enviar mensagem de teste** envia uma mensagem ao destino salvo. O painel informa erros de token, Chat ID, permissão ou rede do servidor e mostra a última entrega. Configurações antigas permanecem válidas; a atualização não exige recriar o bot.
+
 ### Correção da atualização dos downloads (11.4.1)
 
 Pastas residuais de pacotes não bloqueiam mais o botão **Atualizar mecanismo**, inclusive quando a remoção falha com `Directory not empty`. Atualize apenas a imagem do servidor para 11.4.1 e tente novamente no painel. A autorização já aprovada do canal e os cookies ficam preservados; não é necessário remover arquivos manualmente.
