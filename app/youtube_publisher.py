@@ -519,6 +519,8 @@ class YouTubePublisher:
                     bindings.append({'video': str(video), 'automatic': automatic})
                 existing['telegram_link_enabled'] = True
                 self.save('jobs.json', jobs)
+                if existing.get('status') == 'done':
+                    threading.Thread(target=self.notify_published, args=(existing,), daemon=True).start()
                 self.start()
                 return self.public_job(existing)
             job_id = secrets.token_hex(12)
@@ -559,6 +561,10 @@ class YouTubePublisher:
             jobs = self.read('jobs.json', [])
             for index, item in enumerate(jobs):
                 if item['id'] == job['id']:
+                    # Another result can reuse this upload while the worker is active.
+                    if 'telegram_results' in item:
+                        job['telegram_results'] = item['telegram_results']
+                        job['telegram_link_enabled'] = True
                     jobs[index] = job
                     break
             self.save('jobs.json', jobs)

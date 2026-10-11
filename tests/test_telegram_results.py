@@ -179,20 +179,23 @@ class PublicationCompletionTests(unittest.TestCase):
             publisher.on_published = lambda job: (calls.append(job) or True)
             with patch.object(publisher, 'start'), patch.object(publisher, 'validate_profile_playlist', return_value='playlist'):
                 first = publisher.enqueue(original, 'Title', thumbnail=b'\xff\xd8\xff', automatic=True)
+                active_job = publisher.read('jobs.json', [])[0]
                 second = publisher.enqueue(duplicate, 'Title', thumbnail=b'\xff\xd8\xff', automatic=True)
             self.assertEqual(first['id'], second['id'])
+            # The active worker still holds the job from before the second result arrived.
+            publisher.checkpoint(active_job, status='done', video_id='abcdefghijk')
             jobs = publisher.read('jobs.json', [])
             self.assertEqual(len(jobs), 1)
-            jobs[0].update(status='done', video_id='abcdefghijk')
-            publisher.save('jobs.json', jobs)
             with patch.object(publisher, 'publish') as upload:
                 publisher.work()
                 upload.assert_not_called()
             self.assertEqual({job['video'] for job in calls}, {str(original), str(duplicate)})
             calls.clear()
             # A manual request can also reuse an already completed upload.
-            with patch.object(publisher, 'start'), patch.object(publisher, 'validate_profile_playlist', return_value='playlist'):
+            with patch.object(publisher, 'start'), patch.object(publisher, 'validate_profile_playlist', return_value='playlist'), patch('youtube_publisher.threading.Thread') as background:
                 publisher.enqueue(duplicate, 'Title', thumbnail=b'\xff\xd8\xff')
+                background.assert_called_once()
+                self.assertEqual(background.call_args.kwargs['target'], publisher.notify_published)
             publisher.work()
             self.assertFalse(next(job for job in calls if job['video'] == str(duplicate))['automatic'])
 
