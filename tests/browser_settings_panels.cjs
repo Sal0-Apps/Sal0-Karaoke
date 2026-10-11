@@ -41,7 +41,10 @@ const HTML = fs.readFileSync('app/templates/index.html', 'utf8');
             const summary = panel.locator(':scope > summary');
             assert.equal(await summary.getAttribute('aria-expanded'),'false');
             await summary.focus(); await page.keyboard.press('Enter');
-            await page.waitForFunction(id => document.getElementById(id).open, await panel.getAttribute('id'));
+            await page.waitForFunction(id => {
+                const panel = document.getElementById(id);
+                return panel.open && panel.querySelector(':scope > summary').getAttribute('aria-expanded') === 'true';
+            }, await panel.getAttribute('id'));
             assert.equal(await summary.getAttribute('aria-expanded'),'true');
             await summary.click();
         }

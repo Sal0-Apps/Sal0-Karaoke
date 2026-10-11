@@ -105,6 +105,7 @@ await page.locator('#telegramSection > summary').click();
   assert(!(await page.locator('#telegramFeedback').textContent()).includes('private proxy body'));
   testKind='success';await page.locator('#btnTestTelegram').click();
   await page.waitForFunction(()=>document.getElementById('telegramFeedback').textContent.includes('Mensagem de teste enviada'));
+  await page.waitForFunction(()=>document.getElementById('telegramDeliveryStatus').textContent.includes('Último envio confirmado'));
   assert((await page.locator('#telegramDeliveryStatus').textContent()).includes('Último envio confirmado'));
   for(const width of [320,360,390,768,1440]){
    await page.setViewportSize({width,height:900});
