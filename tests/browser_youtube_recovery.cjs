@@ -62,10 +62,15 @@ for(const match of HTML.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/g)) new Fu
   await page.waitForFunction(()=>currentUser?.role==='admin');
   await page.locator('#easyYoutubeUrl').fill('https://youtu.be/abcdefghijk');
   await page.locator('#tabBtnSettings').click();
+  await page.locator('#youtubePublisherSection > summary').click();
+  await page.locator('#ytConnectionHeading').click();
+  await page.locator('#ytUsersHeading').click();
+  await page.locator('#youtubeToolsSection > summary').click();
   await page.waitForFunction(()=>document.getElementById('ytPublishChannel').dataset.kind==='error');
   assert((await page.locator('#ytPublishChannel').textContent()).includes('expirou'));
   assert((await page.locator('#ytPublishJobs').textContent()).includes('Aguardando reconexão'));
-  assert(await page.locator('#ytDeviceSetup').evaluate(el=>el.open));
+  assert(!(await page.locator('#ytDeviceSetup').evaluate(el=>el.open)));
+  await page.locator('#ytDeviceSetup > summary').click();
   await page.locator('#ytDeviceClientId').evaluate(el=>el.closest('details').open=true);
   await page.locator('#ytDeviceClientId').fill('tv-client');await page.locator('#ytDeviceClientSecret').fill('private-secret');
   await page.clock.runFor(5200);

@@ -67,6 +67,7 @@ class YouTubePublisher:
         self.worker_lock = threading.Lock()
         self.oauth_states = {}
         self._device = None
+        self.on_published = None
 
     @property
     def device(self):
@@ -481,7 +482,7 @@ class YouTubePublisher:
                 'title_template': settings['title_template'], 'connection_message': error,
                 'needs_reconnection': bool(token.get('auth_error') or (error and not enabled))}
 
-    def enqueue(self, video, title, privacy='unlisted', playlist_id='', thumbnail=None, channel_id=None, requester=None):
+    def enqueue(self, video, title, privacy='unlisted', playlist_id='', thumbnail=None, channel_id=None, requester=None, automatic=False):
         video = Path(video).resolve()
         title = str(title).strip()
         if not youtube_eligible(video):
@@ -508,6 +509,17 @@ class YouTubePublisher:
             jobs = self.read('jobs.json', [])
             existing = next((j for j in jobs if j['identity'] == identity), None)
             if existing:
+                bindings = existing.setdefault('telegram_results',
+                    [{'video': existing['video'], 'automatic': bool(existing.get('automatic'))}]
+                    if existing.get('telegram_link_enabled') else [])
+                binding = next((item for item in bindings if item['video'] == str(video)), None)
+                if binding:
+                    binding['automatic'] = bool(binding.get('automatic')) and automatic
+                else:
+                    bindings.append({'video': str(video), 'automatic': automatic})
+                existing['telegram_link_enabled'] = True
+                self.save('jobs.json', jobs)
+                self.start()
                 return self.public_job(existing)
             job_id = secrets.token_hex(12)
             folder = self.root / 'covers'
@@ -524,7 +536,9 @@ class YouTubePublisher:
                 shutil.copyfile(video_thumbnail(video, cover=True), cover)
             job = {'id': job_id, 'identity': identity, 'video': str(video), 'thumbnail': str(cover),
                    'title': title, 'privacy': privacy, 'playlist_id': playlist_id, 'channel_id': token['channel_id'],
-                   'status': 'queued', 'progress': 0, 'created_at': time.time(), 'requester': requester}
+                   'status': 'queued', 'progress': 0, 'created_at': time.time(), 'requester': requester,
+                   'automatic': automatic, 'telegram_link_enabled': True,
+                   'telegram_results': [{'video': str(video), 'automatic': automatic}]}
             jobs.append(job)
             self.save('jobs.json', jobs)
         self.start()
@@ -532,7 +546,7 @@ class YouTubePublisher:
 
     def enqueue_automatic(self, video, original_title, options):
         title = options.get('title_override') or options['title_template'].replace('{title}', original_title)[:100]
-        return self.enqueue(video, title, options['privacy'], options.get('playlist_id', ''), channel_id=options['channel_id'], requester=options.get('requester'))
+        return self.enqueue(video, title, options['privacy'], options.get('playlist_id', ''), channel_id=options['channel_id'], requester=options.get('requester'), automatic=True)
 
     @staticmethod
     def public_job(job):
@@ -656,12 +670,32 @@ class YouTubePublisher:
         if actual != job['privacy']:
             self.checkpoint(job, actual_privacy=actual)
             raise PublicationError('O YouTube manteve uma privacidade diferente. Projetos de API sem auditoria podem ficar restritos a privado.')
-        self.checkpoint(job, status='done', actual_privacy=actual, progress=100, error=None)
+        self.checkpoint(job, status='done', actual_privacy=actual, progress=100, error=None,
+                        telegram_link_enabled=True, telegram_link_pending=True)
+        self.notify_published(job)
+
+    def notify_published(self, job):
+        if not self.on_published:
+            return
+        confirmed = True
+        bindings = job.get('telegram_results') or [{'video': job['video'], 'automatic': bool(job.get('automatic'))}]
+        for binding in bindings:
+            try:
+                delivered = self.on_published({**job, **binding})
+                confirmed = bool(delivered) and confirmed
+            except Exception as error:
+                # Telegram cannot turn a confirmed YouTube publication into an upload failure.
+                confirmed = False
+                logger.warning('YouTube publicado; atualização do Telegram pendente (%s).', type(error).__name__)
+        self.checkpoint(job, telegram_link_pending=not confirmed)
 
     def work(self):
         if not self.worker_lock.acquire(blocking=False):
             return
         try:
+            for completed in self.read('jobs.json', []):
+                if completed.get('status') == 'done' and completed.get('telegram_link_enabled'):
+                    self.notify_published(completed)
             while True:
                 job = next((j for j in self.read('jobs.json', []) if j['status'] in {'queued', 'uploading', 'finalizing'}), None)
                 if not job:
@@ -690,11 +724,12 @@ class YouTubePublisher:
         self.start()
 
 
-def install_routes(app, get_current_user, require_admin, resolve_video, check_admin, user_lookup=None):
+def install_routes(app, get_current_user, require_admin, resolve_video, check_admin, user_lookup=None, on_published=None):
     from fastapi import Depends, HTTPException, UploadFile, File, Form
     from fastapi.responses import HTMLResponse
     publisher = YouTubePublisher()
     publisher.user_lookup = user_lookup or (lambda username: None)
+    publisher.on_published = on_published
 
     def admin(user=Depends(get_current_user)):
         require_admin(user)

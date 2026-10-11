@@ -1,6 +1,6 @@
 # Manual do Sal0 Karaokê
 
-Este manual descreve os controles disponíveis na distribuição 12.0. Para instalar o servidor, consulte [DEPLOYMENT.md](DEPLOYMENT.md). Para configurar o aparelho, consulte o [guia Android](android/README.md).
+Este manual descreve os controles disponíveis na distribuição 12.1. Para instalar o servidor, consulte [DEPLOYMENT.md](DEPLOYMENT.md). Para configurar o aparelho, consulte o [guia Android](android/README.md).
 
 O Sal0 Karaokê é destinado a uma instalação pessoal, acessada pela rede local ou por VPN, como ZeroTier. O repositório aberto disponibiliza o código e os pacotes; o projeto não opera um serviço público de processamento nem coleta centralmente as mídias das instalações. Não é necessário expor a porta do app à internet. O processamento principal é local, mas as integrações escolhidas podem se comunicar com serviços externos.
 
@@ -11,6 +11,8 @@ O Sal0 Karaokê é destinado a uma instalação pessoal, acessada pela rede loca
 3. Nas próximas visitas, entre com o usuário e a senha da instalação.
 4. Use **Criar** para preparar ou acompanhar trabalhos, **Ajustes** para configurações e **Biblioteca** para arquivos e resultados.
 5. No topo, **Manual** abre os tutoriais curtos, o botão de tema alterna claro/escuro e **Sair** encerra a sessão desta interface.
+
+Todos os painéis de **Ajustes** e suas seções expansíveis começam recolhidos. Toque em **Abrir ajustes** para usar um painel e em **Fechar ajustes** para recolhê-lo. **Recolher todos** fecha os painéis e as seções internas. Os campos em edição são preservados; salvar continua sendo uma ação separada. Os resumos de conexão e entrega se atualizam sem abrir os painéis.
 
 O título da página apresenta apenas o nome da aplicação. A versão do servidor aparece no Manual; a versão nativa do Android está em **Configurações do app**. As versões podem ser diferentes: mudanças da interface chegam pelo servidor, enquanto alterações nativas exigem instalar um APK atualizado.
 
@@ -141,7 +143,7 @@ A tradução depende exclusivamente do **LibreTranslate** configurado pelo admin
 
 ### Configuração e atualizações do LibreTranslate
 
-1. Abra **Ajustes → Tradução de SRT · LibreTranslate**, como administrador.
+1. Abra **Ajustes → Tradução das legendas**, como administrador.
 2. Informe a URL base do serviço, incluindo a porta. Use um endereço acessível pelo container do Karaokê; `localhost` refere-se ao próprio container.
 3. Informe a chave de API somente se sua instância exigir. Deixar o campo vazio mantém a chave salva; marque **Remover chave salva** para apagá-la.
 4. Salve e use **Testar e atualizar idiomas**. O teste consulta `/languages`, envia um pequeno SRT por `/translate_file` com origem `auto` e destino `pt-BR` e baixa sua tradução.
@@ -251,6 +253,8 @@ Na conclusão da tarefa, os botões da tela dão acesso ao MP4 ou aos SRTs. No A
 
 O painel distingue configuração salva de conexão verificada. Ele mostra a última tentativa de envio e informa como corrigir token, Chat ID, permissões ou conexão do servidor. A internet e o DNS relevantes para o envio são os do servidor, mesmo se você acessar o app pela rede móvel. Em conversa privada, inicie o bot; em grupos/canais, permita mensagens e vídeos. Uma migração oficial do grupo para supergrupo atualiza o destino automaticamente. Edições não salvas desabilitam a verificação e o teste até salvar ou fechar a edição.
 
+Quando o karaokê é publicado no YouTube, **Assistir no YouTube** aparece na mensagem do resultado. Se o upload terminar depois, a legenda da mesma mensagem é atualizada, preservando os links de download e o vídeo já recebido. Para resultados anteriores sem mensagem registrada ou quando a mensagem original não pode mais ser editada, chega uma confirmação com o link. O link só é incluído após a conclusão do envio, capa, playlist e privacidade no YouTube.
+
 Os avisos seguem a ordem de cada destino e respeitam pausas solicitadas pelo Telegram, com tentativas limitadas. Uma confirmação de leitura perdida por timeout não provoca uma cópia automática da mesma mensagem. Se o vídeo for recusado, o app mantém a indicação de falha do anexo mesmo quando a mensagem com os links for entregue. O histórico exibido se refere ao funcionamento desde a inicialização atual do servidor.
 
 Cada conta pode ter uma configuração própria. O bot administrativo também pode receber os avisos de trabalhos dos perfis sob sua gestão, conforme as configurações existentes.
@@ -275,17 +279,17 @@ Os links usam identificadores aleatórios e não exigem a sessão do navegador. 
 
 ## 11. Administração
 
-### Modelos Whisper
+### Modelos de reconhecimento
 
-Em **Ajustes → Modelos Whisper**, consulte os modelos disponíveis e os já baixados. O administrador instala modelos; as contas usam os modelos compartilhados. Verifique internet, disco e RAM antes de baixar ou selecionar modelos grandes.
+Em **Ajustes → Modelos de reconhecimento**, consulte os modelos disponíveis e os já baixados. O administrador instala modelos; as contas usam os modelos compartilhados. Verifique internet, disco e RAM antes de baixar ou selecionar modelos grandes.
 
-### Perfil global do Modo Rápido
+### Padrões do Modo Rápido
 
 Abra os grupos de transcrição, visual e fluxo. Configure modelo, perfil da voz, origem do áudio, VAD, busca de letra, estilo, fonte, versos, fundo, revisão e salvamento. Marque os fundos da coleção aleatória e salve em **Salvar perfil do Modo Rápido**. **Restaurar padrão** permite voltar aos valores iniciais; confira a tela e salve a configuração desejada.
 
 ### Downloads do YouTube e renovação de sessão
 
-Em **Ajustes → YouTube · Downloads**, cole o link e toque em **Testar link**. O teste consulta o vídeo com o mecanismo do servidor; não inicia o processamento nem comprova que o arquivo completo já foi baixado. Se o YouTube mudou seu mecanismo, use **Atualizar mecanismo**. A instalação é preparada em separado, inclusive durante Demucs ou Whisper, e somente a aplicação aguarda downloads ativos. O servidor seleciona a versão mais recente entre a imagem Docker e o volume persistente.
+Em **Ajustes → Downloads do YouTube**, cole o link e toque em **Testar link**. O teste consulta o vídeo com o mecanismo do servidor; não inicia o processamento nem comprova que o arquivo completo já foi baixado. Se o YouTube mudou seu mecanismo, use **Atualizar mecanismo**. A instalação é preparada em separado, inclusive durante Demucs ou Whisper, e somente a aplicação aguarda downloads ativos. O servidor seleciona a versão mais recente entre a imagem Docker e o volume persistente.
 
 Na 11.4.1, pastas de pacotes antigos ainda ocupadas não bloqueiam uma atualização nem fazem uma instalação concluída aparecer como falha. Cada tentativa usa uma pasta nova; a versão anterior é restaurada se a ativação falhar. Se aparecer o erro `Directory not empty` na 11.4, atualize primeiro o servidor e repita **Atualizar mecanismo**. Não é necessário apagar pastas nem reconectar o canal.
 
@@ -346,7 +350,7 @@ Os três modos e as entradas do YouTube na Biblioteca permitem pesquisar por nom
 
 ### Conectar ou reconectar o canal pelo celular
 
-1. Acesse o app pela rede local, endereço externo ou VPN e entre como administrador. Abra **Ajustes → YouTube · Administração → Conexão do canal**.
+1. Acesse o app pela rede local, endereço externo ou VPN e entre como administrador. Abra **Ajustes → Canal e publicação no YouTube → Conexão do canal**.
 2. Na primeira vez, abra **Configurar conexão pelo celular (uma vez)**. No navegador do celular, ative **YouTube Data API v3** no projeto Google, configure o público do app e crie um cliente OAuth do tipo **TVs e dispositivos com entrada limitada**. Use a visualização para computador do navegador se necessário; não é necessário usar um PC.
 3. Baixe o JSON dessa credencial ou copie ID e chave. Escolha o arquivo ou cole os campos no app e toque em **Salvar credencial e gerar código**. A credencial antiga de aplicativo para computador não serve para este fluxo; o Google valida o tipo antes de salvá-la.
 4. Toque em **Copiar código** e **Abrir Google no navegador**. Se o navegador não abrir, acesse `google.com/device` no Chrome ou Firefox. Escolha a conta do canal, informe o código e permita o acesso ao YouTube. Volte ao app: ele consulta a aprovação e confirma o nome do canal.

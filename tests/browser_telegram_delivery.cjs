@@ -60,6 +60,7 @@ for(const match of HTML.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/g)) new Fu
   await page.goto('https://external.karaoke.test');
   await page.waitForFunction(()=>currentUser?.username==='owner');
   await page.locator('#tabBtnSettings').click();
+await page.locator('#telegramSection > summary').click();
   await page.locator('#telegramSection').scrollIntoViewIfNeeded();
   assert((await page.locator('#telegramConfiguredBadge').textContent()).includes('Configuração salva'));
   assert(!(await page.locator('#telegramConfiguredBadge').textContent()).includes('ativo'));

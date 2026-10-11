@@ -906,6 +906,26 @@
                 max-width: none;
             }
         }
+
+        .settings-toolbar { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:.8rem; margin:0 0 1rem; }
+        .settings-toolbar p { margin:0; flex:1 1 240px; }
+        .settings-panel-summary { display:block; list-style:none; cursor:pointer; border-radius:10px; }
+        .settings-panel-summary::-webkit-details-marker { display:none; }
+        .settings-panel-summary:focus-visible { outline:2px solid var(--accent); outline-offset:7px; }
+        .settings-panel-heading { display:flex; align-items:center; justify-content:space-between; gap:1rem; flex-wrap:wrap; }
+        .settings-panel-heading .card-title { margin:0; font-size:clamp(1rem,1.2vw,1.2rem); line-height:1.4; }
+        .settings-panel-trigger { display:inline-flex; align-items:center; justify-content:center; gap:.65rem; min-height:44px; min-width:165px; padding:.65rem 1rem; border-radius:11px; color:white; background:linear-gradient(135deg,#38a7e8,#1677b6); font-size:.88rem; font-weight:700; }
+        .settings-panel-chevron { transition:transform .18s ease; }
+        .settings-panel[open] > summary .settings-panel-chevron { transform:rotate(180deg); }
+        .settings-panel-overview { display:block; color:var(--text-muted); font-size:.82rem; line-height:1.5; margin:.6rem 0 0; overflow-wrap:anywhere; }
+        .settings-panel-body { margin-top:1rem; border-top:1px solid var(--glass-border); padding-top:1rem; }
+        .settings-panel[open] > .settings-panel-body { animation:settings-panel-in .16s ease-out; }
+        .settings-panel-actions { display:flex; flex-wrap:wrap; gap:.7rem; margin:0 0 1rem; }
+        .settings-panel .yt-panel > summary { font-size:1rem; font-weight:700; cursor:pointer; min-height:44px; }
+        @keyframes settings-panel-in { from { opacity:.4; transform:translateY(-4px); } to { opacity:1; transform:translateY(0); } }
+        @media (max-width:620px) { .settings-panel-heading { gap:.7rem; } .settings-panel-trigger { width:100%; } .settings-panel-heading > .card-title { width:100%; } }
+        @media (prefers-reduced-motion:reduce) { .settings-panel-chevron { transition:none; } .settings-panel[open] > .settings-panel-body { animation:none; } }
+
         .settings-grid {
             display: grid;
             grid-template-columns: repeat(12, minmax(0, 1fr));
@@ -916,7 +936,7 @@
 
         #youtubePublisherSection .yt-panel { min-width: 0; border: 1px solid var(--glass-border); border-radius: 14px; padding: clamp(16px, 2vw, 24px); margin-top: 16px; }
         #youtubePublisherSection h3 { font-size: 1.12rem; margin: 0 0 12px; }
-        #youtubePublisherSection summary { font-weight: 700; cursor: pointer; min-height: 44px; display: flex; align-items: center; }
+        #youtubePublisherSection .yt-panel summary { font-weight: 700; cursor: pointer; min-height: 44px; display: flex; align-items: center; }
         .yt-status { padding: 12px; border-radius: 10px; background: var(--input-bg); line-height: 1.5; overflow-wrap: anywhere; }
         .yt-status[data-kind="success"] { border: 1px solid #4ade80; color: #bbf7d0; }
         .yt-status[data-kind="error"] { border: 1px solid #fb7185; color: #fecdd3; }
@@ -944,8 +964,8 @@
         #youtubeToolsSection,
         #translationToolsSection,
         #easyModeSettingsSection { grid-column: 1 / -1; }
-        #telegramSection { grid-column: 1 / 7; }
-        #externalUrlSection { grid-column: 7 / 13; }
+        #telegramSection { grid-column: 1 / -1; }
+        #externalUrlSection { grid-column: 1 / -1; }
         #userManagementSection,
         #logsSection { grid-column: 1 / -1; }
         #userManagementSection .form-grid {
@@ -976,7 +996,7 @@
         .subtitle-settings-preview { display:grid; gap:1rem; min-width:0; }
         .subtitle-settings-preview .subtitle-style-sample { aspect-ratio:16 / 9; min-height:150px; width:100%; margin:0; padding:1rem; background:var(--input-bg); }
         .subtitle-settings-preview .subtitle-style-sample span { font-family:Arial,sans-serif; line-height:1.3; }
-        .subtitle-settings-preview h3 { margin:0 0 .7rem; font-size:.95rem; }
+        .subtitle-settings-preview h3 { margin:0 0 .7rem; font-size:.95rem; color:var(--text-main); }
         .subtitle-settings-note { border-left:3px solid var(--accent); padding:.8rem 1rem; background:var(--input-bg); border-radius:0 9px 9px 0; }
         .subtitle-settings-note p { margin:.4rem 0; color:var(--text-muted); font-size:.82rem; line-height:1.5; }
         .subtitle-settings-actions { display:flex; flex-wrap:wrap; align-items:center; gap:1rem; margin-top:1.25rem; }
@@ -2269,12 +2289,17 @@
         <!-- ABA 2: AJUSTES -->
         <!-- ============================================================= -->
         <div id="settingsTabContent" style="display: none;">
+            <div class="settings-toolbar"><p class="compact-note">Abra os ajustes que deseja usar. Fechar um painel mantém os campos em edição.</p><button type="button" id="btnCollapseSettings" class="btn-secondary">Recolher todos</button></div>
             <div class="settings-grid">
 
-            <div class="card" id="youtubePublisherSection" style="display:none">
-                <div class="card-header"><span class="card-title">YouTube · Administração</span></div>
-                <section class="yt-panel" aria-labelledby="ytConnectionHeading">
-                    <h3 id="ytConnectionHeading">1. Conexão do canal</h3>
+            <details class="card settings-panel" id="youtubePublisherSection" style="display:none">
+                <summary id="youtubePublisherSectionToggle" class="settings-panel-summary" aria-expanded="false" aria-controls="youtubePublisherSectionBody">
+                    <span class="settings-panel-heading"><span class="card-title">Canal e publicação no YouTube</span><span class="settings-panel-trigger"><span data-panel-label data-closed-label="Abrir ajustes">Abrir ajustes</span><span class="settings-panel-chevron" aria-hidden="true">▾</span></span></span>
+                    <span id="youtubePublisherSectionOverview" class="settings-panel-overview">Conexão do canal, playlists e vídeos publicados.</span>
+                </summary>
+                <div id="youtubePublisherSectionBody" class="settings-panel-body">
+                <details class="yt-panel" aria-labelledby="ytConnectionHeading">
+                    <summary><span id="ytConnectionHeading">1. Conexão do canal</span></summary>
                     <p id="ytPublishChannel" class="yt-status" role="status">Verificando conexão do canal…</p>
                     <p class="compact-note">Conecte pelo celular, na rede local ou pelo endereço externo do app. A aprovação acontece no navegador do Google; não precisa abrir portas nem usar um computador.</p>
                     <div class="yt-actions"><button type="button" id="ytDeviceReconnect" class="btn-primary">Reconectar canal pelo celular</button><button type="button" id="ytPublishRefresh" class="btn-secondary">Verificar e renovar conexão</button><button type="button" id="ytPublishConnect" class="btn-secondary" style="display:none">Conectar pelo navegador (HTTPS)</button></div>
@@ -2321,9 +2346,9 @@
                     </details>
                     <p id="ytConnectionMessage" class="yt-status" role="status" aria-live="polite" hidden></p>
 
-                </section>
-                <section class="yt-panel" aria-labelledby="ytUsersHeading">
-                    <h3 id="ytUsersHeading">2. Playlist de cada usuário</h3>
+                </details>
+                <details class="yt-panel" aria-labelledby="ytUsersHeading">
+                    <summary><span id="ytUsersHeading">2. Playlist de cada usuário</span></summary>
                     <p class="compact-note">A publicação começa marcada para todas as contas, com privacidade Não listado. Defina a playlist de destino de cada pessoa; ela pode desmarcar o envio em um vídeo específico.</p>
                     <button type="button" id="ytPlaylistsRefresh" class="btn-secondary">Atualizar playlists</button>
                     <p id="ytPlaylistStatus" class="yt-status" role="status" aria-live="polite"></p>
@@ -2337,7 +2362,7 @@
                     </details>
                     <button type="button" id="ytPublishSave" class="btn-primary">Salvar playlists</button>
                     <p id="ytUsersMessage" class="yt-status" role="status" aria-live="polite" hidden></p>
-                </section>
+                </details>
                 <details class="yt-panel" id="ytManualPublication"><summary>3. Publicar um vídeo já pronto</summary>
                 <label for="ytPublishVideo" class="label">Vídeo finalizado</label>
                 <select id="ytPublishVideo" class="select-input"><option value="">Escolha um vídeo…</option></select>
@@ -2359,24 +2384,29 @@
                 <details class="yt-panel"><summary>Histórico de publicações</summary><div id="ytPublishJobs"></div></details>
                 <p class="compact-note">Projetos de API sem auditoria podem ficar restritos a vídeos privados. Capas personalizadas dependem da permissão do canal.</p>
             </div>
+            </details>
 
-            <!-- Gerenciador de Modelos Whisper -->
-            <div class="card" id="modelManagerSection">
-                <div class="card-header">
-                    <span class="card-title">🤖 Modelos Whisper</span>
-                </div>
+            <!-- Gerenciador de Modelos de reconhecimento -->
+            <details class="card settings-panel" id="modelManagerSection">
+                <summary id="modelManagerSectionToggle" class="settings-panel-summary" aria-expanded="false" aria-controls="modelManagerSectionBody">
+                    <span class="settings-panel-heading"><span class="card-title">Modelos de reconhecimento</span><span class="settings-panel-trigger"><span data-panel-label data-closed-label="Abrir ajustes">Abrir ajustes</span><span class="settings-panel-chevron" aria-hidden="true">▾</span></span></span>
+                    <span id="modelManagerSectionOverview" class="settings-panel-overview">Instale e acompanhe os modelos Whisper disponíveis.</span>
+                </summary>
+                <div id="modelManagerSectionBody" class="settings-panel-body">
                 <p class="compact-note">Modelos baixados ficam disponíveis para todas as contas, mas só o administrador pode instalar novos.</p>
 
                 <div id="modelsListContainer" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr)); gap: 0.8rem;">
                     <!-- Preenchido via JS fetchModelsStatus() -->
                 </div>
             </div>
+            </details>
 
-            <div class="card" id="youtubeToolsSection">
-                <div class="card-header">
-                    <span class="card-title">YouTube · Downloads</span>
-                    <button type="button" id="btnUpdateYoutubeTools" class="btn-secondary">↻ Atualizar mecanismo</button>
-                </div>
+            <details class="card settings-panel" id="youtubeToolsSection">
+                <summary id="youtubeToolsSectionToggle" class="settings-panel-summary" aria-expanded="false" aria-controls="youtubeToolsSectionBody">
+                    <span class="settings-panel-heading"><span class="card-title">Downloads do YouTube</span><span class="settings-panel-trigger"><span data-panel-label data-closed-label="Abrir ajustes">Abrir ajustes</span><span class="settings-panel-chevron" aria-hidden="true">▾</span></span></span>
+                    <span id="youtubeToolsSectionOverview" class="settings-panel-overview">Teste links, renove a sessão e atualize o mecanismo.</span>
+                </summary>
+                <div id="youtubeToolsSectionBody" class="settings-panel-body"><div class="settings-panel-actions"><button type="button" id="btnUpdateYoutubeTools" class="btn-secondary">↻ Atualizar mecanismo</button></div>
                 <p class="compact-note">Downloads e publicação usam conexões diferentes. Para publicar, reconecte o canal acima. Para baixar, teste o link e renove a sessão abaixo quando o YouTube pedir login. Tudo pode ser feito pelo celular, mesmo pela rede externa.</p>
                 <p id="youtubeSessionStatus" class="yt-status" role="status">Verificando sessão de downloads…</p>
                 <label for="youtubeTestUrl" class="label">Link do vídeo para testar</label><input id="youtubeTestUrl" type="url" class="input-text" placeholder="https://www.youtube.com/watch?v=…" autocomplete="off" inputmode="url">
@@ -2406,15 +2436,17 @@
                 </div>
                 <p id="youtubeToolsMessage" class="compact-note" style="margin: 0.75rem 0 0;">Consultando o estado do mecanismo...</p>
             </div>
+            </details>
 
-            <div class="card" id="subtitleModeSettingsSection" style="display:none;">
-                <div class="card-header subtitle-settings-head">
-                    <h2 class="card-title">Legendas dos vídeos</h2>
-                    <button type="button" id="btnToggleSubtitleSettings" class="btn-primary" aria-expanded="false" aria-controls="subtitleModeSettingsBody">Personalizar legendas ▾</button>
-                </div>
+            <details class="card settings-panel" id="subtitleModeSettingsSection" style="display:none;">
+                <summary id="btnToggleSubtitleSettings" class="settings-panel-summary" aria-expanded="false" aria-controls="subtitleModeSettingsBody">
+                    <span class="settings-panel-heading"><span class="card-title">Legendas dos vídeos</span><span class="settings-panel-trigger"><span data-panel-label data-closed-label="Personalizar legendas">Personalizar legendas</span><span class="settings-panel-chevron" aria-hidden="true">▾</span></span></span>
+                    <span id="subtitleModeSettingsSectionOverview" class="settings-panel-overview">Aparência, idioma e fundo do modo Legendar vídeo.</span><span id="subtitleSettingsSummary" class="subtitle-settings-summary" aria-label="Padrões salvos da legendagem"></span>
+                </summary>
+
                 <p class="compact-note">Padrões do modo <strong>Legendar vídeo</strong> para todas as contas. Abra os ajustes para mudar aparência, idioma e fundo.</p>
-                <div id="subtitleSettingsSummary" class="subtitle-settings-summary" aria-label="Padrões salvos da legendagem"></div>
-                <div id="subtitleModeSettingsBody" class="subtitle-settings-body" hidden>
+
+                <div id="subtitleModeSettingsBody" class="subtitle-settings-body">
                     <div class="subtitle-settings-layout">
                         <div class="subtitle-settings-controls">
                             <section class="subtitle-settings-group" aria-labelledby="subtitleAppearanceHeading">
@@ -2460,10 +2492,15 @@
                         <p id="subtitleSettingsMessage" class="compact-note" role="status" aria-live="polite"></p>
                     </div>
                 </div>
-            </div>
 
-            <div class="card" id="translationToolsSection" style="display: none;">
-                <div class="card-header"><span class="card-title">Tradução de SRT · LibreTranslate</span></div>
+            </details>
+
+            <details class="card settings-panel" id="translationToolsSection" style="display: none;">
+                <summary id="translationToolsSectionToggle" class="settings-panel-summary" aria-expanded="false" aria-controls="translationToolsSectionBody">
+                    <span class="settings-panel-heading"><span class="card-title">Tradução das legendas</span><span class="settings-panel-trigger"><span data-panel-label data-closed-label="Abrir ajustes">Abrir ajustes</span><span class="settings-panel-chevron" aria-hidden="true">▾</span></span></span>
+                    <span id="translationToolsSectionOverview" class="settings-panel-overview">Conexão e idiomas do LibreTranslate.</span>
+                </summary>
+                <div id="translationToolsSectionBody" class="settings-panel-body">
                 <p class="compact-note">A tradução depende do seu servidor LibreTranslate. O padrão é detecção automática → português do Brasil. Os resultados continuam na Biblioteca, nos downloads do Karaokê e no Telegram configurado.</p>
                 <div class="easy-config-fields">
                     <div class="form-group"><label class="label" for="translationServerUrl">Endereço do LibreTranslate</label><input id="translationServerUrl" class="input-text" type="url" placeholder="http://servidor:5000" autocomplete="off"></div>
@@ -2477,18 +2514,20 @@
                 <p id="translationToolsMessage" class="compact-note" role="status" style="overflow-wrap: anywhere;"></p>
                 <p class="compact-note">Depois de atualizar o container LibreTranslate, teste novamente aqui. O botão consulta a API e envia e baixa um SRT de teste; a atualização da imagem é feita no CasaOS/Docker. A configuração permanece salva após reiniciar o Karaokê.</p>
             </div>
+            </details>
 
-            <div class="card" id="easyModeSettingsSection">
-                <div class="card-header">
-                    <span class="card-title">⚡ Perfil global do Modo Rápido</span>
-                    <button type="button" id="btnResetEasyModeDefaults" class="btn-secondary">↺ Restaurar padrão</button>
-                </div>
+            <details class="card settings-panel" id="easyModeSettingsSection">
+                <summary id="easyModeSettingsSectionToggle" class="settings-panel-summary" aria-expanded="false" aria-controls="easyModeSettingsSectionBody">
+                    <span class="settings-panel-heading"><span class="card-title">Padrões do Modo Rápido</span><span class="settings-panel-trigger"><span data-panel-label data-closed-label="Abrir ajustes">Abrir ajustes</span><span class="settings-panel-chevron" aria-hidden="true">▾</span></span></span>
+                    <span id="easyModeSettingsSectionOverview" class="settings-panel-overview">Reconhecimento, visual e resultado para novas criações.</span>
+                </summary>
+                <div id="easyModeSettingsSectionBody" class="settings-panel-body"><div class="settings-panel-actions"><button type="button" id="btnResetEasyModeDefaults" class="btn-secondary">↺ Restaurar padrão</button></div>
                 <div class="easy-config-intro">
                     <span style="font-size: 1.25rem;">🪄</span>
                     <p class="compact-note">Todas as contas começam pelo Modo Rápido. Estas configurações ficam escondidas e são aplicadas pelo servidor; o Modo Detalhado continua disponível para ajustes manuais.</p>
                 </div>
 
-                <details class="easy-config-group" open>
+                <details class="easy-config-group">
                     <summary>🎙️ Transcrição e reconhecimento</summary>
                     <div class="easy-config-fields">
                         <div class="form-group"><span class="label">Modo Rápido disponível</span><select id="easyModeEnabled" class="select-input"><option value="true">Sim</option><option value="false">Não</option></select></div>
@@ -2501,7 +2540,7 @@
                     <p class="compact-note">Áudio original mantém a gravação completa para o Whisper, mesmo com backing vocals ativados. A separação continua preparando o instrumental do vídeo.</p>
                 </details>
 
-                <details class="easy-config-group" open>
+                <details class="easy-config-group">
                     <summary>🎨 Legenda e visual</summary>
                     <div class="easy-config-fields">
                         <div class="form-group"><span class="label">Modo da legenda</span><select id="easyModeSubtitleMode" class="select-input"><option value="syllable">Sílabas (varredura)</option><option value="word">Palavras</option><option value="line">Linhas</option><option value="phrase">Frase estática</option></select></div>
@@ -2536,13 +2575,15 @@
 
                 <button type="button" id="btnSaveEasyMode" class="btn-primary">💾 Salvar perfil do Modo Rápido</button>
             </div>
+            </details>
 
             <!-- Credenciais do Telegram -->
-            <div class="card" id="telegramSection">
-                <div class="card-header">
-                    <span class="card-title">✈️ Meu bot do Telegram</span>
-                    <button type="button" id="btnEditTelegram" class="btn-secondary">✏️ Editar</button>
-                </div>
+            <details class="card settings-panel" id="telegramSection">
+                <summary id="telegramSectionToggle" class="settings-panel-summary" aria-expanded="false" aria-controls="telegramSectionBody">
+                    <span class="settings-panel-heading"><span class="card-title">Meu bot do Telegram</span><span class="settings-panel-trigger"><span data-panel-label data-closed-label="Abrir ajustes">Abrir ajustes</span><span class="settings-panel-chevron" aria-hidden="true">▾</span></span></span>
+                    <span id="telegramSectionOverview" class="settings-panel-overview">Configuração, conexão e confirmação dos envios.</span>
+                </summary>
+                <div id="telegramSectionBody" class="settings-panel-body"><div class="settings-panel-actions"><button type="button" id="btnEditTelegram" class="btn-secondary">✏️ Editar</button></div>
 
                 <p id="telegramScopeText" class="compact-note">Este bot recebe apenas as suas criações.</p>
 
@@ -2571,13 +2612,15 @@
                 <div id="telegramDeliveryStatus" class="compact-note" role="status" aria-live="polite" style="overflow-wrap:anywhere;"></div>
                 <div id="telegramFeedback" role="status" aria-live="polite" style="overflow-wrap:anywhere;"></div>
             </div>
+            </details>
 
             <!-- IP Externo / Acesso Remoto -->
-            <div class="card" id="externalUrlSection">
-                <div class="card-header">
-                    <span class="card-title">🌐 Acesso externo</span>
-                    <button type="button" id="btnEditExternalUrl" class="btn-secondary">✏️ Editar</button>
-                </div>
+            <details class="card settings-panel" id="externalUrlSection">
+                <summary id="externalUrlSectionToggle" class="settings-panel-summary" aria-expanded="false" aria-controls="externalUrlSectionBody">
+                    <span class="settings-panel-heading"><span class="card-title">Acesso externo</span><span class="settings-panel-trigger"><span data-panel-label data-closed-label="Abrir ajustes">Abrir ajustes</span><span class="settings-panel-chevron" aria-hidden="true">▾</span></span></span>
+                    <span id="externalUrlSectionOverview" class="settings-panel-overview">Endereço usado nos links de download enviados ao Telegram.</span>
+                </summary>
+                <div id="externalUrlSectionBody" class="settings-panel-body"><div class="settings-panel-actions"><button type="button" id="btnEditExternalUrl" class="btn-secondary">✏️ Editar</button></div>
 
                 <p class="compact-note">Base pública opcional para o link direto e aleatório enviado pelo Telegram.</p>
 
@@ -2595,12 +2638,15 @@
                     </div>
                 </div>
             </div>
+            </details>
 
             <!-- Gerenciamento de Usuários -->
-            <div class="card" id="userManagementSection">
-                <div class="card-header">
-                    <span class="card-title">👥 Usuários</span>
-                </div>
+            <details class="card settings-panel" id="userManagementSection">
+                <summary id="userManagementSectionToggle" class="settings-panel-summary" aria-expanded="false" aria-controls="userManagementSectionBody">
+                    <span class="settings-panel-heading"><span class="card-title">Contas e permissões</span><span class="settings-panel-trigger"><span data-panel-label data-closed-label="Abrir ajustes">Abrir ajustes</span><span class="settings-panel-chevron" aria-hidden="true">▾</span></span></span>
+                    <span id="userManagementSectionOverview" class="settings-panel-overview">Adicione contas e gerencie quem usa o servidor.</span>
+                </summary>
+                <div id="userManagementSectionBody" class="settings-panel-body">
 
                 <div class="form-grid" style="margin-bottom: 1rem;">
                     <div class="form-group">
@@ -2627,20 +2673,23 @@
                     <!-- Preenchido via JS fetchUsers() -->
                 </div>
             </div>
+            </details>
 
             <!-- Logs e Diagnóstico do Sistema -->
-            <div class="card" id="logsSection">
-                <div class="card-header">
-                    <span class="card-title">📋 Diagnóstico</span>
-                    <button type="button" id="btnDownloadLogs" class="btn-secondary">⬇️ Logs atuais</button>
-                </div>
+            <details class="card settings-panel" id="logsSection">
+                <summary id="logsSectionToggle" class="settings-panel-summary" aria-expanded="false" aria-controls="logsSectionBody">
+                    <span class="settings-panel-heading"><span class="card-title">Diagnóstico do servidor</span><span class="settings-panel-trigger"><span data-panel-label data-closed-label="Abrir ajustes">Abrir ajustes</span><span class="settings-panel-chevron" aria-hidden="true">▾</span></span></span>
+                    <span id="logsSectionOverview" class="settings-panel-overview">Baixe um relatório com o estado e os registros atuais.</span>
+                </summary>
+                <div id="logsSectionBody" class="settings-panel-body"><div class="settings-panel-actions"><button type="button" id="btnDownloadLogs" class="btn-secondary">⬇️ Logs atuais</button></div>
                 <p class="compact-note">Gera um relatório novo com o estado e os registros mais recentes do aplicativo.</p>
             </div>
+            </details>
             </div>
         </div>
 
         <!-- ============================================================= -->
-        <!-- ABA 3: BIBLIOTECA & HISTÓRICO -->
+<!-- ABA 3: BIBLIOTECA & HISTÓRICO -->
         <!-- ============================================================= -->
         <div id="libraryTabContent" style="display: none; flex-direction: column; gap: 1.5rem;">
             <details class="card library-section" id="libraryResults" open>
@@ -2763,7 +2812,7 @@
                 <summary>3. Legendar vídeos com Whisper</summary>
                 <ol>
                     <li>Escolha <strong>Legendar vídeo</strong> e envie áudio/vídeo, cole um link, busque no YouTube ou escolha um original da Biblioteca.</li>
-                    <li>Como administrador, configure <strong>Ajustes → Tradução de SRT · LibreTranslate</strong>: salve o endereço e a chave opcional, depois toque em <strong>Testar e atualizar idiomas</strong>.</li>
+                    <li>Como administrador, configure <strong>Ajustes → Tradução das legendas</strong>: salve o endereço e a chave opcional, depois toque em <strong>Testar e atualizar idiomas</strong>.</li>
                     <li>Em <strong>Segundo SRT traduzido</strong>, o padrão é <strong>detecção automática → Português (Brasil)</strong>. A tradução depende desse LibreTranslate. Você também pode escolher outro destino ou <strong>Não traduzir</strong>.</li>
                     <li>Ajuste modelo, leitura da fala, VAD e revisão se necessário. Toque em <strong>Legendar vídeo</strong>.</li>
                     <li>Assista ou baixe o <strong>vídeo legendado</strong>, o <strong>SRT original</strong> e a tradução disponível. No Telegram chega somente o vídeo compactado, com links locais e externos para os três arquivos na própria mensagem.</li>
@@ -2823,10 +2872,10 @@
             <details>
                 <summary>9. Administrar e resolver problemas</summary>
                 <ul>
-                    <li><strong>Modelos Whisper:</strong> o administrador instala modelos em Ajustes. Os modelos baixados ficam disponíveis para as contas.</li>
-                    <li><strong>Perfil global do Modo Rápido:</strong> configure transcrição, visual, revisão e coleção de fundos; salve ao terminar.</li>
+                    <li><strong>Modelos de reconhecimento:</strong> o administrador instala modelos em Ajustes. Os modelos baixados ficam disponíveis para as contas.</li>
+                    <li><strong>Padrões do Modo Rápido:</strong> configure transcrição, visual, revisão e coleção de fundos; salve ao terminar.</li>
                     <li><strong>Usuários:</strong> crie contas comuns ou administrativas. Excluir uma conta não equivale a apagar automaticamente todos os seus arquivos.</li>
-                    <li><strong>YouTube:</strong> se um link autorizado falhar, consulte <strong>Ajustes → YouTube · Downloads → Testar link / Renovar sessão / Atualizar mecanismo</strong> como administrador e tente novamente. A atualização pode não resolver restrições do provedor.</li>
+                    <li><strong>YouTube:</strong> se um link autorizado falhar, consulte <strong>Ajustes → Downloads do YouTube → Testar link / Renovar sessão / Atualizar mecanismo</strong> como administrador e tente novamente. A atualização pode não resolver restrições do provedor.</li>
                     <li><strong>Tradução:</strong> atualize o container e os modelos do LibreTranslate no CasaOS/Docker e use <strong>Testar e atualizar idiomas</strong> no Karaokê. O botão verifica a API; não atualiza outro container. Confira PT-BR, chave, tradução de arquivos habilitada, limite de upload e tempo limite se houver falha.</li>
                     <li><strong>Sem conexão:</strong> confirme servidor, porta, rede e certificado HTTPS. No APK, use a faixa inferior para revisar os endereços.</li>
                     <li><strong>Memória ou lentidão:</strong> confira espaço e RAM; um modelo menor pode ajudar na transcrição, com possível perda de qualidade. O Demucs usa CPU e pode levar mais tempo que o vídeo.</li>
@@ -2836,7 +2885,7 @@
             <details>
                 <summary>10. Conectar e publicar no YouTube</summary>
                 <ol>
-                    <li>Em <strong>Ajustes → YouTube · Administração → Conexão do canal</strong>, configure uma vez uma credencial Google do tipo <strong>TVs e dispositivos com entrada limitada</strong>, pelo navegador do celular. Ative a YouTube Data API v3 no mesmo projeto.</li>
+                    <li>Em <strong>Ajustes → Canal e publicação no YouTube → Conexão do canal</strong>, configure uma vez uma credencial Google do tipo <strong>TVs e dispositivos com entrada limitada</strong>, pelo navegador do celular. Ative a YouTube Data API v3 no mesmo projeto.</li>
                     <li>Toque em <strong>Reconectar canal pelo celular</strong>, copie o código e abra <strong>google.com/device</strong> no navegador. Escolha sua conta e permita o acesso. Volte ao app e confira o nome do canal. Funciona pela rede local ou externa; não precisa de um PC ou retorno HTTPS. Projetos em Teste podem exigir nova aprovação em sete dias.</li>
                     <li>Em <strong>Playlist de cada usuário</strong>, defina uma playlist válida de cada conta. O envio fica bloqueado enquanto o perfil não tiver playlist. Para o administrador, abra <strong>Padrões de publicação do administrador → Playlist padrão do administrador</strong>. O envio começa marcado para todas as contas. A privacidade automática é <strong>Não listado</strong>. Salve e confira a confirmação.</li>
                     <li>No modo Rápido ou Detalhado, marque <strong>Publicar no YouTube</strong> somente quando quiser enviar esse vídeo. Desmarcado, não há publicação. Uma playlist no perfil é obrigatória; sem ela, o vídeo não é enviado. O administrador pode trocar o destino por vídeo no modo rápido.</li>
@@ -2844,7 +2893,7 @@
                 </ol>
                 <p>A API tem cota gratuita e pode limitar projetos sem auditoria a vídeos privados. Guarde a autorização como uma senha. Backing vocals e vídeo do modo SRT mostram porcentagem da etapa e avisam o avanço no Telegram; o LibreTranslate informa apenas início e término.</p>
             </details>
-            <p class="compact-note">Versão do servidor: 12.0. A transcrição é local; fontes, modelos e integrações podem acessar serviços externos. Use conteúdo autorizado.</p>
+            <p class="compact-note">Versão do servidor: 12.1. A transcrição é local; fontes, modelos e integrações podem acessar serviços externos. Use conteúdo autorizado.</p>
             <p class="compact-note">Use o servidor pela rede local ou VPN. A busca/importação do YouTube não concede direitos sobre a mídia. OAuth autoriza o acesso ao canal, não o uso de músicas. Confira as permissões do conteúdo e os termos do YouTube antes de importar ou publicar. Não listado permite acesso a quem tiver o link; resultados SRT nunca vão ao YouTube.</p>
             <p class="compact-note"><a href="https://www.youtube.com/static?template=terms" target="_blank" rel="noopener noreferrer">Termos do YouTube</a> · <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer">Privacidade do Google</a> · <a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener noreferrer">Revogar acesso ao canal</a></p>
         </div>
@@ -2905,6 +2954,34 @@
             return String(value ?? '').replace(/[&<>'"]/g, char => ({
                 '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
             })[char]);
+        }
+
+
+        function initSettingsPanels() {
+            for (const panel of document.querySelectorAll('.settings-grid > .settings-panel')) {
+                const summary = panel.querySelector(':scope > summary');
+                const label = summary.querySelector('[data-panel-label]');
+                panel.addEventListener('toggle', () => {
+                    summary.setAttribute('aria-expanded', String(panel.open));
+                    label.textContent = panel.open ? 'Fechar ajustes' : label.dataset.closedLabel;
+                });
+            }
+            document.getElementById('btnCollapseSettings')?.addEventListener('click', () => {
+                for (const panel of document.querySelectorAll('.settings-grid details')) panel.open = false;
+            });
+            const sources = {
+                youtubePublisherSection: 'ytPublishChannel', youtubeToolsSection: 'youtubeSessionStatus',
+                telegramSection: 'telegramDeliveryStatus', externalUrlSection: 'externalUrlValText',
+                translationToolsSection: 'translationToolsMessage',
+            };
+            for (const [panel, sourceId] of Object.entries(sources)) {
+                const source = document.getElementById(sourceId), overview = document.getElementById(panel + 'Overview');
+                const update = () => {
+                    const text = source.textContent.trim().replace(/\s+/g, ' ');
+                    if (text && overview.textContent !== text) overview.textContent = text;
+                };
+                new MutationObserver(update).observe(source, {childList:true, subtree:true, characterData:true});
+            }
         }
 
         function applyRoleUI() {
@@ -4718,6 +4795,7 @@
         // INICIALIZAÇÃO E LISTENERS DE EVENTOS
         window.addEventListener('DOMContentLoaded', async () => {
             initTheme();
+            initSettingsPanels();
 
             document.addEventListener('dragover', event => {
                 if (Array.from(event.dataTransfer?.types || []).includes('Files')) event.preventDefault();
@@ -4780,13 +4858,7 @@
 
             document.getElementById('btnUpdateYoutubeTools')?.addEventListener('click', updateYoutubeTools);
 
-            document.getElementById('btnToggleSubtitleSettings')?.addEventListener('click', () => {
-                const body = document.getElementById('subtitleModeSettingsBody');
-                const button = document.getElementById('btnToggleSubtitleSettings');
-                body.hidden = !body.hidden;
-                button.setAttribute('aria-expanded', String(!body.hidden));
-                button.textContent = body.hidden ? 'Personalizar legendas ▾' : 'Fechar ajustes ▴';
-            });
+
 
             for (const id of Object.values(subtitleSettingFields)) document.getElementById(id)?.addEventListener('input', updateSubtitleStyleSample);
             updateSubtitleStyleSample();
@@ -7375,7 +7447,7 @@
                 const sameChannel = !!channel && channel === youtubePlaylistChannel;
                 youtubeChannelConnected = !!status.connected;
                 ytNotice('ytPublishChannel', status.connected ? '✓ Canal conectado: ' + status.channel_title : (status.message || 'Canal não conectado. Use Reconectar canal pelo celular.'), status.connected ? 'success' : status.recovery === 'auth_required' ? 'error' : 'info');
-                if (!youtubeDeviceSetupSeen) { ytElement('ytDeviceSetup').open = !status.device_configured; youtubeDeviceSetupSeen = true; }
+                if (!youtubeDeviceSetupSeen) { youtubeDeviceSetupSeen = true; }
                 if (deviceGeneration === youtubeDeviceGeneration) renderYoutubeDevice(status.device_session);
                 ytElement('ytDeviceReconnect').onclick = () => status.device_configured ? startYoutubeDevice(true) : (ytElement('ytDeviceSetup').open = true, ytElement('ytDeviceSetup').scrollIntoView({behavior:'smooth',block:'nearest'}));
                 ytElement('ytPublishConnect').style.display = status.web_configured ? '' : 'none';

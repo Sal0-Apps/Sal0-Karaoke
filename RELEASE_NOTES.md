@@ -1,3 +1,10 @@
+# 12.1
+
+- Todos os painéis de Ajustes começam recolhidos: publicação e downloads do YouTube, modelos, legendagem, tradução, Modo Rápido, Telegram, acesso externo, contas e diagnóstico. Seções internas também começam fechadas. Abertura individual com teclado e toque, títulos claros, resumos de conexão/entrega e botão Recolher todos. Consultas não abrem painéis nem substituem campos em edição; fechar não salva nem descarta valores.
+- Quando o YouTube confirma a conclusão do envio, capa, playlist e privacidade, a mensagem original do Telegram recebe **Assistir no YouTube**, preservando a prévia e os downloads locais/externos. Se o upload termina primeiro, o link já acompanha a mensagem inicial. Funciona com resultados automáticos e publicação manual, inclusive após reinício; não reenviamos o vídeo para acrescentar o link.
+- Resultados antigos sem mensagem registrada ou mensagens que não podem mais ser editadas recebem uma confirmação com link. Registros por vídeo e destino evitam repetir essa confirmação; destinatários seguem o dono da mídia e os administradores configurados. Tokens não são gravados nesses registros. Falhas de Telegram não transformam uma publicação concluída no YouTube em erro de upload.
+- Validação de corridas entre upload e envio, retomada, preservação dos downloads, confirmação final, isolamento de vídeos/bots/contas, acesso por função e painéis nas telas de celular/desktop. Atualização apenas do servidor; os clientes Android e Windows existentes continuam compatíveis.
+
 # 12.0
 
 - Corrigido o painel de legendagem que ficava espremido em uma coluna no desktop. **Legendas dos vídeos** passa a ocupar a largura disponível e começa recolhido, com **Personalizar legendas** em destaque e resumo dos padrões salvos. Ajustes agrupados por aparência, idioma e fundo, prévia de cores/posição e botão de salvamento claro; organização adaptada ao celular e aos temas claro/escuro. Fechar e abrir preserva a edição, sem mudar tarefas já na fila.
