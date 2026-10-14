@@ -197,7 +197,7 @@ Como administrador, use **↑ / ↓** para mover itens aguardando. Um item em pr
 
 **Remover** tira um item pendente da execução e conserva seus arquivos nesta fila para ajustes ou reexecução. **Cancelar Processamento** encerra a tarefa atual. A próxima tarefa elegível começa se a fila estiver ativa e não houver uma pausa/revisão impedindo o avanço.
 
-Trabalhos encerrados continuam na própria lista com os botões **Legendas**, **Rápido** e **Detalhado**; Legendar vídeo usa **Ajustes**. A lista e o cache só são substituídos quando uma nova mídia é aceita após esgotar os pendentes. Refazer um item conserva a fila atual. Os resultados salvos continuam em **Biblioteca → Resultados**, inclusive depois da troca de fila.
+O item em processamento aparece primeiro, seguido dos pendentes na ordem real da fila; os encerrados ficam abaixo. Ao refazer um item, a nova execução aparece entre os pendentes, acima dos resultados já concluídos. Trabalhos encerrados continuam na própria lista com os botões **Legendas**, **Rápido** e **Detalhado**; Legendar vídeo usa **Ajustes**. A lista e o cache são substituídos quando uma nova mídia é aceita após esgotar os pendentes, ou apagados pelo botão **Apagar cache da fila**. Refazer um item conserva a fila atual. Os resultados salvos continuam em **Biblioteca → Resultados**, inclusive depois da troca de fila.
 
 ## 8. Progresso e pausa por etapa
 
@@ -401,7 +401,13 @@ O uso pessoal, a ausência de divulgação, a gratuidade e o acesso por VPN não
 
 Referências: [Termos do YouTube](https://www.youtube.com/static?template=terms), [políticas da API](https://developers.google.com/youtube/terms/developer-policies), [privacidade do Google](https://policies.google.com/privacy) e [permissões da conta Google](https://myaccount.google.com/permissions).
 
-O cache mantém todas as execuções da fila atual desse perfil. Abra **Criar → Fila de processamento**, escolha o item e use **Legendas**, **Rápido** ou **Detalhado**. Legendar vídeo oferece **Ajustes**, com visual por execução. A fila concluída permanece disponível; só uma nova origem aceita após esgotar os pendentes inicia a próxima fila e libera os arquivos anteriores. Refazer um item em cache e adicionar durante a execução continuam na mesma fila. Resultados da Biblioteca permanecem. Os arquivos já apagados antes da 12.2 não podem ser recuperados.
+O cache mantém todas as execuções da fila atual desse perfil. Abra **Criar → Fila de processamento**, escolha o item e use **Legendas**, **Rápido** ou **Detalhado**. Legendar vídeo oferece **Ajustes**, com visual por execução. A fila concluída permanece disponível até iniciar a próxima fila com uma nova origem ou usar **Apagar cache da fila**. Refazer um item em cache e adicionar durante a execução continuam na mesma fila. Resultados da Biblioteca permanecem. Os arquivos já apagados antes da 12.2 não podem ser recuperados.
+
+## Apagar o cache da fila inteira
+
+Em **Criar → Fila de processamento**, use **Apagar cache da fila** e confirme a limpeza. O botão libera a ação quando todos os seus itens terminaram, foram cancelados ou removidos da execução. Se houver pendentes, aguarde ou remova-os; aguarde a conclusão do cancelamento de uma execução ativa.
+
+A limpeza remove a lista e os arquivos de trabalho de todos os itens do seu perfil, incluindo revisões e versões anteriores. Os resultados salvos na Biblioteca, as mídias permanentes e as publicações no YouTube permanecem disponíveis. Mesmo para administradores, a limpeza afeta somente a própria fila; outras contas são preservadas. Revisões que existiam apenas em cache são descartadas. Em caso de erro, a interface informa a falha e permite repetir a limpeza.
 
 ## Refazer um vídeo da fila e corrigir a publicação
 

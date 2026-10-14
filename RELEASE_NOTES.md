@@ -1,3 +1,10 @@
+# 12.5
+
+- **Apagar cache da fila** remove os arquivos de trabalho e os itens de toda a fila do perfil, com confirmação. A ação é liberada após esgotar os trabalhos ativos; pendentes e processamento em andamento são protegidos. Resultados permanentes, publicações, prévias da Biblioteca e outras contas permanecem disponíveis, inclusive para administradores.
+- Listagem sempre mostra o processamento primeiro, os pendentes na ordem real de execução e os encerrados abaixo. Uma reexecução aparece entre os pendentes, acima dos resultados concluídos. A apresentação preserva a sequência do worker, as posições e os controles de movimentação.
+- Falhas ao salvar a limpeza preservam os arquivos; erros de remoção são informados e permitem repetir a ação. Consultas atrasadas não repõem itens já apagados. Mantidas revisão independente, restauração de ajustes, YouTube, Telegram, playlists e painéis recolhidos.
+- Verificados limpeza integral por perfil, bloqueio durante processamento e cancelamento, retenção de Biblioteca e prévias, falhas/repetição, caminhos e links simbólicos, ordenação e resposta antiga no navegador. Atualização somente do servidor; Android e Windows atuais continuam compatíveis.
+
 # 12.2.2
 
 - Corrigida a demora ao abrir a fila: a consulta começa logo após autenticar, sem aguardar estado, perfil ou configurações. A listagem verifica a disponibilidade dos arquivos sem carregar a transcrição completa de cada item e faz as leituras fora do bloqueio da fila.

@@ -1564,6 +1564,12 @@
         .queue-item[data-status="done"] { border-color: rgba(34, 197, 94, .3); }
         .queue-item .queue-meta { display: flex; align-items: center; flex-wrap: wrap; gap: .4rem; }
         #queueFeedback:empty { display: none; }
+        .queue-cache-controls { display: flex; align-items: center; flex-wrap: wrap; gap: .65rem; margin: .75rem 0; }
+        .queue-cache-controls[hidden] { display: none; }
+        .queue-cache-controls > p { flex: 1 1 220px; margin: 0; }
+        #btnClearQueueCache { display: inline-flex; align-items: center; gap: .35rem; width: auto; min-height: 36px; padding: .45rem .65rem; font-size: .75rem; }
+        #btnClearQueueCache svg { width: 15px; height: 15px; }
+        #btnClearQueueCache:disabled { opacity: .5; cursor: not-allowed; }
         .queue-move-btn {
             min-width: 2.35rem;
             padding: 0.42rem 0.58rem;
@@ -2187,10 +2193,17 @@
                     <span class="card-title"><span class="line-glyph">≡</span> Fila de processamento</span>
                     <span id="queueCountBadge" class="queue-status">0 aguardando</span>
                 </div>
-                <p class="compact-note" style="margin-bottom: 0.8rem;">Os concluídos continuam nesta lista para editar e refazer. A lista só é trocada quando uma nova mídia inicia a próxima fila.</p>
+                <p class="compact-note" style="margin-bottom: 0.8rem;">Em processamento e pendentes aparecem primeiro; os encerrados ficam abaixo para editar e refazer. A próxima fila substitui esta lista. Você também pode apagar o cache ao terminar.</p>
                 <div class="queue-maintenance-control">
                     <span class="compact-note queue-pause-status">A fila está ativa.</span>
                     <button type="button" class="btn-secondary btn-queue-pause">⏸ Pausar ao concluir etapa</button>
+                </div>
+                <div id="queueCacheControls" class="queue-cache-controls" hidden>
+                    <button type="button" id="btnClearQueueCache" class="btn-secondary" onclick="clearWholeQueueCache()" aria-describedby="queueCacheClearHint">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7"/></svg>
+                        Apagar cache da fila
+                    </button>
+                    <p id="queueCacheClearHint" class="compact-note"></p>
                 </div>
                 <div id="processingQueueList" class="queue-list"><span class="compact-note">A fila está vazia.</span></div>
                 <p id="queueFeedback" class="compact-note" role="status"></p>
@@ -2906,7 +2919,7 @@
                 </ol>
                 <p>A API tem cota gratuita e pode limitar projetos sem auditoria a vídeos privados. Guarde a autorização como uma senha. Backing vocals e vídeo do modo SRT mostram porcentagem da etapa e avisam o avanço no Telegram; o LibreTranslate informa apenas início e término.</p>
             </details>
-            <p class="compact-note">Versão do servidor: 12.2.2. A transcrição é local; fontes, modelos e integrações podem acessar serviços externos. Use conteúdo autorizado.</p>
+            <p class="compact-note">Versão do servidor: 12.5. A transcrição é local; fontes, modelos e integrações podem acessar serviços externos. Use conteúdo autorizado.</p>
             <p class="compact-note">Use o servidor pela rede local ou VPN. A busca/importação do YouTube não concede direitos sobre a mídia. OAuth autoriza o acesso ao canal, não o uso de músicas. Confira as permissões do conteúdo e os termos do YouTube antes de importar ou publicar. Não listado permite acesso a quem tiver o link; resultados SRT nunca vão ao YouTube.</p>
             <p class="compact-note"><a href="https://www.youtube.com/static?template=terms" target="_blank" rel="noopener noreferrer">Termos do YouTube</a> · <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer">Privacidade do Google</a> · <a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener noreferrer">Revogar acesso ao canal</a></p>
         </div>
@@ -4105,8 +4118,10 @@
             const container = document.getElementById('processingQueueList');
             const badge = document.getElementById('queueCountBadge');
             if (!card || !container || !badge) return;
+            jobs = orderedQueueJobs(jobs);
             latestQueueJobs = jobs;
             latestQueueState = queueState;
+            updateQueueCacheControls(jobs);
             const activeJobs = jobs.filter(job => ['queued', 'processing'].includes(job.status) && !job.cancel_requested);
             const queuedCount = activeJobs.filter(job => job.status === 'queued').length;
             processingQueuePaused = Boolean(queueState.paused);
@@ -4157,11 +4172,15 @@
             `).join('');
         }
 
+        let processingQueueRequestGeneration = 0;
+
         async function fetchProcessingQueue() {
+            const generation = ++processingQueueRequestGeneration;
             try {
                 const response = await authFetch('/api/queue?include_completed=true', { cache: 'no-store' });
                 if (!response.ok) return;
                 const data = await response.json();
+                if (generation !== processingQueueRequestGeneration) return;
                 const jobs = data.jobs || [];
                 renderProcessingQueue(jobs, data);
                 clearTimeout(processingQueuePollTimer);

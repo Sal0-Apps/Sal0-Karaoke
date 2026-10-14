@@ -65,7 +65,7 @@ class QueueCacheTests(unittest.TestCase):
             'retire_queue_batch','ensure_processing_queue_capacity','active_queue_pipeline_for_user','cached_queue_job',
             'queue_cache_dir_for_user','remove_finished_queue_cache','get_processing_queue','remove_queued_job',
             'get_cache_info','get_cached_background','get_cached_audio','get_queue_cache','public_cached_queue_job','get_queue_cache_job','get_queue_cache_segments',
-            'save_queue_cache_segments','reprocess_queue_cache_job','process_karaoke','processing_queue_worker'}
+            'save_queue_cache_segments','reprocess_queue_cache_job','clear_queue_cache','process_karaoke','processing_queue_worker'}
         tree=ast.parse((ROOT/'app/main.py').read_text())
         nodes=[n for n in tree.body if isinstance(n,ast.ClassDef) and n.name in {'EditWordModel','EditSegmentModel','ContinueProcessModel'}
             or isinstance(n,ast.FunctionDef) and n.name in names]
@@ -94,6 +94,99 @@ class QueueCacheTests(unittest.TestCase):
                   process_summary={'mode':'Legendar vídeo' if subtitle else 'Modo Detalhado'})
         self.queue.append(item);return item
 
+    def test_clear_entire_exhausted_queue_preserves_results_and_other_profiles(self):
+        owned = [self.job(name, status) for name,status in [('A','done'),('E','error'),('C','cancelled'),('R','removed'),('V','replaced')]]
+        bob = self.job('BOB','processing',owner='bob')
+        self.user['role'] = 'admin'; self.scope['processing_queue_paused'] = True
+        paths = self.paths(self.user); legacy = Path(paths['cache'])
+        (legacy/'draft.json').write_text('draft')
+        previews=legacy/'thumbnails';previews.mkdir();(previews/'other-profile.jpg').write_bytes(b'library preview')
+        for suffix in ('.previous','.promoting'):
+            folder=Path(str(legacy)+suffix);folder.mkdir();(folder/'old.wav').write_bytes(b'old')
+        history=Path(paths['library'])/'history'/'finished.mp4';history.write_bytes(b'permanent result')
+        original=Path(paths['library'])/'videos'/'original.mp4';original.write_bytes(b'permanent source')
+        background=Path(paths['library'])/'photos'/'background.png';background.write_bytes(b'permanent background')
+        self.scope['youtube_publisher'].replacement_for = Mock(side_effect=AssertionError('publication must remain intact'))
+        self.scope['save_processing_queue_unlocked']()
+        response = self.client.delete('/api/queue-cache')
+        self.assertEqual(response.status_code,200,response.text);self.assertEqual(response.json()['removed'],5)
+        self.assertEqual([j['id'] for j in self.queue],['BOB'])
+        self.assertEqual([j['id'] for j in json.loads((self.root/'queue.json').read_text())],['BOB'])
+        for item in owned:self.assertFalse(Path(item['pipeline']['cache_dir']).exists())
+        self.assertTrue(Path(bob['pipeline']['cache_dir']).is_dir());self.assertEqual(list(legacy.iterdir()),[previews])
+        self.assertEqual((previews/'other-profile.jpg').read_bytes(),b'library preview')
+        self.assertFalse(Path(str(legacy)+'.previous').exists());self.assertFalse(Path(str(legacy)+'.promoting').exists())
+        self.assertEqual(history.read_bytes(),b'permanent result');self.assertEqual(original.read_bytes(),b'permanent source')
+        self.assertEqual(background.read_bytes(),b'permanent background');self.assertTrue(self.scope['processing_queue_paused'])
+        self.assertEqual(self.client.get('/api/queue-cache/A/segments').status_code,404)
+        again=self.client.delete('/api/queue-cache');self.assertEqual(again.status_code,200,again.text)
+        self.assertEqual(again.json()['removed'],0)
+
+    def test_clear_is_blocked_while_owned_work_is_queued_processing_or_still_canceling(self):
+        active=self.job('A','queued');self.scope['save_processing_queue_unlocked']()
+        for status,cancel in [('queued',False),('processing',False),('processing',True)]:
+            with self.subTest(status=status,cancel=cancel):
+                active['status']=status;active['cancel_requested']=cancel
+                response=self.client.delete('/api/queue-cache')
+                self.assertEqual(response.status_code,409,response.text)
+                self.assertTrue(Path(active['pipeline']['cache_dir']).is_dir())
+                self.assertEqual(self.queue,[active])
+
+    def test_failed_clear_persistence_does_not_delete_any_cache(self):
+        a=self.job('A');self.scope['save_processing_queue_unlocked']()
+        self.scope['save_processing_queue_unlocked']=Mock(side_effect=OSError('disk full'))
+        response=self.client.delete('/api/queue-cache')
+        self.assertEqual(response.status_code,503,response.text)
+        self.assertTrue(Path(a['pipeline']['cache_dir']).is_dir());self.assertEqual(self.queue,[a])
+        self.assertEqual(json.loads((self.root/'queue.json').read_text())[0]['id'],'A')
+
+    def test_partial_cleanup_failure_keeps_queue_available_for_retry(self):
+        a=self.job('A');b=self.job('B');self.scope['save_processing_queue_unlocked']()
+        root_b=Path(b['pipeline']['cache_dir']).parent;remove=shutil.rmtree
+        def fail(path,*args,**kwargs):
+            if Path(path)==root_b:raise PermissionError('busy file')
+            return remove(path,*args,**kwargs)
+        with patch.object(shutil,'rmtree',side_effect=fail):response=self.client.delete('/api/queue-cache')
+        self.assertEqual(response.status_code,503,response.text)
+        self.assertEqual([j['id'] for j in self.queue],['A','B'])
+        self.assertEqual(len(json.loads((self.root/'queue.json').read_text())),2)
+        self.assertFalse(Path(a['pipeline']['cache_dir']).exists());self.assertTrue(root_b.is_dir())
+        response=self.client.delete('/api/queue-cache');self.assertEqual(response.status_code,200,response.text)
+        self.assertEqual(self.queue,[]);self.assertFalse(root_b.exists())
+
+    def test_invalid_record_cannot_clear_directories_outside_the_queue_root(self):
+        a=self.job('A')
+        for id in ('../../alice/library','.','..','../jobs/A'):
+            with self.subTest(id=id):
+                a['id']=id;response=self.client.delete('/api/queue-cache')
+                self.assertEqual(response.status_code,409,response.text)
+                self.assertTrue(Path(a['pipeline']['cache_dir']).is_dir());self.assertEqual(self.queue,[a])
+
+    def test_cleanup_unlinks_owned_symlink_without_deleting_another_profiles_files(self):
+        a=self.job('A');bob=self.job('BOB','processing',owner='bob')
+        root=Path(a['pipeline']['cache_dir']).parent;shutil.rmtree(root)
+        bob_root=Path(bob['pipeline']['cache_dir']).parent;root.symlink_to(bob_root,target_is_directory=True)
+        response=self.client.delete('/api/queue-cache')
+        self.assertEqual(response.status_code,200,response.text)
+        self.assertFalse(root.is_symlink());self.assertTrue(bob_root.is_dir())
+        self.assertEqual((bob_root/'cache'/'original_input.mp4').read_bytes(),b'BOB')
+
+    def test_revisions_and_live_items_are_displayed_before_finished_rows_without_changing_fifo(self):
+        self.job('A');self.job('E','error');self.job('Q1','queued');self.job('BOB','queued',owner='bob')
+        self.job('Q2','queued');self.job('LIVE','processing');self.job('C','cancelled')
+        initial=[j['id'] for j in self.queue]
+        visible=self.client.get('/api/queue?include_completed=true').json()['jobs']
+        self.assertEqual([j['id'] for j in visible],['LIVE','Q1','Q2','A','E','C'])
+        self.assertEqual([j.get('position') for j in visible[:3]],[None,1,3])
+        self.assertEqual([j['id'] for j in self.queue],initial)
+        revision=self.client.post('/api/queue-cache/A/reprocess');self.assertEqual(revision.status_code,200,revision.text)
+        id=revision.json()['job_id']
+        visible=self.client.get('/api/queue?include_completed=true').json()['jobs']
+        self.assertEqual([j['id'] for j in visible],['LIVE','Q1','Q2',id,'A','E','C'])
+        self.assertEqual(visible[3]['position'],4)
+        self.assertEqual([j['id'] for j in self.queue],initial+[id])
+        self.assertEqual([j['id'] for j in self.client.get('/api/queue-cache').json()['jobs']],['LIVE','Q1','Q2',id,'A','E','C'])
+
     def test_queue_and_settings_do_not_load_complete_transcriptions(self):
         a = self.job('A'); self.job('B', 'queued')
         self.job('BOB', owner='bob')
@@ -105,7 +198,7 @@ class QueueCacheTests(unittest.TestCase):
             for route in ('/api/queue?include_completed=true', '/api/queue-cache'):
                 response = self.client.get(route)
                 self.assertEqual(response.status_code, 200, response.text)
-                self.assertEqual([job['id'] for job in response.json()['jobs']], ['A', 'B'])
+                self.assertEqual([job['id'] for job in response.json()['jobs']], ['B', 'A'])
                 self.assertTrue(all(job['has_segments'] for job in response.json()['jobs']))
             settings = self.client.get('/api/queue-cache/A?include_segments=false')
             self.assertEqual(settings.status_code, 200, settings.text)
@@ -113,7 +206,7 @@ class QueueCacheTests(unittest.TestCase):
             self.assertEqual(settings.json()['options']['font_size'], 32)
         (Path(a['pipeline']['cache_dir']) / 'transcribed_segments.json').write_text('[]')
         (Path(a['pipeline']['cache_dir']) / 'lyrics_guide_cache.json').write_text(json.dumps({'signature':'x'*64,'segments':[],'report':{}}))
-        self.assertFalse(self.client.get('/api/queue?include_completed=true').json()['jobs'][0]['has_segments'])
+        self.assertFalse(next(job for job in self.client.get('/api/queue?include_completed=true').json()['jobs'] if job['id']=='A')['has_segments'])
 
     def test_editor_reads_only_selected_segments_without_publication_lookup_or_queue_lock(self):
         self.job('A'); self.job('BOB', owner='bob')
@@ -299,8 +392,8 @@ class QueueCacheTests(unittest.TestCase):
         self.job('A');self.job('B','queued');self.job('C','cancelled');self.job('BOB',owner='bob')
         self.assertEqual([j['id'] for j in self.client.get('/api/queue').json()['jobs']],['B'])
         visible=self.client.get('/api/queue?include_completed=true').json()['jobs']
-        self.assertEqual([j['id'] for j in visible],['A','B','C'])
-        self.assertEqual(visible[1]['position'],1)
+        self.assertEqual([j['id'] for j in visible],['B','A','C'])
+        self.assertEqual(visible[0]['position'],1)
         self.assertTrue(visible[0]['has_segments']);self.assertTrue(visible[0]['can_reprocess'])
         self.user={'username':'administrator','role':'admin'}
         self.assertEqual(len(self.client.get('/api/queue?include_completed=true').json()['jobs']),4)
