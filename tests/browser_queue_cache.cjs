@@ -13,6 +13,7 @@ for (const match of HTML.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/g)) new F
   const options = {whisper_model:'medium',font_size:41,text_color:'#00FFFF',text_position:'bottom',subtitle_mode:'word',background_mode:'original',lyrics_mode:'manual',lyrics_text:'Guia A',lyrics_selected:true,enable_correction:false,keep_backing_vocals:true,backing_vocals_volume:100,youtube_publish:true,transcription_preset:'karaoke',youtube_extra_playlists:false};
   const jobs = [{id:'A',title:'Canção A',status:'done',can_reprocess:true,has_segments:true}, {id:'B',title:'Canção B',status:'error',can_reprocess:true,has_segments:true}, {id:'S',title:'Vídeo para legendar',status:'done',can_reprocess:true,has_segments:true,subtitle_only:true}, {id:'C',title:'Canção C',status:'processing',can_reprocess:false,has_segments:false}];
   let saved = structuredClone(seg);
+  let serverStatus={status:'processing',step:'Transcribing vocals',progress:60,can_cancel:true,process_summary:{title:'Canção C',mode:'Modo Detalhado'}};
   const publicationOptions = {enabled:true,can_publish:true,default_publish:true,can_choose_playlist:true,playlist_id:'PL-profile',privacy:'unlisted',channel_title:'Canal',playlists:[{id:'PL-profile',title:'Do perfil'},{id:'PL-extra1',title:'Extras 1'},{id:'PL-extra2',title:'Extras 2'}],additional_playlists:[{id:'PL-profile',title:'Do perfil'},{id:'PL-extra1',title:'Extras 1'},{id:'PL-extra2',title:'Extras 2'}]};
   await page.route('**/*', async route=>{
    const req=route.request(),u=new URL(req.url());
@@ -22,9 +23,9 @@ for (const match of HTML.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/g)) new F
    const fulfill=d=>route.fulfill({contentType:'application/json',body:JSON.stringify(d)});
    requests.push({path:u.pathname,method:req.method(),body:req.postData(),query:u.search});
    if(u.pathname==='/api/auth_status')return fulfill({status:'authenticated',username:'owner',role:'admin'});
-   if(u.pathname==='/api/status')return fulfill({status:'processing',step:'Transcribing vocals',progress:60,can_cancel:true,process_summary:{title:'Canção C',mode:'Modo Detalhado'}});
-   if(u.pathname==='/api/queue')return fulfill({jobs:[{id:'C',status:'processing',title:'Canção C'}],paused:false});
-   if(u.pathname==='/api/queue-cache')return fulfill({jobs});
+   if(u.pathname==='/api/status')return fulfill(serverStatus);
+   if(u.pathname==='/api/queue'){assert.equal(u.searchParams.get('include_completed'),'true');return fulfill({jobs,paused:false});}
+   if(u.pathname==='/api/queue-cache')throw new Error('The separate queue panel should not be fetched.');
    if(u.pathname.match(/^\/api\/queue-cache\/[ABS]$/)){
     const id=u.pathname.split('/').at(-1),job=jobs.find(j=>j.id===id);
     return fulfill({...job,options:id==='S'?{...options,subtitle_only:true,translation_language:'original',subtitle_settings:{font_size:24,text_color:'#FFFFFF',box_color:'#000000',box_opacity:65,text_position:'bottom',video_subtitle_source:'original',background_color:'#101827'}}:options,segments:id==='A'?saved:seg,publication:id==='A'?{video_id:'oldVideo001',url:'https://youtu.be/oldVideo001'}:null});
@@ -41,12 +42,13 @@ for (const match of HTML.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/g)) new F
    return fulfill({});
   });
   await page.goto('http://karaoke.test');
-  await page.waitForFunction(()=>currentUser && document.querySelectorAll('.queue-cache-row').length===4);
-  assert.equal(await page.locator('#queueCacheCard').evaluate(e=>e.open),false);
+  await page.waitForFunction(()=>currentUser && document.querySelectorAll('#processingQueueList .queue-item').length===4);
+  assert.equal(await page.locator('#queueCacheCard').count(),0);
+  assert.equal(await page.evaluate(()=>queueStatusLabel({status:'cancelled',cancel_requested:true})),'Cancelado');
+  assert(await page.locator('#queueCard').isVisible());
   assert.equal(await page.locator('#easyYoutubeExtras').isChecked(),false);
-  await page.locator('#queueCacheCard summary').click();
   assert.equal(await page.locator('[data-cache-id="C"] button').first().isDisabled(),true);
-  await page.locator('[data-cache-id="A"]').getByRole('button',{name:'Editar legendas',exact:true}).click();
+  await page.locator('[data-cache-id="A"]').locator('[data-queue-action=edit]').click();
   await page.locator('#correctionCard textarea').first().fill('Letra corrigida A');
   await page.evaluate(async()=>{await fetchStatus();await fetchProcessingQueue();});
   assert.equal(await page.locator('#correctionCard textarea').first().inputValue(),'Letra corrigida A');
@@ -58,7 +60,7 @@ for (const match of HTML.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/g)) new F
   await page.locator('#btnContinueProcess').click();
   await page.waitForFunction(()=>!window.cacheEditorActive);
   assert(!requests.some(r=>r.method==='POST' && ['/api/continue_process','/api/skip_edit','/api/cancel'].includes(r.path)));
-  await page.locator('[data-cache-id="A"]').getByRole('button',{name:'Refazer no Rápido',exact:true}).click();
+  await page.locator('[data-cache-id="A"]').locator('[data-queue-action=quick]').click();
   await page.locator('#easyModeForm').waitFor({state:'visible'});
   assert.equal(await page.locator('#cachedReplaceYoutube').isChecked(),true);
   assert.equal(await page.locator('#easyYoutubePlaylist').isDisabled(),true);
@@ -74,7 +76,7 @@ for (const match of HTML.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/g)) new F
   assert.equal(value(submissions[0],'youtube_replace_previous'),'true');
   assert.deepEqual(JSON.parse(value(submissions[0],'youtube_additional_playlists')),['PL-extra1','PL-extra2']);
   assert.equal(await page.locator('#easyYoutubeExtras').isChecked(),false);
-  await page.locator('[data-cache-id="A"]').getByRole('button',{name:'Refazer no Detalhado',exact:true}).click();
+  await page.locator('[data-cache-id="A"]').locator('[data-queue-action=detail]').click();
   await page.locator('#karaokêForm').waitFor({state:'visible'});
   assert.equal(await page.locator('[name="font_size"]').inputValue(),'41');
   if(!await page.locator('#advancedContent').isVisible())await page.locator('#btnToggleAdvanced').click();
@@ -83,18 +85,39 @@ for (const match of HTML.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/g)) new F
   await page.waitForFunction(()=>!window.cachedRevisionId);
   assert.equal(value(submissions[1],'cache_job_id'),'A');assert.equal(value(submissions[1],'font_size'),'48');
   assert.equal(value(submissions[1],'youtube_extra_playlists'),'false');
-  await page.locator('[data-cache-id="S"]').getByRole('button',{name:'Rever ajustes',exact:true}).click();
+  await page.locator('[data-cache-id="S"]').locator('[data-queue-action=detail]').click();
   await page.locator('[data-subtitle-field="font_size"]').fill('44');
   await page.locator('#subtitleSubmitBtn').click();
   await page.waitForFunction(()=>!window.cachedRevisionId);
   assert.equal(value(submissions[2],'subtitle_only'),'true');assert.equal(JSON.parse(value(submissions[2],'subtitle_settings_json')).font_size,44);
-  await page.locator('[data-cache-id="B"]').getByRole('button',{name:'Refazer no Detalhado',exact:true}).click();
+  assert.equal(await page.locator('[data-cache-id="S"] [data-queue-action=quick]').count(),0);
+  serverStatus={status:'done',progress:100,can_cancel:false};
+  jobs.forEach(j=>{j.status='done';j.can_reprocess=true;j.has_segments=true;});
+  await page.evaluate(async()=>{await fetchStatus();await fetchProcessingQueue();});
+  assert(await page.locator('#queueCard').isVisible());
+  assert.equal(await page.locator('#processingQueueList .queue-item').count(),4);
+  assert.equal(await page.locator('#queueCountBadge').textContent(),'4 itens');
+  const rowBefore=await page.locator('[data-cache-id="A"]').elementHandle();
+  await page.evaluate(async()=>{await fetchProcessingQueue();});
+  assert(await rowBefore.evaluate(e=>e.isConnected));
+  await page.locator('[data-cache-id="A"] [data-queue-action=edit]').focus();
+  await page.evaluate(async()=>{await fetchProcessingQueue();});
+  assert.equal(await page.locator('[data-cache-id="A"] [data-queue-action=edit]').evaluate(e=>e===document.activeElement),true);
   for(const width of [320,390,768,1440]){
    await page.setViewportSize({width,height:900});
    assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),`Overflow at ${width}`);
    await page.screenshot({path:`queue-cache-${width}.png`,fullPage:true});
   }
+  await page.evaluate(()=>setTheme('light'));
+  await page.waitForTimeout(350);
+  await page.locator('#queueCard').screenshot({path:'queue-cache-light.png'});
+  jobs.splice(0,jobs.length,{id:'NEXT',title:'Próxima fila',status:'queued',can_reprocess:true,has_segments:false});
+  serverStatus={status:'processing',progress:1,step:'Preparing queued job',can_cancel:true};
+  await page.evaluate(async()=>{await fetchStatus();await fetchProcessingQueue();});
+  assert.equal(await page.locator('#processingQueueList .queue-item').count(),1);
+  assert.equal(await page.locator('[data-cache-id="A"]').count(),0);
+  assert(await page.locator('[data-cache-id="NEXT"]').isVisible());
   assert.deepEqual(errors,[]);
-  console.log('Queue retention UI, independent review, Quick/Detailed/SRT replay, replacement and optional multiple playlists passed.');
+  console.log('Single queue list, finished-item retention, compact actions, stable focus, batch rotation and all revision flows passed.');
  } finally {await browser.close();}
 })().catch(e=>{console.error(e);process.exit(1)});

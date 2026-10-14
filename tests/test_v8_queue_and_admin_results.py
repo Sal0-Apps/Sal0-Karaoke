@@ -34,13 +34,15 @@ class VersionEightQueueTests(unittest.TestCase):
         self.assertIn("ensure_processing_queue_capacity", MAIN)
         self.assertIn("remove_finished_queue_cache", MAIN)
 
-    def test_queue_contains_only_active_jobs_and_is_hidden_for_one_video(self):
+    def test_queue_list_keeps_finished_items_with_compact_actions(self):
         self.assertIn('ACTIVE_QUEUE_STATUSES = {"queued", "processing"}', MAIN)
         self.assertIn('job["status"] = "removed"', MAIN)
         self.assertIn('job.get("status") in ACTIVE_QUEUE_STATUSES', MAIN)
         self.assertIn('id="queueCard" style="display: none;"', HTML)
-        self.assertIn("activeJobs.length > 1 || (adminCanControl && processingQueuePaused))", HTML)
-        self.assertIn("if (activeJobs.length <= 1 && queuedCount === 0 && !processingQueuePaused)", HTML)
+        self.assertIn("jobs.length > 0 || (adminCanControl && processingQueuePaused)", HTML)
+        self.assertIn("container.innerHTML = jobs.map", HTML)
+        self.assertIn("cachedQueueActionButtons(job)", HTML)
+        self.assertNotIn("activeJobs.slice(0, 20)", HTML)
         self.assertNotIn("queueResultUrl", HTML)
 
     def test_queue_accepts_all_authenticated_profiles(self):
