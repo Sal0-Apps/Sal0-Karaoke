@@ -18,7 +18,7 @@ const srtDefaults = {text_color:'#FFFFFF',box_color:'#000000',box_opacity:65,fon
             const request=route.request(),url=new URL(request.url());
             if(url.hostname!=='karaoke.test')return route.abort();
             if(url.pathname==='/')return route.fulfill({contentType:'text/html',body:HTML});
-            if(url.pathname==='/favicon.png')return route.fulfill({contentType:'image/png',body:icon});
+            if(url.pathname==='/app-icon-v8.png')return route.fulfill({contentType:'image/png',body:icon});
             const reply=data=>route.fulfill({contentType:'application/json',body:JSON.stringify(data)});
             if(url.pathname==='/api/auth_status')return reply({status:'authenticated',username:'owner',role:'admin'});
             if(url.pathname==='/api/status')return reply({status:'processing',step:'Transcribing original audio',progress:50,can_cancel:true,

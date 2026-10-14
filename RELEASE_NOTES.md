@@ -1,3 +1,11 @@
+# 12.5.1
+
+- Links do YouTube são confirmados na fila antes do download. A transferência ocorre no worker, respeita a ordem e a pausa da fila, mostra andamento e aceita cancelamento; falhas ficam no item, preservando a origem para repetir.
+- Confirmação de inclusão pode ser recuperada depois de uma queda de conexão. O identificador é gravado com a tarefa e a repetição, inclusive concorrente, confirma a mesma execução. Consultas de fila e andamento têm prazo para voltar a tentar sem travar a interface.
+- Download concluído atualiza o título e o caminho real da mídia no cache da fila; a opção de salvar a origem na Biblioteca foi mantida. Guias e fundos são preservados durante a transferência.
+- Web, label Docker e metadados do ZimaOS usam `app-icon-v8.png` com endereço renovado. Removido o PNG duplicado; a URL web antiga serve o único ícone atual para compatibilidade. Compose de exemplo atualizado para 12.5.1. No ZimaOS instalado, salve os dois campos de ícone no Compose para atualizar o painel.
+- Mantidos cache da fila, limpeza por perfil, ordem dos pendentes, restauração de ajustes, revisão, playlists, YouTube e Telegram. Atualização do servidor; os clientes Android e Windows atuais continuam compatíveis.
+
 # 12.5
 
 - **Apagar cache da fila** remove os arquivos de trabalho e os itens de toda a fila do perfil, com confirmação. A ação é liberada após esgotar os trabalhos ativos; pendentes e processamento em andamento são protegidos. Resultados permanentes, publicações, prévias da Biblioteca e outras contas permanecem disponíveis, inclusive para administradores.

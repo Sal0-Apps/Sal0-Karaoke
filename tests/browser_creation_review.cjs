@@ -30,7 +30,7 @@ for (const script of HTML.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/g)) new 
             const request = route.request(), url = new URL(request.url());
             if (url.hostname !== 'karaoke.test') return route.abort();
             if (url.pathname === '/') return route.fulfill({contentType: 'text/html', body: HTML});
-            if (url.pathname === '/favicon.png') return route.fulfill({contentType: 'image/png', body: icon});
+            if (url.pathname === '/app-icon-v8.png') return route.fulfill({contentType: 'image/png', body: icon});
             if (url.pathname === '/api/cache/background') {
                 backgroundAuthenticated = url.searchParams.get('token') === 'test-session';
                 return route.fulfill({contentType: 'image/png', body: icon});

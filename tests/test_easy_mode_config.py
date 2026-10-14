@@ -275,7 +275,7 @@ class EasyModeConfigTests(unittest.TestCase):
 
         self.assertIn("let statusRequestInFlight = false;", html)
         self.assertIn("function scheduleStatusPoll", html)
-        self.assertIn("authFetch('/api/status', { cache: 'no-store' })", html)
+        self.assertIn("timedAuthFetch('/api/status', { cache: 'no-store' })", html)
         self.assertIn("document.addEventListener('visibilitychange'", html)
         self.assertIn("window.addEventListener('focus'", html)
         self.assertNotIn("setInterval(fetchStatus", html)

@@ -255,6 +255,25 @@ class EngineRecoveryTests(unittest.TestCase):
                 with self.assertRaises(InterruptedError): function('https://youtu.be/abcdefghijk',folder)
                 extract.assert_called_once()
 
+    def test_music_download_reports_bytes_and_checks_cancellation_inside_the_transfer(self):
+        with tempfile.TemporaryDirectory() as folder:
+            progress=Mock();cancel=Mock();options_seen=[]
+            def extract(engine,url,options):
+                options_seen.append(options)
+                for payload in [{'status':'downloading','downloaded_bytes':45,'total_bytes':100},
+                                {'status':'finished','downloaded_bytes':100,'total_bytes':100}]:
+                    options['progress_hooks'][0](payload)
+                return {'title':'Música'}
+            function=load('download_youtube',{'yt_dlp_operation_lock':threading.RLock(),'load_yt_dlp':Mock(),
+                'youtube_download_options':lambda *args:{},'extract_youtube_info':extract,
+                'find_downloaded_file':lambda *args:'source.mp4'})
+            self.assertEqual(function('https://youtu.be/abcdefghijk',folder,progress,cancel),('source.mp4','Música'))
+            self.assertEqual([call.args[0] for call in progress.call_args_list],[45,100])
+            self.assertEqual(cancel.call_count,3)
+            cancel.side_effect=InterruptedError('Cancelado pelo usuário.')
+            with self.assertRaises(InterruptedError):
+                options_seen[0]['progress_hooks'][0]({'status':'downloading'})
+
     def test_update_can_start_during_whisper_processing_without_duplicate_worker(self):
         processing = threading.Lock(); processing.acquire()
         thread = Mock(); state = {}

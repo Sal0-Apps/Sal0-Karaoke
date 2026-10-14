@@ -60,6 +60,7 @@ from lyric_guide import prepare_lyrics_guide, verify_lyrics_guide, review_lyrics
 from backing_vocals import preserve_backing_vocals
 from processing_validation import validate_processing_options, validate_review_segments, canonical_review_segments
 import queue_cache
+import queue_submissions
 
 # Configurar logs
 logging.basicConfig(
@@ -226,7 +227,7 @@ def find_downloaded_file(cache_dir: str, prefix: str) -> str:
     return max(candidates, key=os.path.getmtime)
 
 
-def download_youtube(url: str, cache_dir: str) -> tuple[str, str]:
+def download_youtube(url: str, cache_dir: str, progress_callback=None, cancel_callback=None) -> tuple[str, str]:
     """Baixa o melhor vídeo/áudio do YouTube usando yt-dlp com expurgo prévio e 'overwrites': True."""
     with yt_dlp_operation_lock:
         yt_dlp = load_yt_dlp()
@@ -239,7 +240,17 @@ def download_youtube(url: str, cache_dir: str) -> tuple[str, str]:
                 except OSError:
                     pass
 
+        def download_progress(info):
+            if cancel_callback:
+                cancel_callback()
+            if progress_callback:
+                total = info.get("total_bytes") or info.get("total_bytes_estimate") or 0
+                percent = min(100, int(100 * (info.get("downloaded_bytes") or 0) / total)) if total else None
+                progress_callback(percent, "Unindo áudio e vídeo…" if info.get("status") == "finished" else "Transferindo mídia do YouTube…")
+
         base_options = youtube_download_options(os.path.join(cache_dir, "original_input.%(ext)s"))
+        if progress_callback or cancel_callback:
+            base_options["progress_hooks"] = [download_progress]
         formats = (
             "bv+ba/b",
             "b/bv*+ba",
@@ -255,6 +266,8 @@ def download_youtube(url: str, cache_dir: str) -> tuple[str, str]:
                 "remux_video": "mp4",
             }
             try:
+                if cancel_callback:
+                    cancel_callback()
                 logger.info("Download do YouTube: tentativa %s de %s.", attempt, len(formats))
                 info = extract_youtube_info(yt_dlp, url, options)
                 title = str((info or {}).get("title") or title)
@@ -796,6 +809,10 @@ def public_queue_job(job: dict, waiting_position: int | None = None) -> dict:
 
 def enqueue_processing_job(job: dict) -> int:
     with processing_queue_lock:
+        if job.get("submission_id"):
+            receipt = queue_submissions.receipt(processing_queue, job["submission_owner"], job["submission_id"])
+            if receipt:
+                raise queue_submissions.DuplicateSubmission(receipt)
         active = sum(item.get("status") in ACTIVE_QUEUE_STATUSES for item in processing_queue
                      if item.get("owner_username") == job.get("owner_username")
                      and item.get("id") != job.get("cache_source_id"))
@@ -1020,6 +1037,27 @@ def start_processing_queue_worker():
     processing_queue_worker_started = True
     threading.Thread(target=processing_queue_worker, daemon=True, name="karaoke-processing-queue").start()
     processing_queue_event.set()
+
+
+@app.get("/api/queue/submissions/{submission_id}")
+def get_process_submission(submission_id: str, current_user: dict = Depends(get_current_user)):
+    with processing_queue_lock:
+        receipt = queue_submissions.receipt(processing_queue, current_user.get("username"), submission_id)
+    if not receipt:
+        raise HTTPException(status_code=404, detail="Esta inclusão ainda não foi confirmada.")
+    return receipt
+
+
+def update_queued_source(cache_dir: str, input_audio_path: str, title: str):
+    """Persist the downloaded media path and title so every retained revision can use them."""
+    with processing_queue_lock:
+        job = next((item for item in processing_queue
+            if (item.get("pipeline") or {}).get("cache_dir") == cache_dir), None)
+        if job:
+            job["pipeline"]["input_audio_path"] = input_audio_path
+            job["title"] = title
+            job["process_summary"] = {**(job.get("process_summary") or {}), "title": title}
+            save_processing_queue_unlocked()
 
 
 @app.get("/api/queue")
@@ -3102,9 +3140,10 @@ def save_last_profile(data: dict, current_user: dict = Depends(get_current_user)
 
 
 
-@app.get("/favicon.png")
+@app.get("/favicon.png", include_in_schema=False)
+@app.get("/app-icon-v8.png")
 def get_favicon():
-    fav_path = os.path.join(os.path.dirname(__file__), "templates", "favicon.png")
+    fav_path = os.path.join(os.path.dirname(__file__), "templates", "app-icon-v8.png")
     if os.path.exists(fav_path):
         return FileResponse(fav_path)
     return HTMLResponse(status_code=404)
@@ -3872,7 +3911,7 @@ def public_cached_queue_job(job: dict, waiting_position: int | None = None) -> d
     if not source_path:
         meta = queue_cache.read_json(os.path.join(cache_dir, "cache_meta.json"), {})
         source_path = os.path.join(cache_dir, "original_input" + str(meta.get("input_ext", "")))
-    has_source = os.path.isfile(source_path)
+    has_source = os.path.isfile(source_path) or bool(youtube_identity(pipeline.get("youtube_url")))
     return {**public_queue_job(job, waiting_position), "batch_id": job.get("batch_id"),
         "revision_of": job.get("revision_of"), "subtitle_only": bool(pipeline.get("subtitle_only")),
         "cancel_requested": bool(job.get("cancel_requested")),
@@ -4170,10 +4209,20 @@ def process_karaoke(
     youtube_extra_playlists: bool = Form(False),
     youtube_additional_playlists: str = Form("[]"),
     youtube_replace_previous: bool = Form(True),
+    submission_id: str = Form(""),
+    source_title: str = Form(""),
 ):
     """
     Recebe os arquivos enviados, valida a concorrência e inicia o pipeline em segundo plano.
     """
+    submission_owner = current_user.get("username")
+    if submission_id:
+        if not queue_submissions.valid_id(submission_id):
+            raise HTTPException(status_code=400, detail="Identificador de inclusão inválido.")
+        with processing_queue_lock:
+            receipt = queue_submissions.receipt(processing_queue, submission_owner, submission_id)
+        if receipt:
+            return receipt
     has_source = bool((audio_file and audio_file.filename) or youtube_url or library_audio)
     source_job = None
     if cache_job_id and has_source:
@@ -4349,7 +4398,7 @@ def process_karaoke(
     if youtube_url and youtube_url.strip():
         # Verificar se já baixamos essa exata URL no cache
         already_downloaded = False
-        orig_name = "Baixando do YouTube..."
+        orig_name = " ".join(str(source_title or "Vídeo do YouTube").split())[:200]
         input_audio_path = os.path.join(cache_dir, "original_input.mp4")
         if os.path.exists(cache_meta_file):
             try:
@@ -4358,7 +4407,7 @@ def process_karaoke(
                     if youtube_identity(meta.get("youtube_url")) == youtube_identity(youtube_url.strip()):
                         ext = meta.get("input_ext", ".mp4")
                         orig_file = os.path.join(cache_dir, f"original_input{ext}")
-                        if os.path.exists(orig_file):
+                        if meta.get("download_quality_version") == 2 and os.path.isfile(orig_file) and os.path.getsize(orig_file) > 0:
                             already_downloaded = True
                             orig_name = meta.get("original_filename", "YouTube Video")
                             input_audio_path = orig_file
@@ -4389,36 +4438,11 @@ def process_karaoke(
                 has_bg = True
 
         if not already_downloaded:
-            logger.info(f"Novo processamento do YouTube solicitado ({youtube_url.strip()}). Limpando cache anterior...")
-            for f_name in os.listdir(cache_dir):
-                if f_name.startswith("original_bg"):
-                    continue
-                f_path = os.path.join(cache_dir, f_name)
-                try:
-                    if os.path.isfile(f_path):
-                        os.remove(f_path)
-                    elif os.path.isdir(f_path):
-                        shutil.rmtree(f_path)
-                except Exception as e:
-                    logger.error(f"Erro ao limpar cache: {e}")
-
-            # Baixar o áudio/vídeo do YouTube agora
-            input_audio_path, orig_name = download_youtube(youtube_url.strip(), cache_dir)
-            ext = os.path.splitext(input_audio_path)[1]
-
-            if save_to_library:
-                try:
-                    lib_video_dir = os.path.join(library_dir, "videos")
-                    os.makedirs(lib_video_dir, exist_ok=True)
-                    safe_title = "".join([c for c in orig_name if c.isalnum() or c in ' ._-']).strip() or "youtube_download"
-                    shutil.copy2(input_audio_path, os.path.join(lib_video_dir, f"{safe_title}{ext}"))
-                except Exception as copy_err:
-                    logger.error(f"Erro ao salvar YouTube na biblioteca: {copy_err}")
-
+            # Download only after the queue receipt has been returned to the client.
+            ext = ".mp4"
             cached_meta = {
                 "source_type": "youtube",
                 "youtube_url": youtube_url.strip(),
-                "download_quality_version": 2,
                 "original_filename": orig_name,
                 "audio_filename": orig_name + ext,
                 "input_ext": ext,
@@ -4606,7 +4630,10 @@ def process_karaoke(
             )
 
         input_audio_path = os.path.join(cache_dir, f"original_input{input_ext}")
-        if not os.path.exists(input_audio_path):
+        if not os.path.exists(input_audio_path) and youtube_identity(cached_meta.get("youtube_url")):
+            # A failed or canceled transfer can be retried with its saved source URL.
+            youtube_url = cached_meta["youtube_url"]
+        elif not os.path.exists(input_audio_path):
             raise HTTPException(
                 status_code=400,
                 detail="Arquivos de cache não encontrados. Por favor, envie uma música."
@@ -4741,6 +4768,7 @@ def process_karaoke(
         "enable_correction": enable_correction,
         "keep_first_line_visible": keep_first_line_visible,
         "youtube_url": youtube_url,
+        "save_to_library": save_to_library,
         "only_remove_vocals": only_remove_vocals,
         "owner_user": dict(current_user),
         "cache_dir": cache_dir,
@@ -4752,6 +4780,8 @@ def process_karaoke(
     }
     job = {
         "id": job_id,
+        "submission_id": submission_id,
+        "submission_owner": submission_owner,
         "title": orig_name,
         "owner_username": current_user.get("username"),
         "owner_role": current_user.get("role"),
@@ -4767,6 +4797,9 @@ def process_karaoke(
     }
     try:
         position = enqueue_processing_job(job)
+    except queue_submissions.DuplicateSubmission as duplicate:
+        remove_finished_queue_cache(cache_dir)
+        return duplicate.receipt
     except Exception:
         remove_finished_queue_cache(cache_dir)
         raise
@@ -5344,6 +5377,7 @@ def run_pipeline(
     app_base_url: str = "",
     subtitle_only: bool = False,
     translation_language: str = "pt-BR",
+    save_to_library: bool = False,
 ):
     """Pipeline principal de processamento sequencial."""
     if not subtitle_only:
@@ -5456,7 +5490,7 @@ def run_pipeline(
                         if youtube_identity(meta.get("youtube_url")) == youtube_identity(youtube_url.strip()):
                             ext = meta.get("input_ext", ".mp4")
                             orig_file = os.path.join(cache_dir, f"original_input{ext}")
-                            if os.path.exists(orig_file):
+                            if meta.get("download_quality_version") == 2 and os.path.isfile(orig_file) and os.path.getsize(orig_file) > 0:
                                 already_downloaded = True
                                 input_audio_path = orig_file
                                 orig_name = meta.get("original_filename", "YouTube Video")
@@ -5477,7 +5511,16 @@ def run_pipeline(
                 )
 
                 try:
-                    input_audio_path, title = download_youtube(youtube_url, cache_dir)
+                    last_download_update = [0.0]
+                    def report_download_progress(percent, detail):
+                        now = time.monotonic()
+                        if now - last_download_update[0] >= 1 or percent == 100:
+                            last_download_update[0] = now
+                            update_state("processing", "Downloading YouTube", 5,
+                                         stage_progress=percent, stage_detail=detail)
+                    input_audio_path, title = download_youtube(youtube_url, cache_dir,
+                        progress_callback=report_download_progress, cancel_callback=pm.check_cancelled)
+                    pm.check_cancelled()
                     orig_name = title
                     update_state("processing", "Extracting audio", 15, original_filename=orig_name)
 
@@ -5500,11 +5543,24 @@ def run_pipeline(
                             "➡️ Próxima etapa: preparação do áudio.",
                         ),
                     )
+                except InterruptedError:
+                    raise
                 except Exception as e:
                     logger.error(f"Erro ao baixar do YouTube: {e}")
                     raise RuntimeError(f"Falha ao baixar vídeo do YouTube: {e}")
             else:
                 logger.info("Reaproveitando download do YouTube do cache.")
+
+            if save_to_library:
+                try:
+                    library_videos = os.path.join(library_dir, "videos")
+                    os.makedirs(library_videos, exist_ok=True)
+                    safe_title = "".join(c for c in orig_name if c.isalnum() or c in " ._-").strip() or "youtube_download"
+                    shutil.copy2(input_audio_path, os.path.join(library_videos, safe_title + os.path.splitext(input_audio_path)[1]))
+                except OSError:
+                    logger.exception("Erro ao salvar a origem do YouTube na Biblioteca.")
+            update_process_summary(title=orig_name)
+            update_queued_source(cache_dir, input_audio_path, orig_name)
 
         # Verificar se a música sendo processada agora é DIFERENTE da do cache
         # Se for diferente, apagamos todo o conteúdo do cache para começar do zero!
