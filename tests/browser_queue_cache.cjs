@@ -127,6 +127,7 @@ for (const match of HTML.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/g)) new F
   assert.equal(value(submissions[1],'youtube_extra_playlists'),'false');
   assert.equal(value(submissions[1],'lyrics_text'),'Guia corrigida no detalhado');
   await page.locator('[data-cache-id="S"]').locator('[data-queue-action=detail]').click();
+  await page.waitForFunction(()=>window.cachedRevisionId==='S'&&!document.getElementById('cachedSubtitleStyle').hidden);
   assert.equal(await page.locator('#subtitleSaveLibrary').inputValue(),'false');
   await page.locator('[data-subtitle-field="font_size"]').fill('44');
   await page.locator('#subtitleSubmitBtn').click();
