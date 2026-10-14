@@ -1,6 +1,6 @@
 # Manual do Sal0 Karaokê
 
-Este manual descreve os controles disponíveis na distribuição 12.1. Para instalar o servidor, consulte [DEPLOYMENT.md](DEPLOYMENT.md). Para configurar o aparelho, consulte o [guia Android](android/README.md).
+Este manual descreve os controles disponíveis na distribuição 12.2. Para instalar o servidor, consulte [DEPLOYMENT.md](DEPLOYMENT.md). Para configurar o aparelho, consulte o [guia Android](android/README.md).
 
 O Sal0 Karaokê é destinado a uma instalação pessoal, acessada pela rede local ou por VPN, como ZeroTier. O repositório aberto disponibiliza o código e os pacotes; o projeto não opera um serviço público de processamento nem coleta centralmente as mídias das instalações. Não é necessário expor a porta do app à internet. O processamento principal é local, mas as integrações escolhidas podem se comunicar com serviços externos.
 
@@ -371,7 +371,7 @@ O grupo **Já tenho um arquivo do assistente antigo** preserva a importação de
 3. Para o administrador, expanda **Padrões de publicação do administrador** e configure **Playlist padrão do administrador**.
 4. Ajuste o modelo de título. `{title}` é substituído pelo nome da música. Toque em **Salvar playlists** e confira a confirmação.
 
-Nos modos Rápido e Detalhado, com uma playlist definida no perfil, **Publicar no YouTube** começa marcado para todos os usuários, inclusive contas novas e configurações antigas. A privacidade automática é **Não listado**. Desmarcar no vídeo impede o envio. Uma conta comum usa a playlist atribuída; o administrador pode escolher outra playlist válida do canal para seu vídeo. **Uma playlist definida no perfil é obrigatória**. Sem ela, o vídeo não é enviado, mesmo que o administrador selecione um destino para a tarefa. O administrador pode trocar a playlist por vídeo no modo rápido, usando a do perfil como padrão. O título e a capa automática são preparados na conclusão. Sem conexão do canal, a opção fica indisponível.
+Nos modos Rápido e Detalhado, com uma playlist definida no perfil, **Publicar no YouTube** começa marcado para todos os usuários, inclusive contas novas e configurações antigas. A privacidade automática é **Não listado**. Desmarcar no vídeo impede o envio. A playlist atribuída ao perfil é sempre incluída. **Enviar também para outras playlists** começa desmarcado e permite acrescentar destinos válidos do canal naquele vídeo. **Uma playlist definida no perfil é obrigatória**. Sem ela, o vídeo não é enviado, mesmo que o administrador selecione um destino para a tarefa. A playlist principal permanece a do perfil nos modos Rápido e Detalhado. Publicações manuais no painel administrativo conservam suas opções próprias. O título e a capa automática são preparados na conclusão. Sem conexão do canal, a opção fica indisponível.
 
 ### Publicar um resultado já pronto
 
@@ -401,4 +401,14 @@ O uso pessoal, a ausência de divulgação, a gratuidade e o acesso por VPN não
 
 Referências: [Termos do YouTube](https://www.youtube.com/static?template=terms), [políticas da API](https://developers.google.com/youtube/terms/developer-policies), [privacidade do Google](https://policies.google.com/privacy) e [permissões da conta Google](https://myaccount.google.com/permissions).
 
-A v10.7 preserva também `synced_acoustic_segments.json` e os metadados originais do Whisper ao refazer tarefas. A revisão manual fica separada da análise bruta. Alterar apenas a aparência não chama novamente o modelo; mudar mídia, fonte de voz, modelo, VAD, perfil de reconhecimento ou conteúdo da guia exige nova análise. Quebras de linha/espaços na mesma guia não invalidam o cache. Falhas posteriores preservam as etapas caras; se a cópia do cache falhar, a pasta original não é apagada. A primeira análise após atualizar a preparação de áudio/precisão será refeita uma vez; tentativas compatíveis seguintes reutilizam o resultado. Um novo pedido do mesmo link YouTube, no mesmo perfil, também reaproveita o download em qualidade atual. O cache reutilizável contém a última tarefa desse perfil, não um arquivo permanente de todas as músicas.
+O cache mantém todas as execuções da fila atual desse perfil. Abra **Criar → Execuções desta fila**, escolha o item e use **Editar legendas**, **Refazer no Rápido** ou **Refazer no Detalhado**. Legendar vídeo oferece **Rever ajustes**, com visual por execução. A fila concluída permanece disponível; só uma nova origem aceita após esgotar os pendentes inicia a próxima fila e libera os arquivos anteriores. Refazer um item em cache e adicionar durante a execução continuam na mesma fila. Resultados da Biblioteca permanecem. Os arquivos já apagados antes da 12.2 não podem ser recuperados.
+
+## Refazer um vídeo da fila e corrigir a publicação
+
+1. Abra **Criar → Execuções desta fila** e localize a música ou vídeo desejado. O painel começa recolhido e conserva os itens após a conclusão.
+2. Em **Editar legendas**, confira o áudio daquela execução, altere texto/horários e salve. **Salvar alterações nesta execução** mantém a revisão sem gerar um vídeo; **Salvar e renderizar** adiciona uma revisão à mesma fila.
+3. Para mudar o visual ou áudio, use **Refazer no Rápido** (perfil rápido atual) ou **Refazer no Detalhado** (ajustes daquela execução). Em Legendar vídeo, **Rever ajustes** também permite mudar tamanho, posição, cores e idioma embutido sem alterar os padrões administrativos.
+4. A playlist do perfil permanece incluída. Para mais destinos, marque **Enviar também para outras playlists** e escolha as adicionais; em novas criações, a opção começa desmarcada.
+5. Se existe uma publicação confirmada, **Substituir o vídeo anterior no YouTube** começa marcado. O app mantém sua privacidade, envia o novo vídeo, confirma capa e playlists, e só então remove o anterior. O novo tem outro link, que também atualiza a mensagem do Telegram. Comentários e estatísticas antigos não são transferidos. Desmarque para conservar as duas publicações.
+
+O cache guarda arquivos de trabalho, sem criar um acervo permanente. Após esgotar a fila, a próxima música ou vídeo enviado como uma nova origem inicia outra fila e libera os arquivos antigos. Falhas antes da confirmação da inclusão preservam o cache anterior. Modelos, Biblioteca e dados das outras contas não são apagados.

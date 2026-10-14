@@ -24,6 +24,8 @@ jobs:
             sudo timeout 240 apt-get install -y ffmpeg
           fi
           python -m compileall -q app
+          python -m unittest discover -s tests -p test_queue_cache.py -v
+          python -m unittest discover -s tests -p test_youtube_revisions.py -v
           python -m unittest discover -s tests -p test_web_stack_compatibility.py -v
           python -m unittest discover -s tests -p test_whisper_audio.py -v
           python -m unittest discover -s tests -p test_lyric_guide.py -v
@@ -60,6 +62,7 @@ jobs:
           NODE_PATH=/tmp/sal0-ui/node_modules node tests/browser_settings_panels.cjs
           NODE_PATH=/tmp/sal0-ui/node_modules node tests/browser_creation_review.cjs
           NODE_PATH=/tmp/sal0-ui/node_modules node tests/browser_queue_creation.cjs
+          NODE_PATH=/tmp/sal0-ui/node_modules node tests/browser_queue_cache.cjs
           NODE_PATH=/tmp/sal0-ui/node_modules node tests/browser_subtitle_lyrics.cjs
           NODE_PATH=/tmp/sal0-ui/node_modules node tests/browser_lyrics_search.cjs
       - uses: actions/upload-artifact@v4
@@ -73,6 +76,7 @@ jobs:
             settings-panels-*.png
             creation-review-*.png
             queue-creation-*.png
+            queue-cache-*.png
             subtitle-*.png
             lyrics-search-*.png
           if-no-files-found: ignore

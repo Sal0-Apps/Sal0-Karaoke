@@ -347,6 +347,8 @@ class YouTubePublisher:
                         'insufficientPermissions':'O Google não permitiu consultar ou gerenciar playlists. Reconecte e permita o acesso solicitado.',
                     }
                     raise PublicationError(messages.get(str(reason), f'O YouTube recusou a solicitação (HTTP {response.status_code}).'))
+                if method.upper() == "DELETE" and response.status_code == 204:
+                    return {}
                 payload = json_object(response)
                 if validate:
                     validate(payload)
@@ -443,7 +445,36 @@ class YouTubePublisher:
             raise PublicationError('Use a playlist atribuída à sua conta pelo administrador.')
         return selected
 
-    def publication_options(self, user, requested=False, playlist_id='', title=''):
+    def validate_additional_playlists(self, values, primary):
+        if values is None:
+            return []
+        if not isinstance(values, list) or len(values) > 20 or any(
+                not isinstance(value, str) or not re.fullmatch(r'[A-Za-z0-9_-]{1,128}', value) for value in values):
+            raise PublicationError('Escolha até 20 playlists adicionais válidas.')
+        values = list(dict.fromkeys(value for value in values if value != primary))
+        if values and not set(values).issubset({item['id'] for item in self.playlists()}):
+            raise PublicationError('Uma playlist adicional não pertence ao canal conectado.')
+        return values
+
+    def replacement_for(self, video):
+        path = str(Path(video).resolve())
+        with self.lock:
+            jobs = self.read('jobs.json', [])
+            found = next((item for item in reversed(jobs) if item.get('status') == 'done'
+                and (item.get('video') == path or any(binding.get('video') == path
+                     for binding in item.get('telegram_results', [])))), None)
+            seen = set()
+            while found and found.get('replaced_by') and found['id'] not in seen:
+                seen.add(found['id'])
+                replacement = next((item for item in jobs if item['id'] == found['replaced_by']
+                    and item.get('status') == 'done' and item.get('replacement_done')
+                    and item.get('channel_id') == found.get('channel_id')), None)
+                if not replacement:
+                    break
+                found = replacement
+            return dict(found) if found else None
+
+    def publication_options(self, user, requested=False, playlist_id='', title='', additional_playlists=None):
         # Every account starts checked in the UI; each video still submits its own choice.
         if not requested:
             return None
@@ -456,7 +487,9 @@ class YouTubePublisher:
             raise PublicationError(token['auth_error'], 'auth_required')
         if len(title) > 100 or '<' in title or '>' in title:
             raise PublicationError('Título do YouTube inválido.')
+        additional_playlists = self.validate_additional_playlists(additional_playlists, playlist_id)
         return {'privacy': settings['privacy'], 'title_template': settings['title_template'],
+                'additional_playlists': additional_playlists,
                 'playlist_id': playlist_id, 'channel_id': token['channel_id'],
                 'title_override': title.strip(), 'requester': dict(username=user.get('username'), role=user.get('role'))}
 
@@ -476,13 +509,13 @@ class YouTubePublisher:
             error = str(failure) if isinstance(failure, PublicationError) else 'O YouTube não respondeu agora.'
             if getattr(failure, 'kind', '') == 'auth_required':
                 enabled = False
-        return {'enabled': enabled, 'playlists': playlists, 'allow_no_playlist': False, 'can_choose_playlist': admin, 'can_publish': bool(enabled and playlist_id and any(p['id'] == playlist_id for p in playlists)),
+        return {'enabled': enabled, 'playlists': playlists, 'additional_playlists': playlists if admin else [], 'allow_no_playlist': False, 'can_choose_playlist': admin, 'can_publish': bool(enabled and playlist_id and any(p['id'] == playlist_id for p in playlists)),
                 'playlist_id': playlist_id, 'default_publish': bool(enabled and playlist_id and any(p['id'] == playlist_id for p in playlists)),
                 'privacy': settings['privacy'], 'channel_title': token.get('channel_title', ''),
                 'title_template': settings['title_template'], 'connection_message': error,
                 'needs_reconnection': bool(token.get('auth_error') or (error and not enabled))}
 
-    def enqueue(self, video, title, privacy='unlisted', playlist_id='', thumbnail=None, channel_id=None, requester=None, automatic=False):
+    def enqueue(self, video, title, privacy='unlisted', playlist_id='', thumbnail=None, channel_id=None, requester=None, automatic=False, additional_playlists=None, replaces_video_id=None):
         video = Path(video).resolve()
         title = str(title).strip()
         if not youtube_eligible(video):
@@ -499,7 +532,14 @@ class YouTubePublisher:
         if playlist_id and not re.fullmatch(r'[A-Za-z0-9_-]{1,128}', playlist_id):
             raise PublicationError('Identificador de playlist inválido.')
         playlist_id = self.validate_profile_playlist(requester or {'role':'admin'}, playlist_id)
-        digest = hashlib.sha256(json.dumps([token['channel_id'], playlist_id, privacy,
+        additional_playlists = self.validate_additional_playlists(additional_playlists, playlist_id)
+        previous = None
+        if replaces_video_id:
+            previous = next((item for item in self.read('jobs.json', []) if item.get('video_id') == replaces_video_id
+                             and item.get('status') == 'done' and item.get('channel_id') == token['channel_id']), None)
+            if not previous:
+                raise PublicationError('Não foi possível confirmar a publicação anterior deste canal.')
+        digest = hashlib.sha256(json.dumps([token['channel_id'], playlist_id, privacy, additional_playlists, replaces_video_id,
             (requester or {}).get('username', '')], ensure_ascii=False).encode())
         with video.open('rb') as source:
             for block in iter(lambda: source.read(1024 * 1024), b''):
@@ -540,7 +580,12 @@ class YouTubePublisher:
                    'title': title, 'privacy': privacy, 'playlist_id': playlist_id, 'channel_id': token['channel_id'],
                    'status': 'queued', 'progress': 0, 'created_at': time.time(), 'requester': requester,
                    'automatic': automatic, 'telegram_link_enabled': True,
-                   'telegram_results': [{'video': str(video), 'automatic': automatic}]}
+                   'telegram_results': [{'video': str(video), 'automatic': automatic}],
+                   'playlist_ids': [playlist_id, *additional_playlists], 'replaces_video_id': replaces_video_id}
+            if previous:
+                for binding in previous.get('telegram_results') or [{'video': previous['video']}]:
+                    if binding['video'] != str(video):
+                        job['telegram_results'].append({**binding, 'automatic': True})
             jobs.append(job)
             self.save('jobs.json', jobs)
         self.start()
@@ -548,12 +593,12 @@ class YouTubePublisher:
 
     def enqueue_automatic(self, video, original_title, options):
         title = options.get('title_override') or options['title_template'].replace('{title}', original_title)[:100]
-        return self.enqueue(video, title, options['privacy'], options.get('playlist_id', ''), channel_id=options['channel_id'], requester=options.get('requester'), automatic=True)
+        return self.enqueue(video, title, options['privacy'], options.get('playlist_id', ''), channel_id=options['channel_id'], requester=options.get('requester'), automatic=True, additional_playlists=options.get('additional_playlists'), replaces_video_id=options.get('replaces_video_id'))
 
     @staticmethod
     def public_job(job):
         return {key: job.get(key) for key in ('id', 'title', 'privacy', 'playlist_id', 'status', 'progress',
-                                             'video_id', 'actual_privacy', 'error', 'created_at')}
+                                             'video_id', 'actual_privacy', 'error', 'created_at', 'playlist_ids', 'replaces_video_id', 'replacement_done')}
 
     def checkpoint(self, job, **updates):
         with self.lock:
@@ -565,6 +610,9 @@ class YouTubePublisher:
                     if 'telegram_results' in item:
                         job['telegram_results'] = item['telegram_results']
                         job['telegram_link_enabled'] = True
+                    if item.get('replaced_by'):
+                        job['replaced_by'] = item['replaced_by']
+                        job['telegram_link_enabled'] = False
                     jobs[index] = job
                     break
             self.save('jobs.json', jobs)
@@ -652,9 +700,11 @@ class YouTubePublisher:
             profile_playlist = self.validate_profile_playlist({'role':'admin'})
         if self.token()['channel_id'] != job['channel_id']:
             raise PublicationError('O canal conectado mudou. A publicação foi interrompida.')
-        if job['playlist_id'] and not job.get('playlist_done'):
+        targets = list(dict.fromkeys([profile_playlist, *(job.get('playlist_ids') or [job['playlist_id']])]))
+        completed = list(job.get('completed_playlists') or ([job['playlist_id']] if job.get('playlist_done') else []))
+        if any(playlist not in completed for playlist in targets):
             available_playlists = {p['id'] for p in self.playlists()}
-            if profile_playlist not in available_playlists or job['playlist_id'] not in available_playlists:
+            if not set(targets).issubset(available_playlists):
                 raise PublicationError('A playlist não pertence ao canal conectado.')
         video_id = self.upload_video(job)
         if not job.get('thumbnail_done'):
@@ -664,24 +714,55 @@ class YouTubePublisher:
             if response.status_code != 200:
                 raise PublicationError('O vídeo está privado, mas a capa não foi aplicada. Verifique se o canal permite miniaturas personalizadas e retome.')
             self.checkpoint(job, thumbnail_done=True, progress=94)
-        if job['playlist_id'] and not job.get('playlist_done'):
-            items = self.api('GET', '/playlistItems', params={'part': 'id', 'playlistId': job['playlist_id'], 'videoId': video_id})
+        for playlist in targets:
+            if playlist in completed:
+                continue
+            items = self.api('GET', '/playlistItems', params={'part': 'id', 'playlistId': playlist, 'videoId': video_id})
             if not items.get('items'):
                 self.api('POST', '/playlistItems', params={'part': 'snippet'}, json={'snippet': {
-                    'playlistId': job['playlist_id'], 'resourceId': {'kind': 'youtube#video', 'videoId': video_id}}})
-            self.checkpoint(job, playlist_done=True, progress=97)
+                    'playlistId': playlist, 'resourceId': {'kind': 'youtube#video', 'videoId': video_id}}})
+            completed.append(playlist)
+            self.checkpoint(job, completed_playlists=list(completed), progress=97)
+        self.checkpoint(job, playlist_done=True)
         response = self.api('PUT', '/videos', params={'part': 'status'}, json={
             'id': video_id, 'status': {'privacyStatus': job['privacy']}})
         actual = response.get('status', {}).get('privacyStatus')
         if actual != job['privacy']:
             self.checkpoint(job, actual_privacy=actual)
             raise PublicationError('O YouTube manteve uma privacidade diferente. Projetos de API sem auditoria podem ficar restritos a privado.')
+        previous_id = job.get('replaces_video_id')
+        if previous_id and not job.get('replacement_done'):
+            # Follow revisions completed by another job while this one was being rendered.
+            prior = next((item for item in self.read('jobs.json', []) if item.get('video_id') == previous_id), None)
+            latest = self.replacement_for(prior['video']) if prior else None
+            if latest and latest.get('video_id') != previous_id:
+                previous_id = latest['video_id']
+                self.checkpoint(job, replaces_video_id=previous_id)
+            if previous_id == video_id:
+                raise PublicationError('Não é possível remover o vídeo que acabou de ser enviado.')
+            old = self.api('GET', '/videos', params={'part': 'snippet', 'id': previous_id})
+            items = old.get('items')
+            if not isinstance(items, list):
+                raise PublicationError('Não foi possível confirmar o vídeo anterior. Retome a publicação.')
+            if items:
+                if len(items) != 1 or items[0].get('id') != previous_id or items[0].get('snippet', {}).get('channelId') != job['channel_id']:
+                    raise PublicationError('O vídeo anterior não pertence ao canal conectado. Ele foi preservado.')
+                self.api('DELETE', '/videos', params={'id': previous_id})
+            self.checkpoint(job, replacement_done=True)
+            with self.lock:
+                jobs = self.read('jobs.json', [])
+                for item in jobs:
+                    if item.get('video_id') == previous_id:
+                        item['replaced_by'] = job['id']
+                        item['telegram_link_enabled'] = False
+                self.save('jobs.json', jobs)
         self.checkpoint(job, status='done', actual_privacy=actual, progress=100, error=None,
                         telegram_link_enabled=True, telegram_link_pending=True)
         self.notify_published(job)
 
     def notify_published(self, job):
-        if not self.on_published:
+        if not self.on_published or job.get('replaced_by') or any(
+                item.get('replaced_by') for item in self.read('jobs.json', []) if item.get('id') == job['id']):
             return
         confirmed = True
         bindings = job.get('telegram_results') or [{'video': job['video'], 'automatic': bool(job.get('automatic'))}]
@@ -700,7 +781,7 @@ class YouTubePublisher:
             return
         try:
             for completed in self.read('jobs.json', []):
-                if completed.get('status') == 'done' and completed.get('telegram_link_enabled'):
+                if completed.get('status') == 'done' and completed.get('telegram_link_enabled') and not completed.get('replaced_by'):
                     self.notify_published(completed)
             while True:
                 job = next((j for j in self.read('jobs.json', []) if j['status'] in {'queued', 'uploading', 'finalizing'}), None)
@@ -761,6 +842,13 @@ def install_routes(app, get_current_user, require_admin, resolve_video, check_ad
     @app.get('/api/youtube/publication-options')
     def quick_options(user=Depends(get_current_user)):
         return guarded(lambda: publisher.quick_options(user))
+
+    @app.get('/api/youtube/additional-playlists')
+    def additional_playlists(user=Depends(get_current_user)):
+        def action():
+            publisher.validate_profile_playlist(user)
+            return {'playlists': publisher.playlists()}
+        return guarded(action)
 
     @app.get('/api/admin/youtube/desktop-helper')
     def desktop_helper(platform: str = "python", user=Depends(admin)):

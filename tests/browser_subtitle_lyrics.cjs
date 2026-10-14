@@ -1,5 +1,5 @@
 const fs = require('fs'), assert = require('assert'), {chromium} = require('playwright');
-const HTML = fs.readFileSync('app/templates/index.html', 'utf8');
+const HTML = require('./load_html.cjs')();
 const icon = fs.readFileSync('app/templates/app-icon-v8.png');
 const srtDefaults = {text_color:'#FFFFFF',box_color:'#000000',box_opacity:65,font_size:24,text_position:'bottom',
     video_subtitle_source:'translated',background_color:'#101827',background_file:''};

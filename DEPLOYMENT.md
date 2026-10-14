@@ -25,7 +25,7 @@ Crie uma pasta própria para a instalação e salve nela o arquivo `compose.yaml
 ```yaml
 services:
   karaoke-app:
-    image: ghcr.io/sal0-apps/sal0-karaoke:12.1
+    image: ghcr.io/sal0-apps/sal0-karaoke:12.2
     container_name: karaoke-app
     ports:
       - "7885:7860"
@@ -65,25 +65,25 @@ Somente `/data` deve receber o volume persistente. Não monte um diretório vazi
 | `/data/output/queue_jobs/` | Entradas isoladas e checkpoints das tarefas |
 | `/data/output/processing_queue.json` | Fila persistida |
 | `/data/output/` | Demais configurações, controles e links públicos |
-| `/data/cache/` | Cache reutilizável |
+| `/data/cache/` | Cache legado do perfil, migrado conforme a próxima fila |
 | `/data/user_data/` | Bibliotecas e configurações isoladas das contas comuns |
 | `/data/users.json` e `/data/sessions.json` | Contas e sessões |
 
 O backup deve incluir o volume inteiro. Copiar apenas resultados não preserva contas, fila, configurações ou checkpoints. Não adicione `data`, backups, logs, chaves Android ou credenciais ao Git.
 
-## Mensagens do Telegram na 12.1
+## Mensagens do Telegram na 12.2
 
 Atualize apenas a imagem do servidor, mantendo os volumes e o APK existente. O token e o Chat ID salvos continuam disponíveis. Em **Ajustes → Meu bot do Telegram**, use **Verificar conexão** e **Enviar mensagem de teste** para confirmar o destino sem processar um vídeo. Falhas mostram a ação necessária no próprio painel; se houver erro de rede, confira o acesso do contêiner a `api.telegram.org`, internet e DNS do servidor. Nenhuma porta de entrada ou webhook adicional é necessário para enviar as mensagens.
 
 Publicações confirmadas no YouTube acrescentam **Assistir no YouTube** à mensagem do resultado no Telegram. O vínculo entre vídeo e mensagem fica em `/data/output/telegram-results/`, no volume persistente. Todos os painéis de Ajustes começam recolhidos; abra o painel desejado antes de usar os controles.
 
-## Reconexões do YouTube na 12.1
+## Reconexões do YouTube na 12.2
 
 Não há mudança nos aplicativos Android ou Windows. O volume `/data` conserva credenciais, playlists e fila. Após atualizar o servidor, abra **Ajustes → Canal e publicação no YouTube** no celular, pela conexão local ou externa do app. Cadastre uma vez uma credencial Google do tipo **TVs e dispositivos com entrada limitada** no painel; nas próximas expirações use **Reconectar canal pelo celular** e aprove o código no Google. Não exige variáveis OAuth nem portas adicionais. O [manual](MANUAL.md#conectar-ou-reconectar-o-canal-pelo-celular) inclui os passos e a limitação de sete dias de projetos Google em Teste.
 
 Em **Downloads do YouTube**, teste links, atualize o mecanismo e renove a sessão por cookies.txt, inclusive pelo Firefox Android. A renovação do canal não autentica downloads; remover a sessão de downloads não desconecta o canal.
 
-A 12.1 mantém a correção do erro `Directory not empty` durante a atualização do mecanismo. Atualize a imagem do servidor para esta versão; depois use **Atualizar mecanismo** e **Testar link** no painel. Pastas residuais de pacotes não exigem exclusão manual. A conexão já aprovada com o canal e a sessão de downloads são preservadas.
+A 12.2 mantém a correção do erro `Directory not empty` durante a atualização do mecanismo. Atualize a imagem do servidor para esta versão; depois use **Atualizar mecanismo** e **Testar link** no painel. Pastas residuais de pacotes não exigem exclusão manual. A conexão já aprovada com o canal e a sessão de downloads são preservadas.
 
 ## Atualizar com uma tarefa em andamento
 
@@ -178,3 +178,9 @@ Antes de publicar:
 O auxiliar `deploy.sh` exige alterações rastreadas já commitadas, envia `main` e cria uma tag nova. Ele não faz o commit por você e não substitui uma revisão dos arquivos não rastreados. Não use tokens em URLs nem salve credenciais no repositório.
 
 Para conservar a identidade de atualização do Android, proteja uma chave de assinatura própria fora do Git e use-a em todas as versões. Sem configuração de assinatura de lançamento, o projeto usa uma chave de depuração; builds independentes podem ter assinaturas diferentes e não atualizar um APK instalado. Consulte o [guia Android](android/README.md).
+
+## Cache da fila na 12.2
+
+Cada execução mantém seus arquivos em `/data/output/queue_jobs/<id>/cache/`, com índice persistente da fila. Não remova essas pastas enquanto quiser revisar os itens. Resultados concluídos, falhos, cancelados e removidos continuam disponíveis até a aceitação de uma nova origem após esgotar a fila do perfil. Reexecuções permanecem na mesma fila; resultados da Biblioteca e modelos continuam preservados. A mudança aplica-se às tarefas ainda disponíveis na atualização e às novas; arquivos que a versão anterior já descartou não são recuperáveis.
+
+Atualize apenas a imagem do servidor para `ghcr.io/sal0-apps/sal0-karaoke:12.2` ou `latest`. Os aplicativos Android e Windows existentes continuam compatíveis. Publicações substituídas no YouTube recebem outro link; o anterior só é removido após confirmar o novo vídeo, capa, playlists e privacidade. Playlists adicionais começam desmarcadas em novas criações, com a playlist do perfil mantida.

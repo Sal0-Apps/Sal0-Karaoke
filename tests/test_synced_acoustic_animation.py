@@ -46,7 +46,7 @@ class SyncedAcousticAnimationTests(unittest.TestCase):
                         transcription_preset='standard', whisper_audio_version=audio_cache_version, whisper_quality_mode='max_quality',
                         lyrics_hint_hash=hashlib.sha256(' '.join(lyric_text.split()).encode()).hexdigest())
             transcriber = Mock(return_value=acoustic)
-            scope = dict(os=os, hashlib=hashlib, json=json, synced_segments=lrc,
+            scope = dict(queue_cache=__import__("queue_cache"), os=os, hashlib=hashlib, json=json, synced_segments=lrc,
                 lyrics_text=lyric_text, cache_dir=folder, cached_meta=meta,
                 prepare_lyrics_guide=prepare_lyrics_guide, review_lyrics_with_whisper=review_lyrics_with_whisper,
                 cache_meta_file=str(Path(folder) / 'cache_meta.json'), vocal_source=vocal_source,

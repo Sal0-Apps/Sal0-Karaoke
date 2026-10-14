@@ -95,8 +95,8 @@ class DemucsFallbackAndQueueTests(unittest.TestCase):
         self.assertIn("Modo Legendar vídeo: transcrição da fala", pipeline)
 
     def test_queue_removal_wakes_worker_and_cleanup_is_non_blocking(self):
-        self.assertIn('target=cleanup_queue_cache_in_background', MAIN)
-        self.assertIn('name=f"queue-remove-{job_id}"', MAIN)
+        self.assertIn('target=retire_queue_batch', MAIN)
+        self.assertIn('name="queue-cache-rotation"', MAIN)
         self.assertIn("processing_queue_event.set()", MAIN)
 
     def test_queue_can_be_reordered_from_interface(self):

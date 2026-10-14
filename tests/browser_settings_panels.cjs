@@ -1,5 +1,5 @@
 const fs = require('fs'), assert = require('assert'), {chromium} = require('playwright');
-const HTML = fs.readFileSync('app/templates/index.html', 'utf8');
+const HTML = require('./load_html.cjs')();
 (async () => {
     const browser = await chromium.launch({headless:true});
     try {

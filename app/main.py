@@ -58,7 +58,8 @@ from youtube_download_access import (
 from lyrics_sync import recording_matches, require_acoustic_word_timing, anchor_synced_animation
 from lyric_guide import prepare_lyrics_guide, verify_lyrics_guide, review_lyrics_with_whisper, GUIDE_POLICY_VERSION
 from backing_vocals import preserve_backing_vocals
-from processing_validation import validate_processing_options, validate_review_segments
+from processing_validation import validate_processing_options, validate_review_segments, canonical_review_segments
+import queue_cache
 
 # Configurar logs
 logging.basicConfig(
@@ -742,10 +743,6 @@ def load_processing_queue_control():
 
 
 def save_processing_queue_unlocked():
-    processing_queue[:] = [
-        job for job in processing_queue
-        if job.get("status") in ACTIVE_QUEUE_STATUSES
-    ]
     os.makedirs(os.path.dirname(PROCESSING_QUEUE_FILE), exist_ok=True)
     temporary_file = f"{PROCESSING_QUEUE_FILE}.tmp"
     with open(temporary_file, "w", encoding="utf-8") as queue_file:
@@ -763,10 +760,13 @@ def load_processing_queue():
             loaded = json.load(queue_file)
         processing_queue = [
             job for job in (loaded if isinstance(loaded, list) else [])
-            if isinstance(job, dict) and job.get("status") in ACTIVE_QUEUE_STATUSES
+            if isinstance(job, dict) and job.get("status") in queue_cache.STATUSES
         ]
         for job in processing_queue:
-            if job.get("status") == "processing":
+            if job.get("cancel_requested") and job.get("status") in ACTIVE_QUEUE_STATUSES:
+                job["status"] = "cancelled"
+                job["message"] = "Cancelado antes do reinício do servidor."
+            elif job.get("status") == "processing":
                 job["status"] = "queued"
                 job["message"] = "Recuperado após reinício do servidor."
         save_processing_queue_unlocked()
@@ -796,30 +796,48 @@ def public_queue_job(job: dict, waiting_position: int | None = None) -> dict:
 
 def enqueue_processing_job(job: dict) -> int:
     with processing_queue_lock:
-        active_for_user = sum(
-            1 for queued_job in processing_queue
-            if queued_job.get("owner_username") == job.get("owner_username")
-            and queued_job.get("status") in {"queued", "processing"}
-        )
-        if active_for_user >= 25:
+        active = sum(item.get("status") in ACTIVE_QUEUE_STATUSES for item in processing_queue
+                     if item.get("owner_username") == job.get("owner_username")
+                     and item.get("id") != job.get("cache_source_id"))
+        if active >= 25:
             raise HTTPException(status_code=429, detail="Sua fila atingiu o limite de 25 vídeos pendentes.")
-        processing_queue.append(job)
-        position = sum(1 for queued_job in processing_queue if queued_job.get("status") == "queued")
+        previous = list(processing_queue)
+        try:
+            planned, retired = queue_cache.plan_enqueue(processing_queue, job)
+        except ValueError as error:
+            raise HTTPException(status_code=409, detail=str(error))
+        processing_queue[:] = planned
         try:
             save_processing_queue_unlocked()
         except OSError:
-            processing_queue.remove(job)
+            processing_queue[:] = previous
             logger.exception("Não foi possível salvar a nova tarefa na fila.")
             raise HTTPException(status_code=503, detail="Não foi possível salvar a tarefa. Verifique o espaço do servidor e tente novamente.")
+        position = next(index for index, item in enumerate(
+            (item for item in processing_queue if item.get("status") == "queued"), 1) if item["id"] == job["id"])
+    if retired or not job.get("cache_source_id") and not any(
+            item.get("owner_username") == job.get("owner_username") for item in previous):
+        threading.Thread(target=retire_queue_batch, args=(retired, job["pipeline"]["owner_user"]),
+                         daemon=True, name="queue-cache-rotation").start()
     processing_queue_event.set()
     return position
 
 
-def ensure_processing_queue_capacity(username: str):
+def retire_queue_batch(jobs, owner):
+    for job in jobs:
+        remove_finished_queue_cache((job.get("pipeline") or {}).get("cache_dir"))
+    with legacy_cache_promotion_lock:
+        legacy = get_user_paths(owner)["cache"]
+        for folder in (legacy, legacy + ".previous", legacy + ".promoting"):
+            shutil.rmtree(folder, ignore_errors=True)
+        os.makedirs(legacy, exist_ok=True)
+
+
+def ensure_processing_queue_capacity(username: str, source_id: str = ""):
     with processing_queue_lock:
         active_for_user = sum(
             1 for queued_job in processing_queue
-            if queued_job.get("owner_username") == username
+            if queued_job.get("owner_username") == username and queued_job.get("id") != source_id
             and queued_job.get("status") in {"queued", "processing"}
         )
     if active_for_user >= 25:
@@ -834,25 +852,38 @@ def ensure_processing_queue_access(
         raise HTTPException(status_code=401, detail="Autenticação necessária.")
 
 
-def active_queue_pipeline_for_user(current_user: dict) -> dict:
-    """Retorna os parâmetros do trabalho ativo visível ao usuário, quando existir."""
+def active_queue_pipeline_for_user(current_user: dict, job_id: str = "") -> dict:
+    if job_id:
+        return cached_queue_job(job_id, current_user)["pipeline"]
     with processing_queue_lock:
-        active_job = next(
-            (
-                job for job in processing_queue
-                if job.get("status") == "processing"
-                and (
-                    is_admin(current_user)
-                    or job.get("owner_username") == current_user.get("username")
-                )
-            ),
-            None,
-        )
-    return dict((active_job or {}).get("pipeline") or {})
+        active = next((item for item in processing_queue if item.get("status") == "processing"
+            and (is_admin(current_user) or item.get("owner_username") == current_user.get("username"))), None)
+        retained = next((item for item in reversed(processing_queue)
+            if item.get("owner_username") == current_user.get("username")), None)
+        return dict((active or retained or {}).get("pipeline") or {})
 
 
-def queue_cache_dir_for_user(current_user: dict) -> str | None:
-    pipeline = active_queue_pipeline_for_user(current_user)
+def cached_queue_job(job_id: str, current_user: dict, unlocked: bool = False) -> dict:
+    def lookup():
+        job = next((item for item in processing_queue if item.get("id") == job_id), None)
+        if not job:
+            raise HTTPException(status_code=404, detail="Essa execução não está mais no cache da fila.")
+        if not (is_admin(current_user) or job.get("owner_username") == current_user.get("username")):
+            raise HTTPException(status_code=403, detail="Esta execução pertence a outra conta.")
+        pipeline = dict(job.get("pipeline") or {})
+        expected = os.path.realpath(os.path.join(PROCESSING_QUEUE_ROOT, job_id, "cache"))
+        cache_dir = os.path.realpath(pipeline.get("cache_dir") or "/missing")
+        if cache_dir != expected or not os.path.isdir(cache_dir):
+            raise HTTPException(status_code=404, detail="Os arquivos desta execução não estão mais disponíveis.")
+        return {**job, "pipeline": pipeline}
+    if unlocked:
+        return lookup()
+    with processing_queue_lock:
+        return lookup()
+
+
+def queue_cache_dir_for_user(current_user: dict, job_id: str = "") -> str | None:
+    pipeline = active_queue_pipeline_for_user(current_user, job_id)
     cache_dir = pipeline.get("cache_dir")
     return cache_dir if cache_dir and os.path.isdir(cache_dir) else None
 
@@ -930,7 +961,6 @@ def processing_queue_worker():
             pipeline = dict(job.get("pipeline") or {})
             owner = dict(pipeline.get("owner_user") or {})
             summary = dict(job.get("process_summary") or {})
-            deferred_cache_cleanup = False
             try:
                 update_state(
                     "processing",
@@ -950,32 +980,15 @@ def processing_queue_worker():
                 if final_status == "done":
                     queue_status = "done"
                     queue_message = "Resultado concluído e salvo na Biblioteca."
-                    job_cache = pipeline.get("cache_dir")
-                    if job_cache and os.path.isdir(job_cache):
-                        deferred_cache_cleanup = True
-                        threading.Thread(
-                            target=promote_queue_cache_in_background,
-                            args=(job_cache, owner),
-                            daemon=True,
-                            name=f"cache-promotion-{job.get('id', 'job')}",
-                        ).start()
                 elif final_status == "idle" and "cancel" in final_error.casefold():
                     queue_status = "cancelled"
                     queue_message = "Processamento cancelado."
                 else:
                     queue_status = "error"
                     queue_message = final_error or "O processamento não foi concluído."
-                    # Preserve completed expensive stages if rendering/delivery fails.
-                    job_cache = pipeline.get("cache_dir")
-                    if job_cache and os.path.isdir(job_cache):
-                        deferred_cache_cleanup = True
-                        threading.Thread(target=promote_queue_cache_in_background,
-                            args=(job_cache, owner), daemon=True,
-                            name=f"cache-preserve-{job.get('id', 'job')}").start()
             except StagePauseRequested as exc:
                 queue_status = "queued"
                 queue_message = f"Pausado com segurança após: {exc.label}."
-                deferred_cache_cleanup = True
                 logger.info("Trabalho devolvido à fila no checkpoint %s.", exc.stage)
             except Exception as exc:
                 logger.exception("Falha inesperada no trabalhador da fila.")
@@ -983,6 +996,9 @@ def processing_queue_worker():
                 queue_message = str(exc)
 
             with processing_queue_lock:
+                # Enqueue plans copy records for atomic rollback. Resolve the current record
+                # before finishing a worker that was already running during that enqueue.
+                job = next((item for item in processing_queue if item.get("id") == job.get("id")), job)
                 job["status"] = queue_status
                 job["message"] = queue_message
                 if queue_status == "queued":
@@ -994,13 +1010,6 @@ def processing_queue_worker():
                     job["history_filename"] = final_history_filename
                     job["subtitle_filename"] = final_subtitle_filename
                 save_processing_queue_unlocked()
-            if not deferred_cache_cleanup:
-                threading.Thread(
-                    target=cleanup_queue_cache_in_background,
-                    args=(pipeline.get("cache_dir"),),
-                    daemon=True,
-                    name=f"cache-cleanup-{job.get('id', 'job')}",
-                ).start()
             processing_queue_event.set()
 
 
@@ -1019,7 +1028,7 @@ def get_processing_queue(current_user: dict = Depends(get_current_user)):
         waiting = 0
         visible = []
         for job in processing_queue:
-            if job.get("status") not in ACTIVE_QUEUE_STATUSES:
+            if job.get("status") not in ACTIVE_QUEUE_STATUSES or job.get("cancel_requested"):
                 continue
             position = None
             if job.get("status") == "queued":
@@ -1067,7 +1076,6 @@ def resume_processing_queue(current_user: dict = Depends(get_current_user)):
 
 @app.delete("/api/queue/{job_id}")
 def remove_queued_job(job_id: str, current_user: dict = Depends(get_current_user)):
-    cache_dir = None
     with processing_queue_lock:
         job = next((item for item in processing_queue if item.get("id") == job_id), None)
         if not job:
@@ -1076,15 +1084,9 @@ def remove_queued_job(job_id: str, current_user: dict = Depends(get_current_user
             raise HTTPException(status_code=403, detail="Este item pertence a outro usuário.")
         if job.get("status") != "queued":
             raise HTTPException(status_code=409, detail="Somente itens que ainda aguardam podem ser removidos.")
-        cache_dir = (job.get("pipeline") or {}).get("cache_dir")
-        processing_queue.remove(job)
+        job["status"] = "removed"
+        job["message"] = "Removido da execução; arquivos mantidos nesta fila."
         save_processing_queue_unlocked()
-    threading.Thread(
-        target=cleanup_queue_cache_in_background,
-        args=(cache_dir,),
-        daemon=True,
-        name=f"queue-remove-{job_id}",
-    ).start()
     processing_queue_event.set()
     return {"status": "cancelled"}
 
@@ -3768,8 +3770,8 @@ class ContinueProcessModel(BaseModel):
     segments: list[EditSegmentModel]
 
 @app.get("/api/cache_info")
-def get_cache_info(current_user: dict = Depends(get_current_user)):
-    cache_dir = queue_cache_dir_for_user(current_user) or get_user_paths(current_user)["cache"]
+def get_cache_info(current_user: dict = Depends(get_current_user), job_id: str = ""):
+    cache_dir = queue_cache_dir_for_user(current_user, job_id) or get_user_paths(current_user)["cache"]
     cache_meta_file = os.path.join(cache_dir, "cache_meta.json")
     if os.path.exists(cache_meta_file):
         try:
@@ -3781,7 +3783,7 @@ def get_cache_info(current_user: dict = Depends(get_current_user)):
 
             bg_filename = None
             bg_is_video = False
-            active_pipeline = active_queue_pipeline_for_user(current_user)
+            active_pipeline = active_queue_pipeline_for_user(current_user, job_id)
             original_video = active_pipeline.get("input_audio_path")
             uses_original = active_pipeline.get("subtitle_only") or active_pipeline.get("background_mode") == "original"
             if uses_original and original_video and check_has_video(original_video):
@@ -3805,10 +3807,10 @@ def get_cache_info(current_user: dict = Depends(get_current_user)):
     return {"has_cache": False, "audio_filename": None, "bg_filename": None, "lyrics_text": "", "bg_is_video": False}
 
 @app.get("/api/cache/background")
-def get_cached_background(current_user: dict = Depends(get_current_user)):
+def get_cached_background(current_user: dict = Depends(get_current_user), job_id: str = ""):
     """Serve o arquivo de background em cache (imagem ou vídeo) ou uma paisagem padrão como fallback."""
-    cache_dir = queue_cache_dir_for_user(current_user) or get_user_paths(current_user)["cache"]
-    active_pipeline = active_queue_pipeline_for_user(current_user)
+    cache_dir = queue_cache_dir_for_user(current_user, job_id) or get_user_paths(current_user)["cache"]
+    active_pipeline = active_queue_pipeline_for_user(current_user, job_id)
     original_video = active_pipeline.get("input_audio_path")
     uses_original = active_pipeline.get("subtitle_only") or active_pipeline.get("background_mode") == "original"
     if uses_original and original_video and check_has_video(original_video):
@@ -3844,12 +3846,12 @@ def get_cached_background(current_user: dict = Depends(get_current_user)):
 
 
 @app.get("/api/cache/audio")
-def get_cached_audio(current_user: dict = Depends(get_current_user)):
+def get_cached_audio(current_user: dict = Depends(get_current_user), job_id: str = ""):
     """Serve the complete source of this user's review, without the title cover."""
-    pipeline = active_queue_pipeline_for_user(current_user)
+    pipeline = active_queue_pipeline_for_user(current_user, job_id)
     source = pipeline.get("input_audio_path")
-    if not source:
-        cache_dir = queue_cache_dir_for_user(current_user) or get_user_paths(current_user)["cache"]
+    if not source or not os.path.isfile(source) and pipeline.get("cache_dir"):
+        cache_dir = queue_cache_dir_for_user(current_user, job_id) or get_user_paths(current_user)["cache"]
         try:
             with open(os.path.join(cache_dir, "cache_meta.json"), encoding="utf-8") as file:
                 extension = json.load(file).get("input_ext", "")
@@ -3859,6 +3861,64 @@ def get_cached_audio(current_user: dict = Depends(get_current_user)):
     if not source or not os.path.isfile(source):
         raise HTTPException(status_code=404, detail="Áudio da revisão não está disponível.")
     return FileResponse(source, media_type=mimetypes.guess_type(source)[0] or "audio/wav")
+
+
+@app.get("/api/queue-cache")
+def get_queue_cache(current_user: dict = Depends(get_current_user)):
+    with processing_queue_lock:
+        items = []
+        for job in processing_queue:
+            if not (is_admin(current_user) or job.get("owner_username") == current_user.get("username")):
+                continue
+            cache_dir = (job.get("pipeline") or {}).get("cache_dir", "")
+            meta = queue_cache.read_json(os.path.join(cache_dir, "cache_meta.json"), {})
+            has_source = os.path.isfile(os.path.join(cache_dir, "original_input" + str(meta.get("input_ext", ""))))
+            items.append({**public_queue_job(job), "batch_id": job.get("batch_id"), "revision_of": job.get("revision_of"),
+                "subtitle_only": bool((job.get("pipeline") or {}).get("subtitle_only")),
+                "has_segments": bool(queue_cache.read_segments(cache_dir)),
+                "can_reprocess": bool(has_source and job.get("status") != "processing")})
+    return {"jobs": items}
+
+
+@app.get("/api/queue-cache/{job_id}")
+def get_queue_cache_job(job_id: str, current_user: dict = Depends(get_current_user)):
+    with processing_queue_lock:
+        job = cached_queue_job(job_id, current_user, unlocked=True)
+        filename = job.get("history_filename")
+        previous = youtube_publisher.replacement_for(os.path.join(job["pipeline"]["library_dir"], "history", filename)) if filename else None
+        return {**public_queue_job(job), "options": queue_cache.public_options(job),
+            "segments": queue_cache.read_segments(job["pipeline"]["cache_dir"]),
+            "can_reprocess": job.get("status") != "processing",
+            "publication": {"video_id": previous["video_id"], "url": "https://youtu.be/" + previous["video_id"]} if previous else None}
+
+
+@app.patch("/api/queue-cache/{job_id}/segments")
+def save_queue_cache_segments(job_id: str, data: ContinueProcessModel, current_user: dict = Depends(get_current_user)):
+    with processing_queue_lock:
+        job = cached_queue_job(job_id, current_user, unlocked=True)
+        if job.get("status") == "processing":
+            raise HTTPException(status_code=409, detail="Essa execução está em andamento. Use a revisão do processamento atual.")
+        try:
+            validate_review_segments(data.segments)
+        except ValueError as error:
+            raise HTTPException(status_code=400, detail=str(error))
+        segments = canonical_review_segments(data.segments, queue_cache.read_segments(job["pipeline"]["cache_dir"]))
+        queue_cache.write_draft(job["pipeline"]["cache_dir"], segments)
+    return {"status": "saved", "segments": segments}
+
+
+@app.post("/api/queue-cache/{job_id}/reprocess")
+def reprocess_queue_cache_job(job_id: str, current_user: dict = Depends(get_current_user)):
+    import inspect
+    job = cached_queue_job(job_id, current_user)
+    options = queue_cache.public_options(job)
+    params = inspect.signature(process_karaoke).parameters
+    values = {key: getattr(param.default, "default", param.default) for key, param in params.items()}
+    values.update({key: value for key, value in options.items() if key in params})
+    values.update(current_user=current_user, cache_job_id=job_id, enable_correction=False)
+    if options.get("subtitle_settings"):
+        values["subtitle_settings_json"] = json.dumps(options["subtitle_settings"])
+    return process_karaoke(**values)
 
 
 @app.post("/api/skip_edit")
@@ -3888,64 +3948,7 @@ def continue_process(data: ContinueProcessModel, current_user: dict = Depends(ge
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
 
-    updated_segments = []
-    for segment_index, s in enumerate(data.segments):
-        seg_text = s.text if s.synced_line else s.text.strip()
-        if s.synced_line:
-            if getattr(s, "acoustic_animation", False):
-                source = {"start": s.start, "end": s.end, "text": seg_text}
-                acoustic = [{"words": [{"word": w.word, "start": w.start, "end": w.end}
-                                        for w in (s.words or [])]}]
-                updated_segments.extend(anchor_synced_animation([source], acoustic))
-                continue
-            updated_segments.append({"start": s.start, "end": s.end, "text": seg_text,
-                                     "words": [], "synced_line": True})
-            continue
-        words_list = seg_text.split()
-
-        orig_words = []
-        if s.words:
-            orig_words = [{"word": w.word, "start": w.start, "end": w.end} for w in s.words]
-
-        if len(orig_words) == len(words_list):
-            orig_dur = s.words[-1].end - s.words[0].start if len(s.words) > 0 else 0
-            new_dur = s.end - s.start
-            original = segments_to_edit[segment_index] if segment_index < len(segments_to_edit) else {}
-            clocks_changed = (s.start != original.get("start") or s.end != original.get("end"))
-            if clocks_changed and orig_dur > 0 and new_dur > 0:
-                scale = new_dur / orig_dur
-                t0 = s.words[0].start
-                for w in orig_words:
-                    w["start"] = s.start + (w["start"] - t0) * scale
-                    w["end"] = s.start + (w["end"] - t0) * scale
-            for idx, word_txt in enumerate(words_list):
-                orig_w = orig_words[idx]["word"]
-                leading_spaces = len(orig_w) - len(orig_w.lstrip(' '))
-                trailing_spaces = len(orig_w.lstrip(' ')) - len(orig_w.strip(' '))
-                orig_words[idx]["word"] = " " * leading_spaces + word_txt + " " * trailing_spaces
-            words = orig_words
-        else:
-            total_dur = s.end - s.start
-            if total_dur <= 0:
-                total_dur = 1.0
-            word_dur = total_dur / len(words_list)
-            words = []
-            for idx, word_txt in enumerate(words_list):
-                w_start = s.start + idx * word_dur
-                w_end = w_start + word_dur
-                word_val = word_txt + " " if idx < len(words_list) - 1 else word_txt
-                words.append({
-                    "word": word_val,
-                    "start": w_start,
-                    "end": w_end
-                })
-
-        updated_segments.append({
-            "start": s.start,
-            "end": s.end,
-            "text": seg_text,
-            "words": words
-        })
+    updated_segments = canonical_review_segments(data.segments, segments_to_edit)
 
     segments_to_edit = updated_segments
     correction_event.set()
@@ -3957,8 +3960,7 @@ def cancel_process(current_user: dict = Depends(get_current_user)):
     require_task_control(current_user)
     logger.info("Solicitação de cancelamento recebida de %s.", current_user.get("username"))
 
-    # O item cancelado deixa de existir na fila imediatamente. O worker mantém
-    # apenas sua referência privada enquanto encerra o subprocesso e limpa o cache.
+    # Preserve the cache; the worker keeps the item active until its files are no longer in use.
     with processing_queue_lock:
         active_job = next(
             (
@@ -3972,7 +3974,7 @@ def cancel_process(current_user: dict = Depends(get_current_user)):
             None,
         )
         if active_job:
-            processing_queue.remove(active_job)
+            active_job["cancel_requested"] = True
             save_processing_queue_unlocked()
 
     # 1. Definir o flag de cancelamento
@@ -4098,21 +4100,46 @@ def process_karaoke(
     easy_mode: bool = Form(False),
     easy_background_choice: str = Form("default"),
     subtitle_only: bool = Form(False),
-    translation_language: str = Form("pt-BR")
+    translation_language: str = Form("pt-BR"),
+    cache_job_id: str = Form(""),
+    subtitle_settings_json: str = Form(""),
+    youtube_extra_playlists: bool = Form(False),
+    youtube_additional_playlists: str = Form("[]"),
+    youtube_replace_previous: bool = Form(True),
 ):
     """
     Recebe os arquivos enviados, valida a concorrência e inicia o pipeline em segundo plano.
     """
+    has_source = bool((audio_file and audio_file.filename) or youtube_url or library_audio)
+    source_job = None
+    if cache_job_id and has_source:
+        raise HTTPException(status_code=400, detail="Para refazer uma execução, mantenha a origem em cache sem enviar outra mídia.")
+    if not has_source and not cache_job_id:
+        with processing_queue_lock:
+            retained = next((item for item in reversed(processing_queue)
+                if item.get("owner_username") == current_user.get("username") and item.get("status") != "processing"), None)
+            cache_job_id = (retained or {}).get("id", "")
+    if cache_job_id:
+        source_job = cached_queue_job(cache_job_id, current_user)
+        if source_job.get("status") == "processing":
+            raise HTTPException(status_code=409, detail="Aguarde essa execução terminar antes de refazê-la.")
+        current_user = dict(source_job["pipeline"]["owner_user"])
+    try:
+        additional = json.loads(youtube_additional_playlists) if youtube_extra_playlists else []
+    except (ValueError, TypeError):
+        raise HTTPException(status_code=400, detail="Escolha playlists adicionais válidas.")
+    youtube_playlist_id = ""  # Automatic creation always includes the assigned profile playlist.
     try:
         publication_options = None if subtitle_only else youtube_publisher.publication_options(
-            current_user, youtube_publish, youtube_playlist_id, youtube_title)
+            current_user, youtube_publish, youtube_playlist_id, youtube_title,
+            **({"additional_playlists": additional} if youtube_extra_playlists else {}))
     except Exception as error:
         from youtube_publisher import PublicationError
         if isinstance(error, PublicationError):
             raise HTTPException(status_code=400, detail=str(error))
         raise
     ensure_processing_queue_access(current_user)
-    ensure_processing_queue_capacity(current_user.get("username"))
+    ensure_processing_queue_capacity(current_user.get("username"), cache_job_id)
     translation_language = normalize_translation_language(translation_language)
     if translation_language not in SUPPORTED_TARGET_LANGUAGES:
         raise HTTPException(status_code=400, detail="Idioma de tradução inválido.")
@@ -4203,11 +4230,27 @@ def process_karaoke(
         or (library_audio and library_audio.strip())
         or (audio_file and audio_file.filename and audio_file.filename.strip())
     )
-    if not has_new_source or (youtube_url and not library_audio and not (audio_file and audio_file.filename)):
+    if source_job:
+        with processing_queue_lock:
+            source_job = cached_queue_job(cache_job_id, current_user, unlocked=True)
+            if source_job.get("status") == "processing":
+                raise HTTPException(status_code=409, detail="Essa execução começou a processar. Aguarde o término para refazer.")
+            queue_cache.copy_revision_cache(source_job["pipeline"]["cache_dir"], cache_dir)
+        if publication_options and youtube_replace_previous and source_job.get("history_filename"):
+            previous = youtube_publisher.replacement_for(os.path.join(library_dir, "history", source_job["history_filename"]))
+            if previous:
+                if previous["channel_id"] != publication_options["channel_id"]:
+                    raise HTTPException(status_code=400, detail="O canal mudou. Publique sem substituir ou reconecte o canal anterior.")
+                publication_options["replaces_video_id"] = previous["video_id"]
+                publication_options["privacy"] = previous.get("actual_privacy") or previous["privacy"]
+    elif not has_new_source or (youtube_url and not library_audio and not (audio_file and audio_file.filename)):
         legacy_cache_dir = user_paths["cache"]
         with legacy_cache_promotion_lock:
             if os.path.isdir(legacy_cache_dir):
-                copy_reusable_inputs(legacy_cache_dir, cache_dir, youtube_url=youtube_url if has_new_source else None)
+                if not has_new_source:
+                    queue_cache.copy_revision_cache(legacy_cache_dir, cache_dir)
+                else:
+                    copy_reusable_inputs(legacy_cache_dir, cache_dir, youtube_url=youtube_url)
 
     if quick_random_background_requested:
         library_bg, quick_background_title = stage_quick_random_background(easy_config, current_user)
@@ -4220,7 +4263,17 @@ def process_karaoke(
         lyrics_text = ""
     else:
         lyrics_text = prepare_lyrics_guide(lyrics_text)
-    subtitle_settings = load_subtitle_settings(SUBTITLE_MODE_FILE) if subtitle_only else None
+    subtitle_settings = (source_job["pipeline"].get("subtitle_settings") if source_job else None) or (load_subtitle_settings(SUBTITLE_MODE_FILE) if subtitle_only else None)
+    if subtitle_only and subtitle_settings_json:
+        try:
+            override = json.loads(subtitle_settings_json)
+            if not isinstance(override, dict):
+                raise ValueError()
+            # File and owner remain from the cached snapshot; visual fields are per execution.
+            visual = {key: value for key, value in override.items() if key not in {"background_owner", "background_file"}}
+            subtitle_settings = normalize_subtitle_settings({**(subtitle_settings or {}), **visual})
+        except (ValueError, TypeError):
+            raise HTTPException(status_code=400, detail="Os ajustes desta legenda são inválidos.")
     subtitle_background_path = None
 
     # Se uma música da biblioteca foi explicitamente selecionada, anular youtube_url para priorizar a biblioteca
@@ -4547,7 +4600,9 @@ def process_karaoke(
                     input_bg_path = None
 
     if subtitle_only:
-        subtitle_background_path = stage_subtitle_background(subtitle_settings, cache_dir)
+        cached_background = next((os.path.join(cache_dir, name) for name in os.listdir(cache_dir)
+            if name.startswith("subtitle_background.")), None)
+        subtitle_background_path = cached_background or stage_subtitle_background(subtitle_settings, cache_dir)
     elif lyrics_text:
         with open(os.path.join(cache_dir, "lyrics_guide.txt"), "w", encoding="utf-8") as guide_file:
             guide_file.write(lyrics_text)
@@ -4641,6 +4696,7 @@ def process_karaoke(
         "started_at": None,
         "finished_at": None,
         "process_summary": process_summary,
+        "cache_source_id": cache_job_id or ("legacy" if not has_new_source else ""),
         "pipeline": pipeline,
     }
     try:
@@ -4993,6 +5049,12 @@ def run_subtitle_srt_pipeline(
     save_stage_checkpoint(cache_dir, "subtitle_transcription_ready", "transcrição do Whisper concluída", 69)
 
     pm.check_cancelled()
+    draft = queue_cache.read_draft(cache_dir)
+    if draft:
+        original_segments = draft
+        with open(segments_cache_file, "w", encoding="utf-8") as file:
+            json.dump(original_segments, file, ensure_ascii=False, indent=2)
+        save_stage_checkpoint(cache_dir, "subtitle_transcription_reviewed", "revisão da transcrição concluída", 70)
     review_checkpoint = stage_checkpoint(cache_dir, "subtitle_transcription_reviewed")
     if enable_correction and not review_checkpoint:
         global segments_to_edit, correction_event
@@ -5917,6 +5979,13 @@ def run_pipeline(
                 update_state("processing", "Checking lyrics guide", 74, stage_progress=100, stage_detail=detail)
                 logger.info("Conferência da letra-guia: %s. Todos os tempos vêm do Whisper.", detail)
             pm.check_cancelled()
+
+            draft = queue_cache.read_draft(cache_dir)
+            if draft:
+                segments = draft
+                with open(os.path.join(cache_dir, "reviewed_segments.json"), "w", encoding="utf-8") as file:
+                    json.dump(segments, file, ensure_ascii=False, indent=2)
+                save_stage_checkpoint(cache_dir, "transcription_reviewed", "revisão das legendas concluída", 78)
 
             # --- NOVO: Passo de Pausa e Correção de Legendas (se ativado pelo usuário) ---
             review_checkpoint = stage_checkpoint(cache_dir, "transcription_reviewed")

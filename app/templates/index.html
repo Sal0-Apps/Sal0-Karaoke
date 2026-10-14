@@ -2170,6 +2170,7 @@
                 </div>
 </form>
 
+            {% include "queue_cache_panel.html" %}
             <div class="card" id="queueCard" style="display: none;">
                 <div class="card-header">
                     <span class="card-title"><span class="line-glyph">≡</span> Fila de processamento</span>
@@ -2893,7 +2894,7 @@
                 </ol>
                 <p>A API tem cota gratuita e pode limitar projetos sem auditoria a vídeos privados. Guarde a autorização como uma senha. Backing vocals e vídeo do modo SRT mostram porcentagem da etapa e avisam o avanço no Telegram; o LibreTranslate informa apenas início e término.</p>
             </details>
-            <p class="compact-note">Versão do servidor: 12.1. A transcrição é local; fontes, modelos e integrações podem acessar serviços externos. Use conteúdo autorizado.</p>
+            <p class="compact-note">Versão do servidor: 12.2. A transcrição é local; fontes, modelos e integrações podem acessar serviços externos. Use conteúdo autorizado.</p>
             <p class="compact-note">Use o servidor pela rede local ou VPN. A busca/importação do YouTube não concede direitos sobre a mídia. OAuth autoriza o acesso ao canal, não o uso de músicas. Confira as permissões do conteúdo e os termos do YouTube antes de importar ou publicar. Não listado permite acesso a quem tiver o link; resultados SRT nunca vão ao YouTube.</p>
             <p class="compact-note"><a href="https://www.youtube.com/static?template=terms" target="_blank" rel="noopener noreferrer">Termos do YouTube</a> · <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer">Privacidade do Google</a> · <a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener noreferrer">Revogar acesso ao canal</a></p>
         </div>
@@ -3113,6 +3114,7 @@
         }
 
         function resetCreationSources() {
+            clearCachedRevision(); resetYoutubeExtras();
             window.rememberLyricDraft?.();
             const inputs = ['easyAudioFile', 'audioFile', 'subtitleVideoFile', 'easyYoutubeUrl', 'youtubeUrl', 'subtitleYoutubeUrl', 'easyLibraryAudio', 'libraryAudioSelect', 'libraryAudioHidden', 'subtitleLibraryVideo', 'easyYoutubeTitle', 'fullYoutubeTitle']
                 .map(id => document.getElementById(id)).filter(Boolean);
@@ -3156,6 +3158,7 @@
         }
 
         async function finishCreationSubmission() {
+            clearCachedRevision(); resetYoutubeExtras();
             await fetchProcessingQueue();
             clientPreparationInProgress = false;
             document.getElementById('createTabContent').setAttribute('aria-busy', 'false');
@@ -4147,6 +4150,7 @@
                 const data = await response.json();
                 const jobs = data.jobs || [];
                 renderProcessingQueue(jobs, data);
+                await fetchQueueCache();
                 clearTimeout(processingQueuePollTimer);
                 if (data.paused || jobs.some(job => ['queued', 'processing'].includes(job.status))) {
                     processingQueuePollTimer = setTimeout(fetchProcessingQueue, 3000);
@@ -4233,7 +4237,8 @@
                 const formData = cloneFormData(baseFormData);
                 formData.delete('audio_file');
                 if (file) formData.set('audio_file', file, file.name);
-                if (formData.get('subtitle_only') !== 'true') window.attachLyricDraft?.(formData, file);
+                applyCachedRevision(formData);
+                if (!window.cachedRevisionId && formData.get('subtitle_only') !== 'true') window.attachLyricDraft?.(formData, file);
                 let result;
                 document.getElementById('creationLoadingDetail').textContent = submissions.length > 1
                     ? `Enviando arquivo ${index + 1} de ${submissions.length} e aguardando a confirmação do servidor…`
@@ -4934,6 +4939,7 @@
                 formData.set('youtube_publish', String(document.getElementById('easyYoutubePublish').checked));
                 formData.set('youtube_playlist_id', document.getElementById('easyYoutubePlaylist').value);
                 formData.set('youtube_title', document.getElementById('easyYoutubeTitle').value.trim());
+                addYoutubeExtras(formData, 'easy');
                 formData.set('lyrics_timing', document.getElementById('easyLyricsTiming')?.value || 'acoustic');
                 formData.set('keep_backing_vocals', document.getElementById('easyKeepBackingVocals')?.value || 'true');
                 formData.set('backing_vocals_volume', document.getElementById('easyBackingVolume')?.value || '100');
@@ -4942,7 +4948,7 @@
 
                 if (easyAudioMode === 'upload') {
                     audioFiles = Array.from(document.getElementById('easyAudioFile')?.files || []);
-                    if (!audioFiles.length) { quickValidation('Toque em Enviar arquivo e escolha uma música.', 'easyAudioFile'); return; }
+                    if (!audioFiles.length && !window.cachedRevisionId) { quickValidation('Toque em Enviar arquivo e escolha uma música.', 'easyAudioFile'); return; }
                     if (audioFiles.length > 25) { quickValidation('Envie no máximo 25 arquivos por vez.', 'easyAudioFile'); return; }
                 } else if (easyAudioMode === 'youtube') {
                     const url = document.getElementById('easyYoutubeUrl')?.value.trim();
@@ -4997,7 +5003,7 @@
                 const youtubeUrl = document.getElementById('subtitleYoutubeUrl')?.value.trim() || '';
                 const libraryVideo = document.getElementById('subtitleLibraryVideo')?.value || '';
                 const selectedSources = Number(audioFiles.length > 0) + Number(Boolean(youtubeUrl)) + Number(Boolean(libraryVideo));
-                if (selectedSources !== 1) {
+                if (selectedSources !== 1 && !window.cachedRevisionId) {
                     showCreationFeedback('Escolha apenas uma origem: arquivos, link do YouTube ou vídeo da Biblioteca.');
                     return;
                 }
@@ -6385,6 +6391,7 @@
                 const initialStatus = document.getElementById('creationLoadingDetail');
 
                 const formData = new FormData(karaokêForm);
+                addYoutubeExtras(formData, "full");
                 formData.set('app_base_url', window.location.origin);
                 let audioFiles = [];
                 try {
@@ -6532,18 +6539,19 @@
         let currentSegments = [];
         let selectedSegmentIndex = 0;
 
-        async function loadCorrectionPanel() {
+        async function loadCorrectionPanel(jobId = "") {
+            const cacheQuery = jobId ? "?job_id=" + encodeURIComponent(jobId) : "";
             try {
                 // Carregar fundo no Mockup de Preview
                 try {
-                    const cacheRes = await authFetch('/api/cache_info');
+                    const cacheRes = await authFetch('/api/cache_info' + cacheQuery);
                     if (cacheRes.ok) {
                         const cacheData = await cacheRes.json();
                         const previewBgImage = document.getElementById('previewBgImage');
                         const previewBgVideo = document.getElementById('previewBgVideo');
 
                         if (cacheData.has_cache) {
-                            const bgUrl = `/api/cache/background?token=${encodeURIComponent(authToken)}`;
+                            const bgUrl = `/api/cache/background?token=${encodeURIComponent(authToken)}${jobId ? "&job_id=" + encodeURIComponent(jobId) : ""}`;
                             if (cacheData.bg_is_video) {
                                 if (previewBgImage) previewBgImage.style.display = 'none';
                                 if (previewBgVideo) {
@@ -6565,14 +6573,15 @@
                 }
 
                 // Carregar segmentos transcritos do servidor
-                const res = await authFetch('/api/segments_to_edit');
+                const res = await authFetch(jobId ? '/api/queue-cache/' + encodeURIComponent(jobId) : '/api/segments_to_edit');
                 if (!res.ok) throw new Error("Falha ao obter legendas para correção.");
 
-                currentSegments = await res.json();
+                const segmentData = await res.json();
+                currentSegments = jobId ? segmentData.segments : segmentData;
                 selectedSegmentIndex = 0;
                 renderSegments();
                 const audio = document.getElementById('correctionAudio');
-                audio.src = `/api/cache/audio?token=${encodeURIComponent(authToken)}`;
+                audio.src = `/api/cache/audio?token=${encodeURIComponent(authToken)}${jobId ? "&job_id=" + encodeURIComponent(jobId) : ""}`;
                 audio.onloadedmetadata = () => {
                     const start = currentSegments[selectedSegmentIndex]?.start || 0;
                     audio.currentTime = Math.min(start, audio.duration || start);
@@ -6835,6 +6844,7 @@
 
             if (btnContinue) {
                 btnContinue.onclick = async () => {
+                    if (window.cacheEditorActive) { await saveCachedEditor(true); return; }
                     const feedback = document.getElementById('correctionValidationMessage');
                     feedback.textContent = '';
                     const invalid = currentSegments.findIndex((segment, index) => !segment.text.trim() ||
@@ -6885,6 +6895,7 @@
 
             if (btnSkip) {
                 btnSkip.onclick = async () => {
+                    if (window.cacheEditorActive) { closeCachedEditor(); await fetchStatus(); return; }
                     btnSkip.disabled = true;
                     btnSkip.innerText = "⏳ Renderizando...";
                     try {
@@ -6933,6 +6944,7 @@
 
 
         async function renderServerStatus(data, previousStatus = lastKnownServerStatus) {
+            if (window.cacheEditorActive) return;
             const statusChanged = previousStatus !== data.status;
             if (clientPreparationInProgress || queueCreationExpanded) {
                 updateQueueCreationNotice(data);
@@ -7389,12 +7401,13 @@
                     if (!options.playlist_id) select.add(new Option('Defina uma playlist no perfil', ''));
                     for (const playlist of options.playlists || []) select.add(new Option(playlist.title, playlist.id));
                     select.value = options.playlist_id || '';
-                    select.disabled = !options.can_publish || !options.can_choose_playlist;
+                    select.disabled = true;
                     const updateNote = () => ytElement(prefix + 'YoutubePublicationNote').textContent = `Canal: ${options.channel_title} · ${({'private':'Privado','unlisted':'Não listado','public':'Público'})[options.privacy] || options.privacy} · ${options.playlists?.find(playlist => playlist.id === select.value)?.title || 'Playlist não definida'}.`;
                     if (!options.can_publish) ytElement(prefix + 'YoutubePublicationNote').textContent = 'Publicação bloqueada: o administrador precisa definir uma playlist no perfil desta conta.';
                     else updateNote();
                     select.onchange = updateNote;
                 }
+                renderYoutubeExtras(options);
             } catch (error) { console.warn(error.message); }
         }
         async function renderYoutubeUserAssignments(assignments, playlists) {

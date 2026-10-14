@@ -1,5 +1,5 @@
 const fs=require('fs'),assert=require('assert'),{chromium}=require('playwright');
-const HTML=fs.readFileSync('app/templates/index.html','utf8');
+const HTML=require('./load_html.cjs')();
 for(const match of HTML.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/g)) new Function(match[1]);
 (async()=>{
 const browser=await chromium.launch({headless:true});const page=await browser.newPage();
@@ -119,8 +119,9 @@ await page.waitForFunction(()=>document.getElementById('ytPublishChannel').datas
 assert.equal(await page.locator('#ytDefaultPlaylist').inputValue(),'PL-two');
 await page.locator('#tabBtnCreate').click();
 await page.locator('#btnCreatorEasy').click();
-await page.locator('#easyYoutubePlaylist').selectOption('PL-one');
-assert.equal(await page.locator('#easyYoutubePlaylist').inputValue(),'PL-one');
+assert.equal(await page.locator('#easyYoutubePlaylist').isDisabled(),true);
+assert.equal(await page.locator('#easyYoutubePlaylist').inputValue(),'PL-two');
+assert.equal(await page.locator('#easyYoutubeExtras').isChecked(),false);
 assert.equal(await page.locator('#easyYoutubePlaylist option[value=""]').count(),0);
 
 await page.locator('#btnCreatorSubtitle').click();

@@ -1,5 +1,5 @@
 const fs = require('fs'), assert = require('assert'), {chromium} = require('playwright');
-const HTML = fs.readFileSync('app/templates/index.html', 'utf8');
+const HTML = require('./load_html.cjs')();
 const title = 'YOASOBI / Tracing A Dream (あの夢をなぞって English Ver.)';
 const correct = {id:1, provider:'LRCLIB', track_name:'Tracing A Dream', artist_name:'YOASOBI', has_lyrics:true};
 
