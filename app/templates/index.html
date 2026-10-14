@@ -2906,7 +2906,7 @@
                 </ol>
                 <p>A API tem cota gratuita e pode limitar projetos sem auditoria a vídeos privados. Guarde a autorização como uma senha. Backing vocals e vídeo do modo SRT mostram porcentagem da etapa e avisam o avanço no Telegram; o LibreTranslate informa apenas início e término.</p>
             </details>
-            <p class="compact-note">Versão do servidor: 12.2.1. A transcrição é local; fontes, modelos e integrações podem acessar serviços externos. Use conteúdo autorizado.</p>
+            <p class="compact-note">Versão do servidor: 12.2.2. A transcrição é local; fontes, modelos e integrações podem acessar serviços externos. Use conteúdo autorizado.</p>
             <p class="compact-note">Use o servidor pela rede local ou VPN. A busca/importação do YouTube não concede direitos sobre a mídia. OAuth autoriza o acesso ao canal, não o uso de músicas. Confira as permissões do conteúdo e os termos do YouTube antes de importar ou publicar. Não listado permite acesso a quem tiver o link; resultados SRT nunca vão ao YouTube.</p>
             <p class="compact-note"><a href="https://www.youtube.com/static?template=terms" target="_blank" rel="noopener noreferrer">Termos do YouTube</a> · <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer">Privacidade do Google</a> · <a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener noreferrer">Revogar acesso ao canal</a></p>
         </div>
@@ -3128,7 +3128,7 @@
         function resetCreationSources() {
             clearCachedRevision(); resetYoutubeExtras();
             window.rememberLyricDraft?.();
-            const inputs = ['easyAudioFile', 'audioFile', 'subtitleVideoFile', 'easyYoutubeUrl', 'youtubeUrl', 'subtitleYoutubeUrl', 'easyLibraryAudio', 'libraryAudioSelect', 'libraryAudioHidden', 'subtitleLibraryVideo', 'easyYoutubeTitle', 'fullYoutubeTitle']
+            const inputs = ['easyAudioFile', 'audioFile', 'subtitleVideoFile', 'easyYoutubeUrl', 'youtubeUrl', 'subtitleYoutubeUrl', 'easyLibraryAudio', 'libraryAudioSelect', 'libraryAudioHidden', 'subtitleLibraryVideo', 'easyYoutubeTitle', 'fullYoutubeTitle', 'bgFile', 'easyBgFile', 'bgYoutubeUrl', 'easyBgYoutubeUrl', 'libraryBgSelect', 'easyLibraryBg']
                 .map(id => document.getElementById(id)).filter(Boolean);
             for (const input of inputs) {
                 input.value = '';
@@ -3286,10 +3286,10 @@
             renderEasyRandomBackgroundChoices(latestLibraryPhotos);
             renderSubtitleBackgroundOptions();
             updateEasyModeRandomBackgroundSection();
-            refreshEasySummary(config);
+            if (!window.cachedRevisionId) refreshEasySummary(config);
             // Speech captioning keeps its own defaults.
             const defaultBackground = document.getElementById('easyDefaultBackgroundOption');
-            if (defaultBackground) {
+            if (defaultBackground && !window.cachedRevisionId) {
                 const labels = {
                     random_library: 'Um fundo da coleção será sorteado',
                     original: 'O vídeo original será usado',
@@ -3358,11 +3358,12 @@
                 easyModeConfig = await response.json();
                 applyEasyModeConfigToControls(easyModeConfig);
                 const switcher = document.getElementById('creatorModeSwitch');
-                if (switcher) switcher.style.display = creationUiLocked ? 'none' : 'grid';
-                setCreatorMode(easyModeConfig.enabled ? 'easy' : 'advanced');
+                if (switcher) switcher.style.display = creationUiLocked || window.cacheEditorActive ? 'none' : 'grid';
+                if (!window.cachedRevisionId && !window.cacheEditorActive && !queueCreationExpanded)
+                    setCreatorMode(easyModeConfig.enabled ? 'easy' : 'advanced');
             } catch (error) {
                 console.warn('Não foi possível carregar o Modo Rápido.', error);
-                setCreatorMode('advanced');
+                if (!window.cachedRevisionId && !window.cacheEditorActive && !queueCreationExpanded) setCreatorMode('advanced');
             }
         }
 
@@ -3385,7 +3386,7 @@
             const title = easyAudioMode === 'youtube' ? (input?.value.trim() ? input.dataset.youtubeTitle || 'Vídeo do YouTube selecionado' : '')
                 : easyAudioMode === 'upload' ? (files.length ? files[0].name + (files.length > 1 ? ` e mais ${files.length - 1}` : '') : '')
                 : (document.getElementById('easyLibraryAudio')?.value ? selectedOptionText('easyLibraryAudio') : '');
-            status.textContent = title ? 'Música escolhida: ' + title : 'Escolha uma música para continuar.';
+            status.textContent = window.cachedRevisionId ? 'Música em cache: ' + window.cachedRevisionTitle : title ? 'Música escolhida: ' + title : 'Escolha uma música para continuar.';
             const message = document.getElementById('easyValidationMessage'); if (message) message.textContent = '';
             document.querySelectorAll('[data-quick-source]').forEach(button => {
                 button.classList.toggle('is-active', button.dataset.quickSource === easyAudioMode);
@@ -3883,7 +3884,8 @@
                 if (currentVal === 'Padrão' && allProfiles['Karaokê equilibrado']) currentVal = 'Karaokê equilibrado';
                 if (!allProfiles[currentVal]) currentVal = allProfiles['Karaokê equilibrado'] ? 'Karaokê equilibrado' : Object.keys(allProfiles)[0];
                 profileSelect.value = currentVal || '';
-                if (currentVal) applyProfile(currentVal);
+                if (window.cachedRevisionId) profileSelect.value = '';
+                else if (currentVal) applyProfile(currentVal);
 
                 profileSelect.onchange = async () => {
                     const selected = profileSelect.value;
@@ -5596,6 +5598,7 @@
             }
             function currentLyricSource() {
                 if (currentCreatorMode === 'subtitle') return '';
+                if (window.cachedRevisionId) return 'cache:' + window.cachedRevisionId;
                 const quick = currentCreatorMode === 'easy';
                 const mode = quick ? easyAudioMode : (document.getElementById('btnAudioModeYoutube').classList.contains('active') ? 'youtube' : document.getElementById('btnAudioModeLibrary').classList.contains('active') ? 'library' : 'upload');
                 if (mode === 'youtube') return youtubeLyricKey(document.getElementById(quick ? 'easyYoutubeUrl' : 'youtubeUrl').value);
@@ -5611,6 +5614,18 @@
                 try { sessionStorage.setItem(draftStorageKey(), JSON.stringify([...lyricDrafts].slice(-100))); } catch (_) {}
             }
             window.rememberLyricDraft = rememberLyricDraft;
+            window.restoreCachedLyricDraft = (options, title) => {
+                cancelAutomaticLyricsLookup();
+                boundLyricSource = 'cache:' + window.cachedRevisionId;
+                pendingLyricLoad = Promise.resolve();
+                lyricsText.value = options.lyrics_text || '';
+                lyricsMode.value = options.lyrics_mode || 'manual';
+                lyricsText.disabled = false; btnSaveLyrics.disabled = false; btnClearLyrics.disabled = false;
+                lyricsSearchQuery.value = title || '';
+                lyricsSearchResults?.replaceChildren(); setLyricsSearchStatus('');
+                document.getElementById('lyricsSourceLabel').textContent = `Guia de ${title}. Altere somente o que precisar nesta nova versão.`;
+                updateLyricsBadge(lyricsText.value); rememberLyricDraft();
+            };
             function syncLyricSource() {
                 const key = currentLyricSource();
                 if (key === boundLyricSource) return pendingLyricLoad;
@@ -6353,25 +6368,24 @@
 
             // O estado vem primeiro: um processamento ativo oculta os formulários
             // antes das consultas administrativas mais demoradas.
-            await fetchStatus();
-            startPolling(false);
+            const queueReady = fetchProcessingQueue();
+            void fetchStatus().finally(() => startPolling(false));
 
-            await fetchEasyModeConfig();
             const initialLoads = [
+                fetchEasyModeConfig(),
                 loadYoutubePublicationOptions(),
                 fetchSubtitleModeConfig(),
                 fetchTelegramConfig(),
                 fetchProfiles(),
                 loadLibrary(),
                 fetchCacheInfo(),
-                fetchProcessingQueue(),
-
+                queueReady,
             ];
             if (currentUser?.role === 'admin') {
                 initialLoads.push(loadYoutubePublisher(), fetchExternalUrlConfig(), fetchUsers(), fetchModelsStatus(), fetchYoutubeToolsStatus(), fetchTranslationSettings());
             }
             await Promise.allSettled(initialLoads);
-            setCreatorMode(currentCreatorMode);
+            if (!window.cacheEditorActive) setCreatorMode(currentCreatorMode);
         });
 
         async function deleteUser(username) {
@@ -6550,49 +6564,52 @@
         let currentSegments = [];
         let selectedSegmentIndex = 0;
 
-        async function loadCorrectionPanel(jobId = "") {
-            const cacheQuery = jobId ? "?job_id=" + encodeURIComponent(jobId) : "";
+        let correctionLoadGeneration = 0;
+
+        function resetCorrectionPreview() {
+            const video = document.getElementById('previewBgVideo');
+            video?.pause();
+            if (video) { video.removeAttribute('src'); video.style.display = 'none'; }
+            const image = document.getElementById('previewBgImage');
+            if (image) { image.removeAttribute('src'); image.style.display = 'none'; }
+            document.getElementById('correctionAudioHint').textContent = '';
+        }
+
+        async function loadCorrectionBackground(jobId, generation) {
             try {
-                // Carregar fundo no Mockup de Preview
-                try {
-                    const cacheRes = await authFetch('/api/cache_info' + cacheQuery);
-                    if (cacheRes.ok) {
-                        const cacheData = await cacheRes.json();
-                        const previewBgImage = document.getElementById('previewBgImage');
-                        const previewBgVideo = document.getElementById('previewBgVideo');
-
-                        if (cacheData.has_cache) {
-                            const bgUrl = `/api/cache/background?token=${encodeURIComponent(authToken)}${jobId ? "&job_id=" + encodeURIComponent(jobId) : ""}`;
-                            if (cacheData.bg_is_video) {
-                                if (previewBgImage) previewBgImage.style.display = 'none';
-                                if (previewBgVideo) {
-                                    previewBgVideo.src = bgUrl;
-                                    previewBgVideo.style.display = 'block';
-                                    previewBgVideo.play().catch(e => console.log("Auto-play blocked", e));
-                                }
-                            } else {
-                                if (previewBgVideo) previewBgVideo.style.display = 'none';
-                                if (previewBgImage) {
-                                    previewBgImage.src = bgUrl;
-                                    previewBgImage.style.display = 'block';
-                                }
-                            }
-                        }
-                    }
-                } catch (e) {
-                    console.error("Erro ao carregar imagem/vídeo de fundo no preview:", e);
+                const query = jobId ? '?job_id=' + encodeURIComponent(jobId) : '';
+                const response = await authFetch('/api/cache_info' + query);
+                if (!response.ok) return;
+                const cache = await response.json();
+                if (generation !== correctionLoadGeneration || (jobId && window.cachedEditorId !== jobId) || !cache.has_cache) return;
+                const url = `/api/cache/background?token=${encodeURIComponent(authToken)}${jobId ? '&job_id=' + encodeURIComponent(jobId) : ''}`;
+                const image = document.getElementById('previewBgImage');
+                const video = document.getElementById('previewBgVideo');
+                if (cache.bg_is_video) {
+                    image.style.display = 'none'; video.src = url; video.style.display = 'block';
+                    video.play().catch(() => {});
+                } else {
+                    video.style.display = 'none'; image.src = url; image.style.display = 'block';
                 }
+            } catch (error) { console.warn('Prévia de fundo indisponível.', error); }
+        }
 
-                // Carregar segmentos transcritos do servidor
-                const res = await authFetch(jobId ? '/api/queue-cache/' + encodeURIComponent(jobId) : '/api/segments_to_edit');
-                if (!res.ok) throw new Error("Falha ao obter legendas para correção.");
-
-                const segmentData = await res.json();
+        async function loadCorrectionPanel(jobId = "", loadedJob = null) {
+            const generation = ++correctionLoadGeneration;
+            resetCorrectionPreview();
+            try {
+                let segmentData = loadedJob;
+                if (!segmentData) {
+                    const response = await authFetch(jobId ? '/api/queue-cache/' + encodeURIComponent(jobId) + '/segments' : '/api/segments_to_edit');
+                    if (!response.ok) throw new Error('Falha ao obter legendas para correção.');
+                    segmentData = await response.json();
+                }
+                if (generation !== correctionLoadGeneration || (jobId && window.cachedEditorId !== jobId)) return;
                 currentSegments = jobId ? segmentData.segments : segmentData;
                 selectedSegmentIndex = 0;
                 renderSegments();
                 const audio = document.getElementById('correctionAudio');
-                audio.src = `/api/cache/audio?token=${encodeURIComponent(authToken)}${jobId ? "&job_id=" + encodeURIComponent(jobId) : ""}`;
+                audio.src = `/api/cache/audio?token=${encodeURIComponent(authToken)}${jobId ? '&job_id=' + encodeURIComponent(jobId) : ''}`;
                 audio.onloadedmetadata = () => {
                     const start = currentSegments[selectedSegmentIndex]?.start || 0;
                     audio.currentTime = Math.min(start, audio.duration || start);
@@ -6600,13 +6617,15 @@
                 audio.onerror = () => {
                     document.getElementById('correctionAudioHint').textContent = 'Prévia de áudio indisponível. Confira a mídia original.';
                 };
-
                 initCorrectionButtonListeners();
-                const correctionCard = document.getElementById('correctionCard');
-                if (correctionCard && !queueCreationExpanded && !clientPreparationInProgress) correctionCard.style.display = "block";
+                const card = document.getElementById('correctionCard');
+                if (card && !queueCreationExpanded && !clientPreparationInProgress) card.style.display = 'block';
                 isShowingCorrection = true;
-            } catch (err) {
-                console.error("Erro ao carregar painel de correção:", err);
+                // Editing is ready; the optional media preview loads independently.
+                void loadCorrectionBackground(jobId, generation);
+            } catch (error) {
+                if (jobId) throw error;
+                console.error('Erro ao carregar painel de correção:', error);
             }
         }
 
@@ -6683,6 +6702,7 @@
 
             selectedSegmentIndex = Math.min(selectedSegmentIndex, currentSegments.length - 1);
 
+            const fragment = document.createDocumentFragment();
             currentSegments.forEach((seg, idx) => {
                 const card = document.createElement('div');
                 card.className = 'correction-segment';
@@ -6832,8 +6852,9 @@
                 };
 
                 card.appendChild(textInput);
-                container.appendChild(card);
+                fragment.appendChild(card);
             });
+            container.appendChild(fragment);
             selectCorrectionSegment(selectedSegmentIndex);
         }
 
@@ -7405,7 +7426,7 @@
                     const container = ytElement(prefix + 'YoutubePublication');
                     container.style.display = options.enabled ? 'block' : 'none';
                     const checkbox = ytElement(prefix + 'YoutubePublish');
-                    checkbox.checked = options.enabled && options.can_publish && options.default_publish;
+                    if (!window.cachedRevisionId) checkbox.checked = options.enabled && options.can_publish && options.default_publish;
                     checkbox.disabled = !options.can_publish;
                     const select = ytElement(prefix + 'YoutubePlaylist');
                     select.replaceChildren();

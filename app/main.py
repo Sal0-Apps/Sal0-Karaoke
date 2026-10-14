@@ -1035,9 +1035,11 @@ def get_processing_queue(current_user: dict = Depends(get_current_user), include
                 waiting += 1
                 position = waiting
             if is_admin(current_user) or job.get("owner_username") == current_user.get("username"):
-                visible.append(public_cached_queue_job(job, position) if include_completed else public_queue_job(job, position))
+                visible.append((dict(job), position))
         active_job = next((job for job in processing_queue if job.get("status") == "processing"), None)
         paused = processing_queue_paused
+    visible = [public_cached_queue_job(job, position) if include_completed else public_queue_job(job, position)
+               for job, position in visible]
     return {
         "jobs": visible if include_completed else visible[-100:],
         "paused": paused,
@@ -3786,7 +3788,7 @@ def get_cache_info(current_user: dict = Depends(get_current_user), job_id: str =
             active_pipeline = active_queue_pipeline_for_user(current_user, job_id)
             original_video = active_pipeline.get("input_audio_path")
             uses_original = active_pipeline.get("subtitle_only") or active_pipeline.get("background_mode") == "original"
-            if uses_original and original_video and check_has_video(original_video):
+            if uses_original and original_video and queue_cache.has_video(original_video, check_has_video):
                 bg_is_video = True
             if meta.get("has_bg") and not uses_original and active_pipeline.get("background_mode") != "color":
                 bg_ext = meta.get("bg_ext", "")
@@ -3813,7 +3815,7 @@ def get_cached_background(current_user: dict = Depends(get_current_user), job_id
     active_pipeline = active_queue_pipeline_for_user(current_user, job_id)
     original_video = active_pipeline.get("input_audio_path")
     uses_original = active_pipeline.get("subtitle_only") or active_pipeline.get("background_mode") == "original"
-    if uses_original and original_video and check_has_video(original_video):
+    if uses_original and original_video and queue_cache.has_video(original_video, check_has_video):
         return FileResponse(original_video, media_type=mimetypes.guess_type(original_video)[0] or "video/mp4")
     if active_pipeline.get("background_mode") == "color":
         return Response('<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720"><rect width="100%" height="100%" fill="black"/></svg>', media_type="image/svg+xml")
@@ -3866,33 +3868,46 @@ def get_cached_audio(current_user: dict = Depends(get_current_user), job_id: str
 def public_cached_queue_job(job: dict, waiting_position: int | None = None) -> dict:
     pipeline = job.get("pipeline") or {}
     cache_dir = pipeline.get("cache_dir", "")
-    meta = queue_cache.read_json(os.path.join(cache_dir, "cache_meta.json"), {})
-    has_source = os.path.isfile(os.path.join(cache_dir, "original_input" + str(meta.get("input_ext", ""))))
+    source_path = pipeline.get("input_audio_path")
+    if not source_path:
+        meta = queue_cache.read_json(os.path.join(cache_dir, "cache_meta.json"), {})
+        source_path = os.path.join(cache_dir, "original_input" + str(meta.get("input_ext", "")))
+    has_source = os.path.isfile(source_path)
     return {**public_queue_job(job, waiting_position), "batch_id": job.get("batch_id"),
         "revision_of": job.get("revision_of"), "subtitle_only": bool(pipeline.get("subtitle_only")),
         "cancel_requested": bool(job.get("cancel_requested")),
-        "has_segments": bool(queue_cache.read_segments(cache_dir)),
+        "has_segments": queue_cache.has_segments(cache_dir),
         "can_reprocess": bool(has_source and job.get("status") != "processing")}
 
 
 @app.get("/api/queue-cache")
 def get_queue_cache(current_user: dict = Depends(get_current_user)):
     with processing_queue_lock:
-        items = [public_cached_queue_job(job) for job in processing_queue
+        jobs = [dict(job) for job in processing_queue
             if is_admin(current_user) or job.get("owner_username") == current_user.get("username")]
-    return {"jobs": items}
+    return {"jobs": [public_cached_queue_job(job) for job in jobs]}
 
 
 @app.get("/api/queue-cache/{job_id}")
-def get_queue_cache_job(job_id: str, current_user: dict = Depends(get_current_user)):
+def get_queue_cache_job(job_id: str, current_user: dict = Depends(get_current_user), include_segments: bool = True):
     with processing_queue_lock:
-        job = cached_queue_job(job_id, current_user, unlocked=True)
-        filename = job.get("history_filename")
-        previous = youtube_publisher.replacement_for(os.path.join(job["pipeline"]["library_dir"], "history", filename)) if filename else None
-        return {**public_queue_job(job), "options": queue_cache.public_options(job),
-            "segments": queue_cache.read_segments(job["pipeline"]["cache_dir"]),
-            "can_reprocess": job.get("status") != "processing",
-            "publication": {"video_id": previous["video_id"], "url": "https://youtu.be/" + previous["video_id"]} if previous else None}
+        job = dict(cached_queue_job(job_id, current_user, unlocked=True))
+    filename = job.get("history_filename")
+    previous = youtube_publisher.replacement_for(os.path.join(job["pipeline"]["library_dir"], "history", filename)) if filename else None
+    result = {**public_queue_job(job), "options": queue_cache.public_options(job),
+        "can_reprocess": job.get("status") != "processing",
+        "publication": {"video_id": previous["video_id"], "url": "https://youtu.be/" + previous["video_id"]} if previous else None}
+    if include_segments:
+        result["segments"] = queue_cache.read_segments(job["pipeline"]["cache_dir"])
+    return result
+
+
+@app.get("/api/queue-cache/{job_id}/segments")
+def get_queue_cache_segments(job_id: str, current_user: dict = Depends(get_current_user)):
+    with processing_queue_lock:
+        job = dict(cached_queue_job(job_id, current_user, unlocked=True))
+    return {"title": job.get("title"), "can_reprocess": job.get("status") != "processing",
+            "segments": queue_cache.read_segments(job["pipeline"]["cache_dir"])}
 
 
 @app.patch("/api/queue-cache/{job_id}/segments")
@@ -4148,7 +4163,8 @@ def process_karaoke(
         raise HTTPException(status_code=400, detail="Idioma de tradução inválido.")
     quick_random_background_requested = False
     quick_background_title = ""
-    if easy_mode:
+    if easy_mode and not source_job:
+        # A revision submits the saved effective settings, independent of current profile defaults.
         easy_config = load_easy_mode_config()
         if not easy_config.get("enabled", True):
             raise HTTPException(status_code=403, detail="O Modo Rápido foi desativado pelo administrador.")
@@ -4700,6 +4716,7 @@ def process_karaoke(
         "finished_at": None,
         "process_summary": process_summary,
         "cache_source_id": cache_job_id or ("legacy" if not has_new_source else ""),
+        "creation_options": {"save_to_library": save_to_library, "pause_for_editing": pause_for_editing},
         "pipeline": pipeline,
     }
     try:

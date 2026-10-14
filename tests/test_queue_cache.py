@@ -15,7 +15,7 @@ import unittest
 import uuid
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 from fastapi import FastAPI, Depends, File, Form, UploadFile, HTTPException
 from fastapi.responses import FileResponse, Response
@@ -64,7 +64,7 @@ class QueueCacheTests(unittest.TestCase):
         names={'save_processing_queue_unlocked','load_processing_queue','public_queue_job','enqueue_processing_job',
             'retire_queue_batch','ensure_processing_queue_capacity','active_queue_pipeline_for_user','cached_queue_job',
             'queue_cache_dir_for_user','remove_finished_queue_cache','get_processing_queue','remove_queued_job',
-            'get_cache_info','get_cached_background','get_cached_audio','get_queue_cache','public_cached_queue_job','get_queue_cache_job',
+            'get_cache_info','get_cached_background','get_cached_audio','get_queue_cache','public_cached_queue_job','get_queue_cache_job','get_queue_cache_segments',
             'save_queue_cache_segments','reprocess_queue_cache_job','process_karaoke','processing_queue_worker'}
         tree=ast.parse((ROOT/'app/main.py').read_text())
         nodes=[n for n in tree.body if isinstance(n,ast.ClassDef) and n.name in {'EditWordModel','EditSegmentModel','ContinueProcessModel'}
@@ -93,6 +93,83 @@ class QueueCacheTests(unittest.TestCase):
         item=dict(id=id,title=id,status=status,owner_username=owner,owner_role='user',batch_id=owner+'-batch',pipeline=pipeline,
                   process_summary={'mode':'Legendar vídeo' if subtitle else 'Modo Detalhado'})
         self.queue.append(item);return item
+
+    def test_queue_and_settings_do_not_load_complete_transcriptions(self):
+        a = self.job('A'); self.job('B', 'queued')
+        self.job('BOB', owner='bob')
+        availability = queue_cache.has_segments
+        def available(cache):
+            self.assertFalse(self.scope['processing_queue_lock']._is_owned())
+            return availability(cache)
+        with patch.object(queue_cache, 'has_segments', side_effect=available), patch.object(queue_cache, 'read_segments', side_effect=AssertionError('full transcription in list/settings')):
+            for route in ('/api/queue?include_completed=true', '/api/queue-cache'):
+                response = self.client.get(route)
+                self.assertEqual(response.status_code, 200, response.text)
+                self.assertEqual([job['id'] for job in response.json()['jobs']], ['A', 'B'])
+                self.assertTrue(all(job['has_segments'] for job in response.json()['jobs']))
+            settings = self.client.get('/api/queue-cache/A?include_segments=false')
+            self.assertEqual(settings.status_code, 200, settings.text)
+            self.assertNotIn('segments', settings.json())
+            self.assertEqual(settings.json()['options']['font_size'], 32)
+        (Path(a['pipeline']['cache_dir']) / 'transcribed_segments.json').write_text('[]')
+        (Path(a['pipeline']['cache_dir']) / 'lyrics_guide_cache.json').write_text(json.dumps({'signature':'x'*64,'segments':[],'report':{}}))
+        self.assertFalse(self.client.get('/api/queue?include_completed=true').json()['jobs'][0]['has_segments'])
+
+    def test_editor_reads_only_selected_segments_without_publication_lookup_or_queue_lock(self):
+        self.job('A'); self.job('BOB', owner='bob')
+        self.scope['youtube_publisher'].replacement_for = Mock(side_effect=AssertionError('unneeded publication lookup'))
+        original = queue_cache.read_segments
+        def read(cache):
+            self.assertFalse(self.scope['processing_queue_lock']._is_owned())
+            return original(cache)
+        with patch.object(queue_cache, 'read_segments', side_effect=read) as reader:
+            response = self.client.get('/api/queue-cache/A/segments')
+            self.assertEqual(response.status_code, 200, response.text)
+            self.assertEqual(response.json()['segments'][0]['text'], 'Texto A')
+            reader.assert_called_once()
+        self.assertEqual(self.client.get('/api/queue-cache/BOB/segments').status_code, 403)
+
+    def test_preview_probes_once_per_unchanged_file(self):
+        self.job('A')
+        probe = Mock(return_value=True); self.scope['check_has_video'] = probe
+        self.assertTrue(self.client.get('/api/cache_info?job_id=A').json()['bg_is_video'])
+        self.assertEqual(self.client.get('/api/cache/background?job_id=A').content, b'A')
+        probe.assert_called_once()
+        source = Path(self.queue[0]['pipeline']['input_audio_path']); source.write_bytes(b'changed')
+        self.assertTrue(self.client.get('/api/cache_info?job_id=A').json()['bg_is_video'])
+        self.assertEqual(probe.call_count, 2)
+
+    def test_quick_revision_keeps_saved_settings_despite_changed_profile(self):
+        a = self.job('A')
+        a['process_summary']['mode'] = 'Modo Rápido'
+        a['pipeline'].update(font_size=41, text_color='#123456', text_position='top', subtitle_mode='line',
+            background_mode='image', enable_correction=True, keep_backing_vocals=False, backing_vocals_volume=37,
+            words_per_line=4, max_chars_line=22, show_instrumental=False, transcribe_source='vocals',
+            show_next_line_preview=True, keep_first_line_visible=True)
+        a['creation_options'] = {'save_to_library':False, 'pause_for_editing':False}
+        cache = Path(a['pipeline']['cache_dir']); (cache/'original_bg.png').write_bytes(b'background')
+        meta = json.loads((cache/'cache_meta.json').read_text()); meta.update(has_bg=True, bg_ext='.png', bg_filename='Fundo A.png')
+        (cache/'cache_meta.json').write_text(json.dumps(meta))
+        self.scope['load_easy_mode_config'] = Mock(side_effect=AssertionError('current profile must not override revision'))
+        settings = self.client.get('/api/queue-cache/A?include_segments=false').json()['options']
+        self.assertEqual(settings['background_filename'], 'Fundo A.png')
+        result = self.client.post('/api/queue-cache/A/reprocess')
+        self.assertEqual(result.status_code, 200, result.text)
+        revised = self.queue[-1]
+        for key in ('font_size','text_color','text_position','subtitle_mode','background_mode','keep_backing_vocals',
+                    'backing_vocals_volume','words_per_line','max_chars_line','show_instrumental','transcribe_source',
+                    'show_next_line_preview','keep_first_line_visible'):
+            self.assertEqual(revised['pipeline'][key], a['pipeline'][key], key)
+        self.assertFalse(revised['pipeline']['enable_correction']) # Save-and-render skips another review pause.
+        self.assertFalse(revised['creation_options']['save_to_library'])
+        self.assertEqual(Path(revised['pipeline']['input_bg_path']).read_bytes(), b'background')
+        data = {key:str(value).lower() if isinstance(value,bool) else str(value) for key,value in settings.items() if value is not None and not isinstance(value,dict)}
+        data.update(cache_job_id='A', font_size='48', lyrics_text='Guia alterada', enable_correction='true')
+        result = self.client.post('/api/process', data=data)
+        self.assertEqual(result.status_code, 200, result.text)
+        self.assertEqual(self.queue[-1]['pipeline']['font_size'],48)
+        self.assertEqual(self.queue[-1]['pipeline']['lyrics_text'],'Guia alterada')
+        self.assertTrue(self.queue[-1]['pipeline']['enable_correction'])
 
     def test_finished_cache_survives_disk_restart_and_does_not_appear_as_pending(self):
         a=self.job('A');b=self.job('B','error')

@@ -1,13 +1,17 @@
 """Retain one editable queue per owner until a fresh source starts the next queue."""
 import json
 import os
+import re
 import shutil
 import tempfile
+from functools import lru_cache
 
 from reprocess_cache import copy_reusable_inputs
 
 ACTIVE = {"queued", "processing"}
 STATUSES = ACTIVE | {"done", "error", "cancelled", "removed", "replaced"}
+SEGMENT_FILES = ("review_draft.json", "reviewed_segments.json", "subtitle_segments_original.json", "lyrics_guide_cache.json",
+                 "transcribed_segments.json", "synced_acoustic_segments.json")
 
 
 def plan_enqueue(jobs, job):
@@ -51,14 +55,42 @@ def read_json(path, fallback=None):
 
 
 def read_segments(cache_dir):
-    for name in ("review_draft.json", "reviewed_segments.json", "subtitle_segments_original.json", "lyrics_guide_cache.json",
-                 "transcribed_segments.json", "synced_acoustic_segments.json"):
+    for name in SEGMENT_FILES:
         segments = read_json(os.path.join(cache_dir, name))
         if isinstance(segments, dict):
             segments = segments.get("segments")
         if isinstance(segments, list) and segments:
             return segments
     return []
+
+
+def has_segments(cache_dir):
+    """The queue needs availability, not the complete transcription of every item."""
+    for name in SEGMENT_FILES:
+        try:
+            with open(os.path.join(cache_dir, name), encoding="utf-8") as file:
+                head = file.read(128).lstrip()
+            if head.startswith("[") and head[1:].lstrip().startswith("{"):
+                return True
+            if name == "lyrics_guide_cache.json" and re.search(r'"segments"\s*:\s*\[\s*\{', head):
+                return True
+        except (OSError, UnicodeError):
+            pass
+    return False
+
+
+@lru_cache(maxsize=256)
+def _probe_video(path, size, modified_ns, probe):
+    return bool(probe(path))
+
+
+def has_video(path, probe):
+    """Probe each unchanged preview source once, shared by info and media requests."""
+    try:
+        info = os.stat(path)
+    except (OSError, TypeError):
+        return False
+    return _probe_video(path, info.st_size, info.st_mtime_ns, probe)
 
 
 def read_draft(cache_dir):
@@ -105,7 +137,12 @@ def public_options(job):
     excluded = {"input_audio_path", "input_bg_path", "owner_user", "cache_dir", "output_dir", "library_dir",
                 "subtitle_background_path", "app_base_url", "youtube_publish_options", "youtube_url"}
     result = {key: value for key, value in pipeline.items() if key not in excluded}
+    saved = job.get("creation_options") or {}
+    result.update(save_to_library=saved.get("save_to_library", True),
+                  pause_for_editing=saved.get("pause_for_editing", False))
     meta = read_json(os.path.join(pipeline.get("cache_dir", ""), "cache_meta.json"), {})
+    result["audio_filename"] = meta.get("audio_filename", job.get("title", ""))
+    result["background_filename"] = meta.get("bg_filename", "")
     result["lyrics_text"] = meta.get("lyrics_text", result.get("lyrics_text", "")) or ""
     result["lyrics_mode"] = "manual"
     result["lyrics_selected"] = True
