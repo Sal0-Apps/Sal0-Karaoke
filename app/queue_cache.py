@@ -14,6 +14,12 @@ SEGMENT_FILES = ("review_draft.json", "reviewed_segments.json", "subtitle_segmen
                  "transcribed_segments.json", "synced_acoustic_segments.json")
 
 
+def display_order(jobs):
+    """Show live work first while preserving the worker's pending order."""
+    priority = {"processing": 0, "queued": 1}
+    return sorted(jobs, key=lambda job: priority.get(job.get("status"), 2))
+
+
 def plan_enqueue(jobs, job):
     """Plan on copies: a failed queue write must not discard the previous batch."""
     jobs = [dict(item) for item in jobs]

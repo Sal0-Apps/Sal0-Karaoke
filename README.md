@@ -8,7 +8,7 @@ O código original é software livre sob a [licença MIT](LICENSE). Dependência
 
 O Sal0 Karaokê é destinado a uma instalação pessoal, acessada pela rede local ou por VPN, como ZeroTier. O repositório aberto disponibiliza o código e os pacotes; o projeto não opera um serviço público de processamento nem coleta centralmente as mídias das instalações. Não é necessário expor a porta do app à internet. O processamento principal é local, mas as integrações escolhidas podem se comunicar com serviços externos.
 
-Na **12.2.2**, a fila carrega independentemente das configurações; Rápido e Detalhado restauram as escolhas e a letra-guia da execução, preservando o fundo em cache; o editor abre sem esperar a prévia de mídia. **Fila de processamento** mantém todos os itens com botões compactos de **Legendas**, **Rápido** e **Detalhado**, guarda os arquivos e permite editar legendas e refazer qualquer item no Rápido ou Detalhado. O cache permanece após o término e só é trocado ao aceitar uma nova origem para a próxima fila. Playlists adicionais são opcionais e começam desmarcadas; a do perfil continua incluída. Revisões podem substituir o vídeo anterior no YouTube após a confirmação do novo, atualizando também seu link no Telegram. Mantidos os painéis de Ajustes recolhidos.
+Na **12.5**, a fila mostra primeiro o item em processamento, depois os pendentes na ordem de execução e, abaixo, os encerrados. **Apagar cache da fila** limpa os arquivos temporários de todo o seu perfil após esgotar os pendentes, preservando os resultados e outras contas. A limpeza tem confirmação e indicação de erros; consultas antigas não repõem itens apagados. Mantidas as melhorias da 12.2.2: a fila carrega independentemente das configurações; Rápido e Detalhado restauram as escolhas e a letra-guia da execução, preservando o fundo em cache; o editor abre sem esperar a prévia de mídia. **Fila de processamento** mantém todos os itens com botões compactos de **Legendas**, **Rápido** e **Detalhado**, guarda os arquivos e permite editar legendas e refazer qualquer item no Rápido ou Detalhado. O cache permanece após o término e é trocado ao aceitar uma nova origem para a próxima fila, ou removido pelo botão de limpeza. Playlists adicionais são opcionais e começam desmarcadas; a do perfil continua incluída. Revisões podem substituir o vídeo anterior no YouTube após a confirmação do novo, atualizando também seu link no Telegram. Mantidos os painéis de Ajustes recolhidos.
 
 ## Documentação
 
@@ -133,14 +133,14 @@ Em **Playlist de cada usuário**, a administração define uma playlist válida 
 
 ## Início rápido com Docker
 
-A versão de distribuição desta documentação é **12.2.2**. O título e o rodapé da página mostram apenas o nome da aplicação. A versão do servidor pode ser consultada no Manual; a versão do APK aparece nas configurações nativas.
+A versão de distribuição desta documentação é **12.5**. O título e o rodapé da página mostram apenas o nome da aplicação. A versão do servidor pode ser consultada no Manual; a versão do APK aparece nas configurações nativas.
 
 Crie um arquivo `compose.yaml`:
 
 ```yaml
 services:
   karaoke-app:
-    image: ghcr.io/sal0-apps/sal0-karaoke:12.2.2
+    image: ghcr.io/sal0-apps/sal0-karaoke:12.5
     container_name: karaoke-app
     ports:
       - "7885:7860"

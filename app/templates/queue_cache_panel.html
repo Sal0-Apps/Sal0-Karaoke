@@ -23,6 +23,7 @@ window.cachedRevisionId = '';
 window.cachedRevisionOptions = {};
 window.cacheEditorActive = false;
 window.cachedEditorId = '';
+let clearingQueueCache = false;
 let cachedYoutubeOptions = {};
 let cachedPlaylistChoices = [];
 const cachedExtraSelections = new Map();
@@ -34,6 +35,36 @@ async function cacheRequest(path, init = {}) {
     return result;
 }
 function cacheFeedback(error) { document.getElementById('queueFeedback').textContent = error.message || String(error); }
+function orderedQueueJobs(jobs) {
+    const priority = {processing: 0, queued: 1};
+    return [...jobs].sort((a, b) => (priority[a.status] ?? 2) - (priority[b.status] ?? 2));
+}
+function updateQueueCacheControls(jobs) {
+    const owned = jobs.filter(job => job.owner_username === currentUser?.username);
+    document.getElementById('queueCacheControls').hidden = !owned.length;
+    const active = owned.some(job => ['queued', 'processing'].includes(job.status));
+    document.getElementById('btnClearQueueCache').disabled = clearingQueueCache || active;
+    document.getElementById('queueCacheClearHint').textContent = active
+        ? 'Aguarde terminar os itens da sua fila ou remova os pendentes para liberar a limpeza.'
+        : 'Apaga os arquivos temporários de toda a sua fila. Os resultados da Biblioteca permanecem salvos.';
+}
+async function clearWholeQueueCache() {
+    const owned = latestQueueJobs.filter(job => job.owner_username === currentUser?.username);
+    if (clearingQueueCache || !owned.length || owned.some(job => ['queued', 'processing'].includes(job.status))) return;
+    if (!confirm(`Apagar o cache dos ${owned.length} itens da sua fila? As revisões em cache serão removidas. Os resultados da Biblioteca continuam salvos.`)) return;
+    clearingQueueCache = true; updateQueueCacheControls(latestQueueJobs);
+    document.getElementById('queueFeedback').textContent = 'Apagando o cache da sua fila…';
+    try {
+        const result = await cacheRequest('', {method: 'DELETE'});
+        processingQueueRequestGeneration++;
+        clearCachedRevision(); resetYoutubeExtras();
+        await fetchProcessingQueue();
+        void fetchCacheInfo();
+        document.getElementById('queueFeedback').textContent = '';
+        showCreationFeedback(result.message || 'Cache da sua fila apagado. Os resultados da Biblioteca foram preservados.', 'success');
+    } catch (error) { cacheFeedback(error); }
+    finally { clearingQueueCache = false; updateQueueCacheControls(latestQueueJobs); }
+}
 async function runCachedQueueAction(button, id, action) {
     const wasDisabled = button.disabled;
     button.disabled = true;

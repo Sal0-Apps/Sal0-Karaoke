@@ -1041,7 +1041,7 @@ def get_processing_queue(current_user: dict = Depends(get_current_user), include
     visible = [public_cached_queue_job(job, position) if include_completed else public_queue_job(job, position)
                for job, position in visible]
     return {
-        "jobs": visible if include_completed else visible[-100:],
+        "jobs": queue_cache.display_order(visible) if include_completed else visible[-100:],
         "paused": paused,
         "pause_pending": bool(paused and active_job),
     }
@@ -3885,7 +3885,53 @@ def get_queue_cache(current_user: dict = Depends(get_current_user)):
     with processing_queue_lock:
         jobs = [dict(job) for job in processing_queue
             if is_admin(current_user) or job.get("owner_username") == current_user.get("username")]
-    return {"jobs": [public_cached_queue_job(job) for job in jobs]}
+    return {"jobs": [public_cached_queue_job(job) for job in queue_cache.display_order(jobs)]}
+
+
+@app.delete("/api/queue-cache")
+def clear_queue_cache(current_user: dict = Depends(get_current_user)):
+    """Clear this profile's exhausted queue, keeping permanent results and other profiles."""
+    ensure_processing_queue_access(current_user)
+    username = current_user["username"]
+    with processing_queue_lock:
+        owned = [job for job in processing_queue if job.get("owner_username") == username]
+        if any(job.get("status") in ACTIVE_QUEUE_STATUSES for job in owned):
+            raise HTTPException(status_code=409, detail="Aguarde os itens da sua fila terminarem ou remova os pendentes antes de apagar o cache.")
+        queue_root = os.path.realpath(PROCESSING_QUEUE_ROOT)
+        roots = []
+        for job in owned:
+            job_id = str(job.get("id", ""))
+            root = os.path.join(queue_root, job_id)
+            if not job_id or job_id in {".", ".."} or os.path.basename(job_id) != job_id or os.path.dirname(root) != queue_root:
+                raise HTTPException(status_code=409, detail="Os arquivos da fila precisam ser conferidos antes da limpeza.")
+            roots.append(root)
+        previous = list(processing_queue)
+        with legacy_cache_promotion_lock:
+            processing_queue[:] = [job for job in previous if job.get("owner_username") != username]
+            try:
+                save_processing_queue_unlocked()
+            except OSError:
+                processing_queue[:] = previous
+                raise HTTPException(status_code=503, detail="Não foi possível salvar a limpeza. O cache foi preservado; tente novamente.")
+            try:
+                legacy = get_user_paths(current_user)["cache"]
+                # Library previews are shared and are separate from execution files.
+                legacy_files = [os.path.join(legacy, name) for name in os.listdir(legacy) if name != "thumbnails"] if os.path.isdir(legacy) and not os.path.islink(legacy) else [legacy]
+                for folder in [*roots, *legacy_files, legacy + ".previous", legacy + ".promoting"]:
+                    if os.path.islink(folder) or os.path.isfile(folder):
+                        os.unlink(folder)
+                    elif os.path.isdir(folder):
+                        shutil.rmtree(folder)
+                os.makedirs(legacy, exist_ok=True)
+            except OSError:
+                processing_queue[:] = previous
+                try:
+                    save_processing_queue_unlocked()
+                except OSError:
+                    logger.exception("Não foi possível restaurar o registro da limpeza incompleta.")
+                logger.exception("Não foi possível apagar todos os arquivos do cache da fila.")
+                raise HTTPException(status_code=503, detail="Alguns arquivos não puderam ser apagados. Confira o espaço e as permissões do servidor e tente novamente.")
+    return {"status": "cleared", "removed": len(owned), "message": "Cache da sua fila apagado. Os resultados da Biblioteca foram preservados."}
 
 
 @app.get("/api/queue-cache/{job_id}")

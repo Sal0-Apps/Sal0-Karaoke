@@ -5,13 +5,19 @@ for (const match of HTML.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/g)) new F
  const browser = await chromium.launch({headless:true});
  try {
   const page = await browser.newPage({viewport:{width:390,height:900},isMobile:true,hasTouch:true});
-  const errors=[], requests=[], submissions=[];
+  const errors=[], requests=[], submissions=[], confirmations=[];
+  let acceptClear=false, failClear=false, holdNextQueue=false, releaseHeldQueue, notifyHeldQueue;
+  const heldQueueReady=new Promise(resolve=>notifyHeldQueue=resolve);
   page.on('pageerror',e=>errors.push(e.message));
-  page.on('dialog',d=>{errors.push(d.message());d.dismiss();});
+  page.on('dialog',d=>{
+   if(d.type()==='confirm'&&d.message().startsWith('Apagar o cache')){confirmations.push(d.message());return acceptClear?d.accept():d.dismiss();}
+   errors.push(d.message());d.dismiss();
+  });
   await page.addInitScript(()=>localStorage.setItem('karaoke_token','test-session'));
   const seg = [{start:10,end:13,text:'Letra A',words:[{word:'Letra ',start:10.2,end:10.5},{word:'A',start:11.7,end:12.5}]}];
   const options = {whisper_model:'medium',font_size:41,text_color:'#123456',text_position:'top',subtitle_mode:'line',background_mode:'image',background_filename:'Fundo A.png',audio_filename:'Canção A.mp4',lyrics_mode:'manual',lyrics_text:'Guia A',lyrics_selected:true,enable_correction:true,keep_backing_vocals:false,backing_vocals_volume:37,youtube_publish:true,youtube_title:'Título anterior',transcription_preset:'continuous',youtube_extra_playlists:false,words_per_line:4,max_chars_line:22,show_instrumental:false,transcribe_source:'vocals',show_next_line_preview:true,keep_first_line_visible:true,save_to_library:false,only_remove_vocals:false,break_on_punctuation:false,lyrics_timing:'acoustic'};
   const jobs = [{id:'A',title:'Canção A',status:'done',can_reprocess:true,has_segments:true}, {id:'B',title:'Canção B',status:'error',can_reprocess:true,has_segments:true}, {id:'S',title:'Vídeo para legendar',status:'done',can_reprocess:true,has_segments:true,subtitle_only:true}, {id:'C',title:'Canção C',status:'processing',can_reprocess:false,has_segments:false}];
+  jobs.forEach(job=>job.owner_username='owner');
   let saved = structuredClone(seg);
   let serverStatus={status:'processing',step:'Transcribing vocals',progress:60,can_cancel:true,process_summary:{title:'Canção C',mode:'Modo Detalhado'}};
   const publicationOptions = {enabled:true,can_publish:true,default_publish:false,can_choose_playlist:true,playlist_id:'PL-profile',privacy:'unlisted',channel_title:'Canal',playlists:[{id:'PL-profile',title:'Do perfil'},{id:'PL-extra1',title:'Extras 1'},{id:'PL-extra2',title:'Extras 2'}],additional_playlists:[{id:'PL-profile',title:'Do perfil'},{id:'PL-extra1',title:'Extras 1'},{id:'PL-extra2',title:'Extras 2'}]};
@@ -26,8 +32,18 @@ for (const match of HTML.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/g)) new F
    requests.push({path:u.pathname,method:req.method(),body:req.postData(),query:u.search});
    if(u.pathname==='/api/auth_status')return fulfill({status:'authenticated',username:'owner',role:'admin'});
    if(u.pathname==='/api/status'){await statusGate;return fulfill(serverStatus);}
-   if(u.pathname==='/api/queue'){assert.equal(u.searchParams.get('include_completed'),'true');return fulfill({jobs,paused:false});}
-   if(u.pathname==='/api/queue-cache')throw new Error('The separate queue panel should not be fetched.');
+   if(u.pathname==='/api/queue'){
+    assert.equal(u.searchParams.get('include_completed'),'true');
+    if(holdNextQueue){holdNextQueue=false;const snapshot=structuredClone(jobs);releaseHeldQueue=()=>fulfill({jobs:snapshot,paused:false});notifyHeldQueue();return;}
+    return fulfill({jobs,paused:false});
+   }
+   if(u.pathname==='/api/queue-cache'){
+    if(req.method()!=='DELETE')throw new Error('The separate queue panel should not be fetched.');
+    if(failClear)return route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({detail:'Falha de limpeza; tente novamente.'})});
+    const removed=jobs.filter(job=>job.owner_username==='owner').length;
+    jobs.splice(0,jobs.length,...jobs.filter(job=>job.owner_username!=='owner'));
+    return fulfill({status:'cleared',removed,message:'Cache da sua fila apagado. Os resultados da Biblioteca foram preservados.'});
+   }
    if(u.pathname.match(/^\/api\/queue-cache\/[ABS]$/)){
     assert.equal(u.searchParams.get('include_segments'),'false');
     const id=u.pathname.split('/').at(-1),job=jobs.find(j=>j.id===id);
@@ -53,6 +69,9 @@ for (const match of HTML.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/g)) new F
   assert.equal(await page.locator('#queueCacheCard').count(),0);
   assert.equal(await page.evaluate(()=>queueStatusLabel({status:'cancelled',cancel_requested:true})),'Cancelado');
   assert(await page.locator('#queueCard').isVisible());
+  const rowIds=()=>page.locator('#processingQueueList .queue-item').evaluateAll(rows=>rows.map(row=>row.dataset.cacheId));
+  assert.deepEqual(await rowIds(),['C','A','B','S']);
+  assert(await page.locator('#btnClearQueueCache').isDisabled());
   // The queue must arrive while status/profile/configuration requests are still blocked.
   releaseStatus();
   assert.equal(await page.locator('#easyYoutubeExtras').isChecked(),false);
@@ -140,6 +159,7 @@ for (const match of HTML.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/g)) new F
   assert(await page.locator('#queueCard').isVisible());
   assert.equal(await page.locator('#processingQueueList .queue-item').count(),4);
   assert.equal(await page.locator('#queueCountBadge').textContent(),'4 itens');
+  assert.equal(await page.locator('#btnClearQueueCache').isDisabled(),false);
   const rowBefore=await page.locator('[data-cache-id="A"]').elementHandle();
   await page.evaluate(async()=>{await fetchProcessingQueue();});
   assert(await rowBefore.evaluate(e=>e.isConnected));
@@ -154,6 +174,43 @@ for (const match of HTML.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/g)) new F
   await page.evaluate(()=>setTheme('light'));
   await page.waitForTimeout(350);
   await page.locator('#queueCard').screenshot({path:'queue-cache-light.png'});
+  // Redo goes above finished rows and keeps the actual pending order.
+  jobs.push({id:'Q1',title:'Próximo pendente',status:'queued',position:1,owner_username:'owner'},
+      {id:'RETRY',title:'Refazendo Canção A',status:'queued',position:2,owner_username:'owner'});
+  await page.evaluate(()=>fetchProcessingQueue());
+  assert.deepEqual(await rowIds(),['Q1','RETRY','A','B','S','C']);
+  assert(await page.locator('#btnClearQueueCache').isDisabled());
+  assert(await page.locator('[data-cache-id="Q1"] button[title="Mover para cima"]').isDisabled());
+  assert(await page.locator('[data-cache-id="RETRY"] button[title="Mover para baixo"]').isDisabled());
+  jobs.find(job=>job.id==='Q1').status='done';jobs.find(job=>job.id==='RETRY').position=1;
+  await page.evaluate(()=>fetchProcessingQueue());
+  assert.deepEqual(await rowIds(),['RETRY','A','B','S','C','Q1']);
+  jobs.find(job=>job.id==='RETRY').status='done';
+  jobs.push({id:'BOB',title:'Outra conta em processamento',status:'processing',owner_username:'bob'});
+  serverStatus={status:'processing',progress:30,can_cancel:false,process_summary:{title:'Outra conta em processamento'}};
+  await page.evaluate(async()=>{await fetchStatus();await fetchProcessingQueue();});
+  assert.deepEqual(await rowIds(),['BOB','A','B','S','C','Q1','RETRY']);
+  assert.equal(await page.locator('#btnClearQueueCache').isDisabled(),false);
+  await page.locator('#queueCard').screenshot({path:'queue-clear-ready.png'});
+  await page.locator('#btnClearQueueCache').click();
+  assert.equal(requests.filter(r=>r.path==='/api/queue-cache'&&r.method==='DELETE').length,0);
+  assert(confirmations[0].includes('6 itens'));
+  acceptClear=true;failClear=true;
+  await page.locator('#btnClearQueueCache').click();
+  await page.getByText('Falha de limpeza; tente novamente.',{exact:true}).waitFor();
+  assert.equal(await page.locator('#btnClearQueueCache').isDisabled(),false);
+  assert.equal((await rowIds()).length,7);
+  failClear=false;
+  await page.evaluate(()=>clearTimeout(processingQueuePollTimer));
+  holdNextQueue=true;
+  const staleFetch=page.evaluate(()=>fetchProcessingQueue());
+  await heldQueueReady;
+  await page.locator('#btnClearQueueCache').click();
+  await page.waitForFunction(()=>document.getElementById('creationFeedback').textContent.includes('Cache da sua fila apagado.'));
+  assert.deepEqual(await rowIds(),['BOB']);
+  assert(await page.locator('#queueCacheControls').isHidden());
+  await releaseHeldQueue();await staleFetch;
+  assert.deepEqual(await rowIds(),['BOB'],'A stale poll restored cleared cache items');
   jobs.splice(0,jobs.length,{id:'NEXT',title:'Próxima fila',status:'queued',can_reprocess:true,has_segments:false});
   serverStatus={status:'processing',progress:1,step:'Preparing queued job',can_cancel:true};
   await page.evaluate(async()=>{await fetchStatus();await fetchProcessingQueue();});
