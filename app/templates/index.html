@@ -1527,7 +1527,7 @@
             padding: 0.75rem 0.85rem;
             border: 1px solid rgba(73, 174, 239, 0.18);
             border-radius: 12px;
-            background: rgba(3, 14, 24, 0.65);
+            background: var(--input-bg);
             min-width: 0;
             max-width: 100%;
         }
@@ -1553,6 +1553,17 @@
             font-size: 0.68rem;
             font-weight: 800;
         }
+        .queue-actions .btn-secondary {
+            display: inline-flex; align-items: center; gap: .32rem;
+            min-height: 32px; width: auto; padding: .35rem .5rem;
+            font-size: .72rem; line-height: 1.2; white-space: nowrap;
+        }
+        [data-theme="light"] .queue-item .queue-status { color: var(--pink-accent); }
+        .queue-revision-btn svg { width: 14px; height: 14px; flex: 0 0 14px; }
+        .queue-revision-btn:disabled { opacity: .4; cursor: not-allowed; }
+        .queue-item[data-status="done"] { border-color: rgba(34, 197, 94, .3); }
+        .queue-item .queue-meta { display: flex; align-items: center; flex-wrap: wrap; gap: .4rem; }
+        #queueFeedback:empty { display: none; }
         .queue-move-btn {
             min-width: 2.35rem;
             padding: 0.42rem 0.58rem;
@@ -2176,12 +2187,13 @@
                     <span class="card-title"><span class="line-glyph">≡</span> Fila de processamento</span>
                     <span id="queueCountBadge" class="queue-status">0 aguardando</span>
                 </div>
-                <p class="compact-note" style="margin-bottom: 0.8rem;">Selecione vários arquivos de uma vez. O servidor prepara um vídeo por vez, sem sobrescrever os demais.</p>
+                <p class="compact-note" style="margin-bottom: 0.8rem;">Os concluídos continuam nesta lista para editar e refazer. A lista só é trocada quando uma nova mídia inicia a próxima fila.</p>
                 <div class="queue-maintenance-control">
                     <span class="compact-note queue-pause-status">A fila está ativa.</span>
                     <button type="button" class="btn-secondary btn-queue-pause">⏸ Pausar ao concluir etapa</button>
                 </div>
                 <div id="processingQueueList" class="queue-list"><span class="compact-note">A fila está vazia.</span></div>
+                <p id="queueFeedback" class="compact-note" role="status"></p>
             </div>
 
             <!-- CARD DE PROGRESSO DE PRODUÇÃO -->
@@ -2894,7 +2906,7 @@
                 </ol>
                 <p>A API tem cota gratuita e pode limitar projetos sem auditoria a vídeos privados. Guarde a autorização como uma senha. Backing vocals e vídeo do modo SRT mostram porcentagem da etapa e avisam o avanço no Telegram; o LibreTranslate informa apenas início e término.</p>
             </details>
-            <p class="compact-note">Versão do servidor: 12.2. A transcrição é local; fontes, modelos e integrações podem acessar serviços externos. Use conteúdo autorizado.</p>
+            <p class="compact-note">Versão do servidor: 12.2.1. A transcrição é local; fontes, modelos e integrações podem acessar serviços externos. Use conteúdo autorizado.</p>
             <p class="compact-note">Use o servidor pela rede local ou VPN. A busca/importação do YouTube não concede direitos sobre a mídia. OAuth autoriza o acesso ao canal, não o uso de músicas. Confira as permissões do conteúdo e os termos do YouTube antes de importar ou publicar. Não listado permite acesso a quem tiver o link; resultados SRT nunca vão ao YouTube.</p>
             <p class="compact-note"><a href="https://www.youtube.com/static?template=terms" target="_blank" rel="noopener noreferrer">Termos do YouTube</a> · <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer">Privacidade do Google</a> · <a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener noreferrer">Revogar acesso ao canal</a></p>
         </div>
@@ -4080,9 +4092,10 @@
         }
 
         function queueStatusLabel(job) {
+            if (job.cancel_requested && job.status === 'processing') return 'Cancelando…';
             if (job.status === 'queued') return `Aguardando · posição ${job.position || '—'}`;
             if (job.status === 'processing') return 'Processando agora';
-            return job.status || 'Desconhecido';
+            return ({done:'Concluído', error:'Interrompido', cancelled:'Cancelado', removed:'Removido da execução', replaced:'Versão anterior'})[job.status] || job.status || 'Desconhecido';
         }
 
         function renderProcessingQueue(jobs, queueState = {}) {
@@ -4092,14 +4105,14 @@
             if (!card || !container || !badge) return;
             latestQueueJobs = jobs;
             latestQueueState = queueState;
-            const activeJobs = jobs.filter(job => ['queued', 'processing'].includes(job.status));
+            const activeJobs = jobs.filter(job => ['queued', 'processing'].includes(job.status) && !job.cancel_requested);
             const queuedCount = activeJobs.filter(job => job.status === 'queued').length;
             processingQueuePaused = Boolean(queueState.paused);
             processingQueuePausePending = Boolean(queueState.pause_pending);
             updateQueueCreationNotice();
             const adminCanControl = currentUser?.role === 'admin';
             document.querySelectorAll('.queue-maintenance-control').forEach(control => {
-                control.style.display = adminCanControl ? 'flex' : 'none';
+                control.style.display = adminCanControl && (activeJobs.length || processingQueuePaused) ? 'flex' : 'none';
             });
             document.querySelectorAll('.queue-pause-status').forEach(status => {
                 status.textContent = processingQueuePaused
@@ -4112,25 +4125,24 @@
                 button.textContent = processingQueuePaused ? '▶ Retomar do checkpoint' : '⏸ Pausar ao concluir etapa';
                 button.onclick = toggleProcessingQueuePause;
             });
-            card.style.display = !queueCreationExpanded && !clientPreparationInProgress && (queuedCount > 0 || activeJobs.length > 1 || (adminCanControl && processingQueuePaused)) ? '' : 'none';
-            badge.textContent = processingQueuePaused ? `${queuedCount} pausados` : `${queuedCount} aguardando`;
+            card.style.display = !queueCreationExpanded && !clientPreparationInProgress && (jobs.length > 0 || (adminCanControl && processingQueuePaused)) ? '' : 'none';
+            badge.textContent = activeJobs.length || processingQueuePaused ? (processingQueuePaused ? `${queuedCount} pausados` : `${queuedCount} aguardando`) : `${jobs.length} itens`;
             if (latestServerStatus && ['idle', 'done', 'error'].includes(latestServerStatus.status) && !queueCreationExpanded && !clientPreparationInProgress) {
                 void renderServerStatus(latestServerStatus);
             }
-            if (activeJobs.length <= 1 && queuedCount === 0 && !processingQueuePaused) {
-                container.replaceChildren();
-                return;
-            }
+            const signature = JSON.stringify({jobs, adminCanControl});
+            if (container.dataset.signature === signature) return;
+            container.dataset.signature = signature;
             const queuedJobs = activeJobs.filter(job => job.status === 'queued');
             const queuedOrder = new Map(queuedJobs.map((job, index) => [job.id, index]));
-            container.innerHTML = activeJobs.slice(0, 20).map(job => `
-                <div class="queue-item">
+            container.innerHTML = jobs.map(job => `
+                <div class="queue-item" data-cache-id="${escapeHtml(job.id)}" data-status="${escapeHtml(job.status)}">
                     <div>
                         <div class="queue-title">${escapeHtml(job.title || 'Vídeo')}</div>
-                        <div class="queue-meta">${currentUser?.role === 'admin' ? `${escapeHtml(job.owner_username || 'perfil')} · ` : ''}${escapeHtml(job.message || '')}</div>
+                        <div class="queue-meta"><span class="queue-status">${escapeHtml(queueStatusLabel(job))}</span><span>${currentUser?.role === 'admin' ? `${escapeHtml(job.owner_username || 'perfil')} · ` : ''}${escapeHtml(job.message || '')}</span></div>
                     </div>
                     <div class="queue-actions">
-                        <span class="queue-status">${escapeHtml(queueStatusLabel(job))}</span>
+                        ${cachedQueueActionButtons(job)}
                         ${job.status === 'queued' && adminCanControl ? `
                             <button type="button" class="btn-secondary queue-move-btn" title="Mover para cima" aria-label="Mover ${escapeHtml(job.title || 'item')} para cima" ${queuedOrder.get(job.id) === 0 ? 'disabled' : ''} onclick="moveQueuedJob('${encodeURIComponent(job.id)}', 'up')">↑</button>
                             <button type="button" class="btn-secondary queue-move-btn" title="Mover para baixo" aria-label="Mover ${escapeHtml(job.title || 'item')} para baixo" ${queuedOrder.get(job.id) === queuedJobs.length - 1 ? 'disabled' : ''} onclick="moveQueuedJob('${encodeURIComponent(job.id)}', 'down')">↓</button>
@@ -4145,12 +4157,11 @@
 
         async function fetchProcessingQueue() {
             try {
-                const response = await authFetch('/api/queue', { cache: 'no-store' });
+                const response = await authFetch('/api/queue?include_completed=true', { cache: 'no-store' });
                 if (!response.ok) return;
                 const data = await response.json();
                 const jobs = data.jobs || [];
                 renderProcessingQueue(jobs, data);
-                await fetchQueueCache();
                 clearTimeout(processingQueuePollTimer);
                 if (data.paused || jobs.some(job => ['queued', 'processing'].includes(job.status))) {
                     processingQueuePollTimer = setTimeout(fetchProcessingQueue, 3000);

@@ -1,12 +1,4 @@
 <style>
-    #queueCacheCard { padding: 20px; }
-    #queueCacheCard > summary { cursor: pointer; font-weight: 700; font-size: 1.08rem; }
-    #queueCacheCard .compact-note { margin: 12px 0; }
-    .queue-cache-row { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; padding: 14px 0; border-top: 1px solid var(--border-color, #334155); }
-    .queue-cache-row > div:first-child { flex: 1 1 220px; min-width: 0; }
-    .queue-cache-row strong { display: block; overflow-wrap: anywhere; }
-    .queue-cache-actions { display: flex; flex-wrap: wrap; gap: 8px; }
-    .queue-cache-actions button { font-size: .84rem; }
     #cachedRevisionNotice { padding: 16px; border: 1px solid #38bdf8; border-radius: 12px; margin-bottom: 16px; }
     #cachedRevisionNotice p { margin: 6px 0 12px; }
     .youtube-extras { margin-top: 12px; }
@@ -25,12 +17,6 @@
     <div id="cachedSubtitleStyle" hidden></div>
     <button type="button" class="btn-secondary" id="btnClearCachedRevision">Voltar a uma nova criação</button>
 </div>
-<details class="card" id="queueCacheCard" hidden>
-    <summary>Execuções desta fila <span id="queueCacheCount"></span></summary>
-    <p class="compact-note">Você pode voltar a qualquer item para corrigir legendas e refazer o vídeo. Os arquivos continuam aqui após o término da fila e só são liberados quando uma nova mídia inicia a próxima fila.</p>
-    <div id="queueCacheJobs"></div>
-    <p id="queueCacheFeedback" class="compact-note" role="status"></p>
-</details>
 <script>
 window.cachedRevisionId = '';
 window.cachedRevisionOptions = {};
@@ -45,35 +31,28 @@ async function cacheRequest(path, init = {}) {
     if (!response.ok) throw new Error(typeof result.detail === 'string' ? result.detail : 'Não foi possível concluir. Confira o texto e os horários.');
     return result;
 }
-function cacheFeedback(error) { document.getElementById('queueCacheFeedback').textContent = error.message || String(error); }
-async function fetchQueueCache() {
+function cacheFeedback(error) { document.getElementById('queueFeedback').textContent = error.message || String(error); }
+async function runCachedQueueAction(button, id, action) {
+    const wasDisabled = button.disabled;
+    button.disabled = true;
+    document.getElementById('queueFeedback').textContent = '';
     try {
-        const data = await cacheRequest('');
-        const jobs = Array.isArray(data.jobs) ? data.jobs : [];
-        const card = document.getElementById('queueCacheCard'); card.hidden = jobs.length === 0;
-        document.getElementById('queueCacheCount').textContent = jobs.length ? `(${jobs.length})` : '';
-        // Don't touch the editor: progress polling must preserve typing and the mobile keyboard.
-        const list = document.getElementById('queueCacheJobs');
-        const signature = JSON.stringify(jobs);
-        if (list.dataset.signature === signature) return;
-        list.dataset.signature = signature; list.replaceChildren();
-        const labels = {done:'Concluído',queued:'Aguardando',processing:'Em andamento',error:'Interrompido',cancelled:'Cancelado',removed:'Removido da execução',replaced:'Versão anterior'};
-        for (const job of jobs) {
-            const row = document.createElement('div'); row.className = 'queue-cache-row'; row.dataset.cacheId = job.id;
-            const info = document.createElement('div'); const title = document.createElement('strong'); title.textContent = job.title;
-            const note = document.createElement('span'); note.className = 'compact-note'; note.textContent = `${labels[job.status] || job.status} · ${job.subtitle_only ? 'Legendar vídeo' : 'Karaokê'}`;
-            info.append(title, note); row.append(info);
-            const actions = document.createElement('div'); actions.className = 'queue-cache-actions';
-            for (const [label, action, enabled] of [
-                ['Editar legendas', () => openCachedEditor(job.id), job.has_segments && job.can_reprocess],
-                ['Refazer no Rápido', () => openCacheSettings(job.id, true), job.can_reprocess && !job.subtitle_only],
-                [job.subtitle_only ? 'Rever ajustes' : 'Refazer no Detalhado', () => openCacheSettings(job.id, false), job.can_reprocess]]) {
-                const button = document.createElement('button'); button.type = 'button'; button.className = 'btn-secondary'; button.textContent = label; button.disabled = !enabled;
-                button.onclick = async () => { try { await action(); } catch (error) { cacheFeedback(error); } }; actions.append(button);
-            }
-            row.append(actions); list.append(row);
-        }
-    } catch (error) { console.warn('Cache da fila:', error.message); }
+        if (action === 'edit') await openCachedEditor(id);
+        else await openCacheSettings(id, action === 'quick');
+    } catch (error) { cacheFeedback(error); }
+    finally { button.disabled = wasDisabled; }
+}
+function cachedQueueActionButtons(job) {
+    const id = encodeURIComponent(job.id);
+    const title = escapeHtml(job.title || 'vídeo');
+    const icon = paths => `<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${paths}</g></svg>`;
+    const editIcon = icon('<path d="M15 5l4 4M4 20l4-1 12-12a3 3 0 0 0-4-4L4 15z"/>');
+    const quickIcon = icon('<path d="M13 2L4 14h7l-1 8 10-12h-7z"/>');
+    const detailIcon = icon('<path d="M4 6h16M4 12h16M4 18h16"/><circle cx="8" cy="6" r="2"/><circle cx="16" cy="12" r="2"/><circle cx="10" cy="18" r="2"/>');
+    const button = (label, description, action, enabled, svg) => `<button type="button" class="btn-secondary queue-revision-btn" data-queue-action="${action}" title="${description}" aria-label="${description}: ${title}" ${enabled ? '' : 'disabled'} onclick="runCachedQueueAction(this, '${id}', '${action}')">${svg}<span>${label}</span></button>`;
+    return button('Legendas', 'Editar legendas', 'edit', job.has_segments && job.can_reprocess, editIcon)
+        + (job.subtitle_only ? '' : button('Rápido', 'Refazer no Rápido', 'quick', job.can_reprocess, quickIcon))
+        + button(job.subtitle_only ? 'Ajustes' : 'Detalhado', job.subtitle_only ? 'Rever ajustes de legendagem' : 'Refazer no Detalhado', 'detail', job.can_reprocess, detailIcon);
 }
 function clearCachedRevision() {
     window.cachedRevisionId = ''; window.cachedRevisionOptions = {};

@@ -1023,23 +1023,23 @@ def start_processing_queue_worker():
 
 
 @app.get("/api/queue")
-def get_processing_queue(current_user: dict = Depends(get_current_user)):
+def get_processing_queue(current_user: dict = Depends(get_current_user), include_completed: bool = False):
     with processing_queue_lock:
         waiting = 0
         visible = []
         for job in processing_queue:
-            if job.get("status") not in ACTIVE_QUEUE_STATUSES or job.get("cancel_requested"):
+            if not include_completed and (job.get("status") not in ACTIVE_QUEUE_STATUSES or job.get("cancel_requested")):
                 continue
             position = None
             if job.get("status") == "queued":
                 waiting += 1
                 position = waiting
             if is_admin(current_user) or job.get("owner_username") == current_user.get("username"):
-                visible.append(public_queue_job(job, position))
+                visible.append(public_cached_queue_job(job, position) if include_completed else public_queue_job(job, position))
         active_job = next((job for job in processing_queue if job.get("status") == "processing"), None)
         paused = processing_queue_paused
     return {
-        "jobs": visible[-100:],
+        "jobs": visible if include_completed else visible[-100:],
         "paused": paused,
         "pause_pending": bool(paused and active_job),
     }
@@ -3863,20 +3863,23 @@ def get_cached_audio(current_user: dict = Depends(get_current_user), job_id: str
     return FileResponse(source, media_type=mimetypes.guess_type(source)[0] or "audio/wav")
 
 
+def public_cached_queue_job(job: dict, waiting_position: int | None = None) -> dict:
+    pipeline = job.get("pipeline") or {}
+    cache_dir = pipeline.get("cache_dir", "")
+    meta = queue_cache.read_json(os.path.join(cache_dir, "cache_meta.json"), {})
+    has_source = os.path.isfile(os.path.join(cache_dir, "original_input" + str(meta.get("input_ext", ""))))
+    return {**public_queue_job(job, waiting_position), "batch_id": job.get("batch_id"),
+        "revision_of": job.get("revision_of"), "subtitle_only": bool(pipeline.get("subtitle_only")),
+        "cancel_requested": bool(job.get("cancel_requested")),
+        "has_segments": bool(queue_cache.read_segments(cache_dir)),
+        "can_reprocess": bool(has_source and job.get("status") != "processing")}
+
+
 @app.get("/api/queue-cache")
 def get_queue_cache(current_user: dict = Depends(get_current_user)):
     with processing_queue_lock:
-        items = []
-        for job in processing_queue:
-            if not (is_admin(current_user) or job.get("owner_username") == current_user.get("username")):
-                continue
-            cache_dir = (job.get("pipeline") or {}).get("cache_dir", "")
-            meta = queue_cache.read_json(os.path.join(cache_dir, "cache_meta.json"), {})
-            has_source = os.path.isfile(os.path.join(cache_dir, "original_input" + str(meta.get("input_ext", ""))))
-            items.append({**public_queue_job(job), "batch_id": job.get("batch_id"), "revision_of": job.get("revision_of"),
-                "subtitle_only": bool((job.get("pipeline") or {}).get("subtitle_only")),
-                "has_segments": bool(queue_cache.read_segments(cache_dir)),
-                "can_reprocess": bool(has_source and job.get("status") != "processing")})
+        items = [public_cached_queue_job(job) for job in processing_queue
+            if is_admin(current_user) or job.get("owner_username") == current_user.get("username")]
     return {"jobs": items}
 
 

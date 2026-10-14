@@ -1,3 +1,10 @@
+# 12.2.1
+
+- Edição e reexecução passam para a **Fila de processamento** já existente. Removido o painel separado de execuções. Cada item tem botões compactos com ícones, textos curtos e descrições acessíveis: **Legendas**, **Rápido** e **Detalhado**; Legendar vídeo usa **Ajustes**.
+- A lista conserva todos os itens, incluindo concluídos, erros, cancelamentos e versões anteriores. Fim da execução não esconde a fila nem apaga seus itens. Somente uma nova origem aceita após esgotar os pendentes inicia outra fila e substitui os itens do perfil. Revisões e novas inclusões durante o processamento continuam na mesma fila.
+- Contagem de pendentes, remoção, ordem e pausa continuam disponíveis. Consultas preservam foco e teclado; não há corte dos itens antigos por limite de exibição. A interface usa uma única consulta da fila, com dados de revisão por item, preservando a resposta original para os clientes que consultam apenas os pendentes.
+- Verificação de backend, isolamento de perfis, retenção após término/reinício, troca de fila, lista extensa e navegador em 320, 390, 768 e 1440 px. Mantidos revisão independente, YouTube, Telegram e playlists da 12.2. Atualização somente do servidor.
+
 # 12.2
 
 - O cache mantém **todas as execuções da fila por perfil**, inclusive resultados concluídos, erros, cancelamentos e itens removidos. A conclusão não apaga os arquivos. Uma nova origem, aceita após esgotar a fila, inicia a próxima e libera o cache anterior. Inclusões durante a execução e revisões de itens em cache continuam na mesma fila; Biblioteca, modelos e outras contas são preservados.

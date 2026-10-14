@@ -64,7 +64,7 @@ class QueueCacheTests(unittest.TestCase):
         names={'save_processing_queue_unlocked','load_processing_queue','public_queue_job','enqueue_processing_job',
             'retire_queue_batch','ensure_processing_queue_capacity','active_queue_pipeline_for_user','cached_queue_job',
             'queue_cache_dir_for_user','remove_finished_queue_cache','get_processing_queue','remove_queued_job',
-            'get_cache_info','get_cached_background','get_cached_audio','get_queue_cache','get_queue_cache_job',
+            'get_cache_info','get_cached_background','get_cached_audio','get_queue_cache','public_cached_queue_job','get_queue_cache_job',
             'save_queue_cache_segments','reprocess_queue_cache_job','process_karaoke','processing_queue_worker'}
         tree=ast.parse((ROOT/'app/main.py').read_text())
         nodes=[n for n in tree.body if isinstance(n,ast.ClassDef) and n.name in {'EditWordModel','EditSegmentModel','ContinueProcessModel'}
@@ -100,6 +100,7 @@ class QueueCacheTests(unittest.TestCase):
         self.assertEqual([j['status'] for j in self.scope['processing_queue']],['done','error'])
         self.assertEqual(self.client.get('/api/queue').json()['jobs'],[])
         self.assertEqual([j['id'] for j in self.client.get('/api/queue-cache').json()['jobs']],['A','B'])
+        self.assertEqual([j['id'] for j in self.client.get('/api/queue?include_completed=true').json()['jobs']],['A','B'])
         self.assertTrue(Path(a['pipeline']['cache_dir']).is_dir());self.assertTrue(Path(b['pipeline']['cache_dir']).is_dir())
 
     def test_new_source_only_rotates_after_current_queue_is_exhausted(self):
@@ -116,6 +117,7 @@ class QueueCacheTests(unittest.TestCase):
         self.assertFalse(Path(a['pipeline']['cache_dir']).exists());self.assertFalse(Path(b['pipeline']['cache_dir']).exists())
         self.assertTrue(Path(bob['pipeline']['cache_dir']).exists());self.assertTrue(history.exists())
         self.assertEqual(len([j for j in self.queue if j['owner_username']=='alice']),1)
+        self.assertEqual([j['id'] for j in self.client.get('/api/queue?include_completed=true').json()['jobs']],[nextresult.json()['job_id']])
 
     def test_draft_and_reprocess_are_bound_to_a_while_b_is_active(self):
         a=self.job('A');b=self.job('B','processing');self.job('BOB',owner='bob')
@@ -215,6 +217,21 @@ class QueueCacheTests(unittest.TestCase):
         verified=[{'start':1,'end':2,'text':'Texto conferido','words':[]}]
         (cache/'lyrics_guide_cache.json').write_text(json.dumps({'segments':verified,'report':{}}))
         self.assertEqual(self.client.get('/api/queue-cache/A').json()['segments'],verified)
+
+    def test_existing_queue_list_can_include_finished_items_and_actions_without_exposing_other_profiles(self):
+        self.job('A');self.job('B','queued');self.job('C','cancelled');self.job('BOB',owner='bob')
+        self.assertEqual([j['id'] for j in self.client.get('/api/queue').json()['jobs']],['B'])
+        visible=self.client.get('/api/queue?include_completed=true').json()['jobs']
+        self.assertEqual([j['id'] for j in visible],['A','B','C'])
+        self.assertEqual(visible[1]['position'],1)
+        self.assertTrue(visible[0]['has_segments']);self.assertTrue(visible[0]['can_reprocess'])
+        self.user={'username':'administrator','role':'admin'}
+        self.assertEqual(len(self.client.get('/api/queue?include_completed=true').json()['jobs']),4)
+
+    def test_finished_queue_list_does_not_drop_earlier_items_at_a_display_limit(self):
+        for index in range(105): self.job(str(index))
+        self.assertEqual(len(self.client.get('/api/queue?include_completed=true').json()['jobs']),105)
+        self.assertEqual(self.client.get('/api/queue').json()['jobs'],[])
 
     def test_snapshot_freezes_guide_but_does_not_expose_paths(self):
         a=self.job('A');options=self.client.get('/api/queue-cache/A').json()['options']

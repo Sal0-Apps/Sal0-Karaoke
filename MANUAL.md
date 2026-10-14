@@ -195,9 +195,9 @@ Você pode baixar vídeos de fundo pela Biblioteca durante um processamento. O d
 
 Como administrador, use **↑ / ↓** para mover itens aguardando. Um item em processamento não muda de posição. Os demais perfis não veem esses botões.
 
-**Remover** tira um item pendente da fila e limpa seus temporários. **Cancelar Processamento** encerra a tarefa atual. A próxima tarefa elegível começa se a fila estiver ativa e não houver uma pausa/revisão impedindo o avanço.
+**Remover** tira um item pendente da execução e conserva seus arquivos nesta fila para ajustes ou reexecução. **Cancelar Processamento** encerra a tarefa atual. A próxima tarefa elegível começa se a fila estiver ativa e não houver uma pausa/revisão impedindo o avanço.
 
-A fila não é histórico: trabalhos encerrados saem dela. Os arquivos concluídos ficam em **Biblioteca → Resultados**. Cancelar não equivale a apagar todos os arquivos já salvos na Biblioteca.
+Trabalhos encerrados continuam na própria lista com os botões **Legendas**, **Rápido** e **Detalhado**; Legendar vídeo usa **Ajustes**. A lista e o cache só são substituídos quando uma nova mídia é aceita após esgotar os pendentes. Refazer um item conserva a fila atual. Os resultados salvos continuam em **Biblioteca → Resultados**, inclusive depois da troca de fila.
 
 ## 8. Progresso e pausa por etapa
 
@@ -401,13 +401,13 @@ O uso pessoal, a ausência de divulgação, a gratuidade e o acesso por VPN não
 
 Referências: [Termos do YouTube](https://www.youtube.com/static?template=terms), [políticas da API](https://developers.google.com/youtube/terms/developer-policies), [privacidade do Google](https://policies.google.com/privacy) e [permissões da conta Google](https://myaccount.google.com/permissions).
 
-O cache mantém todas as execuções da fila atual desse perfil. Abra **Criar → Execuções desta fila**, escolha o item e use **Editar legendas**, **Refazer no Rápido** ou **Refazer no Detalhado**. Legendar vídeo oferece **Rever ajustes**, com visual por execução. A fila concluída permanece disponível; só uma nova origem aceita após esgotar os pendentes inicia a próxima fila e libera os arquivos anteriores. Refazer um item em cache e adicionar durante a execução continuam na mesma fila. Resultados da Biblioteca permanecem. Os arquivos já apagados antes da 12.2 não podem ser recuperados.
+O cache mantém todas as execuções da fila atual desse perfil. Abra **Criar → Fila de processamento**, escolha o item e use **Legendas**, **Rápido** ou **Detalhado**. Legendar vídeo oferece **Ajustes**, com visual por execução. A fila concluída permanece disponível; só uma nova origem aceita após esgotar os pendentes inicia a próxima fila e libera os arquivos anteriores. Refazer um item em cache e adicionar durante a execução continuam na mesma fila. Resultados da Biblioteca permanecem. Os arquivos já apagados antes da 12.2 não podem ser recuperados.
 
 ## Refazer um vídeo da fila e corrigir a publicação
 
-1. Abra **Criar → Execuções desta fila** e localize a música ou vídeo desejado. O painel começa recolhido e conserva os itens após a conclusão.
-2. Em **Editar legendas**, confira o áudio daquela execução, altere texto/horários e salve. **Salvar alterações nesta execução** mantém a revisão sem gerar um vídeo; **Salvar e renderizar** adiciona uma revisão à mesma fila.
-3. Para mudar o visual ou áudio, use **Refazer no Rápido** (perfil rápido atual) ou **Refazer no Detalhado** (ajustes daquela execução). Em Legendar vídeo, **Rever ajustes** também permite mudar tamanho, posição, cores e idioma embutido sem alterar os padrões administrativos.
+1. Abra **Criar → Fila de processamento** e localize a música ou vídeo desejado. A própria lista conserva os itens após a conclusão e oferece os botões compactos em cada linha.
+2. Em **Legendas**, confira o áudio daquela execução, altere texto/horários e salve. **Salvar alterações nesta execução** mantém a revisão sem gerar um vídeo; **Salvar e renderizar** adiciona uma revisão à mesma fila.
+3. Para mudar o visual ou áudio, use **Rápido** (perfil rápido atual) ou **Detalhado** (ajustes daquela execução). Em Legendar vídeo, **Ajustes** também permite mudar tamanho, posição, cores e idioma embutido sem alterar os padrões administrativos.
 4. A playlist do perfil permanece incluída. Para mais destinos, marque **Enviar também para outras playlists** e escolha as adicionais; em novas criações, a opção começa desmarcada.
 5. Se existe uma publicação confirmada, **Substituir o vídeo anterior no YouTube** começa marcado. O app mantém sua privacidade, envia o novo vídeo, confirma capa e playlists, e só então remove o anterior. O novo tem outro link, que também atualiza a mensagem do Telegram. Comentários e estatísticas antigos não são transferidos. Desmarque para conservar as duas publicações.
 

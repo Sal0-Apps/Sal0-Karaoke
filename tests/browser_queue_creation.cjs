@@ -81,7 +81,7 @@ const activeJob = () => ({id: 'active', status: 'processing', title: 'Música em
 
         // The two primary actions are visible together; queue count comes from GET /api/queue.
         assert(!await page.locator('#creationFeedback').isVisible());
-        assert(!await page.locator('#queueCard').isVisible());
+        assert(await page.locator('#queueCard').isVisible());
         for (const width of [320, 360, 390, 768, 1440]) {
             await page.setViewportSize({width, height: 900});
             const add = await page.locator('#btnToggleQueueCreation').boundingBox();
@@ -203,7 +203,7 @@ const activeJob = () => ({id: 'active', status: 'processing', title: 'Música em
         queuePaused = false; serverStatus = processing(); jobs[0].status = 'processing';
         await refresh();
         assert.equal(await page.locator('#processStatusTitle').textContent(), '⏳ Produzindo');
-        assert(!await page.locator('#queueCard').isVisible());
+        assert(await page.locator('#queueCard').isVisible());
 
         // An asynchronous review load must not reopen its panel over a new-item draft.
         serverStatus = {status: 'waiting_for_user_correction', can_cancel: true};
