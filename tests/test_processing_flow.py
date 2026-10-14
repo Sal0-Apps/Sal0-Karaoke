@@ -223,11 +223,12 @@ class ReviewBackgroundTests(unittest.TestCase):
             cache = Path(folder)
             (cache / 'cache_meta.json').write_text(json.dumps({'has_bg': True, 'bg_ext': '.png'}))
             (cache / 'original_bg.png').write_bytes(b'unused')
-            pipeline = {'input_audio_path': '/own/source.mp4', 'background_mode': 'original'}
+            video = cache / 'source.mp4'; video.write_bytes(b'original')
+            pipeline = {'input_audio_path': str(video), 'background_mode': 'original'}
             view = load_function('get_cached_background', os=os, json=json, mimetypes=mimetypes,
                 queue_cache_dir_for_user=lambda _, job_id="": str(cache), active_queue_pipeline_for_user=lambda _, job_id="": pipeline,
                 check_has_video=lambda _: True, FileResponse=FileResponse)
-            self.assertEqual(view({}).path, '/own/source.mp4')
+            self.assertEqual(view({}).path, str(video))
 
     def test_solid_color_preview_matches_the_black_render(self):
         view = load_function('get_cached_background', os=os, queue_cache_dir_for_user=lambda _, job_id="": '/own/cache',

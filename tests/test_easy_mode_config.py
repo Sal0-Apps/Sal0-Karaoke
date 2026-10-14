@@ -166,7 +166,7 @@ class EasyModeConfigTests(unittest.TestCase):
         )
         easy_block = next(
             node for node in process_function.body
-            if isinstance(node, ast.If) and isinstance(node.test, ast.Name) and node.test.id == "easy_mode"
+            if isinstance(node, ast.If) and any(isinstance(part, ast.Name) and part.id == "easy_mode" for part in ast.walk(node.test))
         )
         config_assignments = {}
         constants = {}
@@ -280,8 +280,12 @@ class EasyModeConfigTests(unittest.TestCase):
         self.assertIn("window.addEventListener('focus'", html)
         self.assertNotIn("setInterval(fetchStatus", html)
         self.assertLess(
-            html.index("await fetchStatus();", html.index("const isAuthenticated")),
-            html.index("await fetchEasyModeConfig();", html.index("const isAuthenticated")),
+            html.index("const queueReady = fetchProcessingQueue();", html.index("const isAuthenticated")),
+            html.index("void fetchStatus()", html.index("const isAuthenticated")),
+        )
+        self.assertLess(
+            html.index("void fetchStatus()", html.index("const isAuthenticated")),
+            html.index("fetchEasyModeConfig(),", html.index("const isAuthenticated")),
         )
         # Form visibility and submission locks are exercised through all three
         # handlers in browser_queue_creation.cjs, including concurrent polls.

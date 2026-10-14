@@ -12,6 +12,7 @@
 <div id="cachedRevisionNotice" hidden>
     <strong id="cachedRevisionTitle"></strong>
     <p class="compact-note">A origem, as legendas e os arquivos desta execução continuam em cache. Ajuste e envie novamente para esta fila.</p>
+    <p id="cachedMediaDescription" class="compact-note"></p>
     <label id="cachedReplaceLabel" hidden><input type="checkbox" id="cachedReplaceYoutube" checked> Substituir o vídeo anterior no YouTube</label>
     <p id="cachedReplaceHint" class="compact-note" hidden>A privacidade anterior é mantida e o YouTube gera um novo link. O anterior só será removido depois da confirmação do novo vídeo, capa e playlists. A mensagem do Telegram recebe o novo link.</p>
     <div id="cachedSubtitleStyle" hidden></div>
@@ -24,6 +25,7 @@ window.cacheEditorActive = false;
 window.cachedEditorId = '';
 let cachedYoutubeOptions = {};
 let cachedPlaylistChoices = [];
+const cachedExtraSelections = new Map();
 
 async function cacheRequest(path, init = {}) {
     const response = await authFetch('/api/queue-cache' + path, init);
@@ -56,10 +58,14 @@ function cachedQueueActionButtons(job) {
 }
 function clearCachedRevision() {
     window.cachedRevisionId = ''; window.cachedRevisionOptions = {};
+    window.cachedRevisionTitle = '';
+    if (typeof easyModeConfig !== 'undefined' && easyModeConfig) refreshEasySummary(easyModeConfig);
+    document.querySelector('#easyBackgroundDefaultChoice > span').textContent = '✨ Surpresa';
     document.getElementById('cachedRevisionNotice').hidden = true;
     document.getElementById('cachedSubtitleStyle').hidden = true;
 }
 function resetYoutubeExtras() {
+    cachedExtraSelections.clear();
     for (const prefix of ['easy', 'full']) {
         const checkbox = document.getElementById(prefix + 'YoutubeExtras');
         if (checkbox) { checkbox.checked = false; document.getElementById(prefix + 'YoutubeExtraList').hidden = true; }
@@ -68,6 +74,8 @@ function resetYoutubeExtras() {
 }
 function closeCachedEditor() {
     window.cacheEditorActive = false; window.cachedEditorId = '';
+    correctionLoadGeneration++;
+    resetCorrectionPreview();
     document.getElementById('correctionCard').style.display = 'none';
     document.getElementById('correctionAudio')?.pause(); isShowingCorrection = false;
     document.querySelectorAll('#correctionCard .btn-cancel-task, #correctionCard .btn-add-queue').forEach(button => button.hidden = false);
@@ -75,21 +83,37 @@ function closeCachedEditor() {
     const skip = document.getElementById('btnSkipEdit'); if (skip) skip.textContent = '⏩ Pular e renderizar sem alterar';
 }
 async function openCachedEditor(id) {
-    const job = await cacheRequest('/' + encodeURIComponent(id));
-    if (!job.can_reprocess || !job.segments?.length) throw new Error('Aguarde a transcrição ou o término desta execução.');
     clearCachedRevision(); window.cacheEditorActive = true; window.cachedEditorId = id;
     hideTrackingPanels(); setActiveProcessLayout(false);
     for (const form of ['karaokêForm','easyModeForm','subtitleModeForm']) document.getElementById(form).style.display = 'none';
     document.getElementById('creatorModeSwitch').style.display = 'none';
-    await loadCorrectionPanel(id);
     document.getElementById('correctionCard').style.display = 'block';
+    currentSegments = []; renderSegments(); resetCorrectionPreview();
+    const feedback = document.getElementById('correctionValidationMessage');
+    feedback.dataset.kind = ''; feedback.textContent = 'Carregando as legendas desta execução…';
+    initCorrectionButtonListeners();
+    document.getElementById('btnContinueProcess').disabled = true;
     document.querySelectorAll('#correctionCard .btn-cancel-task, #correctionCard .btn-add-queue').forEach(button => button.hidden = true);
     document.getElementById('btnSkipEdit').textContent = 'Fechar revisão';
     document.getElementById('cachedEditorSave')?.remove();
     const save = document.createElement('button'); save.id = 'cachedEditorSave'; save.type = 'button'; save.className = 'btn-secondary'; save.textContent = 'Salvar alterações nesta execução';
+    save.disabled = true;
     save.onclick = () => saveCachedEditor(false); document.getElementById('btnContinueProcess').before(save);
-    document.getElementById('correctionValidationMessage').textContent = `Revisando: ${job.title}. As outras execuções continuam independentes.`;
     document.getElementById('correctionCard').scrollIntoView({behavior:'smooth',block:'start'});
+    try {
+        const job = await cacheRequest('/' + encodeURIComponent(id) + '/segments');
+        if (window.cachedEditorId !== id) return;
+        if (!job.can_reprocess || !job.segments?.length) throw new Error('Aguarde a transcrição ou o término desta execução.');
+        await loadCorrectionPanel(id, job);
+        save.disabled = false; document.getElementById('btnContinueProcess').disabled = false;
+        feedback.textContent = `Revisando: ${job.title}. As outras execuções continuam independentes.`;
+    } catch (error) {
+        if (window.cachedEditorId === id) {
+            closeCachedEditor(); queueCreationExpanded = false;
+            renderProcessingQueue(latestQueueJobs, latestQueueState);
+        }
+        throw error;
+    }
 }
 async function saveCachedEditor(reprocess = false) {
     const feedback = document.getElementById('correctionValidationMessage');
@@ -110,32 +134,46 @@ async function saveCachedEditor(reprocess = false) {
     finally { document.getElementById('btnContinueProcess').disabled = false; }
 }
 async function openCacheSettings(id, quick = false) {
-    const job = await cacheRequest('/' + encodeURIComponent(id));
+    const job = await cacheRequest('/' + encodeURIComponent(id) + '?include_segments=false');
     if (!job.can_reprocess) throw new Error('Aguarde esta execução terminar.');
     closeCachedEditor(); resetCreationSources(); resetYoutubeExtras(); setQueueCreationExpanded(true);
-    const options = job.options || {}; window.cachedRevisionOptions = options; window.cachedRevisionId = id;
+    document.getElementById('karaokêForm').reset();
+    const options = job.options || {}; window.cachedRevisionOptions = options; window.cachedRevisionId = id; window.cachedRevisionTitle = job.title;
     setCreatorMode(options.subtitle_only ? 'subtitle' : quick ? 'easy' : 'advanced');
+    for (const [name, value] of Object.entries(options)) {
+        const field = document.querySelector(`#karaokêForm [name="${name}"]`);
+        if (field && field.type !== 'file') { if (field.type === 'checkbox') field.checked = Boolean(value); else field.value = String(value ?? ''); }
+    }
     if (quick) {
         setEasyAudioMode('upload');
+        document.getElementById('easyLyricsTiming').value = options.lyrics_timing || 'acoustic';
         document.getElementById('easyKeepBackingVocals').value = String(options.keep_backing_vocals ?? true);
         document.getElementById('easyBackingVolume').value = String(options.backing_vocals_volume ?? 100);
         setEasyBackgroundType(options.background_mode === 'original' ? 'original' : 'default');
+        refreshEasySummary(options); updateQuickSelection();
+        document.querySelector('#easyBackgroundDefaultChoice > span').textContent = '🖼️ Manter este fundo';
+        document.getElementById('easyDefaultBackgroundOption').textContent = options.background_filename ? 'Fundo em cache: ' + options.background_filename : options.background_mode === 'color' ? 'Manter a cor de fundo desta execução' : 'Manter o fundo desta execução';
     } else {
-        for (const [name, value] of Object.entries(options)) {
-            const field = document.querySelector(`#karaokêForm [name="${name}"]`);
-            if (field && field.type !== 'file') { if (field.type === 'checkbox') field.checked = Boolean(value); else field.value = String(value ?? ''); }
-        }
         // The origin stays in cache; Detailed keeps the existing collapsible visual controls.
         document.getElementById('btnAudioModeUpload')?.click();
+        document.getElementById('btnBgModeUpload')?.click();
     }
+    document.getElementById('profileSelect').value = '';
+    document.getElementById('profileTypeBadge').textContent = 'Ajustes desta execução';
+    document.getElementById('profileDescription').textContent = 'As escolhas desta execução foram restauradas. Altere somente o que precisar.';
+    document.getElementById('audioTextName').textContent = 'Em cache: ' + (options.audio_filename || job.title);
+    document.getElementById('bgTextName').textContent = options.background_filename ? 'Em cache: ' + options.background_filename : 'Arraste o fundo ou clique';
+    if (!options.subtitle_only) window.restoreCachedLyricDraft?.(options, job.title);
     if (options.subtitle_only) {
-        for (const [name, field] of Object.entries({translation_language:'subtitleTranslationLanguage',whisper_model:'subtitleWhisperModel',transcription_preset:'subtitleTranscriptionPreset',enable_vad:'subtitleEnableVad',enable_correction:'subtitleEnableCorrection'})) {
+        for (const [name, field] of Object.entries({translation_language:'subtitleTranslationLanguage',whisper_model:'subtitleWhisperModel',transcription_preset:'subtitleTranscriptionPreset',enable_vad:'subtitleEnableVad',enable_correction:'subtitleEnableCorrection',save_to_library:'subtitleSaveLibrary'})) {
             if (options[name] !== undefined) document.getElementById(field).value = String(options[name]);
         }
         renderCachedSubtitleStyle(options.subtitle_settings || {});
+        document.getElementById('subtitleVisualSummary').textContent = 'Estilo desta execução restaurado. Altere os campos acima para a nova versão.';
     }
     const notice = document.getElementById('cachedRevisionNotice'); document.getElementById('creatorModeSwitch').after(notice); notice.hidden = false;
     document.getElementById('cachedRevisionTitle').textContent = 'Refazendo: ' + job.title;
+    document.getElementById('cachedMediaDescription').textContent = 'Mídia: ' + (options.audio_filename || job.title) + (options.background_filename ? ' · Fundo: ' + options.background_filename : '');
     document.getElementById('cachedReplaceYoutube').checked = Boolean(job.publication);
     document.getElementById('cachedReplaceLabel').hidden = !job.publication;
     document.getElementById('cachedReplaceHint').hidden = !job.publication;
@@ -170,18 +208,30 @@ function applyCachedRevision(formData) {
     formData.set('youtube_replace_previous', String(document.getElementById('cachedReplaceYoutube').checked));
     for (const key of ['audio_file','youtube_url','library_audio']) formData.delete(key);
     const options = window.cachedRevisionOptions;
-    formData.set('lyrics_text', options.lyrics_text || ''); formData.set('lyrics_mode','manual'); formData.set('lyrics_selected','true');
+    if (formData.get('easy_mode') === 'true') {
+        for (const [key, value] of Object.entries(options)) {
+            if (value !== null && typeof value !== 'object' && !formData.has(key)) formData.set(key, String(value));
+        }
+        const type = document.getElementById('easyBackgroundType').value;
+        formData.set('background_mode', type === 'original' ? 'original' : type === 'default' ? options.background_mode || 'original' : 'image');
+    }
+    formData.set('lyrics_text', document.getElementById('lyricsText').value);
+    formData.set('lyrics_mode', document.getElementById('lyricsMode').value);
+    formData.set('lyrics_selected', String(Boolean(formData.get('lyrics_text').trim() || formData.get('lyrics_mode') === 'manual')));
     if (formData.get('subtitle_only') === 'true') {
         const settings = {...options.subtitle_settings};
         document.querySelectorAll('[data-subtitle-field]').forEach(input => settings[input.dataset.subtitleField] = input.type === 'number' ? Number(input.value) : input.value);
         formData.set('subtitle_settings_json', JSON.stringify(settings));
     }
 }
-function renderExtraPlaylistList(prefix, selected = []) {
+function renderExtraPlaylistList(prefix, selected = null) {
     const list = document.getElementById(prefix + 'YoutubeExtraList'); list.replaceChildren();
+    selected = selected ?? cachedExtraSelections.get(prefix) ?? [];
+    cachedExtraSelections.set(prefix, selected);
     for (const playlist of cachedPlaylistChoices) {
         if (playlist.id === cachedYoutubeOptions.playlist_id) continue;
         const label = document.createElement('label'); const input = document.createElement('input'); input.type='checkbox';input.value=playlist.id;input.checked=selected.includes(playlist.id);
+        input.onchange = () => cachedExtraSelections.set(prefix, Array.from(list.querySelectorAll('input:checked')).map(item => item.value));
         label.append(input, document.createTextNode(playlist.title)); list.append(label);
     }
     if (!list.children.length) list.textContent = 'Não há outras playlists disponíveis neste canal.';

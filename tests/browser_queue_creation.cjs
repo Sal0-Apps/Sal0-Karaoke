@@ -54,6 +54,8 @@ const activeJob = () => ({id: 'active', status: 'processing', title: 'Música em
         await page.goto('http://karaoke.test');
         await page.locator('#processCard').waitFor({state: 'visible'});
         await page.waitForFunction(() => Boolean(currentUser));
+        await page.waitForFunction(() => latestServerStatus?.status === 'processing' && creationUiLocked
+            && getComputedStyle(document.getElementById('createTabContent')).display === 'flex');
         const refresh = async () => {
             await page.evaluate(async () => {await fetchStatus(); await fetchProcessingQueue();});
             await page.waitForFunction(status => latestServerStatus?.status === status, serverStatus.status);
@@ -84,10 +86,17 @@ const activeJob = () => ({id: 'active', status: 'processing', title: 'Música em
         assert(await page.locator('#queueCard').isVisible());
         for (const width of [320, 360, 390, 768, 1440]) {
             await page.setViewportSize({width, height: 900});
+            await page.evaluate(async () => {
+                await document.fonts.ready;
+                await new Promise(resolve => requestAnimationFrame(resolve));
+                await Promise.all(document.getAnimations().filter(animation => animation.effect?.getComputedTiming().iterations !== Infinity)
+                    .map(animation => animation.finished.catch(() => {})));
+                await new Promise(resolve => requestAnimationFrame(resolve));
+            });
             const add = await page.locator('#btnToggleQueueCreation').boundingBox();
             const cancel = await page.locator('#processCard .btn-cancel-task').boundingBox();
             assert(add && cancel && Math.abs(add.y - cancel.y) < 75, 'Actions must be adjacent at ' + width);
-            assert(add.y + add.height < 900, 'Add action must be visible without scrolling at ' + width);
+            assert(add.y + add.height < 900, 'Add action must be visible without scrolling at ' + width + ': ' + JSON.stringify(add));
             assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
         }
         await page.setViewportSize({width: 390, height: 900});

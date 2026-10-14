@@ -1,3 +1,10 @@
+# 12.2.2
+
+- Corrigida a demora ao abrir a fila: a consulta começa logo após autenticar, sem aguardar estado, perfil ou configurações. A listagem verifica a disponibilidade dos arquivos sem carregar a transcrição completa de cada item e faz as leituras fora do bloqueio da fila.
+- Rápido e Detalhado restauram os ajustes efetivos da execução selecionada, incluindo letra-guia editável, modelo, visual, áudio, título e opções de publicação. Origem e fundo em cache ficam identificados. Configurações carregadas posteriormente não sobrescrevem os campos da revisão; o Rápido mantém a execução anterior mesmo se o perfil administrativo mudou.
+- Editor de legendas abre com indicação de carga, consulta somente os segmentos do item selecionado uma vez e permite editar sem aguardar áudio ou fundo. Prévias atrasadas não substituem outra revisão; a identificação de vídeo é reaproveitada enquanto o arquivo permanece igual.
+- Verificados carregamento com consultas atrasadas, restauração dos formulários, alteração da guia, retenção e isolamento do cache, reexecução e navegador em celular e desktop. Mantidos YouTube, Telegram, playlists e botões na própria lista. Atualização somente do servidor; Android e Windows existentes continuam compatíveis.
+
 # 12.2.1
 
 - Edição e reexecução passam para a **Fila de processamento** já existente. Removido o painel separado de execuções. Cada item tem botões compactos com ícones, textos curtos e descrições acessíveis: **Legendas**, **Rápido** e **Detalhado**; Legendar vídeo usa **Ajustes**.
