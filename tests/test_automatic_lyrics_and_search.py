@@ -15,7 +15,7 @@ from lyrics_sync import parse_lrc, recording_matches
 from lyrics_search import split_search_identity, lyrics_match_score, relevant_lyrics_results, select_automatic_lyrics
 from lyric_guide import prepare_lyrics_guide, verify_lyrics_guide
 from karaoke_generator import generate_ass_karaoke
-from processing_validation import validate_review_segments, validate_processing_options
+from processing_validation import validate_review_segments, validate_processing_options, canonical_review_segments
 from youtube_download_access import DownloadAccessError, YouTubeDownloadAccess
 import tempfile
 import subprocess
@@ -41,6 +41,12 @@ def load_function(name, **values):
                  prepare_lyrics_guide=prepare_lyrics_guide, verify_lyrics_guide=verify_lyrics_guide,
                  validate_review_segments=validate_review_segments,
                  validate_processing_options=validate_processing_options, **values)
+    import queue_cache, threading
+    scope.setdefault("queue_cache", queue_cache)
+    scope.setdefault("canonical_review_segments", canonical_review_segments)
+    scope.setdefault("ACTIVE_QUEUE_STATUSES", {"queued", "processing"})
+    scope.setdefault("processing_queue_lock", threading.RLock())
+    scope.setdefault("processing_queue", [])
     scope.setdefault('DownloadAccessError', DownloadAccessError)
     scope.setdefault('extract_youtube_info', access.extract_info)
     exec(compile(ast.Module(body=[selected], type_ignores=[]), "main.py", "exec"), scope)

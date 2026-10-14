@@ -1,5 +1,5 @@
 const fs = require('fs'), assert = require('assert'), {chromium} = require('playwright');
-const HTML = fs.readFileSync('app/templates/index.html', 'utf8');
+const HTML = require('./load_html.cjs')();
 const icon = fs.readFileSync('app/templates/app-icon-v8.png');
 const processing = () => ({status: 'processing', progress: 23, step: 'Separating vocals',
     stage_progress: 8, stage_detail: 'Análise 1 de 4', can_cancel: true,

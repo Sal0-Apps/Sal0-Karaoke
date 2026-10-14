@@ -8,7 +8,7 @@ O código original é software livre sob a [licença MIT](LICENSE). Dependência
 
 O Sal0 Karaokê é destinado a uma instalação pessoal, acessada pela rede local ou por VPN, como ZeroTier. O repositório aberto disponibiliza o código e os pacotes; o projeto não opera um serviço público de processamento nem coleta centralmente as mídias das instalações. Não é necessário expor a porta do app à internet. O processamento principal é local, mas as integrações escolhidas podem se comunicar com serviços externos.
 
-Na **12.1**, todos os painéis de Ajustes começam recolhidos, com resumos de status e **Recolher todos**. Vídeos publicados no YouTube passam a ter **Assistir no YouTube** na mensagem do Telegram, inclusive quando o upload termina depois da prévia.
+Na **12.2**, **Execuções desta fila** guarda os arquivos e permite editar legendas e refazer qualquer item no Rápido ou Detalhado. O cache permanece após o término e só é trocado ao aceitar uma nova origem para a próxima fila. Playlists adicionais são opcionais e começam desmarcadas; a do perfil continua incluída. Revisões podem substituir o vídeo anterior no YouTube após a confirmação do novo, atualizando também seu link no Telegram. Mantidos os painéis de Ajustes recolhidos.
 
 ## Documentação
 
@@ -113,7 +113,7 @@ Qualquer perfil autenticado pode adicionar tarefas, independentemente do dono da
 
 Novos vídeos incluem uma capa em uma abertura silenciosa adicional de três segundos, independente do tempo do conteúdo. O áudio, a imagem e as legendas do karaokê começam juntos após a abertura. O modo SRT preserva os tempos de fala e os silêncios, sem essa abertura. Vídeos antigos não são reeditados automaticamente. A geração usa os [filtros locais do FFmpeg](https://ffmpeg.org/ffmpeg-filters.html), sem serviço externo de imagens.
 
-Refazer um karaokê pelo cache reaproveita apenas insumos compatíveis, não a renderização ou os checkpoints da tarefa anterior. A retomada de uma tarefa pausada continua preservando suas etapas concluídas.
+Refazer um item da fila preserva a origem, as análises compatíveis, os ajustes e a revisão manual. Legendagem, tradução e vídeo são gerados novamente para a nova execução, que permanece na mesma fila. A retomada de uma tarefa pausada continua preservando suas etapas concluídas. O cache por perfil só é liberado quando uma nova origem é aceita após a conclusão de todos os itens pendentes; os resultados salvos na Biblioteca permanecem.
 
 Cada conta pode configurar seu bot e destinatário. As mensagens intermediárias informam as etapas e a situação da letra-guia. A conclusão informa o tempo de processamento e os links local/externo disponíveis. Na legendagem SRT, somente o vídeo compactado é anexado, com os links do vídeo completo e dos SRTs na mesma mensagem.
 
@@ -129,18 +129,18 @@ O administrador conecta ou reconecta o canal em **Ajustes → Canal e publicaç�
 
 Em **Ajustes → Downloads do YouTube**, o administrador pode testar um link, atualizar o mecanismo e renovar a sessão com cookies.txt, inclusive exportando pelo Firefox para Android. A sessão de downloads é independente da autorização para publicar no canal. Atualizações são preparadas durante outras tarefas e aplicadas quando os downloads ativos terminarem.
 
-Em **Playlist de cada usuário**, a administração define uma playlist válida para cada conta. A playlist do administrador fica em **Padrões de publicação do administrador**. Com o canal conectado e uma playlist definida no perfil, **Publicar no YouTube** começa marcado para todos os usuários, inclusive contas novas e configurações antigas, e a publicação automática usa **Não listado**. A playlist do perfil é obrigatória: sem ela, a interface e o servidor bloqueiam a publicação. No modo rápido, o administrador pode escolher outra playlist para aquele vídeo, com a do perfil selecionada por padrão. O envio continua opcional por vídeo: desmarcado, nada é publicado. Título e capa automática ficam definidos antes da publicação. Vídeos prontos também podem ser publicados pelo painel administrativo, com outra privacidade escolhida explicitamente. O [manual](MANUAL.md#youtube-e-publicação-por-usuário) explica configuração e falhas comuns.
+Em **Playlist de cada usuário**, a administração define uma playlist válida para cada conta. A playlist do administrador fica em **Padrões de publicação do administrador**. Com o canal conectado e uma playlist definida no perfil, **Publicar no YouTube** começa marcado para todos os usuários, inclusive contas novas e configurações antigas, e a publicação automática usa **Não listado**. A playlist do perfil é obrigatória: sem ela, a interface e o servidor bloqueiam a publicação. Nos modos Rápido e Detalhado, a playlist do perfil é sempre incluída. **Enviar também para outras playlists** começa desmarcado e permite escolher destinos adicionais naquele canal para o vídeo. O envio continua opcional por vídeo: desmarcado, nada é publicado. Título e capa automática ficam definidos antes da publicação. Vídeos prontos também podem ser publicados pelo painel administrativo, com outra privacidade escolhida explicitamente. O [manual](MANUAL.md#youtube-e-publicação-por-usuário) explica configuração e falhas comuns.
 
 ## Início rápido com Docker
 
-A versão de distribuição desta documentação é **12.1**. O título e o rodapé da página mostram apenas o nome da aplicação. A versão do servidor pode ser consultada no Manual; a versão do APK aparece nas configurações nativas.
+A versão de distribuição desta documentação é **12.2**. O título e o rodapé da página mostram apenas o nome da aplicação. A versão do servidor pode ser consultada no Manual; a versão do APK aparece nas configurações nativas.
 
 Crie um arquivo `compose.yaml`:
 
 ```yaml
 services:
   karaoke-app:
-    image: ghcr.io/sal0-apps/sal0-karaoke:12.1
+    image: ghcr.io/sal0-apps/sal0-karaoke:12.2
     container_name: karaoke-app
     ports:
       - "7885:7860"
@@ -181,7 +181,7 @@ As funções de pesquisa, importação por link e publicação no canal continua
 - **Importar por link** usa `yt-dlp` para obter a mídia escolhida. Use somente quando os direitos do conteúdo e as condições do serviço permitirem a obtenção e o processamento. A autorização do titular, por si só, não substitui as permissões exigidas pelo YouTube. Os termos restringem downloads e acesso automatizado; as políticas de API também restringem armazenamento e separação de áudio/vídeo. A presença da função no app não comprova autorização da plataforma. Quando a obtenção pela plataforma não for permitida, use um arquivo disponibilizado por uma fonte autorizada.
 - **Publicar no canal** usa a YouTube Data API com autorização OAuth do administrador. Essa autorização dá ao app acesso ao canal conectado; não licencia músicas, gravações, letras ou fundos. Contas locais autorizadas publicam nesse canal, não em um canal próprio de cada usuário. Confira o título, a capa, a playlist e a privacidade antes de iniciar.
 
-A publicação começa marcada nos modos Rápido e Detalhado quando há canal e playlist válida no perfil. Desmarcar a opção naquela tarefa impede o envio. A privacidade padrão é **Não listado**: quem tiver o link poderá assistir; isso não equivale a privado nem dispensa direitos autorais. O servidor começa o envio como privado, aplica capa e playlist e então solicita a privacidade escolhida. O Google pode manter restrições em projetos sem auditoria.
+A publicação começa marcada nos modos Rápido e Detalhado quando há canal e playlist válida no perfil. Desmarcar a opção naquela tarefa impede o envio. A privacidade padrão é **Não listado**: quem tiver o link poderá assistir; isso não equivale a privado nem dispensa direitos autorais. O servidor começa o envio como privado, aplica capa e todas as playlists escolhidas e então confirma a privacidade. Ao refazer um item publicado, a opção de substituição mantém a privacidade anterior e só remove o vídeo antigo depois dessas confirmações. O YouTube gera um novo endereço; o arquivo do vídeo anterior não pode ser trocado mantendo o link. Comentários e estatísticas do anterior não migram. O Google pode manter restrições em projetos sem auditoria.
 
 Resultados do modo **Legendar vídeo**, incluindo seus MP4, nunca são publicados no YouTube: o bloqueio vale para envio automático, manual e retomadas. Permanecem disponíveis para download, Biblioteca, prévia e Telegram configurado. Vídeos antigos sem origem confirmada também ficam bloqueados na publicação.
 

@@ -57,3 +57,67 @@ def validate_review_segments(segments):
         for word in segment.words or []:
             if not math.isfinite(word.start) or not math.isfinite(word.end) or word.start < 0 or word.end < word.start:
                 raise ValueError(f"Linha {index}: os tempos das palavras são inválidos. Recarregue a revisão.")
+
+
+def canonical_review_segments(segments, original_segments):
+    from lyrics_sync import anchor_synced_animation
+    updated_segments = []
+    for segment_index, s in enumerate(segments):
+        seg_text = s.text if s.synced_line else s.text.strip()
+        if s.synced_line:
+            if getattr(s, "acoustic_animation", False):
+                source = {"start": s.start, "end": s.end, "text": seg_text}
+                acoustic = [{"words": [{"word": w.word, "start": w.start, "end": w.end}
+                                        for w in (s.words or [])]}]
+                updated_segments.extend(anchor_synced_animation([source], acoustic))
+                continue
+            updated_segments.append({"start": s.start, "end": s.end, "text": seg_text,
+                                     "words": [], "synced_line": True})
+            continue
+        words_list = seg_text.split()
+
+        orig_words = []
+        if s.words:
+            orig_words = [{"word": w.word, "start": w.start, "end": w.end} for w in s.words]
+
+        if len(orig_words) == len(words_list):
+            orig_dur = s.words[-1].end - s.words[0].start if len(s.words) > 0 else 0
+            new_dur = s.end - s.start
+            original = original_segments[segment_index] if segment_index < len(original_segments) else {}
+            clocks_changed = (s.start != original.get("start") or s.end != original.get("end"))
+            if clocks_changed and orig_dur > 0 and new_dur > 0:
+                scale = new_dur / orig_dur
+                t0 = s.words[0].start
+                for w in orig_words:
+                    w["start"] = s.start + (w["start"] - t0) * scale
+                    w["end"] = s.start + (w["end"] - t0) * scale
+            for idx, word_txt in enumerate(words_list):
+                orig_w = orig_words[idx]["word"]
+                leading_spaces = len(orig_w) - len(orig_w.lstrip(' '))
+                trailing_spaces = len(orig_w.lstrip(' ')) - len(orig_w.strip(' '))
+                orig_words[idx]["word"] = " " * leading_spaces + word_txt + " " * trailing_spaces
+            words = orig_words
+        else:
+            total_dur = s.end - s.start
+            if total_dur <= 0:
+                total_dur = 1.0
+            word_dur = total_dur / len(words_list)
+            words = []
+            for idx, word_txt in enumerate(words_list):
+                w_start = s.start + idx * word_dur
+                w_end = w_start + word_dur
+                word_val = word_txt + " " if idx < len(words_list) - 1 else word_txt
+                words.append({
+                    "word": word_val,
+                    "start": w_start,
+                    "end": w_end
+                })
+
+        updated_segments.append({
+            "start": s.start,
+            "end": s.end,
+            "text": seg_text,
+            "words": words
+        })
+
+    return updated_segments

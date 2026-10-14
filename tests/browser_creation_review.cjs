@@ -1,5 +1,5 @@
 const fs = require('fs'), assert = require('assert'), {chromium} = require('playwright');
-const HTML = fs.readFileSync('app/templates/index.html', 'utf8');
+const HTML = require('./load_html.cjs')();
 const icon = fs.readFileSync('app/templates/app-icon-v8.png');
 const audio = Buffer.alloc(44 + 20 * 8000 * 2);
 audio.write('RIFF'); audio.writeUInt32LE(audio.length - 8, 4); audio.write('WAVEfmt ', 8);

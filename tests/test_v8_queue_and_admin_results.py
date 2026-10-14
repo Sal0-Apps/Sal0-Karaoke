@@ -36,7 +36,7 @@ class VersionEightQueueTests(unittest.TestCase):
 
     def test_queue_contains_only_active_jobs_and_is_hidden_for_one_video(self):
         self.assertIn('ACTIVE_QUEUE_STATUSES = {"queued", "processing"}', MAIN)
-        self.assertIn('processing_queue.remove(job)', MAIN)
+        self.assertIn('job["status"] = "removed"', MAIN)
         self.assertIn('job.get("status") in ACTIVE_QUEUE_STATUSES', MAIN)
         self.assertIn('id="queueCard" style="display: none;"', HTML)
         self.assertIn("activeJobs.length > 1 || (adminCanControl && processingQueuePaused))", HTML)
@@ -71,7 +71,7 @@ class VersionEightQueueTests(unittest.TestCase):
     def test_finished_jobs_do_not_block_the_next_queue_item(self):
         self.assertIn("promote_queue_cache_in_background", MAIN)
         self.assertIn("daemon=True", MAIN)
-        self.assertIn('if job_cache and os.path.isdir(job_cache)', MAIN)
+        self.assertIn('target=retire_queue_batch', MAIN)
         self.assertIn('raise RuntimeError("O processador não foi liberado pelo trabalho anterior.")', MAIN)
 
     def test_duplicate_admin_results_panel_is_not_rendered(self):

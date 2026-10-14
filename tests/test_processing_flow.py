@@ -208,12 +208,12 @@ class ReviewBackgroundTests(unittest.TestCase):
             audio = Path(folder) / 'source.wav'
             audio.write_bytes(b'audio')
             view = load_function('get_cached_audio', os=os, mimetypes=mimetypes,
-                active_queue_pipeline_for_user=lambda _: {'input_audio_path': str(audio)}, FileResponse=FileResponse)
+                active_queue_pipeline_for_user=lambda _, job_id="": {'input_audio_path': str(audio)}, FileResponse=FileResponse)
             self.assertEqual(view({'username': 'owner'}).path, str(audio))
 
     def test_audio_preview_does_not_fall_back_to_a_previous_song_when_current_source_is_missing(self):
         view = load_function('get_cached_audio', os=os,
-            active_queue_pipeline_for_user=lambda _: {'input_audio_path': '/missing/current.wav'})
+            active_queue_pipeline_for_user=lambda _, job_id="": {'input_audio_path': '/missing/current.wav'})
         with self.assertRaises(HTTPError) as error:
             view({'username': 'owner'})
         self.assertEqual(error.exception.status_code, 404)
@@ -225,13 +225,13 @@ class ReviewBackgroundTests(unittest.TestCase):
             (cache / 'original_bg.png').write_bytes(b'unused')
             pipeline = {'input_audio_path': '/own/source.mp4', 'background_mode': 'original'}
             view = load_function('get_cached_background', os=os, json=json, mimetypes=mimetypes,
-                queue_cache_dir_for_user=lambda _: str(cache), active_queue_pipeline_for_user=lambda _: pipeline,
+                queue_cache_dir_for_user=lambda _, job_id="": str(cache), active_queue_pipeline_for_user=lambda _, job_id="": pipeline,
                 check_has_video=lambda _: True, FileResponse=FileResponse)
             self.assertEqual(view({}).path, '/own/source.mp4')
 
     def test_solid_color_preview_matches_the_black_render(self):
-        view = load_function('get_cached_background', os=os, queue_cache_dir_for_user=lambda _: '/own/cache',
-            active_queue_pipeline_for_user=lambda _: {'background_mode': 'color'}, Response=Response)
+        view = load_function('get_cached_background', os=os, queue_cache_dir_for_user=lambda _, job_id="": '/own/cache',
+            active_queue_pipeline_for_user=lambda _, job_id="": {'background_mode': 'color'}, Response=Response)
         self.assertIn(b'fill="black"', view({}).body)
 
 
