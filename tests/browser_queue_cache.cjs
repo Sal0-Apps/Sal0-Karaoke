@@ -27,7 +27,7 @@ for (const match of HTML.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/g)) new F
    const req=route.request(),u=new URL(req.url());
    if(u.hostname!=='karaoke.test') return route.abort();
    if(u.pathname==='/') return route.fulfill({contentType:'text/html',body:HTML});
-   if(u.pathname==='/favicon.png') return route.fulfill({contentType:'image/png',body:fs.readFileSync('app/templates/app-icon-v8.png')});
+   if(u.pathname==='/app-icon-v8.png') return route.fulfill({contentType:'image/png',body:fs.readFileSync('app/templates/app-icon-v8.png')});
    const fulfill=d=>route.fulfill({contentType:'application/json',body:JSON.stringify(d)});
    requests.push({path:u.pathname,method:req.method(),body:req.postData(),query:u.search});
    if(u.pathname==='/api/auth_status')return fulfill({status:'authenticated',username:'owner',role:'admin'});

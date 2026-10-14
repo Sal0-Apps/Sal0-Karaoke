@@ -12,6 +12,9 @@ const activeJob = () => ({id: 'active', status: 'processing', title: 'Música em
         const page = await browser.newPage({viewport: {width: 390, height: 900}});
         let serverStatus = processing(), jobs = [activeJob()], queuePaused = false, reviewResponse;
         const errors = [], submissions = [], pending = [], waiters = [];
+        const receipts = new Map();
+        let confirmationFailures = 0;
+        let queueFailures = 0;
         const untilSubmitted = count => submissions.length >= count ? Promise.resolve()
             : new Promise(resolve => waiters.push({count, resolve}));
         await page.addInitScript(() => localStorage.setItem('karaoke_token', 'test-session'));
@@ -21,25 +24,44 @@ const activeJob = () => ({id: 'active', status: 'processing', title: 'Música em
             const request = route.request(), url = new URL(request.url());
             if (url.hostname !== 'karaoke.test') return route.abort();
             if (url.pathname === '/') return route.fulfill({contentType: 'text/html', body: HTML});
-            if (url.pathname === '/favicon.png') return route.fulfill({contentType: 'image/png', body: icon});
+            if (url.pathname === '/app-icon-v8.png') return route.fulfill({contentType: 'image/png', body: icon});
             const fulfill = data => route.fulfill({contentType: 'application/json', body: JSON.stringify(data)});
             if (url.pathname === '/api/process') {
                 assert.equal(request.method(), 'POST');
-                const entry = {filename: request.postData().match(/name="audio_file"; filename="([^"]+)"/)?.[1] || 'link', body: request.postData()};
-                pending.push(async (status = 200, body) => {
-                    const id = 'job-' + submissions.indexOf(entry);
+                const entry = {filename: request.postData().match(/name="audio_file"; filename="([^"]+)"/)?.[1] || 'link', body: request.postData(),
+                    submissionId: request.postData().match(/name="submission_id"\r\n\r\n([^\r\n]+)/)?.[1]};
+                assert.match(entry.submissionId, /^[a-f0-9]{32}$/);
+                assert.equal(request.headers()['x-session-token'], 'test-session');
+                pending.push(async (status = 200, body, failure = '') => {
+                    if (failure === 'before') return route.abort('failed');
                     if (status === 200 && body === undefined) {
-                        jobs.push({id, status: 'queued', title: entry.filename, position: jobs.length});
-                        body = {status: 'queued', job_id: id, position: jobs.length - 1};
+                        body = receipts.get(entry.submissionId);
+                        if (!body) {
+                            const id = 'job-' + submissions.indexOf(entry);
+                            jobs.push({id, status: 'queued', title: entry.filename, position: jobs.length});
+                            body = {status: 'queued', job_id: id, position: jobs.length - 1};
+                            receipts.set(entry.submissionId, body);
+                        }
                     }
+                    if (failure === 'after') return route.abort('failed');
                     await route.fulfill({status, contentType: 'application/json', body: JSON.stringify(body)});
                 });
                 submissions.push(entry);
                 waiters.filter(waiter => submissions.length >= waiter.count).forEach(waiter => waiter.resolve());
                 return;
             }
+            if (url.pathname.startsWith('/api/queue/submissions/')) {
+                if (confirmationFailures-- > 0) return route.abort('failed');
+                const receipt = receipts.get(url.pathname.split('/').pop());
+                return route.fulfill({status: receipt ? 200 : 404, contentType: 'application/json', body: JSON.stringify(receipt || {})});
+            }
             if (url.pathname === '/api/status') return fulfill(serverStatus);
-            if (url.pathname === '/api/queue') { assert.equal(request.method(), 'GET'); return fulfill({jobs, paused: queuePaused}); }
+            if (url.pathname === '/api/hung-status') return;
+            if (url.pathname === '/api/queue') {
+                assert.equal(request.method(), 'GET');
+                if (queueFailures-- > 0) return route.fulfill({status:503,contentType:'application/json',body:'{}'});
+                return fulfill({jobs, paused: queuePaused});
+            }
             if (url.pathname === '/api/auth_status') return fulfill({status: 'authenticated', username: 'owner', role: 'admin'});
             if (url.pathname === '/api/easy-mode') return fulfill({enabled: true, whisper_model: 'large-v3-turbo', font_size: 50, lyrics_mode: 'auto'});
             if (url.pathname === '/api/library') return fulfill({audio: [], backgrounds: [], history: [], videos: [], photos: []});
@@ -80,6 +102,17 @@ const activeJob = () => ({id: 'active', status: 'processing', title: 'Música em
             await editorVisible(mode);
         };
         const file = name => ({name, mimeType: 'audio/wav', buffer: Buffer.from('test audio')});
+
+        // An unavailable queue schedules a new consultation; a hanging read cannot reserve polling forever.
+        queueFailures=1;
+        await page.evaluate(() => fetchProcessingQueue());
+        await page.waitForResponse(response => new URL(response.url()).pathname === '/api/queue' && response.status() === 200);
+        const timeoutResult=await page.evaluate(async () => {
+            const start=performance.now();
+            try {await timedAuthFetch('/api/hung-status',{},80);return null;}
+            catch(error) {return {name:error.name,elapsed:performance.now()-start};}
+        });
+        assert.equal(timeoutResult.name,'AbortError');assert(timeoutResult.elapsed<1000);
 
         // The two primary actions are visible together; queue count comes from GET /api/queue.
         assert(!await page.locator('#creationFeedback').isVisible());
@@ -187,10 +220,68 @@ const activeJob = () => ({id: 'active', status: 'processing', title: 'Música em
         await page.locator('#easyAudioFile').setInputFiles(file('unconfirmed.wav'));
         await page.locator('#easySubmitBtn').click();
         await untilSubmitted(baseline + 1); await pending.shift()(200, {});
-        await page.waitForFunction(() => document.getElementById('creationFeedback').textContent.includes('não confirmou'));
+        await untilSubmitted(baseline + 2); await pending.shift()(200, {});
+        await page.waitForFunction(() => document.getElementById('creationFeedback').textContent.includes('não foi possível confirmar'));
         await editorVisible('easy');
         assert.equal(await page.locator('#easyAudioFile').evaluate(input => input.files[0].name), 'unconfirmed.wav');
-        await page.locator('#btnReturnToProcess').click();
+        assert.equal(submissions[baseline].submissionId, submissions[baseline + 1].submissionId);
+        await page.locator('#easySubmitBtn').click();
+        await untilSubmitted(baseline + 3); await pending.shift()();
+        assert.equal(submissions[baseline].submissionId, submissions[baseline + 2].submissionId, 'Manual retry must preserve the uncertain identifier');
+        await page.waitForFunction(() => !clientPreparationInProgress && !queueCreationExpanded);
+
+        // Lost acknowledgements and requests recover in all modes without duplicating YouTube jobs.
+        for (const [mode, input, button, failure] of [['easy','easyYoutubeUrl','easySubmitBtn','after'],
+            ['advanced','youtubeUrl','btnSubmit','before'], ['subtitle','subtitleYoutubeUrl','subtitleSubmitBtn','after']]) {
+            await startNew(mode);
+            if (mode === 'easy') await page.locator('[data-quick-source="youtube"]').click();
+            if (mode === 'advanced') await page.locator('#btnAudioModeYoutube').click();
+            await page.locator('#'+input).fill('https://youtu.be/abcdefghijk');
+            await page.locator('#'+input).evaluate(input => {input.dataset.youtubeTitle='Artista - Música';});
+            baseline=submissions.length;
+            const jobCount=jobs.length;
+            if (mode === 'subtitle') confirmationFailures=1;
+            await page.locator('#'+button).click();
+            await untilSubmitted(baseline + 1); await loadingVisible();
+            assert(submissions[baseline].body.includes('name="youtube_url"'));
+            assert(submissions[baseline].body.includes('name="source_title"'), mode+' source title must be submitted');
+            await pending.shift()(200, undefined, failure);
+            if (mode !== 'easy') {
+                await untilSubmitted(baseline + 2);
+                assert.equal(submissions[baseline].submissionId, submissions[baseline + 1].submissionId);
+                await pending.shift()();
+            }
+            await page.waitForFunction(() => !clientPreparationInProgress && !queueCreationExpanded);
+            assert.equal(jobs.length,jobCount+1, 'Recovery must accept only one '+mode+' YouTube job');
+            assert(!await page.locator('#creationFeedback').isVisible());
+            assert(!await page.locator('#'+input).isVisible(), 'Confirmed creation must return to tracking');
+            serverStatus={...processing(),step:'Downloading YouTube',stage_progress:45,stage_detail:'Transferindo mídia'};
+            await refresh();
+            assert.equal(await page.locator('#statusMessage').textContent(),'Baixando mídia');
+        }
+        serverStatus=processing();await refresh();
+
+        // A title arriving after an uncertain response is display metadata, not a different creation.
+        baseline=submissions.length;
+        const beforeMetadataRetry=jobs.length;
+        confirmationFailures=2;
+        await page.evaluate(() => {
+            const form=new FormData();form.set('youtube_url','https://youtu.be/abcdefghijk');form.set('source_title','Video do YouTube');
+            window.metadataRecoveryError='';
+            submitProcessWithConfirmation(form).catch(error => {window.metadataRecoveryError=error.message;});
+        });
+        await untilSubmitted(baseline+1);await pending.shift()(200,undefined,'after');
+        await untilSubmitted(baseline+2);await pending.shift()(200,undefined,'after');
+        await page.waitForFunction(() => Boolean(window.metadataRecoveryError));
+        await page.evaluate(() => {
+            const form=new FormData();form.set('youtube_url','https://youtu.be/abcdefghijk');form.set('source_title','Artista - Titulo identificado');
+            window.metadataRecoveryResult=null;
+            submitProcessWithConfirmation(form).then(result => {window.metadataRecoveryResult=result;});
+        });
+        await untilSubmitted(baseline+3);await pending.shift()();
+        await page.waitForFunction(() => Boolean(window.metadataRecoveryResult));
+        assert.equal(submissions[baseline].submissionId,submissions[baseline+2].submissionId);
+        assert.equal(jobs.length,beforeMetadataRetry+1);
 
         // When the previous job finishes, the accepted next item has its own waiting view.
         await startNew('easy'); baseline = submissions.length;
@@ -245,6 +336,6 @@ const activeJob = () => ({id: 'active', status: 'processing', title: 'Música em
         await page.evaluate(() => setTheme('light'));
         await page.screenshot({path: 'queue-creation-editor-desktop.png'});
         assert.deepEqual(errors, []);
-        console.log('Queue creation: three modes, delayed acknowledgements, uninterrupted drafts/loading, partial retry, review race, privacy, pause and five viewport sizes passed.');
+        console.log('Queue creation: three modes, lost YouTube acknowledgements, idempotent network/manual retries, download progress, uninterrupted drafts/loading, partial retry, review race, privacy, pause and five viewport sizes passed.');
     } finally { await browser.close(); }
 })().catch(error => {console.error(error); process.exit(1);});

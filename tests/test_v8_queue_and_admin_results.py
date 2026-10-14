@@ -98,11 +98,15 @@ class VersionEightQueueTests(unittest.TestCase):
         self.assertIn('.orElse("10.4")', ANDROID_BUILD)
         self.assertIn('.orElse("100400")', ANDROID_BUILD)
         self.assertIn("-PVERSION_CODE=${{ env.VERSION_CODE }}", WORKFLOW)
-        self.assertIn("sal0-karaoke:9.9.0", COMPOSE)  # Existing sample; personal Compose is delivered separately.
+        self.assertIn(f"sal0-karaoke:{version}", COMPOSE)
         self.assertIn(f'org.opencontainers.image.version="{version}"', DOCKERFILE)
 
     def test_generated_icon_is_committed_for_web_and_android(self):
         self.assertTrue((ROOT / "app" / "templates" / "app-icon-v8.png").is_file())
+        self.assertFalse((ROOT / "app" / "templates" / "favicon.png").exists())
+        self.assertNotIn('src="/favicon.png', HTML)
+        self.assertEqual(COMPOSE.count('main/app/templates/app-icon-v8.png?v='), 2)
+        self.assertNotIn('main/app/templates/favicon.png', COMPOSE)
         self.assertTrue((ROOT / "android" / "app" / "src" / "main" / "res" / "drawable-nodpi" / "app_icon_v8.png").is_file())
 
 

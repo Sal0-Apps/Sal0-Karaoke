@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sal0 Karaokê</title>
-    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="icon" type="image/png" href="/app-icon-v8.png?v=12.5.1">
 
     <!-- Fontes Google -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -1647,7 +1647,7 @@
         <!-- HEADER PRINCIPAL -->
         <header>
             <div class="logo-area">
-                <img src="/favicon.png" alt="Sal0 Karaokê" class="logo-img">
+                <img src="/app-icon-v8.png?v=12.5.1" alt="Sal0 Karaokê" class="logo-img">
                 <h1>Sal0 Karaokê</h1>
             </div>
             <div class="header-actions">
@@ -1694,7 +1694,7 @@
             <form id="easyModeForm">
                 <div class="card easy-hero">
                     <div class="easy-hero-head">
-                        <div class="easy-hero-icon"><img src="/favicon.png" alt=""></div>
+                        <div class="easy-hero-icon"><img src="/app-icon-v8.png?v=12.5.1" alt=""></div>
                         <div><span class="easy-kicker">Modo Rápido</span><span class="card-title">Sua música, pronta para cantar</span>
                             <p class="easy-intro">1. Escolha uma música. 2. Toque em “Criar karaokê”. A letra e o fundo ficam por nossa conta.</p></div>
                     </div>
@@ -1805,7 +1805,7 @@
             <form id="subtitleModeForm" style="display: none;">
                 <div class="card easy-hero">
                     <div class="easy-hero-head">
-                        <div class="easy-hero-icon"><img src="/favicon.png" alt=""></div>
+                        <div class="easy-hero-icon"><img src="/app-icon-v8.png?v=12.5.1" alt=""></div>
                         <div>
                             <span class="easy-kicker">Legendar vídeo</span>
                             <span class="card-title">Transforme a fala em um vídeo legendado</span>
@@ -2919,7 +2919,7 @@
                 </ol>
                 <p>A API tem cota gratuita e pode limitar projetos sem auditoria a vídeos privados. Guarde a autorização como uma senha. Backing vocals e vídeo do modo SRT mostram porcentagem da etapa e avisam o avanço no Telegram; o LibreTranslate informa apenas início e término.</p>
             </details>
-            <p class="compact-note">Versão do servidor: 12.5. A transcrição é local; fontes, modelos e integrações podem acessar serviços externos. Use conteúdo autorizado.</p>
+            <p class="compact-note">Versão do servidor: 12.5.1. A transcrição é local; fontes, modelos e integrações podem acessar serviços externos. Use conteúdo autorizado.</p>
             <p class="compact-note">Use o servidor pela rede local ou VPN. A busca/importação do YouTube não concede direitos sobre a mídia. OAuth autoriza o acesso ao canal, não o uso de músicas. Confira as permissões do conteúdo e os termos do YouTube antes de importar ou publicar. Não listado permite acesso a quem tiver o link; resultados SRT nunca vão ao YouTube.</p>
             <p class="compact-note"><a href="https://www.youtube.com/static?template=terms" target="_blank" rel="noopener noreferrer">Termos do YouTube</a> · <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer">Privacidade do Google</a> · <a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener noreferrer">Revogar acesso ao canal</a></p>
         </div>
@@ -3735,6 +3735,13 @@
             return fetch(url, options);
         }
 
+        async function timedAuthFetch(url, options = {}, timeoutMs = 10000) {
+            const controller = new AbortController();
+            const timer = setTimeout(() => controller.abort(), timeoutMs);
+            try { return await authFetch(url, {...options, signal: controller.signal}); }
+            finally { clearTimeout(timer); }
+        }
+
         async function checkAuth() {
             try {
                 const res = await authFetch('/api/auth_status');
@@ -4177,8 +4184,8 @@
         async function fetchProcessingQueue() {
             const generation = ++processingQueueRequestGeneration;
             try {
-                const response = await authFetch('/api/queue?include_completed=true', { cache: 'no-store' });
-                if (!response.ok) return;
+                const response = await timedAuthFetch('/api/queue?include_completed=true', { cache: 'no-store' });
+                if (!response.ok) throw new Error('Consulta da fila temporariamente indisponível.');
                 const data = await response.json();
                 if (generation !== processingQueueRequestGeneration) return;
                 const jobs = data.jobs || [];
@@ -4188,7 +4195,11 @@
                     processingQueuePollTimer = setTimeout(fetchProcessingQueue, 3000);
                 }
             } catch (error) {
-                console.error('Erro ao consultar a fila:', error);
+                console.debug('Fila temporariamente indisponível:', error);
+                if (generation === processingQueueRequestGeneration && currentUser) {
+                    clearTimeout(processingQueuePollTimer);
+                    processingQueuePollTimer = setTimeout(fetchProcessingQueue, 3000);
+                }
             }
         }
 
@@ -4259,6 +4270,52 @@
             input.dispatchEvent(new Event('change', {bubbles: true}));
         }
 
+        const pendingProcessSubmissions = new Map();
+
+        async function submitProcessWithConfirmation(formData) {
+            const signature = JSON.stringify([currentUser?.username, Array.from(formData.entries()).filter(([key]) => !['submission_id', 'source_title'].includes(key))
+                .map(([key, value]) => [key, value instanceof File
+                    ? [value.name, value.size, value.lastModified] : value])]);
+            let submissionId = pendingProcessSubmissions.get(signature);
+            if (!submissionId) {
+                submissionId = Array.from(crypto.getRandomValues(new Uint8Array(16)), value => value.toString(16).padStart(2, '0')).join('');
+                pendingProcessSubmissions.set(signature, submissionId);
+            }
+            formData.set('submission_id', submissionId);
+            const uploadBytes = Array.from(formData.values()).reduce((total, value) => total + (value instanceof File ? value.size : 0), 0);
+            const timeoutMs = uploadBytes ? Math.max(120000, Math.min(1800000, 60000 + uploadBytes / 100)) : 20000;
+            let failureDetail = '';
+            for (let attempt = 0; attempt < 2; attempt++) {
+                try {
+                    const response = await timedAuthFetch('/api/process', {method: 'POST', body: formData}, timeoutMs);
+                    const result = await response.json().catch(() => ({}));
+                    if (!response.ok) failureDetail = result.detail || '';
+                    if (!response.ok && response.status < 500) {
+                        pendingProcessSubmissions.delete(signature);
+                        const error = new Error(result.detail || 'Não foi possível adicionar à fila.');
+                        error.confirmedFailure = true;
+                        throw error;
+                    }
+                    if (response.ok && result.status === 'queued' && result.job_id) {
+                        pendingProcessSubmissions.delete(signature);
+                        return result;
+                    }
+                } catch (error) {
+                    if (error.confirmedFailure) throw error;
+                }
+                document.getElementById('creationLoadingDetail').textContent = 'Reconectando e conferindo a inclusão na fila…';
+                try {
+                    const response = await timedAuthFetch(`/api/queue/submissions/${submissionId}`, {cache: 'no-store'}, 8000);
+                    const result = await response.json().catch(() => ({}));
+                    if (response.ok && result.status === 'queued' && result.job_id) {
+                        pendingProcessSubmissions.delete(signature);
+                        return result;
+                    }
+                } catch (error) { /* Retry with the same identifier; the server accepts it only once. */ }
+            }
+            throw new Error(failureDetail || 'A conexão com o servidor caiu e não foi possível confirmar a inclusão. Confira a fila. Ao tentar novamente com as mesmas escolhas, o item será confirmado sem duplicação.');
+        }
+
         async function submitProcessBatch(baseFormData, audioFiles = [], inputId = '') {
             const files = Array.from(audioFiles || []);
             const submissions = files.length ? files : [null];
@@ -4270,16 +4327,18 @@
                 formData.delete('audio_file');
                 if (file) formData.set('audio_file', file, file.name);
                 applyCachedRevision(formData);
+                if (formData.get('youtube_url')) {
+                    const sourceInput = document.getElementById(currentCreatorMode === 'easy' ? 'easyYoutubeUrl'
+                        : currentCreatorMode === 'subtitle' ? 'subtitleYoutubeUrl' : 'youtubeUrl');
+                    formData.set('source_title', sourceInput?.dataset.youtubeTitle || 'Vídeo do YouTube');
+                }
                 if (!window.cachedRevisionId && formData.get('subtitle_only') !== 'true') window.attachLyricDraft?.(formData, file);
                 let result;
                 document.getElementById('creationLoadingDetail').textContent = submissions.length > 1
                     ? `Enviando arquivo ${index + 1} de ${submissions.length} e aguardando a confirmação do servidor…`
                     : 'Enviando e aguardando a confirmação do servidor…';
                 try {
-                    const response = await authFetch('/api/process', { method: 'POST', body: formData });
-                    result = await response.json().catch(() => ({}));
-                    if (!response.ok) throw new Error(result.detail || 'Não foi possível adicionar à fila.');
-                    if (result.status !== 'queued' || !result.job_id) throw new Error('O servidor não confirmou a inclusão. Atualize o andamento antes de tentar novamente.');
+                    result = await submitProcessWithConfirmation(formData);
                 } catch (cause) {
                     if (files.length) retainBatchFiles(inputId, files.slice(index));
                     const accepted = results.length ? `${results.length} arquivo(s) já adicionado(s) à fila. ` : '';
@@ -7222,7 +7281,7 @@
             if (statusRequestInFlight) return;
             statusRequestInFlight = true;
             try {
-                const res = await authFetch('/api/status', { cache: 'no-store' });
+                const res = await timedAuthFetch('/api/status', { cache: 'no-store' });
                 if (!res.ok) return;
                 const data = await res.json();
                 const previousStatus = lastKnownServerStatus;

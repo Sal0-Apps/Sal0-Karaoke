@@ -25,7 +25,7 @@ Crie uma pasta própria para a instalação e salve nela o arquivo `compose.yaml
 ```yaml
 services:
   karaoke-app:
-    image: ghcr.io/sal0-apps/sal0-karaoke:12.5
+    image: ghcr.io/sal0-apps/sal0-karaoke:12.5.1
     container_name: karaoke-app
     ports:
       - "7885:7860"
@@ -183,4 +183,18 @@ Para conservar a identidade de atualização do Android, proteja uma chave de as
 
 Cada execução mantém seus arquivos em `/data/output/queue_jobs/<id>/cache/`, com índice persistente da fila. Não remova essas pastas enquanto quiser revisar os itens. Resultados concluídos, falhos, cancelados e removidos continuam disponíveis até a aceitação de uma nova origem após esgotar a fila do perfil. Reexecuções permanecem na mesma fila; resultados da Biblioteca e modelos continuam preservados. A mudança aplica-se às tarefas ainda disponíveis na atualização e às novas; arquivos que a versão anterior já descartou não são recuperáveis.
 
-Atualize apenas a imagem do servidor para `ghcr.io/sal0-apps/sal0-karaoke:12.5` ou `latest`. Os aplicativos Android e Windows existentes continuam compatíveis. Publicações substituídas no YouTube recebem outro link; o anterior só é removido após confirmar o novo vídeo, capa, playlists e privacidade. Playlists adicionais começam desmarcadas em novas criações, com a playlist do perfil mantida.
+Atualize apenas a imagem do servidor para `ghcr.io/sal0-apps/sal0-karaoke:12.5.1` ou `latest`. Os aplicativos Android e Windows existentes continuam compatíveis. Publicações substituídas no YouTube recebem outro link; o anterior só é removido após confirmar o novo vídeo, capa, playlists e privacidade. Playlists adicionais começam desmarcadas em novas criações, com a playlist do perfil mantida.
+
+### Ícone no ZimaOS / CasaOS
+
+Use o mesmo endereço em `services.karaoke-app.labels.icon` e em `x-casaos.icon`:
+
+```
+https://raw.githubusercontent.com/Sal0-Apps/Sal0-Karaoke/main/app/templates/app-icon-v8.png?v=12.5.1
+```
+
+O endereço renovado evita o reaproveitamento da imagem antiga. Atualize os dois campos no Compose instalado e salve a configuração do aplicativo no ZimaOS; baixar apenas a nova imagem Docker não reescreve os metadados do painel. O ícone web também vem do arquivo `app-icon-v8.png`. O endpoint legado `/favicon.png` serve esse mesmo arquivo para compatibilidade, sem manter uma segunda imagem.
+
+### Inclusão por link do YouTube
+
+A confirmação de `/api/process` grava a tarefa na fila sem aguardar a transferência do YouTube. O download só começa quando o worker alcança o item; ele mostra andamento e aceita cancelamento. Cada inclusão da interface leva um identificador: depois de uma falha de conexão, o cliente consulta a confirmação e pode repetir a requisição com o mesmo identificador sem duplicar a tarefa da fila atual. Erros da transferência ficam no item, com a origem e as escolhas preservadas para refazer. O salvamento opcional da origem na Biblioteca continua funcionando depois do download.

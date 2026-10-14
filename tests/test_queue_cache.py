@@ -13,6 +13,7 @@ import threading
 import time
 import unittest
 import uuid
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
@@ -25,6 +26,7 @@ from pydantic import BaseModel
 ROOT = Path(__file__).parents[1]
 sys.path.insert(0, str(ROOT / 'app'))
 import queue_cache
+import queue_submissions
 from processing_validation import validate_processing_options, validate_review_segments, canonical_review_segments
 from reprocess_cache import copy_reusable_inputs, youtube_identity
 from subtitle_settings import load_subtitle_settings, normalize_subtitle_settings
@@ -45,7 +47,7 @@ class QueueCacheTests(unittest.TestCase):
         self.scope=dict(app=app, BaseModel=BaseModel, Depends=Depends, File=File, Form=Form, UploadFile=UploadFile,
             HTTPException=HTTPException, FileResponse=FileResponse, Response=Response,
             get_current_user=user, is_admin=lambda u:u.get('role')=='admin',
-            get_user_paths=self.paths, queue_cache=queue_cache, canonical_review_segments=canonical_review_segments,
+            get_user_paths=self.paths, queue_cache=queue_cache, queue_submissions=queue_submissions, canonical_review_segments=canonical_review_segments,
             validate_processing_options=validate_processing_options,validate_review_segments=validate_review_segments,
             os=os,json=json,shutil=shutil,time=time,uuid=uuid,mimetypes=mimetypes,
             logger=logging.getLogger('queue-cache-tests'),
@@ -61,7 +63,7 @@ class QueueCacheTests(unittest.TestCase):
             SUBTITLE_MODE_FILE=str(self.root/'subtitles.json'),load_subtitle_settings=load_subtitle_settings,
             normalize_subtitle_settings=normalize_subtitle_settings, stage_subtitle_background=Mock(return_value=None),
             check_has_video=lambda p:str(p).endswith('.mp4'),get_random_default_background=lambda:None)
-        names={'save_processing_queue_unlocked','load_processing_queue','public_queue_job','enqueue_processing_job',
+        names={'get_process_submission','update_queued_source','save_processing_queue_unlocked','load_processing_queue','public_queue_job','enqueue_processing_job',
             'retire_queue_batch','ensure_processing_queue_capacity','active_queue_pipeline_for_user','cached_queue_job',
             'queue_cache_dir_for_user','remove_finished_queue_cache','get_processing_queue','remove_queued_job',
             'get_cache_info','get_cached_background','get_cached_audio','get_queue_cache','public_cached_queue_job','get_queue_cache_job','get_queue_cache_segments',
@@ -407,6 +409,91 @@ class QueueCacheTests(unittest.TestCase):
         a=self.job('A');options=self.client.get('/api/queue-cache/A').json()['options']
         self.assertEqual(options['lyrics_mode'],'manual');self.assertEqual(options['lyrics_text'],'Guia A')
         self.assertFalse(any(key.endswith('_dir') or key in {'owner_user','input_audio_path'} for key in options))
+
+    def test_youtube_submission_is_persisted_without_downloading_or_notifying(self):
+        self.scope['download_youtube'] = Mock(side_effect=AssertionError('The request must not download'))
+        self.scope['notify_targets'] = Mock(side_effect=AssertionError('The worker sends notifications'))
+        response = self.client.post('/api/process', data={'youtube_url':'https://youtu.be/abcdefghijk',
+            'source_title':'Artista - Música', 'lyrics_mode':'manual', 'lyrics_text':'Guia preservada',
+            'save_to_library':'true', 'submission_id':'a'*32}, files={'bg_file':('fundo.png', b'background', 'image/png')})
+        self.assertEqual(response.status_code,200,response.text)
+        job=self.queue[0];cache=Path(job['pipeline']['cache_dir'])
+        self.assertEqual(response.json()['job_id'],job['id'])
+        self.assertEqual(job['title'],'Artista - Música');self.assertEqual(job['status'],'queued')
+        self.assertEqual(job['pipeline']['youtube_url'],'https://youtu.be/abcdefghijk')
+        self.assertTrue(job['pipeline']['save_to_library'])
+        self.assertFalse(Path(job['pipeline']['input_audio_path']).exists())
+        self.assertEqual((cache/'original_bg.png').read_bytes(),b'background')
+        self.assertEqual((cache/'lyrics_guide.txt').read_text(),'Guia preservada')
+        meta=json.loads((cache/'cache_meta.json').read_text())
+        self.assertNotIn('download_quality_version',meta)
+        self.assertEqual(json.loads((self.root/'queue.json').read_text())[0]['submission_id'],'a'*32)
+        self.scope['download_youtube'].assert_not_called();self.scope['notify_targets'].assert_not_called()
+
+    def test_confirmation_and_retry_survive_completion_and_restart_without_duplicate(self):
+        data={'youtube_url':'https://youtu.be/abcdefghijk','submission_id':'a'*32}
+        first=self.client.post('/api/process',data=data);self.assertEqual(first.status_code,200,first.text)
+        job=self.queue[0];job['status']='done';self.scope['save_processing_queue_unlocked']()
+        self.scope['load_processing_queue']()
+        self.scope['ensure_processing_queue_capacity']=Mock(side_effect=AssertionError('Accepted work bypasses capacity'))
+        again=self.client.post('/api/process',data=data)
+        self.assertEqual(again.status_code,200,again.text);self.assertEqual(again.json()['job_id'],first.json()['job_id'])
+        receipt=self.client.get('/api/queue/submissions/'+'a'*32)
+        self.assertEqual(receipt.status_code,200,receipt.text);self.assertEqual(receipt.json()['job_status'],'done')
+        self.assertEqual(len(self.scope['processing_queue']),1)
+        self.assertEqual(len(list((self.root/'jobs').iterdir())),1)
+        self.user={'username':'bob','role':'admin'}
+        self.assertEqual(self.client.get('/api/queue/submissions/'+'a'*32).status_code,404)
+
+    def test_concurrent_retries_accept_once_and_remove_the_unused_staging_cache(self):
+        enqueue=self.scope['enqueue_processing_job'];barrier=threading.Barrier(2)
+        def enqueue_together(job):
+            barrier.wait(timeout=5)
+            return enqueue(job)
+        self.scope['enqueue_processing_job']=enqueue_together
+        data={'youtube_url':'https://youtu.be/abcdefghijk','submission_id':'a'*32}
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            results=list(pool.map(lambda _:self.client.post('/api/process',data=data),range(2)))
+        self.assertTrue(all(result.status_code==200 for result in results),[r.text for r in results])
+        self.assertEqual(results[0].json()['job_id'],results[1].json()['job_id'])
+        self.assertEqual(len(self.queue),1);self.assertEqual(len(list((self.root/'jobs').iterdir())),1)
+        self.assertEqual(len(json.loads((self.root/'queue.json').read_text())),1)
+
+    def test_same_identifier_belongs_to_the_submitting_profile(self):
+        data={'youtube_url':'https://youtu.be/abcdefghijk','submission_id':'a'*32}
+        alice=self.client.post('/api/process',data=data).json()['job_id']
+        self.user={'username':'bob','role':'admin'}
+        bob=self.client.post('/api/process',data=data).json()['job_id']
+        self.assertNotEqual(alice,bob)
+        self.assertEqual(self.client.get('/api/queue/submissions/'+'a'*32).json()['job_id'],bob)
+        self.user={'username':'alice','role':'user'}
+        self.assertEqual(self.client.get('/api/queue/submissions/'+'a'*32).json()['job_id'],alice)
+
+    def test_failed_youtube_transfer_can_be_recreated_from_its_saved_url(self):
+        response=self.client.post('/api/process',data={'youtube_url':'https://youtu.be/abcdefghijk','source_title':'Música'})
+        job=self.queue[0];job['status']='error'
+        self.assertTrue(self.client.get('/api/queue-cache').json()['jobs'][0]['can_reprocess'])
+        revision=self.client.post('/api/process',data={'cache_job_id':response.json()['job_id'],'font_size':'48'})
+        self.assertEqual(revision.status_code,200,revision.text)
+        self.assertEqual(self.queue[-1]['pipeline']['youtube_url'],'https://youtu.be/abcdefghijk')
+        self.assertEqual(self.queue[-1]['pipeline']['font_size'],48)
+        self.assertEqual(self.queue[-1]['batch_id'],job['batch_id'])
+
+    def test_invalid_submission_identifier_is_rejected_before_creating_files(self):
+        self.scope['get_user_paths']=Mock(side_effect=AssertionError('No files should be staged'))
+        response=self.client.post('/api/process',data={'youtube_url':'https://youtu.be/abcdefghijk','submission_id':'../bad'})
+        self.assertEqual(response.status_code,400,response.text);self.assertEqual(self.queue,[])
+
+    def test_download_completion_updates_queue_title_and_actual_media_path_on_disk(self):
+        self.client.post('/api/process',data={'youtube_url':'https://youtu.be/abcdefghijk'})
+        job=self.queue[0];media=Path(job['pipeline']['cache_dir'])/'original_input.webm'
+        media.write_bytes(b'complete source')
+        self.scope['update_queued_source'](job['pipeline']['cache_dir'],str(media),'Título real')
+        visible=self.client.get('/api/queue?include_completed=true').json()['jobs'][0]
+        self.assertEqual(visible['title'],'Título real')
+        self.assertEqual(job['process_summary']['title'],'Título real')
+        self.scope['load_processing_queue']()
+        self.assertEqual(self.scope['processing_queue'][0]['pipeline']['input_audio_path'],str(media))
 
 
 if __name__=='__main__':unittest.main()

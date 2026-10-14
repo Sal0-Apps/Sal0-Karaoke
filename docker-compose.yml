@@ -1,7 +1,9 @@
 services:
   karaoke-app:
-    image: ghcr.io/sal0-apps/sal0-karaoke:9.9.0
+    image: ghcr.io/sal0-apps/sal0-karaoke:12.5.1
     container_name: karaoke-app
+    labels:
+      icon: "https://raw.githubusercontent.com/Sal0-Apps/Sal0-Karaoke/main/app/templates/app-icon-v8.png?v=12.5.1"
     ports:
       - "7885:7860"
     volumes:
@@ -15,7 +17,7 @@ services:
 x-casaos:
   author: "Sal0"
   category: "Media"
-  icon: "https://raw.githubusercontent.com/Sal0-Apps/Sal0-Karaoke/main/app/templates/favicon.png"
+  icon: "https://raw.githubusercontent.com/Sal0-Apps/Sal0-Karaoke/main/app/templates/app-icon-v8.png?v=12.5.1"
   title: "Sal0 Karaokê"
   port_map: "7885"
   overview: "Crie vídeos de karaokê localmente com Demucs, Whisper, letras-guia, contas separadas, Biblioteca, preview e Telegram."
