@@ -7,6 +7,8 @@ for(const match of HTML.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/g)) new Fu
   const page=await browser.newPage({viewport:{width:390,height:900},isMobile:true,hasTouch:true});
   const errors=[],starts=[],cookies=[],updates=[],polls=[];
   let connected=false,configured=false,session=null,nonce=0,pollKind='pending',heldPoll=null,holdPoll=false,sessionState='anonymous',failCookies=false,failLink=true,updating=false,processing=false;
+  let notifyHeldPoll;
+  const heldPollReady=new Promise(resolve=>notifyHeldPoll=resolve);
   page.on('pageerror',e=>errors.push(e.message));
   await page.addInitScript(()=>{localStorage.setItem('karaoke_token','session');Object.defineProperty(navigator,'clipboard',{value:{writeText:async text=>window.copiedYoutubeCode=text}});});
   await page.clock.install({time:new Date('2026-10-09T13:00:00Z')});
@@ -37,7 +39,7 @@ for(const match of HTML.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/g)) new Fu
     polls.push(request.postDataJSON());
     const result=pollKind==='connected'?{...session,status:'connected',channel_title:'Meu canal',message:'Canal conectado: Meu canal'}:pollKind==='slow'?{...session,status:'pending',interval:10,message:'Aguardando o Google.'}:pollKind==='denied'?{...session,status:'error',recovery:'auth_required',message:'O acesso foi negado. Gere outro código.'}:{...session,status:'pending',message:'Aguardando sua confirmação.'};
     if(pollKind==='connected')connected=true;
-    if(holdPoll){heldPoll=()=>reply(result);return;}
+    if(holdPoll){heldPoll=()=>reply(result);notifyHeldPoll();return;}
     session=result;return reply(result);
    }
    if(path==='/api/admin/youtube/device/cancel'){session=null;return reply({status:'cancelled'});}
@@ -97,7 +99,8 @@ for(const match of HTML.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/g)) new Fu
   assert(await page.locator('#ytDeviceCodeArea').evaluate(el=>el.hidden));
   assert(!(await page.locator('#ytDeviceReconnect').isDisabled()));
   pollKind='pending';await page.locator('#ytDeviceReconnect').click();await page.waitForFunction(()=>!document.getElementById('ytDeviceCodeArea').hidden);
-  holdPoll=true;await page.clock.runFor(5200);await page.evaluate(()=>({polling:youtubeDevicePolling}));assert(heldPoll);
+  const heldRequest=page.waitForRequest(r=>r.url().endsWith('/api/admin/youtube/device/poll'));
+  holdPoll=true;await page.clock.runFor(5200);await heldRequest;await heldPollReady;assert(heldPoll);
   await page.locator('#ytDeviceCancel').click();await page.waitForFunction(()=>document.getElementById('ytDevicePanel').hidden);
   holdPoll=false;await heldPoll();await page.clock.runFor(100);
   assert(await page.locator('#ytDevicePanel').evaluate(el=>el.hidden),'Canceled late response reopened code');
