@@ -1,0 +1,13 @@
+# Build this checkout without replacing the published image tag.
+# docker compose -f docker-compose.yml -f docker-compose.local.yml up -d --build
+services:
+  karaoke-app:
+    image: sal0-karaoke:local-review
+    pull_policy: build
+    build:
+      context: ./app
+      dockerfile: Dockerfile
+    environment:
+      KARAOKE_CPU_THREADS: ${KARAOKE_CPU_THREADS:-4}
+      DEMUCS_CPU_THREADS: ${DEMUCS_CPU_THREADS:-}
+      WHISPER_COMPUTE_TYPE: ${WHISPER_COMPUTE_TYPE:-}

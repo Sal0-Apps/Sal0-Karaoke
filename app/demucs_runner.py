@@ -3,14 +3,11 @@
 import os
 
 import torch
+from runtime_resources import available_cpu_threads
 
 
 def main() -> None:
-    configured = os.environ.get("DEMUCS_CPU_THREADS", "1").strip()
-    try:
-        threads = max(1, int(configured))
-    except ValueError:
-        threads = 1
+    threads = available_cpu_threads(os.environ.get("DEMUCS_CPU_THREADS"))
 
     # Definir as threads antes de importar o CLI evita que o PyTorch escolha
     # um valor padrão menor durante a inicialização do processo filho.

@@ -52,6 +52,11 @@ jobs:
           python -m unittest discover -s tests -p test_queue_lyrics_and_background.py -v
           python -m unittest discover -s tests -p test_display_modes.py -v
           python -m unittest discover -s tests -p test_whisper_cache_reuse.py -v
+          python -m unittest discover -s tests -p test_runtime_resources.py -v
+          python -m unittest discover -s tests -p test_whisper_models.py -v
+          python -m unittest discover -s tests -p test_whisper_refinements.py -v
+          python -m unittest discover -s tests -p test_alignment_resources.py -v
+          python -m unittest discover -s tests -p test_youtube_renewal_alerts.py -v
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
@@ -67,6 +72,7 @@ jobs:
           NODE_PATH=/tmp/sal0-ui/node_modules node tests/browser_queue_cache.cjs
           NODE_PATH=/tmp/sal0-ui/node_modules node tests/browser_subtitle_lyrics.cjs
           NODE_PATH=/tmp/sal0-ui/node_modules node tests/browser_lyrics_search.cjs
+          NODE_PATH=/tmp/sal0-ui/node_modules node tests/browser_interface_refinements.cjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -81,4 +87,5 @@ jobs:
             queue-cache-*.png
             subtitle-*.png
             lyrics-search-*.png
+            review-artifacts/interface-*.png
           if-no-files-found: ignore

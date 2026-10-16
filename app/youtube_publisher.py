@@ -68,6 +68,40 @@ class YouTubePublisher:
         self.oauth_states = {}
         self._device = None
         self.on_published = None
+        self.on_auth_required = None
+        self._auth_alert_pending = set()
+
+    def notify_auth_required(self, message=None):
+        """Notify administrators once per expired grant; delivery never blocks uploads."""
+        with self.lock:
+            token = self.read('token.json')
+            if not token.get('refresh_token') or not token.get('channel_id'):
+                return
+            token['auth_error'] = message or token.get('auth_error') or 'Reconecte o canal do YouTube.'
+            episode = token.setdefault('auth_alert_episode', secrets.token_hex(12))
+            self.save('token.json', token)
+            if not self.on_auth_required or token.get('auth_alert_notified_at') or episode in self._auth_alert_pending:
+                return
+            self._auth_alert_pending.add(episode)
+            event = {'channel_title': token.get('channel_title', ''),
+                     'pending_count': sum(job.get('status') in {'queued', 'uploading', 'finalizing', 'auth_required'}
+                                          for job in self.read('jobs.json', []))}
+        threading.Thread(target=self._deliver_auth_alert, args=(episode, event),
+                         name='youtube-auth-alert', daemon=True).start()
+
+    def _deliver_auth_alert(self, episode, event):
+        try:
+            delivered = self.on_auth_required(event)
+            with self.lock:
+                token = self.read('token.json')
+                if delivered and token.get('auth_error') and token.get('auth_alert_episode') == episode:
+                    token['auth_alert_notified_at'] = time.time()
+                    self.save('token.json', token)
+        except Exception as error:
+            logger.warning('Alerta de renovação do YouTube pendente (%s).', type(error).__name__)
+        finally:
+            with self.lock:
+                self._auth_alert_pending.discard(episode)
 
     @property
     def device(self):
@@ -84,13 +118,20 @@ class YouTubePublisher:
                 raise PublicationError('Há envios pendentes para outro canal. Reconecte a mesma conta para retomá-los.')
             token.pop('auth_error', None)
             token.pop('refresh_retry_at', None)
+            token.pop('auth_alert_episode', None)
+            token.pop('auth_alert_notified_at', None)
             token['checked_at'] = time.time()
+            token['grant_revision'] = secrets.token_hex(12)
             self.save('token.json', token)
             resumed = False
             for job in jobs:
                 # Keep the resumable session and any confirmed video ID intact.
-                if job.get('status') == 'auth_required' and job.get('channel_id') == token['channel_id']:
-                    job.update(status='queued', error=None)
+                recoverable = (job.get('status') == 'auth_required' or
+                    job.get('status') == 'error' and (job.get('error_kind') in {'auth_required', 'upload_session_expired'} or
+                    job.get('error') in {'A sessão de envio expirou ou foi recusada. Verifique o canal antes de iniciar outro envio.',
+                                         'Não foi possível retomar a sessão. Verifique o canal antes de reenviar.'}))
+                if recoverable and job.get('channel_id') == token['channel_id']:
+                    job.update(status='queued', error=None, error_kind=None)
                     resumed = True
             if resumed:
                 self.save('jobs.json', jobs)
@@ -197,7 +238,7 @@ class YouTubePublisher:
             if reason in {'accessNotConfigured', 'serviceDisabled'}:
                 raise PublicationError('Ative a YouTube Data API v3 no mesmo projeto Google da credencial e tente conectar novamente.')
             if reason in {'insufficientPermissions', 'forbidden'}:
-                raise PublicationError('O Google negou a consulta do canal. Autorize novamente usando a conta do canal e permita o acesso solicitado.')
+                raise PublicationError('O Google negou a consulta do canal. Autorize novamente usando a conta do canal e permita o acesso solicitado.', 'auth_required')
             if reason == 'quotaExceeded':
                 raise PublicationError('A cota diária da API do YouTube foi atingida. Aguarde a renovação e tente novamente.')
             raise PublicationError(f'O Google não confirmou o canal (HTTP {response.status_code}). Confira se a YouTube Data API v3 está ativa no projeto da credencial.')
@@ -247,6 +288,7 @@ class YouTubePublisher:
             if not token.get('refresh_token'):
                 raise PublicationError('Conecte o canal do YouTube no painel administrativo.')
             if token.get('auth_error') and not force_refresh:
+                self.notify_auth_required(token['auth_error'])
                 raise PublicationError(token['auth_error'], 'auth_required')
             if token.get('refresh_retry_at', 0) > time.time() and not force_refresh:
                 raise PublicationError('O Google não respondeu à renovação. Use Verificar e renovar para tentar novamente.', 'retry_later')
@@ -262,6 +304,8 @@ class YouTubePublisher:
                     else:
                         token['refresh_retry_at'] = time.time() + 60
                     self.save('token.json', token)
+                    if error.kind == 'auth_required':
+                        self.notify_auth_required(str(error))
                     raise error
                 updated = json_object(response)
                 if not updated.get('access_token'):
@@ -271,6 +315,8 @@ class YouTubePublisher:
                 token['checked_at'] = time.time()
                 token.pop('auth_error', None)
                 token.pop('refresh_retry_at', None)
+                token.pop('auth_alert_episode', None)
+                token.pop('auth_alert_notified_at', None)
                 self.save('token.json', token)
             return token
 
@@ -299,6 +345,7 @@ class YouTubePublisher:
                 latest = self.read('token.json')
                 latest['auth_error'] = str(error)
                 self.save('token.json', latest)
+                self.notify_auth_required(str(error))
             elif error.kind == 'retry_later':
                 latest = self.read('token.json')
                 if latest.get('refresh_retry_at', 0) <= time.time():
@@ -313,6 +360,13 @@ class YouTubePublisher:
         return result
 
     def authenticated_request(self, method, url, timeout, **kwargs):
+        # OAuth is for YouTube only: never forward it to other Google APIs or redirects.
+        parsed = urlparse(url)
+        if (parsed.scheme != 'https' or parsed.netloc != 'www.googleapis.com' or
+                not parsed.path.startswith(('/youtube/v3/', '/upload/youtube/v3/')) or
+                any(part in {'.', '..'} for part in parsed.path.split('/')) or '%' in parsed.path):
+            raise PublicationError('Endereço fora da API do YouTube bloqueado.')
+        kwargs['allow_redirects'] = False
         headers = dict(kwargs.pop('headers', {}))
         body = kwargs.get('data')
         body_position = body.tell() if hasattr(body, 'tell') and hasattr(body, 'seek') else None
@@ -321,11 +375,23 @@ class YouTubePublisher:
                 body.seek(body_position)
             headers['Authorization'] = 'Bearer ' + self.token(force_refresh=bool(attempt))['access_token']
             response = requests.request(method, url, headers=headers, timeout=timeout, **kwargs)
+            if response.status_code == 403:
+                try:
+                    reason = response.json()['error']['errors'][0]['reason']
+                except (ValueError, TypeError, AttributeError, KeyError, IndexError):
+                    reason = ''
+                if reason in {'quotaExceeded', 'dailyLimitExceeded'}:
+                    raise PublicationError('A cota diária do YouTube foi atingida. Aguarde a renovação; sua conexão foi preservada.', 'quota_exceeded')
+                if reason == 'insufficientPermissions':
+                    message = 'O Google não permitiu o envio. Reconecte o canal e permita o acesso solicitado.'
+                    self.notify_auth_required(message)
+                    raise PublicationError(message, 'auth_required')
             if response.status_code != 401:
                 return response
         token = self.read('token.json')
         token['auth_error'] = 'O Google recusou o acesso ao canal. Use Reconectar canal no app.'
         self.save('token.json', token)
+        self.notify_auth_required(token['auth_error'])
         raise PublicationError(token['auth_error'], 'auth_required')
 
     def api(self, method, path, validate=None, **kwargs):
@@ -342,11 +408,16 @@ class YouTubePublisher:
                         reason = 'apiError'
                     messages = {
                         'quotaExceeded':'A cota diária do YouTube foi atingida. Aguarde a renovação; sua conexão foi preservada.',
+                        'dailyLimitExceeded':'A cota diária do YouTube foi atingida. Aguarde a renovação; sua conexão foi preservada.',
                         'accessNotConfigured':'Ative a YouTube Data API v3 no projeto Google da credencial.',
                         'serviceDisabled':'Ative a YouTube Data API v3 no projeto Google da credencial.',
                         'insufficientPermissions':'O Google não permitiu consultar ou gerenciar playlists. Reconecte e permita o acesso solicitado.',
                     }
-                    raise PublicationError(messages.get(str(reason), f'O YouTube recusou a solicitação (HTTP {response.status_code}).'))
+                    kind = ('auth_required' if reason == 'insufficientPermissions' else
+                            'quota_exceeded' if reason in {'quotaExceeded', 'dailyLimitExceeded'} else 'api_error')
+                    if kind == 'auth_required':
+                        self.notify_auth_required(messages[reason])
+                    raise PublicationError(messages.get(str(reason), f'O YouTube recusou a solicitação (HTTP {response.status_code}).'), kind)
                 if method.upper() == "DELETE" and response.status_code == 204:
                     return {}
                 payload = json_object(response)
@@ -624,6 +695,16 @@ class YouTubePublisher:
         return self.authenticated_request(method, url, (15, 120), **kwargs)
 
     def upload_video(self, job):
+        # A renewed OAuth grant cannot revive an expired resumable upload URI.
+        for attempt in range(2):
+            try:
+                return self._upload_video_session(job)
+            except PublicationError as error:
+                if error.kind != 'upload_session_expired' or attempt or job.get('video_id'):
+                    raise
+                self.checkpoint(job, upload_uri=None, progress=0, status='uploading')
+
+    def _upload_video_session(self, job):
         if job.get('video_id'):
             return job['video_id']
         size = Path(job['video']).stat().st_size
@@ -641,6 +722,8 @@ class YouTubePublisher:
         response = self.upload_request('PUT', job['upload_uri'], headers={'Content-Range': f'bytes */{size}', 'Content-Length': '0'})
         if response.status_code in (200, 201):
             return self.completed_upload(job, response)
+        if response.status_code in (404, 410):
+            raise PublicationError('A sessão de envio expirou; é necessário reiniciar a transferência.', 'upload_session_expired')
         if response.status_code != 308:
             raise PublicationError('A sessão de envio expirou ou foi recusada. Verifique o canal antes de iniciar outro envio.')
         offset = uploaded_offset(response)
@@ -655,6 +738,8 @@ class YouTubePublisher:
                                  'Content-Range': f'bytes {offset}-{offset + len(chunk) - 1}/{size}'})
                     if response.status_code in (200, 201):
                         return self.completed_upload(job, response)
+                    if response.status_code in (404, 410):
+                        raise PublicationError('A sessão de envio expirou; é necessário reiniciar a transferência.', 'upload_session_expired')
                     if response.status_code != 308:
                         raise requests.RequestException('Upload chunk rejected')
                     next_offset = uploaded_offset(response)
@@ -671,6 +756,8 @@ class YouTubePublisher:
                     response = self.upload_request('PUT', job['upload_uri'], headers={'Content-Range': f'bytes */{size}', 'Content-Length': '0'})
                     if response.status_code in (200, 201):
                         return self.completed_upload(job, response)
+                    if response.status_code in (404, 410):
+                        raise PublicationError('A sessão de envio expirou; é necessário reiniciar a transferência.', 'upload_session_expired')
                     if response.status_code != 308:
                         raise PublicationError('Não foi possível retomar a sessão. Verifique o canal antes de reenviar.')
                     offset = uploaded_offset(response)
@@ -787,11 +874,22 @@ class YouTubePublisher:
                 job = next((j for j in self.read('jobs.json', []) if j['status'] in {'queued', 'uploading', 'finalizing'}), None)
                 if not job:
                     return
+                grant_revision = self.read('token.json').get('grant_revision')
                 try:
                     self.publish(job)
                 except Exception as error:
                     message = str(error) if isinstance(error, PublicationError) else 'Falha de comunicação com o YouTube. Retome a tarefa pelo painel.'
-                    self.checkpoint(job, status='auth_required' if getattr(error, 'kind', '') == 'auth_required' else 'error', error=message)
+                    kind = getattr(error, 'kind', '')
+                    with self.lock:
+                        current_token = self.read('token.json')
+                        if (kind == 'auth_required' and not current_token.get('auth_error') and
+                                current_token.get('grant_revision') != grant_revision):
+                            # Consent completed while the old attempt was returning its error.
+                            self.checkpoint(job, status='queued', error=None, error_kind=None)
+                            continue
+                        self.checkpoint(job, status='auth_required' if kind == 'auth_required' else 'error', error=message, error_kind=kind)
+                        if kind == 'auth_required':
+                            self.notify_auth_required(message)
         finally:
             self.worker_lock.release()
             # An enqueue can race the worker's final empty-queue check.
@@ -807,16 +905,17 @@ class YouTubePublisher:
             job = next((j for j in jobs if j['id'] == job_id), None)
             if not job or job['status'] != 'error':
                 raise PublicationError('Não há envio com erro para retomar.')
-            self.checkpoint(job, status='queued', error=None)
+            self.checkpoint(job, status='queued', error=None, error_kind=None)
         self.start()
 
 
-def install_routes(app, get_current_user, require_admin, resolve_video, check_admin, user_lookup=None, on_published=None):
+def install_routes(app, get_current_user, require_admin, resolve_video, check_admin, user_lookup=None, on_published=None, on_auth_required=None):
     from fastapi import Depends, HTTPException, UploadFile, File, Form
     from fastapi.responses import HTMLResponse
     publisher = YouTubePublisher()
     publisher.user_lookup = user_lookup or (lambda username: None)
     publisher.on_published = on_published
+    publisher.on_auth_required = on_auth_required
 
     def admin(user=Depends(get_current_user)):
         require_admin(user)

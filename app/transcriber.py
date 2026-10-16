@@ -1,12 +1,21 @@
 import gc
+import inspect
 import os
 import logging
+import threading
 from faster_whisper import WhisperModel
+from runtime_resources import whisper_runtime_options
+from whisper_models import get_model_local_dir, resolve_whisper_repo
 from whisper_audio import load_whisper_audio
 from whisperx_align import stabilize_word_timestamps
 from lyric_guide import prepare_lyrics_guide
 
 logger = logging.getLogger("karaoke")
+
+TRANSCRIPTION_CACHE_VERSION = 4
+_model_lock = threading.RLock()
+_cached_model = None
+_cached_model_key = None
 
 TRANSCRIPTION_PRESETS = {
     "karaoke": {
@@ -82,70 +91,94 @@ def _prepare_lyrics_hint(lyrics: str, max_chars: int = 1200) -> str | None:
             break
     return " ".join(unique_words)[:max_chars] or None
 
-def resolve_whisper_repo(model_size: str) -> str:
-    """Retorna o repositório oficial do HuggingFace para o modelo Whisper desejado."""
-    m = model_size.lower().strip()
-    if m == "large-v3-turbo":
-        return "deepdml/faster-whisper-large-v3-turbo"
-    elif m == "large-v3":
-        return "Systran/faster-whisper-large-v3"
-    elif m == "medium":
-        return "Systran/faster-whisper-medium"
-    elif m == "small":
-        return "Systran/faster-whisper-small"
-    elif m == "tiny":
-        return "Systran/faster-whisper-tiny"
-    return m
+def clear_cached_model():
+    """Cede RAM/VRAM ao separador de vocais antes de iniciar a próxima música."""
+    global _cached_model, _cached_model_key
+    with _model_lock:
+        _cached_model = None
+        _cached_model_key = None
+        gc.collect()
 
-def get_model_local_dir(model_size: str) -> str:
-    """Localiza o diretório local exato com os pesos do modelo Whisper."""
-    key = model_size.lower().strip()
-    min_size_bytes = 300 * 1024 * 1024  # 300 MB
-    if "tiny" in key:
-        min_size_bytes = 30 * 1024 * 1024
-    elif "small" in key:
-        min_size_bytes = 150 * 1024 * 1024
 
-    if key == "large-v3-turbo":
-        match_fn = lambda name: "turbo" in name or "large-v3-turbo" in name
-    elif key == "large-v3":
-        match_fn = lambda name: "large-v3" in name and "turbo" not in name
-    elif key == "medium":
-        match_fn = lambda name: "medium" in name
-    elif key == "small":
-        match_fn = lambda name: "small" in name
-    elif key == "tiny" or key == "base":
-        match_fn = lambda name: "tiny" in name or "base" in name
-    else:
-        match_fn = lambda name: key in name
+def _device_error(error):
+    return any(term in str(error).lower() for term in (
+        "cuda", "cublas", "cudnn", "nvidia", "out of memory", "float16", "compute type",
+        "memory allocation", "failed to allocate", "not enough memory",
+    ))
 
-    search_roots = [
-        "/data/output/models/whisper",
-        "/root/.cache/huggingface/hub",
-        "/root/.cache/whisper",
-        os.path.expanduser("~/.cache/huggingface/hub"),
-        os.path.expanduser("~/.cache/whisper")
-    ]
 
-    for root in search_roots:
-        if not os.path.exists(root):
-            continue
-        try:
-            for entry in os.listdir(root):
-                entry_path = os.path.join(root, entry)
-                if os.path.isdir(entry_path) and match_fn(entry.lower()):
-                    for r, dirs, files in os.walk(entry_path):
-                        for f in files:
-                            if f in ["model.bin", "model.safetensors", "pytorch_model.bin", "model.pt"]:
-                                fpath = os.path.join(r, f)
-                                try:
-                                    if os.path.getsize(fpath) >= min_size_bytes:
-                                        return r
-                                except Exception:
-                                    pass
-        except Exception as e:
-            logger.warning(f"Erro ao pesquisar diretório {root}: {e}")
-    return None
+def _load_selected_model(model_size, runtime):
+    global _cached_model, _cached_model_key
+    key = (resolve_whisper_repo(model_size), tuple(sorted(runtime.items())))
+    with _model_lock:
+        if _cached_model is not None and _cached_model_key == key:
+            logger.info("Reutilizando o mesmo Whisper %s para a revisão da voz.", model_size)
+            return _cached_model
+        clear_cached_model()
+        save_dir = "/data/output/models/whisper"
+        os.makedirs(save_dir, exist_ok=True)
+        local_dir = get_model_local_dir(model_size)
+        model = None
+        if local_dir:
+            try:
+                model = WhisperModel(local_dir, **runtime)
+            except InterruptedError:
+                raise
+            except Exception as error:
+                if _device_error(error):
+                    raise
+                logger.warning("Cache Whisper não pôde ser carregado em %s: %s", local_dir, error)
+        if model is None:
+            repo = resolve_whisper_repo(model_size)
+            try:
+                model = WhisperModel(repo, download_root=save_dir, local_files_only=True, **runtime)
+            except InterruptedError:
+                raise
+            except Exception as error:
+                if _device_error(error):
+                    raise
+                logger.info("Obtendo arquivos ausentes do modelo selecionado %s: %s", repo, error)
+                # Preservar a escolha do usuário: uma falha nunca troca para medium.
+                model = WhisperModel(repo, download_root=save_dir, local_files_only=False, **runtime)
+        _cached_model, _cached_model_key = model, key
+        return model
+
+
+def _fit_guidance(model, phrase_context, lyrics_hint):
+    """Reserve tokens para a voz; Faster-Whisper soma prompt e hotwords."""
+    tokenizer = getattr(model, "hf_tokenizer", None)
+    if tokenizer is None:
+        return phrase_context, lyrics_hint
+    budget = max(1, int(getattr(model, "max_length", 448)) // 2 - 8)
+
+    def encode(text):
+        return tokenizer.encode(" " + text, add_special_tokens=False).ids if text else []
+
+    def bounded(text, limit):
+        tokens = encode(text)
+        if len(tokens) <= limit:
+            return text, len(tokens)
+        # Um token pode terminar no meio de um caractere UTF-8. Retirar a
+        # substituição e recontar evita dicas corrompidas ou um novo overflow.
+        text = tokenizer.decode(tokens[:limit]).strip().rstrip("\ufffd")
+        while text and len(encode(text)) > limit:
+            text = text[:-1].rstrip()
+        return text or None, len(encode(text))
+
+    context_budget = budget // 2 if lyrics_hint else budget
+    phrase_context, context_count = bounded(phrase_context, context_budget)
+    lyrics_hint, _ = bounded(lyrics_hint, budget - context_count)
+    return phrase_context, lyrics_hint
+
+
+def _compatible_options(model, options):
+    # language_detection_segments surgiu após algumas versões ainda aceitas
+    # pelo requirements; não remover silenciosamente opções já estabelecidas.
+    parameters = inspect.signature(model.transcribe).parameters
+    if any(value.kind == inspect.Parameter.VAR_KEYWORD for value in parameters.values()):
+        return options
+    return {key: value for key, value in options.items()
+            if key not in {"language_detection_segments", "language_detection_threshold"} or key in parameters}
 
 def transcribe_vocals(
     vocals_path: str,
@@ -166,14 +199,10 @@ def transcribe_vocals(
     - Tenta primeiro carregar por caminho direto local sem chamadas de rede.
     - Se não encontrar no disco, baixa do repositório oficial HuggingFace.
     """
-    if not cpu_threads or cpu_threads <= 0:
-        total_cpus = os.cpu_count() or 4
-        cpu_threads = max(1, total_cpus - 1)
-
     preset = TRANSCRIPTION_PRESETS.get(transcription_preset, TRANSCRIPTION_PRESETS["karaoke"])
     transcription_preset = transcription_preset if transcription_preset in TRANSCRIPTION_PRESETS else "karaoke"
     is_max_quality = (quality_mode == "max_quality" or "max" in str(quality_mode).lower())
-    compute_type = "float32" if is_max_quality else "int8"
+    runtime = whisper_runtime_options(quality_mode=quality_mode, cpu_threads=cpu_threads)
     beam_size = max(preset["beam_size"], 10 if is_max_quality else 0)
     guide = prepare_lyrics_guide(initial_prompt)
     lyrics_hint = _prepare_lyrics_hint(prepare_lyrics_guide(guide_vocabulary) or guide)
@@ -183,69 +212,23 @@ def transcribe_vocals(
 
     logger.info(
         f"Configuração Faster-Whisper: Modelo={model_size}, Perfil={transcription_preset}, "
-        f"Threads={cpu_threads}, Compute={compute_type}, BeamSize={beam_size}, SileroVAD={enable_vad}"
+        f"Runtime={runtime}, BeamSize={beam_size}, SileroVAD={enable_vad}"
     )
 
     audio = load_whisper_audio(vocals_path)
 
-    repo_id = resolve_whisper_repo(model_size)
-    save_dir = "/data/output/models/whisper"
-    os.makedirs(save_dir, exist_ok=True)
+    try:
+        model = _load_selected_model(model_size, runtime)
+    except InterruptedError:
+        raise
+    except Exception as error:
+        if runtime["device"] != "cuda" or not _device_error(error):
+            raise
+        logger.warning("GPU indisponível (%s); mantendo Whisper %s na CPU.", error, model_size)
+        runtime = whisper_runtime_options(quality_mode=quality_mode, cpu_threads=cpu_threads, device="cpu")
+        model = _load_selected_model(model_size, runtime)
 
-    model = None
-
-    # Etapa 1: Tentar carregar pelo caminho direto da pasta local contendo os pesos
-    local_dir = get_model_local_dir(model_size)
-    if local_dir:
-        try:
-            logger.info(f"Carregando modelo Whisper '{model_size}' do diretório local: {local_dir}")
-            model = WhisperModel(
-                local_dir,
-                device="cpu",
-                compute_type=compute_type,
-                cpu_threads=cpu_threads
-            )
-        except Exception as e_local:
-            logger.warning(f"Falha ao carregar diretamente do diretório {local_dir}: {e_local}")
-            model = None
-
-    # Etapa 2: Se não carregou do diretório local direto, tentar pelo repositório estrito local
-    if model is None:
-        try:
-            logger.info(f"Tentando carregar '{repo_id}' via HuggingFace local...")
-            model = WhisperModel(
-                repo_id,
-                device="cpu",
-                compute_type=compute_type,
-                cpu_threads=cpu_threads,
-                download_root=save_dir,
-                local_files_only=True
-            )
-        except Exception as ex_local_repo:
-            logger.warning(f"O modelo '{repo_id}' não está completamente snapshot-cacheado no servidor ({ex_local_repo}). Baixando repositório oficial...")
-            # Etapa 3: Baixar arquivos ausentes do repositório oficial do HuggingFace (local_files_only=False)
-            try:
-                model = WhisperModel(
-                    repo_id,
-                    device="cpu",
-                    compute_type=compute_type,
-                    cpu_threads=cpu_threads,
-                    download_root=save_dir,
-                    local_files_only=False
-                )
-                logger.info(f"Download do modelo '{repo_id}' concluído com sucesso e salvo em {save_dir}!")
-            except Exception as ex_online:
-                logger.error(f"Erro no download oficial de '{repo_id}': {ex_online}")
-                # Etapa 4: Fallback final para medium
-                if model_size != "medium":
-                    logger.warning("Tentando fallback de emergência para o modelo 'medium'...")
-                    med_dir = get_model_local_dir("medium")
-                    if med_dir:
-                        model = WhisperModel(med_dir, device="cpu", compute_type=compute_type, cpu_threads=cpu_threads)
-                    else:
-                        model = WhisperModel("Systran/faster-whisper-medium", device="cpu", compute_type=compute_type, cpu_threads=cpu_threads, download_root=save_dir, local_files_only=False)
-                else:
-                    raise RuntimeError(f"Erro fatal ao baixar e carregar o modelo Whisper '{model_size}': {ex_online}")
+    phrase_context, lyrics_hint = _fit_guidance(model, phrase_context, lyrics_hint)
 
     logger.info(f"Iniciando transcrição (Silero VAD={enable_vad}): {vocals_path}")
     transcribe_options = {
@@ -258,12 +241,17 @@ def transcribe_vocals(
         "hallucination_silence_threshold": preset["hallucination_silence_threshold"],
         "initial_prompt": phrase_context,
         "hotwords": lyrics_hint,
+        # O início pode ser instrumental. Conferir até três janelas quando o
+        # primeiro idioma é incerto, sem impor português à música.
+        "language_detection_threshold": 0.7,
+        "language_detection_segments": 3,
     }
     if enable_vad:
         transcribe_options.update({
             "vad_filter": True,
             "vad_parameters": dict(preset["vad_parameters"]),
         })
+    transcribe_options = _compatible_options(model, transcribe_options)
 
     def consume_segments(segment_iterator, transcription_info):
         collected = []
@@ -294,20 +282,44 @@ def transcribe_vocals(
                 logger.debug("Falha ao publicar conclusão do Whisper: %s", callback_error)
         return collected
 
-    try:
+    def run_transcription():
         try:
             segments, info = model.transcribe(audio, **transcribe_options)
             segments = consume_segments(segments, info)
+            if transcribe_options.get("vad_filter") and not any(segment.words for segment in segments):
+                logger.info("VAD sem palavras; conferindo a faixa completa uma vez.")
+                transcribe_options.pop("vad_parameters", None)
+                transcribe_options["vad_filter"] = False
+                segments, info = model.transcribe(audio, **transcribe_options)
+                segments = consume_segments(segments, info)
+            return segments, info
         except InterruptedError:
             raise
         except Exception as e_vad:
-            if not enable_vad:
+            if not transcribe_options.get("vad_filter") or (runtime["device"] == "cuda" and _device_error(e_vad)):
                 raise
             logger.warning(f"Transcrição com Silero VAD retornou aviso ({e_vad}). Transcrevendo sem filtro VAD...")
-            transcribe_options.pop("vad_filter", None)
+            transcribe_options["vad_filter"] = False
             transcribe_options.pop("vad_parameters", None)
             segments, info = model.transcribe(audio, **transcribe_options)
             segments = consume_segments(segments, info)
+            return segments, info
+
+    try:
+        try:
+            segments, info = run_transcription()
+        except InterruptedError:
+            raise
+        except Exception as error:
+            if runtime["device"] != "cuda" or not _device_error(error):
+                raise
+            logger.warning("GPU falhou durante inferência (%s); repetindo o mesmo modelo na CPU.", error)
+            clear_cached_model()
+            model = None
+            gc.collect()
+            runtime = whisper_runtime_options(quality_mode=quality_mode, cpu_threads=cpu_threads, device="cpu")
+            model = _load_selected_model(model_size, runtime)
+            segments, info = run_transcription()
     finally:
         del model
         gc.collect()
@@ -337,7 +349,7 @@ def transcribe_vocals(
     if structured_segments:
         try:
             logger.info("Estabilizando timestamps de palavras sem alterar o alinhamento do áudio...")
-            structured_segments = stabilize_word_timestamps(structured_segments)
+            structured_segments = stabilize_word_timestamps(structured_segments, audio_duration=audio.size / 16000)
         except Exception as e_align:
             logger.warning(f"Aviso ao estabilizar timestamps: {e_align}")
 

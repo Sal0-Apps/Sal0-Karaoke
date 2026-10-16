@@ -294,16 +294,17 @@ const activeJob = () => ({id: 'active', status: 'processing', title: 'Música em
         await untilSubmitted(baseline + 1); await pending.shift()();
         await page.waitForFunction(() => !clientPreparationInProgress && !queueCreationExpanded);
         await page.locator('#processCard').waitFor({state: 'visible'});
-        assert.equal(await page.locator('#processStatusTitle').textContent(), '⏳ Aguardando');
+        assert.equal((await page.locator('#processStatusTitle').textContent()).trim(), 'Aguardando');
+        assert.equal(await page.locator('#processStatusTitle svg use').getAttribute('href'), '#sal0-clock');
         assert(!await page.locator('#easyModeForm').isVisible());
         assert(!await page.locator('#downloadBox').isVisible());
         assert.equal(await page.locator('#queueCountBadge').textContent(), '1 aguardando');
         queuePaused = true;
         await refresh();
-        assert.equal(await page.locator('#processStatusTitle').textContent(), '⏸ Fila pausada');
+        assert.equal((await page.locator('#processStatusTitle').textContent()).trim(), 'Fila pausada');
         queuePaused = false; serverStatus = processing(); jobs[0].status = 'processing';
         await refresh();
-        assert.equal(await page.locator('#processStatusTitle').textContent(), '⏳ Produzindo');
+        assert.equal((await page.locator('#processStatusTitle').textContent()).trim(), 'Produzindo');
         assert(await page.locator('#queueCard').isVisible());
 
         // An asynchronous review load must not reopen its panel over a new-item draft.

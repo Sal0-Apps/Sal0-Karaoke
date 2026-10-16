@@ -135,7 +135,8 @@ const srtDefaults = {text_color:'#FFFFFF',box_color:'#000000',box_opacity:65,fon
         // Speech captioning has distinct labels, defaults and a video submission.
         await page.locator('#btnCreatorSubtitle').click();
         assert(await page.locator('#subtitleModeForm').isVisible());
-        assert.equal(await page.locator('#subtitleSubmitBtn').textContent(),'▤ Legendar vídeo');
+        assert.equal((await page.locator('#subtitleSubmitBtn').textContent()).trim(),'Legendar vídeo');
+        assert.equal(await page.locator('#subtitleSubmitBtn svg use').getAttribute('href'), '#sal0-captions');
         assert.equal(await page.locator('#subtitleTranscriptionPreset').inputValue(),'difficult');
         await page.locator('#subtitleLibraryVideo').selectOption('A.mp4');await page.locator('#subtitleSubmitBtn').click();
         await page.locator('#processCard').waitFor({state:'visible'});

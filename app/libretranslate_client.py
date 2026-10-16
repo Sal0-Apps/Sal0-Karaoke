@@ -21,6 +21,17 @@ def normalize_url(value):
     if (parsed.scheme not in {'http', 'https'} or not parsed.hostname
             or parsed.username or parsed.password or parsed.query or parsed.fragment):
         raise ValueError('Informe uma URL HTTP/HTTPS sem chave, usuário ou parâmetros.')
+    # Requests decodifica escapes no hostname antes de enviar. O ponto final
+    # DNS e as variantes IDNA também representam o mesmo domínio Google.
+    hostname = parsed.hostname
+    if '%' in hostname:
+        raise ValueError('Informe um nome de servidor sem codificação no domínio.')
+    try:
+        hostname = hostname.encode('idna').decode('ascii').lower().rstrip('.')
+    except UnicodeError:
+        raise ValueError('Informe um nome de servidor HTTP/HTTPS válido.') from None
+    if hostname == 'googleapis.com' or hostname.endswith('.googleapis.com'):
+        raise ValueError('APIs Google de tradução/IA estão bloqueadas para evitar consumo pago. Use sua instância LibreTranslate.')
     if value.endswith('/translate'):
         value = value[:-10]
     return value
@@ -93,12 +104,17 @@ class LibreTranslateClient:
     def request(self, method, path, payload=None, files=None, raw=False):
         for attempt in range(3):
             self.check_cancelled()
+            # Validar também no ponto de saída: a configuração em memória pode
+            # ter sido alterada depois da construção do cliente.
+            base_url = normalize_url(self.url)
+            if not base_url:
+                raise TranslationServiceError('Configure o LibreTranslate em Ajustes → Tradução de SRT.')
             kwargs = {('data' if files else self.encoding): payload} if payload is not None else {}
             if files:
                 kwargs['files'] = files
             try:
                 response = self.session.request(
-                    method, self.url + path, timeout=(5, self.config['timeout']),
+                    method, base_url + path, timeout=(5, self.config['timeout']),
                     allow_redirects=False, **kwargs,
                 )
             except requests.RequestException:

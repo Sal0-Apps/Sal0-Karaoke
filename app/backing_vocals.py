@@ -9,6 +9,7 @@ from backing_progress import read_progress_event
 
 import process_manager as pm
 from audio_processor import get_effective_cpu_count
+from runtime_resources import thread_environment
 
 BACKING_MODEL_VERSION = "UVR-BVE-4B_SN-44100-2"
 
@@ -17,8 +18,8 @@ def run_cancellable(command, env=None, progress_callback=None, stage_callback=No
     pm.check_cancelled()
     process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                                text=True, env=env)
-    pm.set_active_process(process)
     try:
+        pm.set_active_process(process)
         import logging
         logger = logging.getLogger("karaoke")
         last_event = None
@@ -44,8 +45,9 @@ def run_cancellable(command, env=None, progress_callback=None, stage_callback=No
         if process.returncode:
             raise RuntimeError("Falha na separação de backing vocals. Consulte os logs ou desative a opção para tentar novamente.")
     finally:
+        pm.stop_process(process)
         process.stdout.close()
-        pm.clear_active_process()
+        pm.clear_active_process(process)
 
 
 def mix_backing(instrumental, backing, output, gain=1.0):
@@ -75,11 +77,8 @@ def preserve_backing_vocals(vocals, instrumental, cache_dir, gain=1.0, update_ca
         if update_callback:
             update_callback("processing", "Separando backing vocals", 56, stage_progress=0,
                             stage_detail="Separando voz principal e vozes de apoio localmente em CPU")
-        env = os.environ.copy()
+        env = thread_environment(get_effective_cpu_count())
         env["CUDA_VISIBLE_DEVICES"] = "-1"
-        threads = str(max(1, get_effective_cpu_count() - 1))
-        for key in ("OMP_NUM_THREADS", "MKL_NUM_THREADS", "OPENBLAS_NUM_THREADS"):
-            env[key] = threads
         env["TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD"] = "1"
         def inference_progress(percent):
             if update_callback:

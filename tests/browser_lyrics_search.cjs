@@ -82,6 +82,7 @@ const correct = {id:1, provider:'LRCLIB', track_name:'Tracing A Dream', artist_n
         assert.equal(await page.evaluate(()=>document.activeElement.id),'lyricsText');
 
         // New media gets one automatic attempt; no match stays empty across every poll.
+        const previousAutomatic = searches.filter(x=>x.automatic).length;
         await page.locator('#easyYoutubeUrl').fill('https://youtu.be/123456789ab');
         await page.waitForTimeout(800);
         await page.waitForFunction(()=>document.getElementById('lyricsSearchStatus').textContent.includes('Nenhuma letra'));
@@ -91,7 +92,7 @@ const correct = {id:1, provider:'LRCLIB', track_name:'Tracing A Dream', artist_n
         assert.equal(searches.length,count,'A missing lyric triggers repeated searches');
         assert.equal(await page.locator('#lyricsText').inputValue(),'');
         assert.equal(await page.locator('#lyricsSearchResults').textContent(),'');
-        assert.equal(searches.filter(x=>x.automatic).length,1);
+        assert.equal(searches.filter(x=>x.automatic).length,previousAutomatic+1);
         await page.locator('#lyricsMode').focus();
         for(let i=0;i<4;i++)await page.evaluate(()=>fetchStatus());
         assert.equal(await page.evaluate(()=>document.activeElement.id),'lyricsMode','Polling interrupts the native mode picker');

@@ -67,7 +67,7 @@ class SubtitlePipelineTests(unittest.TestCase):
         (cache / 'subtitle_segments_original.json').write_text(json.dumps(segments))
         (cache / 'subtitle_info_original.json').write_text(json.dumps({'language':'en', 'cache_signature':
             {'whisper_model':'medium','enable_vad':True,'transcription_preset':'difficult',
-             'whisper_audio_version':2,'whisper_quality_mode':'max_quality'}}))
+             'whisper_audio_version':4,'whisper_quality_mode':'max_quality'}}))
         checkpoints = {}
         if checkpoint:
             (history / 'own.srt').write_text('My own original')

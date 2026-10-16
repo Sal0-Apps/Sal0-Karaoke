@@ -15,6 +15,7 @@ from lyrics_sync import parse_lrc, recording_matches
 from lyrics_search import split_search_identity, lyrics_match_score, relevant_lyrics_results, select_automatic_lyrics
 from lyric_guide import prepare_lyrics_guide, verify_lyrics_guide
 from karaoke_generator import generate_ass_karaoke
+from media_covers import filter_path
 from processing_validation import validate_review_segments, validate_processing_options, canonical_review_segments
 from youtube_download_access import DownloadAccessError, YouTubeDownloadAccess
 import tempfile
@@ -148,7 +149,7 @@ class AutomaticLyricsTests(unittest.TestCase):
             generate_ass_karaoke(segments, str(path), show_instrumental=False)
             def white_pixels(time):
                 raw = subprocess.check_output(['ffmpeg', '-v', 'error', '-f', 'lavfi', '-i',
-                    'color=c=black:s=1280x720:r=25:d=2', '-vf', 'ass='+str(path), '-ss', str(time),
+                    'color=c=black:s=1280x720:r=25:d=2', '-vf', "ass='"+filter_path(path)+"'", '-ss', str(time),
                     '-frames:v', '1', '-f', 'rawvideo', '-pix_fmt', 'rgb24', '-'])
                 return sum(min(raw[i:i+3]) > 220 for i in range(0, len(raw), 3))
             early, late = white_pixels(.2), white_pixels(.8)

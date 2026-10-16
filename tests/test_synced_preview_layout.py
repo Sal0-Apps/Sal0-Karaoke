@@ -12,6 +12,7 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).parents[1] / 'app'))
 from karaoke_generator import generate_ass_karaoke
 from lyrics_sync import anchor_synced_animation
+from media_covers import filter_path
 
 
 CURRENT = "And if the words float up to the surface, I'll keep them down"
@@ -47,7 +48,7 @@ class SyncedPreviewLayoutTests(unittest.TestCase):
                             if not line.startswith('Dialogue:') or f',{style},' in line)
                         target.write_text(isolated)
                         raw = subprocess.check_output(['ffmpeg','-v','error','-f','lavfi','-i',
-                            'color=black:s=1280x720:r=25:d=1','-vf','ass='+str(target),
+                            'color=black:s=1280x720:r=25:d=1','-vf',"ass='"+filter_path(target)+"'",
                             '-frames:v','1','-pix_fmt','rgb24','-f','rawvideo','-'])
                         mask = np.frombuffer(raw, dtype=np.uint8).reshape(720,1280,3).max(axis=2) > 35
                         y, x = np.where(mask)

@@ -54,7 +54,6 @@
             padding: 0;
             font-family: 'Inter', sans-serif;
             -webkit-font-smoothing: antialiased;
-            font-variant-emoji: text;
         }
 
         html,
@@ -1291,8 +1290,8 @@
         .quick-youtube-method .input-text { margin-top: .6rem; }
         #easyModeForm .input-text, #easyModeForm .select-input { min-height: 48px; }
         .youtube-search-panel button { min-height: 44px; }
-        .quick-more-options > summary::after { content: '⌄'; margin-left: auto; font-size: 1.3rem; }
-        .quick-more-options[open] > summary::after { content: '⌃'; }
+        .quick-more-options > summary::after { content: ''; width: .5em; height: .5em; border-right: 1.7px solid currentColor; border-bottom: 1.7px solid currentColor; transform: rotate(45deg); margin: 0 .2em .25em auto; }
+        .quick-more-options[open] > summary::after { transform: rotate(225deg); margin-bottom: -.25em; }
         .quick-selection { padding: .65rem 0 0; font-weight: 600; overflow-wrap: anywhere; }
         .quick-more-options { margin: .9rem 0; padding: .8rem; border: 1px solid var(--glass-border); border-radius: 12px; }
         .quick-more-options summary, #easyYoutubePublication summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; font-weight: 600; }
@@ -1434,7 +1433,7 @@
         .easy-config-group { margin-bottom: 0.75rem; border: 1px solid var(--glass-border); border-radius: var(--radius-md); background: var(--input-bg); overflow: hidden; }
         .easy-config-group > summary { cursor: pointer; list-style: none; padding: 0.8rem 0.9rem; font-size: 0.82rem; font-weight: 700; color: var(--text-main); }
         .easy-config-group > summary::-webkit-details-marker { display: none; }
-        .easy-config-group > summary::after { content: '▾'; float: right; color: var(--accent); transition: transform 0.2s ease; }
+        .easy-config-group > summary::after { content: ''; width: .45em; height: .45em; border-right: 1.7px solid currentColor; border-bottom: 1.7px solid currentColor; transform: rotate(45deg); float: right; margin: .3em .2em 0 0; color: var(--accent); transition: transform 0.2s ease; }
         .easy-config-group:not([open]) > summary::after { transform: rotate(-90deg); }
         .easy-config-fields { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.8rem; padding: 0 0.9rem 0.9rem; border-top: 1px solid var(--glass-border); padding-top: 0.9rem; }
         .easy-random-backgrounds { grid-column: 1 / -1; }
@@ -1640,9 +1639,81 @@
         .help-dialog ol, .help-dialog ul { padding-left: 1.3rem; margin: 0.6rem 0; }
         .help-dialog li + li { margin-top: 0.45rem; }
         .help-dialog strong { color: var(--text-main); }
-</style>
+
+        .sal0-icon-sprite { position: absolute; width: 0; height: 0; overflow: hidden; pointer-events: none; }
+        html { background: var(--bg-primary); }
+        .sal0-icon { width: 1.15em; height: 1.15em; display: inline-block; flex: 0 0 auto; vertical-align: -0.18em; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+        .label:has(> .sal0-icon) { justify-content: flex-start; gap: .4rem; }
+        .sal0-icon-detail { opacity: .65; }
+        .tab-btn.active .line-glyph, .creator-mode-btn.active .creator-mode-icon { color: inherit; }
+        .correction-segment button[title="Excluir Linha"] { color: #fca5a5; }
+        .sal0-icon + .sal0-icon { margin-left: .25em; }
+        .quick-choice-icon, .creator-mode-icon, .process-summary-item > span:first-child, .youtube-identification > span:first-child { filter: none; text-shadow: none; }
+        button:focus-visible, a:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+        .correction-segment { content-visibility: auto; contain-intrinsic-size: auto 150px; }
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+        }
+    </style>
 </head>
 <body>
+    <!-- Desenhos Sal0: microfone, ondas e cantos abertos; sem fontes de ícones externas. -->
+    <svg xmlns="http://www.w3.org/2000/svg" class="sal0-icon-sprite" aria-hidden="true" focusable="false"><defs>
+        <symbol id="sal0-moon" viewBox="0 0 24 24"><path d="M19.6 14.5A8 8 0 0 1 9.5 4.4 8 8 0 1 0 19.6 14.5Z"/><path d="m17 3 .8 1.8L20 5.5l-2.2.7L17 8l-.8-1.8-2.2-.7 2.2-.7Z" class="sal0-icon-detail"/></symbol>
+        <symbol id="sal0-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5" class="sal0-icon-detail"/></symbol>
+        <symbol id="sal0-help" viewBox="0 0 24 24"><path d="M20 11.5a8 8 0 0 1-8 8H5l-1 2v-10a8 8 0 0 1 16 0Z"/><path d="M9.5 9a2.5 2.5 0 1 1 4.2 1.8c-1.2.7-1.7 1.2-1.7 2.2m0 3h.01" class="sal0-icon-detail"/></symbol>
+        <symbol id="sal0-logout" viewBox="0 0 24 24"><path d="M10 4H5v16h5m3-8h8m-3-3 3 3-3 3"/><path d="M8 8v8" class="sal0-icon-detail"/></symbol>
+        <symbol id="sal0-karaoke" viewBox="0 0 24 24"><path d="m6.5 14.5 7-7a3.5 3.5 0 0 1 5 5l-7 7-5-5Z"/><path d="m12 9 5 5M9 17l-5 5m1-6-2 2m15-14 2-2" class="sal0-icon-detail"/></symbol>
+        <symbol id="sal0-settings" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/><path d="M8 3v6m8 0v6m-6 0v6" class="sal0-icon-detail"/></symbol>
+        <symbol id="sal0-library" viewBox="0 0 24 24"><path d="M3 5h5v15H3zm7-2h5v17h-5zm7 3 4-1 2 14-4 1Z"/><path d="M5 8h1m6-2h1m7 3h.1" class="sal0-icon-detail"/></symbol>
+        <symbol id="sal0-bolt" viewBox="0 0 24 24"><path d="m14 2-10 12h7l-1 8L20 10h-7l1-8Z"/><path d="m3 5 3-2m12 18 3-2" class="sal0-icon-detail"/></symbol>
+        <symbol id="sal0-music" viewBox="0 0 24 24"><path d="M8 17V5l12-2v12M8 9l12-2"/><ellipse cx="5" cy="18" rx="3" ry="2.5"/><ellipse cx="17" cy="16" rx="3" ry="2.5"/></symbol>
+        <symbol id="sal0-upload" viewBox="0 0 24 24"><path d="M3 14v6h18v-6M12 16V3m-5 5 5-5 5 5"/><path d="M6 17h2m8 0h2" class="sal0-icon-detail"/></symbol>
+        <symbol id="sal0-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c5 5 5 13 0 18-5-5-5-13 0-18Z"/><path d="M5 7h14M5 17h14" class="sal0-icon-detail"/></symbol>
+        <symbol id="sal0-download" viewBox="0 0 24 24"><path d="M3 15v5h18v-5M12 3v12m-5-5 5 5 5-5"/><path d="M6 17h2m8 0h2" class="sal0-icon-detail"/></symbol>
+        <symbol id="sal0-image" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="m3 16 5-5 5 5 3-3 5 5"/><circle cx="16.5" cy="8.5" r="1.5" class="sal0-icon-detail"/></symbol>
+        <symbol id="sal0-palette" viewBox="0 0 24 24"><path d="M20 13c-3-1-5 1-4 3 2 4-4 6-8 3C-1 13 6 0 15 4c5 2 7 6 5 9Z"/><path d="M7 10h.01M10 7h.01M14 7h.01M17 10h.01" class="sal0-icon-detail"/></symbol>
+        <symbol id="sal0-captions" viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="3"/><path d="M5 15h5m3 0h6M5 11h9m3 0h2"/><path d="M5 7h3" class="sal0-icon-detail"/></symbol>
+        <symbol id="sal0-whisper" viewBox="0 0 24 24"><path d="M4 9v6m4-9v12m4-15v18m4-15v12m4-9v6"/><path d="M2 4h3m14 16h3" class="sal0-icon-detail"/></symbol>
+        <symbol id="sal0-edit" viewBox="0 0 24 24"><path d="m4 16 11-11 4 4L8 20l-5 1 1-5Zm9-9 4 4M15 5l2-2a2.8 2.8 0 0 1 4 4l-2 2"/><path d="M12 21h9" class="sal0-icon-detail"/></symbol>
+        <symbol id="sal0-save" viewBox="0 0 24 24"><path d="M4 3h13l4 4v14H3V3h1Zm3 0v7h10V3M7 21v-7h10v7"/><path d="M13 5v3" class="sal0-icon-detail"/></symbol>
+        <symbol id="sal0-trash" viewBox="0 0 24 24"><path d="M3 6h18M8 6V3h8v3M5 6l1 15h12l1-15"/><path d="M10 10v7m4-7v7" class="sal0-icon-detail"/></symbol>
+        <symbol id="sal0-clock" viewBox="0 0 24 24"><circle cx="12" cy="13" r="8"/><path d="M12 9v5l3 2M9 2h6m-3 0v3m6 0 2 2" class="sal0-icon-detail"/></symbol>
+        <symbol id="sal0-check" viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h8" class="sal0-icon-detail"/></symbol>
+        <symbol id="sal0-stop" viewBox="0 0 24 24"><path d="M8 3h8l5 5v8l-5 5H8l-5-5V8l5-5Z"/><path d="M9 9h6v6H9Z" class="sal0-icon-detail"/></symbol>
+        <symbol id="sal0-render" viewBox="0 0 24 24"><path d="M4 4h16v16H4Z"/><path d="m10 8 6 4-6 4V8ZM1 8h3m-3 8h3m16-8h3m-3 8h3" class="sal0-icon-detail"/></symbol>
+        <symbol id="sal0-preview" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="15" rx="3"/><path d="m10 7 6 3.5-6 3.5V7ZM8 22h8m-4-4v4" class="sal0-icon-detail"/></symbol>
+        <symbol id="sal0-lyrics" viewBox="0 0 24 24"><path d="M6 3h12a2 2 0 0 1 2 2v16H4V5a2 2 0 0 1 2-2Z"/><path d="M8 8h8M8 12h8m-8 4h4" class="sal0-icon-detail"/></symbol>
+        <symbol id="sal0-skip" viewBox="0 0 24 24"><path d="m3 5 9 7-9 7V5Zm10 0 9 7-9 7V5Z"/></symbol>
+        <symbol id="sal0-celebrate" viewBox="0 0 24 24"><path d="m3 21 4-13 9 9-13 4Z"/><path d="m13 3 1 3m5 1 2-2m-2 8 3 1M9 5l1-3m6 7 1-1" class="sal0-icon-detail"/></symbol>
+        <symbol id="sal0-users" viewBox="0 0 24 24"><circle cx="9" cy="7" r="3"/><path d="M2 21v-3a7 7 0 0 1 14 0v3M17 4a3 3 0 0 1 0 6m2 4a6 6 0 0 1 3 5v2"/></symbol>
+        <symbol id="sal0-logs" viewBox="0 0 24 24"><path d="M5 3h14v18H5V3Z"/><path d="M8 7h8m-8 4h8m-8 4h4m-4 3h6" class="sal0-icon-detail"/></symbol>
+        <symbol id="sal0-add" viewBox="0 0 24 24"><path d="M12 4v16M4 12h16"/><path d="M3 6V3h3m12 0h3v3m0 12v3h-3M6 21H3v-3" class="sal0-icon-detail"/></symbol>
+        <symbol id="sal0-admin" viewBox="0 0 24 24"><path d="m3 7 5 4 4-8 4 8 5-4-2 13H5L3 7Z"/><path d="M6 16h12" class="sal0-icon-detail"/></symbol>
+        <symbol id="sal0-lock" viewBox="0 0 24 24"><rect x="4" y="10" width="16" height="12" rx="3"/><path d="M7 10V7a5 5 0 0 1 10 0v3m-5 5v3" class="sal0-icon-detail"/></symbol>
+        <symbol id="sal0-key" viewBox="0 0 24 24"><circle cx="7" cy="8" r="4"/><path d="m10 11 10 10m-4-4 3-3m-6 0 3-3"/><path d="M6 7h.01" class="sal0-icon-detail"/></symbol>
+        <symbol id="sal0-user" viewBox="0 0 24 24"><circle cx="12" cy="7" r="4"/><path d="M4 22v-3a8 8 0 0 1 16 0v3"/></symbol>
+        <symbol id="sal0-folder" viewBox="0 0 24 24"><path d="M3 6h6l2 3h10l-3 11H2V6h1ZM2 12h8"/></symbol>
+        <symbol id="sal0-warning" viewBox="0 0 24 24"><path d="m12 3 10 18H2L12 3Z"/><path d="M12 9v5m0 3h.01" class="sal0-icon-detail"/></symbol>
+        <symbol id="sal0-play" viewBox="0 0 24 24"><path d="m7 3 14 9-14 9V3Z"/></symbol>
+        <symbol id="sal0-pause" viewBox="0 0 24 24"><path d="M6 4h4v16H6zm8 0h4v16h-4z"/></symbol>
+        <symbol id="sal0-spark" viewBox="0 0 24 24"><path d="m12 3 2.5 6.5L21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5L12 3Z"/><path d="m20 2 .5 1.5L22 4l-1.5.5L20 6l-.5-1.5L18 4l1.5-.5Z" class="sal0-icon-detail"/></symbol>
+        <symbol id="sal0-font" viewBox="0 0 24 24"><path d="m3 20 6-16 6 16M5 15h8m1-7h8m-4 0v12"/></symbol>
+        <symbol id="sal0-search" viewBox="0 0 24 24"><circle cx="10" cy="10" r="6"/><path d="m15 15 7 7M7 10h6m-3-3v6" class="sal0-icon-detail"/></symbol>
+        <symbol id="sal0-mic" viewBox="0 0 24 24"><rect x="8" y="2" width="8" height="13" rx="4"/><path d="M5 10v2a7 7 0 0 0 14 0v-2M12 19v3m-4 0h8"/><path d="M11 5h2m-2 3h2" class="sal0-icon-detail"/></symbol>
+        <symbol id="sal0-queue" viewBox="0 0 24 24"><path d="M3 5h13M3 12h13M3 19h8"/><path d="m18 15 4 4-4 4m-5-4h9" class="sal0-icon-detail"/></symbol>
+        <symbol id="sal0-close" viewBox="0 0 24 24"><path d="m5 5 14 14M19 5 5 19"/></symbol>
+        <symbol id="sal0-left" viewBox="0 0 24 24"><path d="M21 12H3m7-7-7 7 7 7"/></symbol>
+        <symbol id="sal0-right" viewBox="0 0 24 24"><path d="M3 12h18m-7-7 7 7-7 7"/></symbol>
+        <symbol id="sal0-up" viewBox="0 0 24 24"><path d="M12 21V3m-7 7 7-7 7 7"/></symbol>
+        <symbol id="sal0-down" viewBox="0 0 24 24"><path d="M12 3v18m-7-7 7 7 7-7"/></symbol>
+        <symbol id="sal0-chevron-down" viewBox="0 0 24 24"><path d="m5 8 7 7 7-7"/></symbol>
+        <symbol id="sal0-chevron-up" viewBox="0 0 24 24"><path d="m5 16 7-7 7 7"/></symbol>
+        <symbol id="sal0-refresh" viewBox="0 0 24 24"><path d="M20 8a8 8 0 1 0 0 8M20 3v6h-6"/></symbol>
+        <symbol id="sal0-undo" viewBox="0 0 24 24"><path d="M4 9h10a7 7 0 0 1 0 14M4 9l5-5M4 9l5 5"/></symbol>
+        <symbol id="sal0-redo" viewBox="0 0 24 24"><path d="M20 9H10a7 7 0 0 0 0 14M20 9l-5-5m5 5-5 5"/></symbol>
+    </defs></svg>
+
     <div class="container">
         <!-- HEADER PRINCIPAL -->
         <header>
@@ -1652,17 +1723,17 @@
             </div>
             <div class="header-actions">
                 <span id="currentUserChip" class="user-chip" style="display: none;"></span>
-                <button type="button" class="header-btn" id="btnToggleTheme" title="Alternar Tema (Escuro / Claro)" style="padding: 0.35rem 0.65rem; font-size: 0.78rem;"><span class="line-glyph">◐</span> Escuro</button>
-                <button type="button" class="header-btn" id="btnOpenHelp"><span class="line-glyph">?</span> Manual</button>
-                <button type="button" class="header-btn" id="btnLogout" style="color: #fca5a5; background: rgba(239,68,68,0.15); border-color: rgba(239,68,68,0.3);">↪ Sair</button>
+                <button type="button" class="header-btn" id="btnToggleTheme" title="Alternar Tema (Escuro / Claro)" style="padding: 0.35rem 0.65rem; font-size: 0.78rem;"><span class="line-glyph"><svg class="sal0-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sal0-moon"></use></svg></span> Escuro</button>
+                <button type="button" class="header-btn" id="btnOpenHelp"><span class="line-glyph"><svg class="sal0-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sal0-help"></use></svg></span> Manual</button>
+                <button type="button" class="header-btn" id="btnLogout" style="color: #fca5a5; background: rgba(239,68,68,0.15); border-color: rgba(239,68,68,0.3);"><svg class="sal0-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sal0-logout"></use></svg> Sair</button>
             </div>
         </header>
 
         <!-- NAVEGAÇÃO ENTRE ABAS -->
         <div class="nav-tabs" role="tablist" aria-label="Seções do aplicativo">
-            <button type="button" class="tab-btn active" id="tabBtnCreate" role="tab" aria-controls="createTabContent" aria-selected="true" tabindex="0"><span class="line-glyph">◉</span> Criar</button>
-            <button type="button" class="tab-btn" id="tabBtnSettings" role="tab" aria-controls="settingsTabContent" aria-selected="false" tabindex="-1"><span class="line-glyph">⌁</span> Ajustes</button>
-            <button type="button" class="tab-btn" id="tabBtnLibrary" role="tab" aria-controls="libraryTabContent" aria-selected="false" tabindex="-1"><span class="line-glyph">▣</span> Biblioteca</button>
+            <button type="button" class="tab-btn active" id="tabBtnCreate" role="tab" aria-controls="createTabContent" aria-selected="true" tabindex="0"><span class="line-glyph"><svg class="sal0-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sal0-karaoke"></use></svg></span> Criar</button>
+            <button type="button" class="tab-btn" id="tabBtnSettings" role="tab" aria-controls="settingsTabContent" aria-selected="false" tabindex="-1"><span class="line-glyph"><svg class="sal0-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sal0-settings"></use></svg></span> Ajustes</button>
+            <button type="button" class="tab-btn" id="tabBtnLibrary" role="tab" aria-controls="libraryTabContent" aria-selected="false" tabindex="-1"><span class="line-glyph"><svg class="sal0-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sal0-library"></use></svg></span> Biblioteca</button>
         </div>
 
         <!-- ============================================================= -->
@@ -1679,13 +1750,13 @@
             </div>
             <div id="creatorModeSwitch" class="creator-mode-switch" role="tablist" aria-label="Modo de criação" style="display: none;">
                 <button type="button" id="btnCreatorEasy" class="creator-mode-btn active" role="tab" aria-selected="true" title="Criação automática com o perfil do administrador">
-                    <span class="creator-mode-icon">⚡</span><span class="creator-mode-title">Rápido</span><span class="creator-mode-hint">Escolher e criar</span>
+                    <span class="creator-mode-icon"><svg class="sal0-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sal0-bolt"></use></svg></span><span class="creator-mode-title">Rápido</span><span class="creator-mode-hint">Escolher e criar</span>
                 </button>
                 <button type="button" id="btnCreatorAdvanced" class="creator-mode-btn" role="tab" aria-selected="false" title="Controle completo da transcrição, legenda e visual">
-                    <span class="creator-mode-icon">🎛️</span><span class="creator-mode-title">Detalhado</span><span class="creator-mode-hint">Todas as opções</span>
+                    <span class="creator-mode-icon"><svg class="sal0-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sal0-settings"></use></svg></span><span class="creator-mode-title">Detalhado</span><span class="creator-mode-hint">Todas as opções</span>
                 </button>
                 <button type="button" id="btnCreatorSubtitle" class="creator-mode-btn" role="tab" aria-selected="false" title="Transcreve a fala e cria vídeo legendado com arquivos SRT">
-                    <span class="creator-mode-icon">▤</span><span class="creator-mode-title">Legendar vídeo</span><span class="creator-mode-hint">Vídeo legendado + SRTs</span>
+                    <span class="creator-mode-icon"><svg class="sal0-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sal0-captions"></use></svg></span><span class="creator-mode-title">Legendar vídeo</span><span class="creator-mode-hint">Vídeo legendado + SRTs</span>
                 </button>
             </div>
 
@@ -1713,7 +1784,7 @@
                                         <div class="quick-youtube-method"><label for="easyYoutubeUrl"><strong>Colar link do YouTube</strong></label>
                                             <input type="url" id="easyYoutubeUrl" class="input-text" placeholder="Cole o link do vídeo aqui">
                                             <p class="compact-note">Já encontrou o vídeo? Cole o endereço.</p>
-                                            <div id="easyYoutubeTitleBadge" class="youtube-identification" aria-live="polite"><span>▶️</span><span id="easyYoutubeTitleText"></span></div>
+                                            <div id="easyYoutubeTitleBadge" class="youtube-identification" aria-live="polite"><span><svg class="sal0-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sal0-play"></use></svg></span><span id="easyYoutubeTitleText"></span></div>
                                         </div>
                                     </div>
                                 </div>
@@ -1738,29 +1809,29 @@
 <input type="hidden" id="easyBackgroundType" value="default">
                             <div class="quick-background-presets">
                                 <button type="button" id="easyBackgroundDefaultChoice" class="quick-preset is-active">
-                                    <span>✨ Surpresa</span>
+                                    <span><svg class="sal0-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sal0-spark"></use></svg> Surpresa</span>
                                     <small id="easyDefaultBackgroundOption">Coleção escolhida pelo administrador</small>
                                 </button>
                                 <button type="button" id="easyBackgroundOriginalChoice" class="quick-preset">
-                                    <span>🎬 Vídeo original</span>
+                                    <span><svg class="sal0-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sal0-karaoke"></use></svg> Vídeo original</span>
                                     <small>Usar a imagem do clipe</small>
                                 </button>
                             </div>
                             <div class="quick-choice-grid quick-background-grid">
                                 <label id="easyBackgroundUploadBox" class="quick-choice-card quick-file-choice" for="easyBgFile">
-                                    <span class="quick-choice-icon">🌄</span>
+                                    <span class="quick-choice-icon"><svg class="sal0-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sal0-image"></use></svg></span>
                                     <span class="quick-choice-label" id="easyBgFileText">Escolher fundo</span>
                                     <span class="quick-choice-hint">Clique ou arraste imagem/vídeo</span>
                                     <input type="file" id="easyBgFile" accept="image/*,video/*" style="display: none;">
                                 </label>
                                 <div id="easyBackgroundLibraryBox" class="quick-choice-card">
-                                    <span class="quick-choice-label">📚 Da Biblioteca</span>
+                                    <span class="quick-choice-label"><svg class="sal0-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sal0-library"></use></svg> Da Biblioteca</span>
                                     <select id="easyLibraryBg" class="select-input"><option value="">Escolha um fundo...</option></select>
                                 </div>
                                 <div id="easyBackgroundYoutubeBox" class="quick-choice-card quick-youtube-background">
-                                    <span class="quick-choice-label">▶️ Link de fundo</span>
+                                    <span class="quick-choice-label"><svg class="sal0-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sal0-play"></use></svg> Link de fundo</span>
                                     <input type="url" id="easyBgYoutubeUrl" class="input-text" placeholder="Cole um vídeo do YouTube">
-                                    <div id="easyBgYoutubeTitleBadge" class="youtube-identification" aria-live="polite"><span>🎞️</span><span id="easyBgYoutubeTitleText"></span></div>
+                                    <div id="easyBgYoutubeTitleBadge" class="youtube-identification" aria-live="polite"><span><svg class="sal0-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sal0-render"></use></svg></span><span id="easyBgYoutubeTitleText"></span></div>
                                     <p class="compact-note">O áudio do fundo é removido.</p>
                                 </div>
                             </div>
@@ -1776,11 +1847,11 @@
                             <p class="compact-note">O resultado da separação pode variar conforme a gravação.</p>
                         </div>
                         <details><summary>Perfil usado na criação</summary>                    <div class="easy-summary">
-                        <span id="easySummaryModel">🤖 Large V3 Turbo</span>
-                        <span id="easySummaryFont">🔤 Letra 50</span>
-                        <span id="easySummaryPreset">🎙️ Voz difícil</span>
-                        <span id="easySummaryLyrics">🔎 Letra automática</span>
-                        <span id="easySummaryReview">⚡ Direto para o vídeo</span>
+                        <span id="easySummaryModel"><svg class="sal0-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sal0-whisper"></use></svg> Large V3 Turbo</span>
+                        <span id="easySummaryFont"><svg class="sal0-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sal0-font"></use></svg> Letra 50</span>
+                        <span id="easySummaryPreset"><svg class="sal0-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sal0-mic"></use></svg> Voz difícil</span>
+                        <span id="easySummaryLyrics"><svg class="sal0-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sal0-search"></use></svg> Letra automática</span>
+                        <span id="easySummaryReview"><svg class="sal0-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sal0-bolt"></use></svg> Direto para o vídeo</span>
                     </div>
 </details>
                     </details>
@@ -1817,7 +1888,7 @@
                         <div class="card-header"><span class="card-title"><span class="line-glyph">1</span> Mídia de origem</span></div>
                         <div class="form-grid">
                             <label class="upload-area" id="subtitleUploadArea" for="subtitleVideoFile" style="min-height: 112px; display:flex; flex-direction:column; align-items:center; justify-content:center; cursor:pointer; border:2px dashed var(--glass-border-light); border-radius:14px; background:var(--input-bg);" data-drop-zone>
-                                <span class="line-glyph" style="font-size:1.5rem;">＋</span>
+                                <span class="line-glyph" style="font-size:1.5rem;"><svg class="sal0-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sal0-add"></use></svg></span>
                                 <strong id="subtitleVideoFileText">Escolher um ou mais arquivos</strong>
                                 <span class="compact-note">Áudio ou vídeo compatível; áudio original completo</span>
                                 <input type="file" id="subtitleVideoFile" accept="audio/*,video/*,.mkv,.avi,.mov,.webm,.m4v,.flac,.m4a,.aac,.ogg,.opus,.wav,.mp3" multiple style="display:none;">
@@ -1826,7 +1897,7 @@
                                 <div class="form-group">
                                     <span class="label">Link do YouTube</span>
                                     <input type="url" id="subtitleYoutubeUrl" class="input-text" placeholder="Ou cole a URL do vídeo">
-                                    <div id="subtitleYoutubeTitleBadge" class="youtube-identification" aria-live="polite"><span>▶</span><span id="subtitleYoutubeTitleText"></span></div>
+                                    <div id="subtitleYoutubeTitleBadge" class="youtube-identification" aria-live="polite"><span><svg class="sal0-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sal0-play"></use></svg></span><span id="subtitleYoutubeTitleText"></span></div>
                                 </div>
                                 <div class="form-group">
                                     <span class="label">Mídia da Biblioteca</span>
@@ -1849,7 +1920,7 @@
                         <p class="compact-note" style="margin-top:0.8rem;">O SRT original é salvo primeiro. A tradução é independente: se ela falhar, o arquivo original continua disponível para download.</p>
                     </div>
                     <p id="subtitleVisualSummary" class="compact-note" aria-live="polite">Legenda embutida: tradução quando disponível. Estilo e fundo definidos pelo administrador.</p>
-                    <button type="submit" id="subtitleSubmitBtn" class="btn-primary easy-submit">▤ Legendar vídeo</button>
+                    <button type="submit" id="subtitleSubmitBtn" class="btn-primary easy-submit"><svg class="sal0-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sal0-captions"></use></svg> Legendar vídeo</button>
                 </div>
             </form>
 
@@ -1858,24 +1929,24 @@
                 <!-- BADGE DE REUTILIZAÇÃO DE CACHE RÁPIDA -->
                 <div id="cacheNoticeBadge" style="display: none; background: rgba(139, 92, 246, 0.15); border: 1px solid rgba(139, 92, 246, 0.35); padding: 0.8rem 1.2rem; border-radius: var(--radius-md); margin-bottom: 1.2rem; align-items: center; justify-content: space-between;">
                     <div>
-                        <strong style="color: var(--accent); font-size: 0.88rem; display: block; margin-bottom: 0.2rem;">⚡ Mídia em Cache Pronta para Recriação Rápida</strong>
+                        <strong style="color: var(--accent); font-size: 0.88rem; display: block; margin-bottom: 0.2rem;"><svg class="sal0-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sal0-bolt"></use></svg> Mídia em Cache Pronta para Recriação Rápida</strong>
                         <span id="cacheNoticeText" style="font-size: 0.78rem; color: var(--text-muted);">Altere qualquer ajuste de legenda, cor ou fonte abaixo e recrie o vídeo em segundos sem re-processar a IA.</span>
                     </div>
                 </div>
 
                 <div class="card">
                     <div class="card-header">
-                        <span class="card-title">🎵 Música</span>
+                        <span class="card-title"><svg class="sal0-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sal0-music"></use></svg> Música</span>
                         <div style="display: flex; gap: 0.3rem;">
-                            <button type="button" id="btnAudioModeUpload" class="btn-tab-small active">📁 Enviar</button>
-                            <button type="button" id="btnAudioModeYoutube" class="btn-tab-small">🌐 YouTube</button>
-                            <button type="button" id="btnAudioModeLibrary" class="btn-tab-small">📚 Biblioteca</button>
+                            <button type="button" id="btnAudioModeUpload" class="btn-tab-small active"><svg class="sal0-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sal0-upload"></use></svg> Enviar</button>
+                            <button type="button" id="btnAudioModeYoutube" class="btn-tab-small"><svg class="sal0-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sal0-globe"></use></svg> YouTube</button>
+                            <button type="button" id="btnAudioModeLibrary" class="btn-tab-small"><svg class="sal0-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sal0-library"></use></svg> Biblioteca</button>
                         </div>
                     </div>
 
                     <div id="audioUploadContainer">
                         <div class="upload-area" id="audioUploadArea" style="height: 110px; display: flex; flex-direction: column; justify-content: center; align-items: center; border: 2px dashed var(--glass-border-light); border-radius: 14px; background: var(--input-bg); cursor: pointer;">
-                            <span style="font-size: 1.6rem; margin-bottom: 0.2rem;">🎵</span>
+                            <span style="font-size: 1.6rem; margin-bottom: 0.2rem;"><svg class="sal0-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sal0-music"></use></svg></span>
                             <p id="audioTextName" style="font-size: 0.85rem; margin: 0; font-weight: 500;">Arraste a música/vídeo aqui ou clique para buscar</p>
                             <p style="font-size: 0.68rem; color: var(--text-muted); margin: 0;">MP3, WAV, FLAC, M4A, MP4, MKV...</p>
                             <input type="file" id="audioFile" name="audio_file" accept=".mp3,.wav,.flac,.m4a,.aac,.ogg,.opus,.mp4,.mkv,.avi,.mov,.webm,.m4v" multiple style="display: none;">
@@ -1885,7 +1956,7 @@
 
                     <div id="audioYoutubeContainer" style="display: none;">
                         <input type="url" id="youtubeUrl" name="youtube_url" placeholder="Cole a URL do vídeo do YouTube..." class="input-text">
-                        <div id="youtubeTitleBadge" class="youtube-identification" aria-live="polite"><span>▶️</span><span id="youtubeTitleText"></span></div>
+                        <div id="youtubeTitleBadge" class="youtube-identification" aria-live="polite"><span><svg class="sal0-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sal0-play"></use></svg></span><span id="youtubeTitleText"></span></div>
                         <p class="compact-note" style="margin: 0.45rem 0 0;">Ao criar, o vídeo será preparado automaticamente.</p>
                     </div>
 
@@ -1902,7 +1973,7 @@
                     <div class="profile-hero">
                         <div>
                             <span class="profile-kicker">Etapa importante</span>
-                            <span class="card-title">🎛️ Perfil da música</span>
+                            <span class="card-title"><svg class="sal0-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sal0-settings"></use></svg> Perfil da música</span>
                             <p style="margin-top: 0.3rem; color: var(--text-muted); font-size: 0.78rem;">Escolha um ponto de partida e ajuste se quiser. Seus próprios perfis continuam disponíveis.</p>
                         </div>
                         <span id="profileTypeBadge" class="profile-badge">Pronto para usar</span>
@@ -1940,8 +2011,8 @@
                 <!-- Card de Fundo e Estilo -->
                 <div class="card">
                     <div class="card-header">
-                        <span class="card-title">🖼️ Visual</span>
-                        <button type="button" id="btnToggleAdvanced" class="btn-secondary">⚙️ Mais ajustes</button>
+                        <span class="card-title"><svg class="sal0-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sal0-image"></use></svg> Visual</span>
+                        <button type="button" id="btnToggleAdvanced" class="btn-secondary"><svg class="sal0-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sal0-settings"></use></svg> Mais ajustes</button>
                     </div>
 
                     <!-- Letra opcional: sempre acessível, sem ocupar espaço quando fechada -->
@@ -1949,10 +2020,10 @@
                     <div id="lyricsCard" class="lyrics-panel">
                         <div class="lyrics-panel-head">
                             <div class="lyrics-panel-title">
-                                <span>📝 Letra-guia desta mídia</span>
+                                <span><svg class="sal0-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sal0-captions"></use></svg> Letra-guia desta mídia</span>
                                 <span id="lyricsSummary" class="lyrics-summary">Sem letra</span>
                             </div>
-                            <button type="button" id="btnToggleLyrics" class="btn-secondary" aria-expanded="false" style="padding: 0.38rem 0.6rem; font-size: 0.72rem; white-space: nowrap;">Abrir ▾</button>
+                            <button type="button" id="btnToggleLyrics" class="btn-secondary" aria-expanded="false" style="padding: 0.38rem 0.6rem; font-size: 0.72rem; white-space: nowrap;">Abrir <svg class="sal0-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sal0-chevron-down"></use></svg></button>
                         </div>
                         <div id="lyricsContent" class="lyrics-panel-content">
                             <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.55rem;">
@@ -1973,9 +2044,9 @@
                             <div id="lyricsBadge" style="display: none; margin-top: 0.35rem; background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.3); color: #34d399; padding: 0.3rem 0.55rem; border-radius: 7px; font-size: 0.7rem; font-weight: 600;"></div>
                             <div style="display: flex; gap: 0.4rem; margin-top: 0.45rem; flex-wrap: wrap;">
                                 <input type="text" id="lyricsSearchQuery" class="input-text" placeholder="Artista - título" style="flex: 1 1 190px; min-width: 0; height: 32px; font-size: 0.76rem;">
-                                <button type="button" id="btnSearchLyrics" class="btn-secondary" style="font-size: 0.72rem; height: 32px; white-space: nowrap;">🔎 Buscar</button>
-                                <button type="button" id="btnSaveLyrics" class="btn-primary" style="width: auto; padding: 0.45rem 0.65rem; font-size: 0.72rem; height: 32px;">💾 Salvar</button>
-                                <button type="button" id="btnClearLyrics" class="btn-secondary" style="font-size: 0.72rem; height: 32px; color: #fca5a5;">🗑️ Limpar</button>
+                                <button type="button" id="btnSearchLyrics" class="btn-secondary" style="font-size: 0.72rem; height: 32px; white-space: nowrap;"><svg class="sal0-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sal0-search"></use></svg> Buscar</button>
+                                <button type="button" id="btnSaveLyrics" class="btn-primary" style="width: auto; padding: 0.45rem 0.65rem; font-size: 0.72rem; height: 32px;"><svg class="sal0-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sal0-save"></use></svg> Salvar</button>
+                                <button type="button" id="btnClearLyrics" class="btn-secondary" style="font-size: 0.72rem; height: 32px; color: #fca5a5;"><svg class="sal0-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sal0-trash"></use></svg> Limpar</button>
                             </div>
                             <p style="font-size: 0.66rem; color: var(--text-muted); margin: 0.35rem 0 0;">A busca usa só título e artista. O resto continua local.</p>
                             <div id="lyricsSearchStatus" aria-live="polite" style="display: none; margin-top: 0.45rem; font-size: 0.72rem;"></div>
@@ -1985,16 +2056,16 @@
 
                     <div class="form-grid">
                         <div class="form-group">
-                            <span class="label">🖼️ Vídeo / Imagem de Fundo (Opcional)</span>
+                            <span class="label"><svg class="sal0-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sal0-image"></use></svg> Vídeo / Imagem de Fundo (Opcional)</span>
                             <div style="display: flex; gap: 0.3rem; margin-bottom: 0.4rem;">
-                                <button type="button" id="btnBgModeUpload" class="btn-tab-small active">📁 Enviar</button>
-                                <button type="button" id="btnBgModeYoutube" class="btn-tab-small">🌐 YouTube</button>
-                                <button type="button" id="btnBgModeLibrary" class="btn-tab-small">📚 Biblioteca</button>
+                                <button type="button" id="btnBgModeUpload" class="btn-tab-small active"><svg class="sal0-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sal0-upload"></use></svg> Enviar</button>
+                                <button type="button" id="btnBgModeYoutube" class="btn-tab-small"><svg class="sal0-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sal0-globe"></use></svg> YouTube</button>
+                                <button type="button" id="btnBgModeLibrary" class="btn-tab-small"><svg class="sal0-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sal0-library"></use></svg> Biblioteca</button>
                             </div>
 
                             <div id="bgUploadContainer">
                                 <div class="upload-area" id="bgUploadArea" style="height: 90px; display: flex; flex-direction: column; justify-content: center; align-items: center; border: 2px dashed var(--glass-border-light); border-radius: 12px; background: var(--input-bg); cursor: pointer;">
-                                    <span style="font-size: 1.3rem;">🖼️</span>
+                                    <span style="font-size: 1.3rem;"><svg class="sal0-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sal0-image"></use></svg></span>
                                     <p id="bgTextName" style="font-size: 0.8rem; margin: 0;">Arraste o fundo ou clique</p>
                                     <input type="file" id="bgFile" name="bg_file" accept="image/*,video/*" style="display: none;">
                                     <div id="bgBadge" style="display: none; background: var(--pink-accent); color: white; padding: 0.15rem 0.5rem; border-radius: 20px; font-size: 0.7rem; margin-top: 0.2rem;"></div>
@@ -2003,7 +2074,7 @@
 
                             <div id="bgYoutubeContainer" style="display: none;">
                                 <input type="url" id="bgYoutubeUrl" placeholder="URL de fundo do YouTube..." class="input-text">
-                                <div id="bgYoutubeTitleBadge" class="youtube-identification" aria-live="polite"><span>🎞️</span><span id="bgYoutubeTitleText"></span></div>
+                                <div id="bgYoutubeTitleBadge" class="youtube-identification" aria-live="polite"><span><svg class="sal0-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sal0-render"></use></svg></span><span id="bgYoutubeTitleText"></span></div>
                                 <p class="compact-note" style="margin: 0.45rem 0 0;">Ao criar, o fundo será preparado e ficará sem áudio.</p>
                             </div>
 
@@ -2015,10 +2086,10 @@
                         </div>
 
                         <div class="form-group">
-                            <span class="label">🎨 Estilo da tela</span>
+                            <span class="label"><svg class="sal0-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sal0-palette"></use></svg> Estilo da tela</span>
                             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 0.5rem; margin-top: 0.5rem;">
                                 <div>
-                                    <span class="label">🖼️ Modo de Fundo</span>
+                                    <span class="label"><svg class="sal0-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sal0-image"></use></svg> Modo de Fundo</span>
                                     <select id="backgroundMode" name="background_mode" class="select-input">
                                         <option value="original" selected>Vídeo Original</option>
                                         <option value="image">Imagem / Vídeo</option>
@@ -2026,7 +2097,7 @@
                                     </select>
                                 </div>
                                 <div>
-                                    <span class="label">📝 Modo da Legenda</span>
+                                    <span class="label"><svg class="sal0-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sal0-captions"></use></svg> Modo da Legenda</span>
                                     <select id="subtitleMode" name="subtitle_mode" class="select-input">
                                         <option value="syllable" selected>Sílabas (Varredura)</option>
                                         <option value="word">Palavras</option>
@@ -2034,7 +2105,7 @@
                                     </select>
                                 </div>
                                 <div>
-                                    <span class="label">✏️ Revisar antes de finalizar</span>
+                                    <span class="label"><svg class="sal0-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sal0-edit"></use></svg> Revisar antes de finalizar</span>
                                     <select id="enableCorrection" name="enable_correction" class="select-input">
                                         <option value="false" selected>Não (Direta)</option>
                                         <option value="true">Sim (Pausar 75%)</option>
@@ -2049,14 +2120,14 @@
 
                         <!-- SEÇÃO DE SALVAR E GERENCIAR PERFIS (DENTRO DAS OPÇÕES AVANÇADAS) -->
                         <div style="background: var(--input-bg); border: 1px solid var(--glass-border); padding: 1rem; border-radius: var(--radius-md); margin-bottom: 1.2rem;">
-                            <span class="label" style="font-size: 0.88rem; color: var(--text-main); margin-bottom: 0.6rem;">💾 Perfil de Ajustes</span>
+                            <span class="label" style="font-size: 0.88rem; color: var(--text-main); margin-bottom: 0.6rem;"><svg class="sal0-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sal0-save"></use></svg> Perfil de Ajustes</span>
                             <div class="form-grid">
                                 <div class="form-group">
                                     <input type="text" id="newProfileName" placeholder="Nome do perfil (Ex: Festas Anos 80)" class="input-text">
                                 </div>
                                 <div style="display: flex; gap: 0.5rem; align-items: flex-end;">
-                                    <button type="button" id="btnSaveProfile" class="btn-primary" style="height: 38px;">💾 Salvar Perfil</button>
-                                    <button type="button" id="btnDeleteProfile" class="btn-secondary" style="height: 38px; color: #fca5a5;">🗑️ Excluir</button>
+                                    <button type="button" id="btnSaveProfile" class="btn-primary" style="height: 38px;"><svg class="sal0-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sal0-save"></use></svg> Salvar Perfil</button>
+                                    <button type="button" id="btnDeleteProfile" class="btn-secondary" style="height: 38px; color: #fca5a5;"><svg class="sal0-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sal0-trash"></use></svg> Excluir</button>
                                 </div>
                             </div>
                         </div>
@@ -2182,7 +2253,7 @@
 
                     <!-- Botão Submeter -->
                     <div style="margin-top: 1.5rem;">
-                        <button type="submit" id="btnSubmit" class="btn-primary">🎬 Criar Karaokê</button>
+                        <button type="submit" id="btnSubmit" class="btn-primary"><svg class="sal0-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sal0-karaoke"></use></svg> Criar Karaokê</button>
                     </div>
                 </div>
 </form>
@@ -2190,17 +2261,17 @@
             {% include "queue_cache_panel.html" %}
             <div class="card" id="queueCard" style="display: none;">
                 <div class="card-header">
-                    <span class="card-title"><span class="line-glyph">≡</span> Fila de processamento</span>
+                    <span class="card-title"><span class="line-glyph"><svg class="sal0-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sal0-queue"></use></svg></span> Fila de processamento</span>
                     <span id="queueCountBadge" class="queue-status">0 aguardando</span>
                 </div>
                 <p class="compact-note" style="margin-bottom: 0.8rem;">Em processamento e pendentes aparecem primeiro; os encerrados ficam abaixo para editar e refazer. A próxima fila substitui esta lista. Você também pode apagar o cache ao terminar.</p>
                 <div class="queue-maintenance-control">
                     <span class="compact-note queue-pause-status">A fila está ativa.</span>
-                    <button type="button" class="btn-secondary btn-queue-pause">⏸ Pausar ao concluir etapa</button>
+                    <button type="button" class="btn-secondary btn-queue-pause"><svg class="sal0-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sal0-pause"></use></svg> Pausar ao concluir etapa</button>
                 </div>
                 <div id="queueCacheControls" class="queue-cache-controls" hidden>
                     <button type="button" id="btnClearQueueCache" class="btn-secondary" onclick="clearWholeQueueCache()" aria-describedby="queueCacheClearHint">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7"/></svg>
+                        <svg class="sal0-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sal0-trash"></use></svg>
                         Apagar cache da fila
                     </button>
                     <p id="queueCacheClearHint" class="compact-note"></p>
@@ -2212,7 +2283,7 @@
             <!-- CARD DE PROGRESSO DE PRODUÇÃO -->
             <div class="card" id="processCard" style="display: none;">
                 <div class="card-header">
-                    <span id="processStatusTitle" class="card-title">⏳ Produzindo</span>
+                    <span id="processStatusTitle" class="card-title"><svg class="sal0-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sal0-clock"></use></svg> Produzindo</span>
                     <span id="progressPercent" style="font-size: 1.2rem; font-weight: 800; color: var(--accent);">0%</span>
                 </div>
 
@@ -2226,15 +2297,15 @@
                 </div>
 
                 <div class="process-actions">
-                    <button type="button" id="btnToggleQueueCreation" class="btn-add-queue btn-primary" aria-expanded="false" aria-controls="creatorModeSwitch">＋ Adicionar à fila</button>
-                    <button type="button" class="btn-cancel-task btn-secondary" style="background:rgba(239,68,68,.15);color:#fca5a5;border-color:rgba(239,68,68,.3);">🛑 Cancelar</button>
+                    <button type="button" id="btnToggleQueueCreation" class="btn-add-queue btn-primary" aria-expanded="false" aria-controls="creatorModeSwitch"><svg class="sal0-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sal0-add"></use></svg> Adicionar à fila</button>
+                    <button type="button" class="btn-cancel-task btn-secondary" style="background:rgba(239,68,68,.15);color:#fca5a5;border-color:rgba(239,68,68,.3);"><svg class="sal0-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sal0-stop"></use></svg> Cancelar</button>
                 </div>
                 <div id="processSummary" class="process-summary" aria-live="polite">
-                    <div class="process-summary-item"><span>🎵</span><span id="processSummaryTitle"></span></div>
-                    <div class="process-summary-item"><span>📝</span><span id="processSummaryLyrics"></span></div>
-                    <div class="process-summary-item"><span>🤖</span><span id="processSummaryModel"></span></div>
-                    <div class="process-summary-item"><span>🖼️</span><span id="processSummaryBackground"></span></div>
-                    <div class="process-summary-item"><span>⏱️</span><span id="processSummaryTiming"></span></div>
+                    <div class="process-summary-item"><span><svg class="sal0-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sal0-music"></use></svg></span><span id="processSummaryTitle"></span></div>
+                    <div class="process-summary-item"><span><svg class="sal0-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sal0-captions"></use></svg></span><span id="processSummaryLyrics"></span></div>
+                    <div class="process-summary-item"><span><svg class="sal0-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sal0-whisper"></use></svg></span><span id="processSummaryModel"></span></div>
+                    <div class="process-summary-item"><span><svg class="sal0-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sal0-image"></use></svg></span><span id="processSummaryBackground"></span></div>
+                    <div class="process-summary-item"><span><svg class="sal0-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sal0-clock"></use></svg></span><span id="processSummaryTiming"></span></div>
                 </div>
 
 
@@ -2246,10 +2317,10 @@
         <div id="correctionCard" style="display: none; background: var(--bg-card); border: 1px solid var(--glass-border); padding: 1.5rem; border-radius: 14px; margin-top: 1.5rem; box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37); backdrop-filter: blur(8px);">
             <div class="correction-head" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem;">
                 <div style="display: flex; align-items: center; gap: 0.5rem;">
-                    <span style="font-size: 1.3rem;">✏️</span>
-                    <h3 style="margin: 0; font-size: 1.1rem; font-weight: 700; color: var(--text-main);">✍️ Revisar legendas</h3>
+                    <span style="font-size: 1.3rem;"><svg class="sal0-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sal0-edit"></use></svg></span>
+                    <h3 style="margin: 0; font-size: 1.1rem; font-weight: 700; color: var(--text-main);">Revisar legendas</h3>
                 </div>
-                <button type="button" id="btnContinueProcess" class="btn-primary" style="width: auto; padding: 0.5rem 1.2rem; font-size: 0.85rem;">🚀 Salvar e renderizar</button>
+                <button type="button" id="btnContinueProcess" class="btn-primary" style="width: auto; padding: 0.5rem 1.2rem; font-size: 0.85rem;"><svg class="sal0-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sal0-render"></use></svg> Salvar e renderizar</button>
             </div>
 
             <p id="correctionValidationMessage" class="flow-feedback" role="alert"></p>
@@ -2261,7 +2332,7 @@
 
                 <!-- Coluna A: Mockup Live Preview -->
                 <div style="display: flex; flex-direction: column; gap: 0.8rem;">
-                    <span style="font-size: 0.82rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">📺 Prévia do texto e do fundo</span>
+                    <span style="font-size: 0.82rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;"><svg class="sal0-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sal0-preview"></use></svg> Prévia do texto e do fundo</span>
 
                     <!-- Container Mockup 16:9 -->
                     <div id="previewVideoMock" style="position: relative; width: 100%; aspect-ratio: 16/9; background: #000; border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; padding: 1.5rem; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.5);">
@@ -2272,15 +2343,15 @@
                         </div>
                     </div>
                     <div class="correction-preview-toolbar">
-                        <button type="button" id="btnPreviousSegment" class="btn-secondary" aria-label="Legenda anterior">← Anterior</button>
+                        <button type="button" id="btnPreviousSegment" class="btn-secondary" aria-label="Legenda anterior"><svg class="sal0-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sal0-left"></use></svg> Anterior</button>
                         <span id="correctionPreviewMeta" class="correction-preview-meta">Selecione uma legenda</span>
-                        <button type="button" id="btnNextSegment" class="btn-secondary" aria-label="Próxima legenda">Próxima →</button>
+                        <button type="button" id="btnNextSegment" class="btn-secondary" aria-label="Próxima legenda">Próxima <svg class="sal0-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sal0-right"></use></svg></button>
                     </div>
                 </div>
 
                 <!-- Coluna B: Lista de Estrofes com Edição de Tempos e Texto -->
                 <div style="display: flex; flex-direction: column; gap: 0.8rem;">
-                    <span style="font-size: 0.82rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">📜 Texto e tempos dos versos</span>
+                    <span style="font-size: 0.82rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;"><svg class="sal0-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sal0-lyrics"></use></svg> Texto e tempos dos versos</span>
 
                     <div id="correctionList" style="display: flex; flex-direction: column; gap: 0.8rem; max-height: 400px; overflow-y: auto; padding-right: 0.5rem;">
                         <!-- Preenchido dinamicamente via renderSegments() -->
@@ -2289,26 +2360,26 @@
             </div>
 
             <div class="process-actions" style="border-top:1px solid var(--glass-border);padding-top:1rem;">
-                <button type="button" class="btn-add-queue btn-primary" aria-expanded="false" aria-controls="creatorModeSwitch">＋ Adicionar à fila</button>
-                <button type="button" class="btn-cancel-task btn-secondary" style="background:rgba(239,68,68,.15);color:#fca5a5;border-color:rgba(239,68,68,.3);">🛑 Cancelar</button>
-                <button type="button" id="btnSkipEdit" class="btn-secondary">⏩ Continuar sem editar</button>
+                <button type="button" class="btn-add-queue btn-primary" aria-expanded="false" aria-controls="creatorModeSwitch"><svg class="sal0-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sal0-add"></use></svg> Adicionar à fila</button>
+                <button type="button" class="btn-cancel-task btn-secondary" style="background:rgba(239,68,68,.15);color:#fca5a5;border-color:rgba(239,68,68,.3);"><svg class="sal0-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sal0-stop"></use></svg> Cancelar</button>
+                <button type="button" id="btnSkipEdit" class="btn-secondary"><svg class="sal0-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sal0-skip"></use></svg> Continuar sem editar</button>
             </div>
         </div>
 
             <!-- CARD DE DOWNLOAD DO VÍDEO CONCLUÍDO -->
             <div class="card" id="downloadBox" style="display: none; text-align: center; border-color: rgba(16, 185, 129, 0.4);">
-                <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">🎉</div>
+                <div style="font-size: 2.5rem; margin-bottom: 0.5rem;"><svg class="sal0-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sal0-celebrate"></use></svg></div>
                 <h3 id="downloadResultTitle" style="font-size: 1.08rem; color: var(--text-main); margin-bottom: 0.25rem;">Vídeo pronto!</h3>
                 <p id="downloadResultDescription" style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.6rem;">Assista aqui ou abra sua cópia permanente na Biblioteca.</p>
                 <p id="resultTimingSummary" style="display: none; font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.6rem;"></p>
                 <video id="resultVideoPreview" class="media-preview" controls preload="metadata"></video>
                 <p id="translationResultWarning" class="compact-note" style="display:none; margin:0 0 0.7rem; color:#fbbf24;"></p>
                 <div style="display: flex; justify-content: center; gap: 0.55rem; flex-wrap: wrap;">
-                    <button type="button" id="btnDownloadResult" class="btn-primary" style="background: linear-gradient(135deg, #10b981, #059669); width: auto;">⬇️ Baixar MP4</button>
-                    <button type="button" id="btnDownloadSubtitles" class="btn-primary" style="display:none; width:auto;">▤ Baixar SRT</button>
-                    <button type="button" id="btnDownloadOriginalSubtitles" class="btn-primary" style="display:none; width:auto;">▤ Baixar SRT original</button>
-                    <button type="button" id="btnDownloadTranslatedSubtitles" class="btn-primary" style="display:none; width:auto;">▤ Baixar SRT traduzido</button>
-                    <button type="button" id="btnOpenResultLibrary" class="btn-secondary">📚 Abrir Biblioteca</button>
+                    <button type="button" id="btnDownloadResult" class="btn-primary" style="background: linear-gradient(135deg, #10b981, #059669); width: auto;"><svg class="sal0-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sal0-download"></use></svg> Baixar MP4</button>
+                    <button type="button" id="btnDownloadSubtitles" class="btn-primary" style="display:none; width:auto;"><svg class="sal0-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sal0-captions"></use></svg> Baixar SRT</button>
+                    <button type="button" id="btnDownloadOriginalSubtitles" class="btn-primary" style="display:none; width:auto;"><svg class="sal0-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sal0-captions"></use></svg> Baixar SRT original</button>
+                    <button type="button" id="btnDownloadTranslatedSubtitles" class="btn-primary" style="display:none; width:auto;"><svg class="sal0-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sal0-captions"></use></svg> Baixar SRT traduzido</button>
+                    <button type="button" id="btnOpenResultLibrary" class="btn-secondary"><svg class="sal0-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sal0-library"></use></svg> Abrir Biblioteca</button>
                 </div>
             </div>
         </div>
@@ -2322,7 +2393,7 @@
 
             <details class="card settings-panel" id="youtubePublisherSection" style="display:none">
                 <summary id="youtubePublisherSectionToggle" class="settings-panel-summary" aria-expanded="false" aria-controls="youtubePublisherSectionBody">
-                    <span class="settings-panel-heading"><span class="card-title">Canal e publicação no YouTube</span><span class="settings-panel-trigger"><span data-panel-label data-closed-label="Abrir ajustes">Abrir ajustes</span><span class="settings-panel-chevron" aria-hidden="true">▾</span></span></span>
+                    <span class="settings-panel-heading"><span class="card-title">Canal e publicação no YouTube</span><span class="settings-panel-trigger"><span data-panel-label data-closed-label="Abrir ajustes">Abrir ajustes</span><span class="settings-panel-chevron" aria-hidden="true"><svg class="sal0-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sal0-chevron-down"></use></svg></span></span></span>
                     <span id="youtubePublisherSectionOverview" class="settings-panel-overview">Conexão do canal, playlists e vídeos publicados.</span>
                 </summary>
                 <div id="youtubePublisherSectionBody" class="settings-panel-body">
@@ -2417,7 +2488,7 @@
             <!-- Gerenciador de Modelos de reconhecimento -->
             <details class="card settings-panel" id="modelManagerSection">
                 <summary id="modelManagerSectionToggle" class="settings-panel-summary" aria-expanded="false" aria-controls="modelManagerSectionBody">
-                    <span class="settings-panel-heading"><span class="card-title">Modelos de reconhecimento</span><span class="settings-panel-trigger"><span data-panel-label data-closed-label="Abrir ajustes">Abrir ajustes</span><span class="settings-panel-chevron" aria-hidden="true">▾</span></span></span>
+                    <span class="settings-panel-heading"><span class="card-title">Modelos de reconhecimento</span><span class="settings-panel-trigger"><span data-panel-label data-closed-label="Abrir ajustes">Abrir ajustes</span><span class="settings-panel-chevron" aria-hidden="true"><svg class="sal0-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sal0-chevron-down"></use></svg></span></span></span>
                     <span id="modelManagerSectionOverview" class="settings-panel-overview">Instale e acompanhe os modelos Whisper disponíveis.</span>
                 </summary>
                 <div id="modelManagerSectionBody" class="settings-panel-body">
@@ -2431,10 +2502,10 @@
 
             <details class="card settings-panel" id="youtubeToolsSection">
                 <summary id="youtubeToolsSectionToggle" class="settings-panel-summary" aria-expanded="false" aria-controls="youtubeToolsSectionBody">
-                    <span class="settings-panel-heading"><span class="card-title">Downloads do YouTube</span><span class="settings-panel-trigger"><span data-panel-label data-closed-label="Abrir ajustes">Abrir ajustes</span><span class="settings-panel-chevron" aria-hidden="true">▾</span></span></span>
+                    <span class="settings-panel-heading"><span class="card-title">Downloads do YouTube</span><span class="settings-panel-trigger"><span data-panel-label data-closed-label="Abrir ajustes">Abrir ajustes</span><span class="settings-panel-chevron" aria-hidden="true"><svg class="sal0-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sal0-chevron-down"></use></svg></span></span></span>
                     <span id="youtubeToolsSectionOverview" class="settings-panel-overview">Teste links, renove a sessão e atualize o mecanismo.</span>
                 </summary>
-                <div id="youtubeToolsSectionBody" class="settings-panel-body"><div class="settings-panel-actions"><button type="button" id="btnUpdateYoutubeTools" class="btn-secondary">↻ Atualizar mecanismo</button></div>
+                <div id="youtubeToolsSectionBody" class="settings-panel-body"><div class="settings-panel-actions"><button type="button" id="btnUpdateYoutubeTools" class="btn-secondary"><svg class="sal0-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sal0-refresh"></use></svg> Atualizar mecanismo</button></div>
                 <p class="compact-note">Downloads e publicação usam conexões diferentes. Para publicar, reconecte o canal acima. Para baixar, teste o link e renove a sessão abaixo quando o YouTube pedir login. Tudo pode ser feito pelo celular, mesmo pela rede externa.</p>
                 <p id="youtubeSessionStatus" class="yt-status" role="status">Verificando sessão de downloads…</p>
                 <label for="youtubeTestUrl" class="label">Link do vídeo para testar</label><input id="youtubeTestUrl" type="url" class="input-text" placeholder="https://www.youtube.com/watch?v=…" autocomplete="off" inputmode="url">
@@ -2468,7 +2539,7 @@
 
             <details class="card settings-panel" id="subtitleModeSettingsSection" style="display:none;">
                 <summary id="btnToggleSubtitleSettings" class="settings-panel-summary" aria-expanded="false" aria-controls="subtitleModeSettingsBody">
-                    <span class="settings-panel-heading"><span class="card-title">Legendas dos vídeos</span><span class="settings-panel-trigger"><span data-panel-label data-closed-label="Personalizar legendas">Personalizar legendas</span><span class="settings-panel-chevron" aria-hidden="true">▾</span></span></span>
+                    <span class="settings-panel-heading"><span class="card-title">Legendas dos vídeos</span><span class="settings-panel-trigger"><span data-panel-label data-closed-label="Personalizar legendas">Personalizar legendas</span><span class="settings-panel-chevron" aria-hidden="true"><svg class="sal0-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sal0-chevron-down"></use></svg></span></span></span>
                     <span id="subtitleModeSettingsSectionOverview" class="settings-panel-overview">Aparência, idioma e fundo do modo Legendar vídeo.</span><span id="subtitleSettingsSummary" class="subtitle-settings-summary" aria-label="Padrões salvos da legendagem"></span>
                 </summary>
 
@@ -2525,7 +2596,7 @@
 
             <details class="card settings-panel" id="translationToolsSection" style="display: none;">
                 <summary id="translationToolsSectionToggle" class="settings-panel-summary" aria-expanded="false" aria-controls="translationToolsSectionBody">
-                    <span class="settings-panel-heading"><span class="card-title">Tradução das legendas</span><span class="settings-panel-trigger"><span data-panel-label data-closed-label="Abrir ajustes">Abrir ajustes</span><span class="settings-panel-chevron" aria-hidden="true">▾</span></span></span>
+                    <span class="settings-panel-heading"><span class="card-title">Tradução das legendas</span><span class="settings-panel-trigger"><span data-panel-label data-closed-label="Abrir ajustes">Abrir ajustes</span><span class="settings-panel-chevron" aria-hidden="true"><svg class="sal0-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sal0-chevron-down"></use></svg></span></span></span>
                     <span id="translationToolsSectionOverview" class="settings-panel-overview">Conexão e idiomas do LibreTranslate.</span>
                 </summary>
                 <div id="translationToolsSectionBody" class="settings-panel-body">
@@ -2546,17 +2617,17 @@
 
             <details class="card settings-panel" id="easyModeSettingsSection">
                 <summary id="easyModeSettingsSectionToggle" class="settings-panel-summary" aria-expanded="false" aria-controls="easyModeSettingsSectionBody">
-                    <span class="settings-panel-heading"><span class="card-title">Padrões do Modo Rápido</span><span class="settings-panel-trigger"><span data-panel-label data-closed-label="Abrir ajustes">Abrir ajustes</span><span class="settings-panel-chevron" aria-hidden="true">▾</span></span></span>
+                    <span class="settings-panel-heading"><span class="card-title">Padrões do Modo Rápido</span><span class="settings-panel-trigger"><span data-panel-label data-closed-label="Abrir ajustes">Abrir ajustes</span><span class="settings-panel-chevron" aria-hidden="true"><svg class="sal0-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sal0-chevron-down"></use></svg></span></span></span>
                     <span id="easyModeSettingsSectionOverview" class="settings-panel-overview">Reconhecimento, visual e resultado para novas criações.</span>
                 </summary>
-                <div id="easyModeSettingsSectionBody" class="settings-panel-body"><div class="settings-panel-actions"><button type="button" id="btnResetEasyModeDefaults" class="btn-secondary">↺ Restaurar padrão</button></div>
+                <div id="easyModeSettingsSectionBody" class="settings-panel-body"><div class="settings-panel-actions"><button type="button" id="btnResetEasyModeDefaults" class="btn-secondary"><svg class="sal0-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sal0-undo"></use></svg> Restaurar padrão</button></div>
                 <div class="easy-config-intro">
-                    <span style="font-size: 1.25rem;">🪄</span>
+                    <span style="font-size: 1.25rem;"><svg class="sal0-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sal0-spark"></use></svg></span>
                     <p class="compact-note">Todas as contas começam pelo Modo Rápido. Estas configurações ficam escondidas e são aplicadas pelo servidor; o Modo Detalhado continua disponível para ajustes manuais.</p>
                 </div>
 
                 <details class="easy-config-group">
-                    <summary>🎙️ Transcrição e reconhecimento</summary>
+                    <summary><svg class="sal0-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sal0-mic"></use></svg> Transcrição e reconhecimento</summary>
                     <div class="easy-config-fields">
                         <div class="form-group"><span class="label">Modo Rápido disponível</span><select id="easyModeEnabled" class="select-input"><option value="true">Sim</option><option value="false">Não</option></select></div>
                         <div class="form-group"><span class="label">Modelo Whisper</span><select id="easyModeModel" class="select-input"><option value="large-v3-turbo">Large V3 Turbo</option><option value="large-v3">Large V3</option><option value="medium">Medium</option><option value="small">Small</option><option value="tiny">Tiny</option></select></div>
@@ -2569,7 +2640,7 @@
                 </details>
 
                 <details class="easy-config-group">
-                    <summary>🎨 Legenda e visual</summary>
+                    <summary><svg class="sal0-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sal0-palette"></use></svg> Legenda e visual</summary>
                     <div class="easy-config-fields">
                         <div class="form-group"><span class="label">Modo da legenda</span><select id="easyModeSubtitleMode" class="select-input"><option value="syllable">Sílabas (varredura)</option><option value="word">Palavras</option><option value="line">Linhas</option><option value="phrase">Frase estática</option></select></div>
                         <div class="form-group"><span class="label">Tamanho da fonte</span><input type="number" id="easyModeFontSize" min="24" max="72" value="50" class="input-text"></div>
@@ -2591,7 +2662,7 @@
                 </details>
 
                 <details class="easy-config-group">
-                    <summary>⚙️ Fluxo e resultado</summary>
+                    <summary><svg class="sal0-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sal0-settings"></use></svg> Fluxo e resultado</summary>
                     <div class="easy-config-fields">
                         <div class="form-group"><span class="label">Quebrar por pontuação</span><select id="easyModeBreakPunctuation" class="select-input"><option value="true">Sim</option><option value="false">Não</option></select></div>
                         <div class="form-group"><span class="label">Mostrar “Instrumental”</span><select id="easyModeInstrumental" class="select-input"><option value="true">Sim</option><option value="false">Não</option></select></div>
@@ -2601,22 +2672,22 @@
                     </div>
                 </details>
 
-                <button type="button" id="btnSaveEasyMode" class="btn-primary">💾 Salvar perfil do Modo Rápido</button>
+                <button type="button" id="btnSaveEasyMode" class="btn-primary"><svg class="sal0-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sal0-save"></use></svg> Salvar perfil do Modo Rápido</button>
             </div>
             </details>
 
             <!-- Credenciais do Telegram -->
             <details class="card settings-panel" id="telegramSection">
                 <summary id="telegramSectionToggle" class="settings-panel-summary" aria-expanded="false" aria-controls="telegramSectionBody">
-                    <span class="settings-panel-heading"><span class="card-title">Meu bot do Telegram</span><span class="settings-panel-trigger"><span data-panel-label data-closed-label="Abrir ajustes">Abrir ajustes</span><span class="settings-panel-chevron" aria-hidden="true">▾</span></span></span>
+                    <span class="settings-panel-heading"><span class="card-title">Meu bot do Telegram</span><span class="settings-panel-trigger"><span data-panel-label data-closed-label="Abrir ajustes">Abrir ajustes</span><span class="settings-panel-chevron" aria-hidden="true"><svg class="sal0-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sal0-chevron-down"></use></svg></span></span></span>
                     <span id="telegramSectionOverview" class="settings-panel-overview">Configuração, conexão e confirmação dos envios.</span>
                 </summary>
-                <div id="telegramSectionBody" class="settings-panel-body"><div class="settings-panel-actions"><button type="button" id="btnEditTelegram" class="btn-secondary">✏️ Editar</button></div>
+                <div id="telegramSectionBody" class="settings-panel-body"><div class="settings-panel-actions"><button type="button" id="btnEditTelegram" class="btn-secondary"><svg class="sal0-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sal0-edit"></use></svg> Editar</button></div>
 
                 <p id="telegramScopeText" class="compact-note">Este bot recebe apenas as suas criações.</p>
 
                 <div id="telegramConfiguredBadge" style="display: none; background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.3); padding: 0.6rem 1rem; border-radius: var(--radius-sm); color: #34d399; font-size: 0.85rem; align-items: center; justify-content: space-between; margin-bottom: 1rem;">
-                    <span>✓ Configuração salva</span>
+                    <span><svg class="sal0-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sal0-check"></use></svg> Configuração salva</span>
                 </div>
 
                 <div id="telegramInputsDiv" class="form-grid">
@@ -2629,7 +2700,7 @@
                         <input type="text" id="telegramChatIdInput" placeholder="Ex: 987654321" class="input-text">
                     </div>
                     <div style="grid-column: 1 / -1;">
-                        <button type="button" id="btnSaveTelegram" class="btn-primary">💾 Salvar Telegram</button>
+                        <button type="button" id="btnSaveTelegram" class="btn-primary"><svg class="sal0-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sal0-save"></use></svg> Salvar Telegram</button>
                     </div>
                 </div>
                 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:0.75rem;margin-top:1rem;">
@@ -2645,10 +2716,10 @@
             <!-- IP Externo / Acesso Remoto -->
             <details class="card settings-panel" id="externalUrlSection">
                 <summary id="externalUrlSectionToggle" class="settings-panel-summary" aria-expanded="false" aria-controls="externalUrlSectionBody">
-                    <span class="settings-panel-heading"><span class="card-title">Acesso externo</span><span class="settings-panel-trigger"><span data-panel-label data-closed-label="Abrir ajustes">Abrir ajustes</span><span class="settings-panel-chevron" aria-hidden="true">▾</span></span></span>
+                    <span class="settings-panel-heading"><span class="card-title">Acesso externo</span><span class="settings-panel-trigger"><span data-panel-label data-closed-label="Abrir ajustes">Abrir ajustes</span><span class="settings-panel-chevron" aria-hidden="true"><svg class="sal0-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sal0-chevron-down"></use></svg></span></span></span>
                     <span id="externalUrlSectionOverview" class="settings-panel-overview">Endereço usado nos links de download enviados ao Telegram.</span>
                 </summary>
-                <div id="externalUrlSectionBody" class="settings-panel-body"><div class="settings-panel-actions"><button type="button" id="btnEditExternalUrl" class="btn-secondary">✏️ Editar</button></div>
+                <div id="externalUrlSectionBody" class="settings-panel-body"><div class="settings-panel-actions"><button type="button" id="btnEditExternalUrl" class="btn-secondary"><svg class="sal0-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sal0-edit"></use></svg> Editar</button></div>
 
                 <p class="compact-note">Base pública opcional para o link direto e aleatório enviado pelo Telegram.</p>
 
@@ -2662,7 +2733,7 @@
                         <input type="text" id="externalUrlInput" placeholder="http://meuservidor:7860" class="input-text">
                     </div>
                     <div style="display: flex; align-items: flex-end;">
-                        <button type="button" id="btnSaveExternalUrl" class="btn-primary" style="height: 38px;">💾 Salvar IP Externo</button>
+                        <button type="button" id="btnSaveExternalUrl" class="btn-primary" style="height: 38px;"><svg class="sal0-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sal0-save"></use></svg> Salvar IP Externo</button>
                     </div>
                 </div>
             </div>
@@ -2671,7 +2742,7 @@
             <!-- Gerenciamento de Usuários -->
             <details class="card settings-panel" id="userManagementSection">
                 <summary id="userManagementSectionToggle" class="settings-panel-summary" aria-expanded="false" aria-controls="userManagementSectionBody">
-                    <span class="settings-panel-heading"><span class="card-title">Contas e permissões</span><span class="settings-panel-trigger"><span data-panel-label data-closed-label="Abrir ajustes">Abrir ajustes</span><span class="settings-panel-chevron" aria-hidden="true">▾</span></span></span>
+                    <span class="settings-panel-heading"><span class="card-title">Contas e permissões</span><span class="settings-panel-trigger"><span data-panel-label data-closed-label="Abrir ajustes">Abrir ajustes</span><span class="settings-panel-chevron" aria-hidden="true"><svg class="sal0-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sal0-chevron-down"></use></svg></span></span></span>
                     <span id="userManagementSectionOverview" class="settings-panel-overview">Adicione contas e gerencie quem usa o servidor.</span>
                 </summary>
                 <div id="userManagementSectionBody" class="settings-panel-body">
@@ -2693,7 +2764,7 @@
                         </select>
                     </div>
                     <div style="display: flex; align-items: flex-end;">
-                        <button type="button" id="btnAddUser" class="btn-primary" style="height: 38px;">➕ Adicionar Usuário</button>
+                        <button type="button" id="btnAddUser" class="btn-primary" style="height: 38px;"><svg class="sal0-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sal0-add"></use></svg> Adicionar Usuário</button>
                     </div>
                 </div>
 
@@ -2706,10 +2777,10 @@
             <!-- Logs e Diagnóstico do Sistema -->
             <details class="card settings-panel" id="logsSection">
                 <summary id="logsSectionToggle" class="settings-panel-summary" aria-expanded="false" aria-controls="logsSectionBody">
-                    <span class="settings-panel-heading"><span class="card-title">Diagnóstico do servidor</span><span class="settings-panel-trigger"><span data-panel-label data-closed-label="Abrir ajustes">Abrir ajustes</span><span class="settings-panel-chevron" aria-hidden="true">▾</span></span></span>
+                    <span class="settings-panel-heading"><span class="card-title">Diagnóstico do servidor</span><span class="settings-panel-trigger"><span data-panel-label data-closed-label="Abrir ajustes">Abrir ajustes</span><span class="settings-panel-chevron" aria-hidden="true"><svg class="sal0-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sal0-chevron-down"></use></svg></span></span></span>
                     <span id="logsSectionOverview" class="settings-panel-overview">Baixe um relatório com o estado e os registros atuais.</span>
                 </summary>
-                <div id="logsSectionBody" class="settings-panel-body"><div class="settings-panel-actions"><button type="button" id="btnDownloadLogs" class="btn-secondary">⬇️ Logs atuais</button></div>
+                <div id="logsSectionBody" class="settings-panel-body"><div class="settings-panel-actions"><button type="button" id="btnDownloadLogs" class="btn-secondary"><svg class="sal0-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sal0-download"></use></svg> Logs atuais</button></div>
                 <p class="compact-note">Gera um relatório novo com o estado e os registros mais recentes do aplicativo.</p>
             </div>
             </details>
@@ -2721,14 +2792,14 @@
         <!-- ============================================================= -->
         <div id="libraryTabContent" style="display: none; flex-direction: column; gap: 1.5rem;">
             <details class="card library-section" id="libraryResults" open>
-                <summary class="card-title">🎬 Resultados</summary>
+                <summary class="card-title"><svg class="sal0-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sal0-karaoke"></use></svg> Resultados</summary>
                 <div id="libHistoryList" class="library-section-content"></div>
             </details>
             <details class="card library-section" id="libraryImports">
-                <summary class="card-title">＋ Adicionar à biblioteca</summary>
+                <summary class="card-title"><svg class="sal0-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sal0-add"></use></svg> Adicionar à biblioteca</summary>
             <div style="background: var(--input-bg); border: 1px solid var(--glass-border); padding: 1.2rem; border-radius: 12px; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr)); gap: 1rem;">
                 <div>
-                    <h4 style="margin: 0 0 0.5rem 0; font-size: 0.9rem; color: var(--text-main);">➕ Música ou vídeo</h4>
+                    <h4 style="margin: 0 0 0.5rem 0; font-size: 0.9rem; color: var(--text-main);"><svg class="sal0-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sal0-add"></use></svg> Música ou vídeo</h4>
                     <div class="library-import-stack">
                         <form id="libAudioUploadForm" style="display: flex; gap: 0.5rem; align-items: center;">
                             <input type="file" id="libAudioFile" accept="audio/*,video/*" style="display: none;">
@@ -2740,15 +2811,15 @@
                         <form id="libAudioYoutubeForm" class="library-youtube-import">
                             <div class="library-youtube-row">
                                 <input type="url" id="libAudioYoutubeUrl" class="input-text" placeholder="Link do YouTube para guardar">
-                                <button type="button" id="btnLibDownloadYoutube" class="btn-primary">📥 Baixar</button>
+                                <button type="button" id="btnLibDownloadYoutube" class="btn-primary"><svg class="sal0-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sal0-download"></use></svg> Baixar</button>
                             </div>
-                            <div id="libAudioYoutubeTitleBadge" class="youtube-identification" aria-live="polite"><span>▶️</span><span id="libAudioYoutubeTitleText"></span></div>
+                            <div id="libAudioYoutubeTitleBadge" class="youtube-identification" aria-live="polite"><span><svg class="sal0-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sal0-play"></use></svg></span><span id="libAudioYoutubeTitleText"></span></div>
                             <div id="audioYtProgressBox" class="library-import-progress"><span id="audioYtStatusTitle">Preparando...</span> · <strong id="audioYtStatusPercent">0%</strong></div>
                         </form>
                     </div>
                 </div>
                 <div>
-                    <h4 style="margin: 0 0 0.5rem 0; font-size: 0.9rem; color: var(--text-main);">🖼️ Fundo</h4>
+                    <h4 style="margin: 0 0 0.5rem 0; font-size: 0.9rem; color: var(--text-main);"><svg class="sal0-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sal0-image"></use></svg> Fundo</h4>
                     <div class="library-import-stack">
                         <form id="libBgUploadForm" style="display: flex; gap: 0.5rem; align-items: center;">
                             <input type="file" id="libBgFile" accept="image/*,video/*" style="display: none;">
@@ -2760,9 +2831,9 @@
                         <form id="libBgYoutubeForm" class="library-youtube-import">
                             <div class="library-youtube-row">
                                 <input type="url" id="libBgYoutubeUrl" class="input-text" placeholder="Link do YouTube para usar como fundo">
-                                <button type="button" id="btnLibDownloadBgYoutube" class="btn-primary">📥 Baixar</button>
+                                <button type="button" id="btnLibDownloadBgYoutube" class="btn-primary"><svg class="sal0-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sal0-download"></use></svg> Baixar</button>
                             </div>
-                            <div id="libBgYoutubeTitleBadge" class="youtube-identification" aria-live="polite"><span>🎞️</span><span id="libBgYoutubeTitleText"></span></div>
+                            <div id="libBgYoutubeTitleBadge" class="youtube-identification" aria-live="polite"><span><svg class="sal0-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sal0-render"></use></svg></span><span id="libBgYoutubeTitleText"></span></div>
                             <div id="bgYtProgressBox" class="library-import-progress"><span id="bgYtStatusTitle">Preparando...</span> · <strong id="bgYtStatusPercent">0%</strong></div>
                             <p id="bgYtSelectedBadge" class="compact-note" style="display:none;" aria-live="polite"><span id="bgYtSelectedText"></span></p>
                         </form>
@@ -2772,11 +2843,11 @@
 
             </details>
             <details class="card library-section" id="libraryOriginals">
-                <summary class="card-title">🎵 Originais</summary>
+                <summary class="card-title"><svg class="sal0-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sal0-music"></use></svg> Originais</summary>
                 <div id="libVideosList" class="library-section-content"></div>
             </details>
             <details class="card library-section" id="libraryBackgrounds">
-                <summary class="card-title">🖼️ Fundos</summary>
+                <summary class="card-title"><svg class="sal0-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sal0-image"></use></svg> Fundos</summary>
                 <div id="libPhotosList" class="library-section-content"></div>
             </details>
         </div>
@@ -2794,14 +2865,14 @@
         <div class="preview-dialog">
             <div class="preview-dialog-head">
                 <h3 id="mediaPreviewTitle">Visualização</h3>
-                <button type="button" id="btnCloseMediaPreview" class="btn-secondary">Fechar ✕</button>
+                <button type="button" id="btnCloseMediaPreview" class="btn-secondary">Fechar <svg class="sal0-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sal0-close"></use></svg></button>
             </div>
             <video id="libraryVideoPreview" class="media-preview" controls preload="metadata"></video>
             <img id="libraryImagePreview" class="media-preview" alt="Visualização do arquivo" style="display: none; object-fit: contain;">
             <div id="mediaSeekControls" class="media-seek-controls">
-                <button type="button" id="btnSeekBackward" class="btn-secondary">↶ 10 s</button>
+                <button type="button" id="btnSeekBackward" class="btn-secondary"><svg class="sal0-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sal0-undo"></use></svg> 10 s</button>
                 <span id="mediaTimeLabel" class="media-time-label">0:00 / 0:00</span>
-                <button type="button" id="btnSeekForward" class="btn-secondary">10 s ↷</button>
+                <button type="button" id="btnSeekForward" class="btn-secondary">10 s <svg class="sal0-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sal0-redo"></use></svg></button>
             </div>
         </div>
     </div>
@@ -2811,7 +2882,7 @@
         <div class="help-dialog">
             <div class="help-heading">
                 <h3 id="helpTitle">Manual do Sal0 Karaokê</h3>
-                <button type="button" id="btnCloseHelpModal" class="btn-secondary">Fechar ✕</button>
+                <button type="button" id="btnCloseHelpModal" class="btn-secondary">Fechar <svg class="sal0-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sal0-close"></use></svg></button>
             </div>
             <p class="compact-note">Escolha um tutorial abaixo. O processamento acontece no servidor; você pode acompanhar pelo PC ou pelo Android.</p>
             <details open>
@@ -2921,7 +2992,7 @@
                 </ol>
                 <p>A API tem cota gratuita e pode limitar projetos sem auditoria a vídeos privados. Guarde a autorização como uma senha. Backing vocals e vídeo do modo SRT mostram porcentagem da etapa e avisam o avanço no Telegram; o LibreTranslate informa apenas início e término.</p>
             </details>
-            <p class="compact-note">Versão do servidor: 12.6.1. A transcrição é local; fontes, modelos e integrações podem acessar serviços externos. Use conteúdo autorizado.</p>
+            <p class="compact-note">Versão do servidor: 12.6.2. A transcrição é local; fontes, modelos e integrações podem acessar serviços externos. Use conteúdo autorizado.</p>
             <p class="compact-note">Use o servidor pela rede local ou VPN. A busca/importação do YouTube não concede direitos sobre a mídia. OAuth autoriza o acesso ao canal, não o uso de músicas. Confira as permissões do conteúdo e os termos do YouTube antes de importar ou publicar. Não listado permite acesso a quem tiver o link; resultados SRT nunca vão ao YouTube.</p>
             <p class="compact-note"><a href="https://www.youtube.com/static?template=terms" target="_blank" rel="noopener noreferrer">Termos do YouTube</a> · <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer">Privacidade do Google</a> · <a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener noreferrer">Revogar acesso ao canal</a></p>
         </div>
@@ -2930,32 +3001,74 @@
     <!-- MODAIS DE SETUP ADMIN E LOGIN -->
     <div id="setupModal" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.8); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); z-index: 99999; justify-content: center; align-items: center; padding: 1rem;">
         <div style="background: var(--bg-card); border: 1px solid var(--glass-border); border-radius: 20px; padding: 2rem; max-width: 420px; width: 100%; box-shadow: var(--shadow); text-align: center;">
-            <div style="width: 60px; height: 60px; border-radius: 16px; background: linear-gradient(135deg, #8b5cf6, #ec4899); display: flex; align-items: center; justify-content: center; font-size: 1.8rem; margin: 0 auto 1.2rem auto; color: #fff;">👑</div>
+            <div style="width: 60px; height: 60px; border-radius: 16px; background: linear-gradient(135deg, #8b5cf6, #ec4899); display: flex; align-items: center; justify-content: center; font-size: 1.8rem; margin: 0 auto 1.2rem auto; color: #fff;"><svg class="sal0-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sal0-admin"></use></svg></div>
             <h2 style="margin: 0 0 0.5rem 0; font-size: 1.4rem; color: var(--text-main);">Configuração Inicial</h2>
             <p style="margin: 0 0 1.5rem 0; font-size: 0.85rem; color: var(--text-muted);">Crie a conta de administrador para proteger seu servidor Sal0 Karaokê.</p>
             <form id="setupForm" style="display: flex; flex-direction: column; gap: 1rem;">
                 <input type="text" id="setupUsername" placeholder="Nome de Usuário Administrador" required class="input-text">
                 <input type="password" id="setupPassword" placeholder="Senha (mínimo de 8 caracteres)" minlength="8" required class="input-text">
-                <button type="submit" id="btnSetupSubmit" class="btn-primary">🚀 Criar Administrador e Entrar</button>
+                <button type="submit" id="btnSetupSubmit" class="btn-primary"><svg class="sal0-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sal0-render"></use></svg> Criar Administrador e Entrar</button>
             </form>
         </div>
     </div>
 
     <div id="loginModal" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.8); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); z-index: 99999; justify-content: center; align-items: center; padding: 1rem;">
         <div style="background: var(--bg-card); border: 1px solid var(--glass-border); border-radius: 20px; padding: 2rem; max-width: 420px; width: 100%; box-shadow: var(--shadow); text-align: center;">
-            <div style="width: 60px; height: 60px; border-radius: 16px; background: linear-gradient(135deg, #c084fc, #8b5cf6); display: flex; align-items: center; justify-content: center; font-size: 1.8rem; margin: 0 auto 1.2rem auto; color: #fff;">🔐</div>
+            <div style="width: 60px; height: 60px; border-radius: 16px; background: linear-gradient(135deg, #c084fc, #8b5cf6); display: flex; align-items: center; justify-content: center; font-size: 1.8rem; margin: 0 auto 1.2rem auto; color: #fff;"><svg class="sal0-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sal0-lock"></use></svg></div>
             <h2 style="margin: 0 0 0.5rem 0; font-size: 1.4rem; color: var(--text-main);">Entrar no Sal0 Karaokê</h2>
             <p style="margin: 0 0 1.5rem 0; font-size: 0.85rem; color: var(--text-muted);">Insira suas credenciais para acessar a plataforma.</p>
             <form id="loginForm" style="display: flex; flex-direction: column; gap: 1rem;">
                 <input type="text" id="loginUsername" placeholder="Usuário" required class="input-text">
                 <input type="password" id="loginPassword" placeholder="Senha" required class="input-text">
-                <button type="submit" id="btnLoginSubmit" class="btn-primary">🔑 Entrar</button>
+                <button type="submit" id="btnLoginSubmit" class="btn-primary"><svg class="sal0-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sal0-key"></use></svg> Entrar</button>
             </form>
         </div>
     </div>
 
     <!-- JAVASCRIPT COMPLETO E SUPORTE A TEMAS (PADRÃO TEMA ESCURO) -->
     <script>
+
+        function startSerialPoll(callback, delay) {
+            const poll = {timer: null, stopped: false};
+            const run = async () => {
+                try { await callback(); }
+                catch (error) { console.debug('Atualização temporariamente indisponível:', error); }
+                finally { if (!poll.stopped) poll.timer = setTimeout(run, delay); }
+            };
+            poll.timer = setTimeout(run, delay);
+            return poll;
+        }
+        function stopSerialPoll(poll) {
+            if (!poll) return;
+            poll.stopped = true; clearTimeout(poll.timer);
+        }
+
+        function sal0Icon(name) {
+            return `<svg class="sal0-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sal0-${name}"></use></svg>`;
+        }
+        // Only explicit interface labels use this setter; filenames and lyrics remain plain text.
+        const uiTextValues = new WeakMap();
+        function setUiText(element, value) {
+            if (!element) return;
+            const text = String(value ?? '');
+            const previous = uiTextValues.get(element);
+            if (previous?.text === text && previous.first === element.firstChild && previous.last === element.lastChild) return;
+            const fragment = document.createDocumentFragment();
+            let cursor = 0;
+            for (const match of text.matchAll(/\[\[sal0:([a-z-]+)\]\]/g)) {
+                fragment.append(document.createTextNode(text.slice(cursor, match.index)));
+                const icon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+                icon.setAttribute('class', 'sal0-icon'); icon.setAttribute('viewBox', '0 0 24 24');
+                icon.setAttribute('aria-hidden', 'true'); icon.setAttribute('focusable', 'false');
+                const use = document.createElementNS('http://www.w3.org/2000/svg', 'use');
+                use.setAttribute('href', '#sal0-' + match[1]); icon.appendChild(use); fragment.appendChild(icon);
+                cursor = match.index + match[0].length;
+            }
+            fragment.append(document.createTextNode(text.slice(cursor)));
+            element.replaceChildren(fragment);
+            uiTextValues.set(element, {text, first: element.firstChild, last: element.lastChild});
+        }
+
         const authToken = localStorage.getItem('karaoke_token') || localStorage.getItem('auth_token') || '';
         let currentUser = null;
         let allProfiles = {};
@@ -3021,7 +3134,7 @@
             });
             const chip = document.getElementById('currentUserChip');
             if (chip && currentUser) {
-                chip.textContent = `${admin ? '👑' : '👤'} ${currentUser.username}`;
+                setUiText(chip, `${admin ? '[[sal0:admin]]' : '[[sal0:user]]'} ${currentUser.username}`);
                 chip.style.display = 'inline-flex';
             }
             const telegramScope = document.getElementById('telegramScopeText');
@@ -3134,9 +3247,9 @@
         }
 
         function resetCreationButtons() {
-            for (const [id, text] of [['easySubmitBtn', '⚡ Criar meu karaokê'], ['btnSubmit', '🎬 Criar Karaokê'], ['subtitleSubmitBtn', '▤ Legendar vídeo']]) {
+            for (const [id, text] of [['easySubmitBtn', '[[sal0:bolt]] Criar meu karaokê'], ['btnSubmit', '[[sal0:karaoke]] Criar Karaokê'], ['subtitleSubmitBtn', '[[sal0:captions]] Legendar vídeo']]) {
                 const button = document.getElementById(id);
-                if (button) { button.disabled = false; button.textContent = text; }
+                if (button) { button.disabled = false; setUiText(button, text); }
             }
         }
 
@@ -3266,11 +3379,11 @@
             const preset = document.getElementById('easySummaryPreset');
             const lyrics = document.getElementById('easySummaryLyrics');
             const review = document.getElementById('easySummaryReview');
-            if (model) model.textContent = `🤖 ${String(config.whisper_model || 'large-v3-turbo').replaceAll('-', ' ')} · ${config.transcribe_source === 'vocals' ? 'Vocais separados' : 'Áudio original'}`;
-            if (font) font.textContent = `🔤 Letra ${config.font_size || 50}`;
-            if (preset) preset.textContent = `🎙️ ${presetLabels[config.transcription_preset] || 'Voz difícil'}`;
-            if (lyrics) lyrics.textContent = config.lyrics_mode === 'auto' ? '🔎 Letra automática' : '🎵 Sem busca de letra';
-            if (review) review.textContent = config.enable_correction ? '✏️ Revisão ativada' : '⚡ Direto para o vídeo';
+            if (model) setUiText(model, `[[sal0:whisper]] ${String(config.whisper_model || 'large-v3-turbo').replaceAll('-', ' ')} · ${config.transcribe_source === 'vocals' ? 'Vocais separados' : 'Áudio original'}`);
+            if (font) setUiText(font, `[[sal0:font]] Letra ${config.font_size || 50}`);
+            if (preset) setUiText(preset, `[[sal0:mic]] ${presetLabels[config.transcription_preset] || 'Voz difícil'}`);
+            if (lyrics) setUiText(lyrics, config.lyrics_mode === 'auto' ? '[[sal0:search]] Letra automática' : '[[sal0:music]] Sem busca de letra');
+            if (review) setUiText(review, config.enable_correction ? '[[sal0:edit]] Revisão ativada' : '[[sal0:bolt]] Direto para o vídeo');
         }
 
         function applyEasyModeConfigToControls(config) {
@@ -3445,12 +3558,17 @@
         function renderEasyRandomBackgroundChoices(files) {
             const container = document.getElementById('easyModeRandomBackgroundList');
             if (!container) return;
-            container.replaceChildren();
+            const snapshot = () => JSON.stringify({files: files || [], selected: [...easyRandomBackgroundSelection].sort()});
+            const signature = snapshot();
+            if (container.dataset.librarySignature === signature) return;
+            const fragment = document.createDocumentFragment();
             if (!(files || []).length) {
                 const empty = document.createElement('span');
                 empty.className = 'compact-note';
                 empty.textContent = 'Adicione imagens ou vídeos à Biblioteca para montar a coleção.';
-                container.appendChild(empty);
+                fragment.appendChild(empty);
+                container.replaceChildren(fragment);
+                container.dataset.librarySignature = signature;
                 return;
             }
             files.forEach(filename => {
@@ -3463,13 +3581,16 @@
                 checkbox.addEventListener('change', () => {
                     if (checkbox.checked) easyRandomBackgroundSelection.add(filename);
                     else easyRandomBackgroundSelection.delete(filename);
+                    container.dataset.librarySignature = snapshot();
                 });
                 const name = document.createElement('span');
                 name.textContent = filename;
                 name.title = filename;
                 label.append(checkbox, name);
-                container.appendChild(label);
+                fragment.appendChild(label);
             });
+            container.replaceChildren(fragment);
+            container.dataset.librarySignature = signature;
         }
 
         function inputAcceptsFile(input, file) {
@@ -3723,7 +3844,7 @@
             const btnTheme = document.getElementById('btnToggleTheme');
 
             if (btnTheme) {
-                btnTheme.innerText = theme === 'light' ? '☀️ Claro' : '🌙 Escuro';
+                setUiText(btnTheme, theme === 'light' ? '[[sal0:sun]] Claro' : '[[sal0:moon]] Escuro');
             }
         }
 
@@ -3934,16 +4055,28 @@
         }
 
         // FUNÇÃO PARA CARREGAR MODELOS WHISPER SALVOS/BAIXADOS
-        async function fetchModelsStatus() {
+        let modelsRequest = null;
+        let modelsPollTimer = null;
+        let modelsDownloading = false;
+        function fetchModelsStatus() {
+            clearTimeout(modelsPollTimer);
+            if (modelsRequest) return modelsRequest;
+            modelsRequest = refreshModelsStatus().finally(() => { modelsRequest = null; });
+            return modelsRequest;
+        }
+        async function refreshModelsStatus() {
             try {
-                const res = await authFetch('/api/models');
+                const res = await timedAuthFetch('/api/models');
                 if (!res.ok) return;
                 const models = await res.json();
 
                 const container = document.getElementById('modelsListContainer');
                 if (!container) return;
 
-                container.innerHTML = "";
+                modelsDownloading = Object.values(models).some(model => model?.status === 'downloading');
+                const signature = JSON.stringify(models);
+                if (container.dataset.modelsSignature === signature) return;
+                const fragment = document.createDocumentFragment();
 
                 const friendlyNames = {
                     "large-v3-turbo": "Large v3 Turbo (~1.5GB - Padrão Recomendado)",
@@ -3953,11 +4086,10 @@
                     "large-v3": "Large v3 (~3GB - Máxima Qualidade)"
                 };
 
-                let isDownloading = false;
                 Object.keys(friendlyNames).forEach(modelKey => {
                     const mInfo = models[modelKey] || {};
                     const isDownloaded = mInfo.status === 'done' || models[modelKey] === true;
-                    if (mInfo.status === 'downloading') isDownloading = true;
+                    const isDownloadingModel = mInfo.status === 'downloading';
 
                     const card = document.createElement('div');
                     card.style.background = "var(--input-bg)";
@@ -3973,27 +4105,30 @@
                         <div>
                             <strong style="color: var(--text-main); font-size: 0.88rem; display: block;">${friendlyNames[modelKey]}</strong>
                             <span style="font-size: 0.75rem; color: ${isDownloaded ? '#34d399' : 'var(--text-muted)'};">
-                                ${isDownloaded ? '✓ Modelo Instalado e Pronto' : '⚠️ Não baixado no servidor'}
+                                ${isDownloadingModel ? `${sal0Icon('clock')} Baixando no servidor...` : isDownloaded ? '<svg class="sal0-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sal0-check"></use></svg> Modelo Instalado e Pronto' : '<svg class="sal0-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sal0-warning"></use></svg> Não baixado no servidor'}
                             </span>
                         </div>
                         <div>
                             ${isDownloaded
-                                ? `<button type="button" class="btn-secondary" disabled style="width: 100%; opacity: 0.6; cursor: default;">✓ Pronto para Uso</button>`
-                                : `<button type="button" class="btn-primary" style="width: 100%; font-size: 0.78rem; padding: 0.45rem;" onclick="downloadModel('${modelKey}', this)">📥 Baixar Modelo</button>`
+                                ? `<button type="button" class="btn-secondary" disabled style="width: 100%; opacity: 0.6; cursor: default;"><svg class="sal0-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sal0-check"></use></svg> Pronto para Uso</button>`
+                                 : isDownloadingModel ? `<button type="button" class="btn-secondary" disabled style="width: 100%;">${sal0Icon('clock')} Baixando...</button>`
+                                 : `<button type="button" class="btn-primary" style="width: 100%; font-size: 0.78rem; padding: 0.45rem;" onclick="downloadModel('${modelKey}', this)"><svg class="sal0-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sal0-download"></use></svg> Baixar Modelo</button>`
                             }
                         </div>
                     `;
-                    container.appendChild(card);
+                    fragment.appendChild(card);
                 });
-
-                if (isDownloading) setTimeout(fetchModelsStatus, 3000);
+                container.replaceChildren(fragment);
+                container.dataset.modelsSignature = signature;
             } catch (e) {
                 console.error("Erro ao carregar modelos:", e);
+            } finally {
+                if (modelsDownloading) modelsPollTimer = setTimeout(fetchModelsStatus, document.hidden ? 6000 : 3000);
             }
         }
 
         async function downloadModel(modelName, btnElem) {
-            if (btnElem) { btnElem.disabled = true; btnElem.innerText = '⏳ Baixando no servidor...'; }
+            if (btnElem) { btnElem.disabled = true; setUiText(btnElem, '[[sal0:clock]] Baixando no servidor...'); }
             try {
                 const res = await authFetch('/api/models/download', {
                     method: 'POST',
@@ -4002,13 +4137,17 @@
                 });
                 if (res.ok) {
                     alert(`Download do modelo '${modelName}' iniciado no servidor!`);
-                    fetchModelsStatus();
                 } else {
                     const err = await res.json();
                     const errMsg = typeof err.detail === 'string' ? err.detail : (err.detail ? JSON.stringify(err.detail) : "Falha no download");
                     alert("Erro ao baixar modelo: " + errMsg);
                 }
             } catch (e) { alert("Erro ao baixar modelo: " + e.message); }
+            finally {
+                const container = document.getElementById('modelsListContainer');
+                if (container) delete container.dataset.modelsSignature;
+                await fetchModelsStatus();
+            }
         }
 
         async function fetchTranslationSettings() {
@@ -4082,7 +4221,7 @@
             renderYoutubeAccess(data?.access);
             if (button) {
                 button.disabled = update.status === 'updating';
-                button.textContent = update.status === 'updating' ? '⏳ Atualizando...' : '↻ Atualizar mecanismo';
+                setUiText(button, update.status === 'updating' ? '[[sal0:clock]] Atualizando...' : '[[sal0:refresh]] Atualizar mecanismo');
             }
         }
 
@@ -4106,7 +4245,7 @@
             const button = document.getElementById('btnUpdateYoutubeTools');
             if (button) {
                 button.disabled = true;
-                button.textContent = '⏳ Preparando...';
+                setUiText(button, '[[sal0:clock]] Preparando...');
             }
             try {
                 const response = await authFetch('/api/youtube-tools/update', { method: 'POST' });
@@ -4152,7 +4291,7 @@
                     : 'Fila ativa: novos itens começam automaticamente.';
             });
             document.querySelectorAll('.btn-queue-pause').forEach(button => {
-                button.textContent = processingQueuePaused ? '▶ Retomar do checkpoint' : '⏸ Pausar ao concluir etapa';
+                setUiText(button, processingQueuePaused ? '[[sal0:play]] Retomar do checkpoint' : '[[sal0:pause]] Pausar ao concluir etapa');
                 button.onclick = toggleProcessingQueuePause;
             });
             card.style.display = !queueCreationExpanded && !clientPreparationInProgress && (jobs.length > 0 || (adminCanControl && processingQueuePaused)) ? '' : 'none';
@@ -4174,8 +4313,8 @@
                     <div class="queue-actions">
                         ${cachedQueueActionButtons(job)}
                         ${job.status === 'queued' && adminCanControl ? `
-                            <button type="button" class="btn-secondary queue-move-btn" title="Mover para cima" aria-label="Mover ${escapeHtml(job.title || 'item')} para cima" ${queuedOrder.get(job.id) === 0 ? 'disabled' : ''} onclick="moveQueuedJob('${encodeURIComponent(job.id)}', 'up')">↑</button>
-                            <button type="button" class="btn-secondary queue-move-btn" title="Mover para baixo" aria-label="Mover ${escapeHtml(job.title || 'item')} para baixo" ${queuedOrder.get(job.id) === queuedJobs.length - 1 ? 'disabled' : ''} onclick="moveQueuedJob('${encodeURIComponent(job.id)}', 'down')">↓</button>
+                            <button type="button" class="btn-secondary queue-move-btn" title="Mover para cima" aria-label="Mover ${escapeHtml(job.title || 'item')} para cima" ${queuedOrder.get(job.id) === 0 ? 'disabled' : ''} onclick="moveQueuedJob('${encodeURIComponent(job.id)}', 'up')"><svg class="sal0-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sal0-up"></use></svg></button>
+                            <button type="button" class="btn-secondary queue-move-btn" title="Mover para baixo" aria-label="Mover ${escapeHtml(job.title || 'item')} para baixo" ${queuedOrder.get(job.id) === queuedJobs.length - 1 ? 'disabled' : ''} onclick="moveQueuedJob('${encodeURIComponent(job.id)}', 'down')"><svg class="sal0-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sal0-down"></use></svg></button>
                         ` : ''}
                         ${job.status === 'queued' ? `
                             <button type="button" class="btn-secondary" onclick="removeQueuedJob('${encodeURIComponent(job.id)}')">Remover</button>
@@ -4472,7 +4611,7 @@
 
                     if (input) input.value = data.external_url || '';
                     if (data.external_url) {
-                        if (text) text.innerText = `✓ URL / IP de Acesso Externo Configurado: ${data.external_url}`;
+                        if (text) setUiText(text, `[[sal0:check]] URL / IP de Acesso Externo Configurado: ${data.external_url}`);
                         if (badge) badge.style.display = 'flex';
                         if (inputsDiv) inputsDiv.style.display = 'none';
                     } else {
@@ -4500,8 +4639,8 @@
                     row.style.padding = "0.6rem 0.9rem";
 
                     const roleBadge = u.role === 'admin'
-                        ? `<span style="background: var(--accent); color: white; padding: 0.15rem 0.5rem; border-radius: 20px; font-size: 0.7rem;">👑 Admin</span>`
-                        : `<span style="background: var(--glass-border); color: var(--text-muted); padding: 0.15rem 0.5rem; border-radius: 20px; font-size: 0.7rem;">👤 Usuário</span>`;
+                        ? `<span style="background: var(--accent); color: white; padding: 0.15rem 0.5rem; border-radius: 20px; font-size: 0.7rem;"><svg class="sal0-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sal0-admin"></use></svg> Admin</span>`
+                        : `<span style="background: var(--glass-border); color: var(--text-muted); padding: 0.15rem 0.5rem; border-radius: 20px; font-size: 0.7rem;"><svg class="sal0-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sal0-user"></use></svg> Usuário</span>`;
 
                     row.innerHTML = `
                         <div class="info">
@@ -4509,7 +4648,7 @@
                             ${roleBadge}
                         </div>
                         <div class="actions">
-                            ${u.username !== 'admin' ? `<button type="button" class="btn-delete" onclick="deleteUser('${u.username}')">🗑️ Deletar</button>` : ''}
+                            ${u.username !== 'admin' ? `<button type="button" class="btn-delete" onclick="deleteUser('${u.username}')"><svg class="sal0-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sal0-trash"></use></svg> Deletar</button>` : ''}
                         </div>
                     `;
                     container.appendChild(row);
@@ -4521,7 +4660,7 @@
             const button = document.createElement('button');
             button.type = 'button';
             button.className = className || '';
-            button.textContent = label;
+            setUiText(button, label);
             button.onclick = handler;
             return button;
         }
@@ -4622,14 +4761,18 @@
 
         function renderLibrarySection(container, section, files, icon, emptyText) {
             if (!container) return;
-            container.replaceChildren();
+            const signature = JSON.stringify({files, role: currentUser?.role, username: currentUser?.username});
+            if (container.dataset.librarySignature === signature) return;
+            const fragment = document.createDocumentFragment();
             const selection = prepareLibrarySelection(container, section, files);
             if (!files?.length) {
                 const empty = document.createElement('p');
                 empty.className = 'compact-note';
                 empty.style.padding = '0.5rem';
                 empty.textContent = emptyText;
-                container.appendChild(empty);
+                fragment.appendChild(empty);
+                container.replaceChildren(fragment);
+                container.dataset.librarySignature = signature;
                 return;
             }
 
@@ -4659,7 +4802,7 @@
                 info.onclick = () => toggleFullTitle(info);
                 const fileIcon = document.createElement('div');
                 fileIcon.className = 'icon';
-                fileIcon.textContent = icon;
+                setUiText(fileIcon, icon);
                 const title = document.createElement('div');
                 title.className = 'title';
                 title.style.cursor = 'pointer';
@@ -4668,13 +4811,13 @@
 
                 const actions = document.createElement('div');
                 actions.className = 'actions';
-                if (section === 'videos') actions.appendChild(makeLibraryButton('📂 Usar', '', () => useAudioFromLibrary(file)));
-                if (section === 'photos') actions.appendChild(makeLibraryButton('🖼️ Usar', '', () => useBgFromLibrary(file)));
+                if (section === 'videos') actions.appendChild(makeLibraryButton('[[sal0:folder]] Usar', '', () => useAudioFromLibrary(file)));
+                if (section === 'photos') actions.appendChild(makeLibraryButton('[[sal0:image]] Usar', '', () => useBgFromLibrary(file)));
 
                 const ext = (file.split('.').pop() || '').toLowerCase();
-                if (ext === 'srt') fileIcon.textContent = '▤';
+                if (ext === 'srt') setUiText(fileIcon, '[[sal0:captions]]');
                 if (['mp4', 'mkv', 'webm', 'mov', 'avi', 'mp3', 'wav', 'm4a', 'flac', 'png', 'jpg', 'jpeg', 'gif', 'webp'].includes(ext)) {
-                    actions.appendChild(makeLibraryButton('▶️ Ver', 'btn-secondary', () => openMediaPreview(section, file, owner)));
+                    actions.appendChild(makeLibraryButton('[[sal0:play]] Ver', 'btn-secondary', () => openMediaPreview(section, file, owner)));
                 }
                 if (section === 'history') {
                     row.classList.add('result-card');
@@ -4694,7 +4837,7 @@
                     } else {
                         cover.setAttribute('role', 'img');
                         cover.setAttribute('aria-label', 'Legenda SRT: ' + file);
-                        coverTitle.textContent = '▤ SRT · ' + file;
+                        setUiText(coverTitle, '[[sal0:captions]] SRT · ' + file);
                     }
                     cover.appendChild(coverTitle);
                     row.appendChild(cover);
@@ -4708,21 +4851,26 @@
                     link.href = `/api/library/download/history/${encodeURIComponent(file)}?token=${encodeURIComponent(authToken)}&${ownerQuery}`;
                     link.download = file;
                     link.className = 'btn-primary';
-                    link.textContent = '⬇️ Baixar';
+                    setUiText(link, '[[sal0:download]] Baixar');
                     link.style.cssText = 'padding:0.3rem 0.65rem;font-size:0.75rem;text-decoration:none;display:inline-flex;align-items:center;';
                     actions.appendChild(link);
                 }
-                actions.appendChild(makeLibraryButton('✏️ Renomear', 'btn-secondary', () => renameInLibrary(section, file, owner)));
-                actions.appendChild(makeLibraryButton('🗑️ Excluir', 'btn-delete', () => deleteFromLibrary(section, file, owner)));
+                actions.appendChild(makeLibraryButton('[[sal0:edit]] Renomear', 'btn-secondary', () => renameInLibrary(section, file, owner)));
+                actions.appendChild(makeLibraryButton('[[sal0:trash]] Excluir', 'btn-delete', () => deleteFromLibrary(section, file, owner)));
                 if (section !== 'history') row.appendChild(info);
                 row.appendChild(actions);
-                container.appendChild(row);
+                fragment.appendChild(row);
             });
+            container.replaceChildren(fragment);
+            container.dataset.librarySignature = signature;
             updateLibrarySelection(section);
         }
 
         function fillLibrarySelect(select, files, placeholder) {
             if (!select) return;
+            const signature = JSON.stringify({files, placeholder});
+            if (select.dataset.librarySignature === signature) return;
+            select.dataset.librarySignature = signature;
             const selected = select.value;
             select.replaceChildren(new Option(placeholder, ''));
             (files || []).forEach(file => select.add(new Option(file, file)));
@@ -4735,9 +4883,9 @@
                 const res = await authFetch('/api/library');
                 if (!res.ok) return;
                 const data = await res.json();
-                renderLibrarySection(document.getElementById('libVideosList'), 'videos', data.videos_items || data.videos, '🎵', 'Nenhum original nesta conta.');
-                renderLibrarySection(document.getElementById('libPhotosList'), 'photos', data.photos_items || data.photos, '🖼️', 'Nenhum fundo nesta conta.');
-                renderLibrarySection(document.getElementById('libHistoryList'), 'history', data.history_items || data.history, '🎬', 'Nenhum resultado nesta conta.');
+                renderLibrarySection(document.getElementById('libVideosList'), 'videos', data.videos_items || data.videos, '[[sal0:music]]', 'Nenhum original nesta conta.');
+                renderLibrarySection(document.getElementById('libPhotosList'), 'photos', data.photos_items || data.photos, '[[sal0:image]]', 'Nenhum fundo nesta conta.');
+                renderLibrarySection(document.getElementById('libHistoryList'), 'history', data.history_items || data.history, '[[sal0:karaoke]]', 'Nenhum resultado nesta conta.');
                 fillLibrarySelect(document.getElementById('libraryAudioSelect'), data.videos, 'Selecione uma música da biblioteca...');
                 fillLibrarySelect(document.getElementById('libraryBgSelect'), data.photos, 'Selecione um fundo da biblioteca...');
                 fillLibrarySelect(document.getElementById('easyLibraryAudio'), data.videos, 'Escolha na biblioteca...');
@@ -4866,7 +5014,7 @@
                 });
 
                 if (res.ok) {
-                    alert(`✓ Arquivo renomeado para '${newName.trim()}' com sucesso!`);
+                    alert(`Arquivo renomeado para '${newName.trim()}' com sucesso!`);
                     await loadLibrary();
                 } else {
                     const err = await res.json();
@@ -5023,7 +5171,7 @@
                 } catch (error) {
                     alert('Erro ao salvar o Modo Rápido: ' + error.message);
                 } finally {
-                    if (button) { button.disabled = false; button.textContent = '💾 Salvar perfil do Modo Rápido'; }
+                    if (button) { button.disabled = false; setUiText(button, '[[sal0:save]] Salvar perfil do Modo Rápido'); }
                 }
             });
 
@@ -5320,7 +5468,7 @@
                         const fname = files[0].name;
                         document.getElementById('audioTextName').innerText = files.length > 1 ? `${files.length} arquivos selecionados para a fila` : fname;
                         const badge = document.getElementById('audioBadge');
-                        badge.innerText = files.length > 1 ? `✓ ${files.length} vídeos prontos para envio` : `✓ Arquivo carregado: ${fname}`;
+                        setUiText(badge, files.length > 1 ? `[[sal0:check]] ${files.length} vídeos prontos para envio` : `[[sal0:check]] Arquivo carregado: ${fname}`);
                         badge.style.display = 'inline-block';
                     }
                 };
@@ -5343,7 +5491,7 @@
                         const fname = bgFile.files[0].name;
                         document.getElementById('bgTextName').innerText = fname;
                         const badge = document.getElementById('bgBadge');
-                        badge.innerText = `✓ Fundo carregado: ${fname}`;
+                        setUiText(badge, `[[sal0:check]] Fundo carregado: ${fname}`);
                         badge.style.display = 'inline-block';
                     }
                 };
@@ -5447,7 +5595,7 @@
                     if (!url) { alert("Digite a URL do vídeo do YouTube."); return; }
 
                     btnDownloadYoutube.disabled = true;
-                    btnDownloadYoutube.innerText = "⏳ Baixando no Servidor...";
+                    setUiText(btnDownloadYoutube, "[[sal0:clock]] Baixando no Servidor...");
 
                     const progressBox = document.getElementById('audioYtProgressBox');
                     const statusTitle = document.getElementById('audioYtStatusTitle');
@@ -5458,7 +5606,7 @@
 
                     if (progressBox) progressBox.style.display = "block";
                     if (selectedBadge) selectedBadge.style.display = "none";
-                    if (statusTitle) statusTitle.innerText = "⏳ Conectando ao YouTube...";
+                    if (statusTitle) setUiText(statusTitle, "[[sal0:clock]] Conectando ao YouTube...");
                     if (statusPercent) statusPercent.innerText = "10%";
                     if (progressBar) progressBar.style.width = "10%";
 
@@ -5471,31 +5619,31 @@
 
                         if (!res.ok) throw new Error("Falha ao iniciar download.");
 
-                        if (audioYtPollInterval) clearInterval(audioYtPollInterval);
-                        audioYtPollInterval = setInterval(async () => {
+                        if (audioYtPollInterval) stopSerialPoll(audioYtPollInterval);
+                        audioYtPollInterval = startSerialPoll(async () => {
                             try {
-                                const stRes = await authFetch('/api/youtube-preset-status/audio');
+                                const stRes = await timedAuthFetch('/api/youtube-preset-status/audio');
                                 if (stRes.ok) {
                                     const stData = await stRes.json();
                                     if (stData.status === "downloading") {
-                                        if (statusTitle) statusTitle.innerText = `⏳ Baixando do YouTube: "${stData.title || 'Música'}"...`;
+                                        if (statusTitle) setUiText(statusTitle, `[[sal0:clock]] Baixando do YouTube: "${stData.title || 'Música'}"...`);
                                         if (statusPercent) statusPercent.innerText = `${stData.progress || 50}%`;
                                         if (progressBar) progressBar.style.width = `${stData.progress || 50}%`;
                                     } else if (stData.status === "done") {
-                                        clearInterval(audioYtPollInterval);
+                                        stopSerialPoll(audioYtPollInterval);
                                         if (progressBox) progressBox.style.display = "none";
                                         btnDownloadYoutube.disabled = false;
-                                        btnDownloadYoutube.innerText = "📥 Baixar";
+                                        setUiText(btnDownloadYoutube, "[[sal0:download]] Baixar");
 
                                         // Recarregar a biblioteca sem alterar a criação em andamento.
                                         await loadLibrary();
                                         if (selectedBadge) selectedBadge.style.display = "none";
-                                        if (selectedText) selectedText.innerText = `✓ Mídia guardada: "${stData.filename}"`;
+                                        if (selectedText) setUiText(selectedText, `[[sal0:check]] Mídia guardada: "${stData.filename}"`);
                                     } else if (stData.status === "error") {
-                                        clearInterval(audioYtPollInterval);
+                                        stopSerialPoll(audioYtPollInterval);
                                         if (progressBox) progressBox.style.display = "none";
                                         btnDownloadYoutube.disabled = false;
-                                        btnDownloadYoutube.innerText = "📥 Baixar";
+                                        setUiText(btnDownloadYoutube, "[[sal0:download]] Baixar");
                                         alert("Erro no download do YouTube: " + (stData.error || "Desconhecido"));
                                     }
                                 }
@@ -5505,7 +5653,7 @@
                     } catch (e) {
                         if (progressBox) progressBox.style.display = "none";
                         btnDownloadYoutube.disabled = false;
-                        btnDownloadYoutube.innerText = "📥 Baixar";
+                        setUiText(btnDownloadYoutube, "[[sal0:download]] Baixar");
                         alert("Erro: " + e.message);
                     }
                 };
@@ -5523,7 +5671,7 @@
                     if (!url) { alert("Digite a URL do YouTube de Fundo."); return; }
 
                     btnDownloadBgYoutube.disabled = true;
-                    btnDownloadBgYoutube.innerText = "⏳ Baixando Fundo no Servidor...";
+                    setUiText(btnDownloadBgYoutube, "[[sal0:clock]] Baixando Fundo no Servidor...");
 
                     const progressBox = document.getElementById('bgYtProgressBox');
                     const statusTitle = document.getElementById('bgYtStatusTitle');
@@ -5534,7 +5682,7 @@
 
                     if (progressBox) progressBox.style.display = "block";
                     if (selectedBadge) selectedBadge.style.display = "none";
-                    if (statusTitle) statusTitle.innerText = "⏳ Conectando ao YouTube...";
+                    if (statusTitle) setUiText(statusTitle, "[[sal0:clock]] Conectando ao YouTube...");
                     if (statusPercent) statusPercent.innerText = "10%";
                     if (progressBar) progressBar.style.width = "10%";
 
@@ -5546,14 +5694,14 @@
                         });
                         await loadLibrary();
                         if (selectedBadge) selectedBadge.style.display = 'block';
-                        if (selectedText) selectedText.textContent = `✓ Fundo guardado: "${result.filename}"`;
+                        if (selectedText) setUiText(selectedText, `[[sal0:check]] Fundo guardado: "${result.filename}"`);
                     } catch (error) {
                         if (selectedBadge) selectedBadge.style.display = 'block';
                         if (selectedText) selectedText.textContent = error.message;
                     } finally {
                         if (progressBox) progressBox.style.display = 'none';
                         btnDownloadBgYoutube.disabled = false;
-                        btnDownloadBgYoutube.textContent = '📥 Baixar Fundo';
+                        setUiText(btnDownloadBgYoutube, '[[sal0:download]] Baixar Fundo');
                     }
                 };
                 document.getElementById('libBgYoutubeForm')?.addEventListener('submit', event => {
@@ -5779,13 +5927,13 @@
                 if (!lyricsContent || !btnToggleLyrics) return;
                 lyricsContent.classList.toggle('open', open);
                 btnToggleLyrics.setAttribute('aria-expanded', String(open));
-                btnToggleLyrics.textContent = open ? 'Fechar ▴' : 'Abrir ▾';
+                setUiText(btnToggleLyrics, open ? 'Fechar [[sal0:chevron-up]]' : 'Abrir [[sal0:chevron-down]]');
             }
 
             function setLyricsSummary(txt) {
                 if (!lyricsSummary) return;
                 const hasLyrics = Boolean(txt && txt.trim());
-                lyricsSummary.textContent = hasLyrics ? '✓ Letra pronta' : 'Sem letra';
+                setUiText(lyricsSummary, hasLyrics ? '[[sal0:check]] Letra pronta' : 'Sem letra');
                 lyricsSummary.classList.toggle('ready', hasLyrics);
             }
 
@@ -5807,7 +5955,7 @@
                 if (!lyricsBadge) return;
                 if (txt && txt.trim()) {
                     const wordCount = txt.trim().split(/\s+/).filter(Boolean).length;
-                    lyricsBadge.textContent = `✓ Guia desta mídia (${wordCount} palavras). A fila guarda uma cópia ao enviar.`;
+                    setUiText(lyricsBadge, `[[sal0:check]] Guia desta mídia (${wordCount} palavras). A fila guarda uma cópia ao enviar.`);
                     lyricsBadge.style.display = 'block';
                 } else {
                     lyricsBadge.style.display = 'none';
@@ -5839,7 +5987,7 @@
                 if (lyricDraftController) lyricDraftController.abort();
                 lyricDraftController = null;
                 btnSearchLyrics.disabled = false;
-                btnSearchLyrics.innerText = '🔎 Buscar';
+                setUiText(btnSearchLyrics, '[[sal0:search]] Buscar');
             }
 
             function takeManualLyricsControl() {
@@ -5867,7 +6015,7 @@
                     }
                     try {
                         btnSaveLyrics.disabled = true;
-                        btnSaveLyrics.innerText = '⏳ Salvando...';
+                        setUiText(btnSaveLyrics, '[[sal0:clock]] Salvando...');
                         const res = await authFetch('/api/lyrics', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
@@ -5879,7 +6027,7 @@
                         alert('Erro ao salvar letra: ' + e.message);
                     } finally {
                         btnSaveLyrics.disabled = !boundLyricSource;
-                        btnSaveLyrics.innerHTML = '💾 Salvar';
+                        setUiText(btnSaveLyrics, '[[sal0:save]] Salvar');
                     }
                 };
             }
@@ -5949,7 +6097,7 @@
                 const isCurrentLookup = () => key === boundLyricSource && generation === lyricsLookupGeneration && !lookupContext?.signal?.aborted;
                 if (button) {
                     button.disabled = true;
-                    button.innerText = '⏳ Importando...';
+                    setUiText(button, '[[sal0:clock]] Importando...');
                 }
                 setLyricsSearchStatus(`Obtendo a letra de ${result.track_name}...`);
 
@@ -6168,7 +6316,7 @@
                     lyricsSearchQuery.value = query;
                     lyricsSearchResults.replaceChildren();
                     btnSearchLyrics.disabled = true;
-                    btnSearchLyrics.innerText = '⏳ Buscando...';
+                    setUiText(btnSearchLyrics, '[[sal0:clock]] Buscando...');
                     setLyricsSearchStatus('Buscando opções de letra online...');
                     try {
                         const response = await authFetch('/api/lyrics/search', {
@@ -6191,7 +6339,7 @@
                         if (isCurrent()) {
                             autoLyricsController = null;
                             btnSearchLyrics.disabled = false;
-                            btnSearchLyrics.innerText = '🔎 Buscar';
+                            setUiText(btnSearchLyrics, '[[sal0:search]] Buscar');
                         }
                     }
                 };
@@ -6257,7 +6405,7 @@
                             body: JSON.stringify(profileData)
                         });
                         if (res.ok) {
-                            alert(`✓ Perfil '${name}' salvo com sucesso!`);
+                            alert(`Perfil '${name}' salvo com sucesso!`);
                             if (nameInput) nameInput.value = '';
                             await fetchProfiles(name);
                         } else {
@@ -6293,7 +6441,7 @@
             editTelegram.onclick = () => {
                 telegramEditing = !telegramEditing;
                 document.getElementById('telegramInputsDiv').style.display = telegramEditing || !telegramConfigured ? 'grid' : 'none';
-                editTelegram.textContent = telegramEditing ? 'Fechar edição' : '✏️ Editar';
+                setUiText(editTelegram, telegramEditing ? 'Fechar edição' : '[[sal0:edit]] Editar');
                 telegramFeedback(telegramEditing ? 'Salve suas alterações antes de verificar ou testar o destino.' : '');
                 updateTelegramButtons();
             };
@@ -6308,16 +6456,16 @@
                         body:JSON.stringify({telegram_token:document.getElementById('telegramTokenInput').value.trim(),
                                              telegram_chat_id:document.getElementById('telegramChatIdInput').value.trim()})});
                     telegramEditing = false;
-                    editTelegram.textContent = '✏️ Editar';
+                    setUiText(editTelegram, '[[sal0:edit]] Editar');
                     await fetchTelegramConfig();
                     telegramFeedback(data.detail || 'Configuração salva. Envie uma mensagem de teste para confirmar.');
                 } catch (error) { telegramFeedback(error.message, true); }
-                finally { telegramRequestPending = false; button.textContent = '💾 Salvar Telegram'; updateTelegramButtons(); }
+                finally { telegramRequestPending = false; setUiText(button, '[[sal0:save]] Salvar Telegram'); updateTelegramButtons(); }
             };
             document.getElementById('btnVerifyTelegram').onclick = () => runTelegramCheck('/verify', 'btnVerifyTelegram', 'Verificando conexão…');
             document.getElementById('btnTestTelegram').onclick = () => runTelegramCheck('/test', 'btnTestTelegram', 'Aguardando confirmação do Telegram…');
-            setInterval(() => {
-                if (!document.hidden && document.getElementById('settingsTabContent')?.style.display !== 'none') fetchTelegramDeliveryStatus();
+            startSerialPoll(async () => {
+                if (!document.hidden && document.getElementById('settingsTabContent')?.style.display !== 'none') await fetchTelegramDeliveryStatus();
             }, 10000);
 
             // Salvar External URL
@@ -6381,7 +6529,7 @@
                 const p = document.getElementById('setupPassword').value;
                 const btn = document.getElementById('btnSetupSubmit');
                 btn.disabled = true;
-                btn.innerText = '⏳ Criando...';
+                setUiText(btn, '[[sal0:clock]] Criando...');
                 try {
                     const res = await fetch('/api/setup_admin', {
                         method: 'POST',
@@ -6397,7 +6545,7 @@
                         alert('Erro no setup: ' + (data.detail || 'Falha ao criar admin'));
                     }
                 } catch (err) { alert('Erro no setup: ' + err.message); }
-                finally { btn.disabled = false; btn.innerText = '🚀 Criar Administrador e Entrar'; }
+                finally { btn.disabled = false; setUiText(btn, '[[sal0:render]] Criar Administrador e Entrar'); }
             });
 
             document.getElementById('loginForm')?.addEventListener('submit', async (e) => {
@@ -6406,7 +6554,7 @@
                 const p = document.getElementById('loginPassword').value;
                 const btn = document.getElementById('btnLoginSubmit');
                 btn.disabled = true;
-                btn.innerText = '⏳ Entrando...';
+                setUiText(btn, '[[sal0:clock]] Entrando...');
                 try {
                     const res = await fetch('/api/login', {
                         method: 'POST',
@@ -6422,7 +6570,7 @@
                         alert('Erro ao entrar: ' + (data.detail || 'Credenciais incorretas'));
                     }
                 } catch (err) { alert('Erro ao entrar: ' + err.message); }
-                finally { btn.disabled = false; btn.innerText = '🔑 Entrar'; }
+                finally { btn.disabled = false; setUiText(btn, '[[sal0:key]] Entrar'); }
             });
 
             const btnLogout = document.getElementById('btnLogout');
@@ -6526,7 +6674,7 @@
                         const backgroundUrl = document.getElementById('bgYoutubeUrl')?.value.trim();
                         if (!backgroundUrl) throw new Error('Cole o link do vídeo de fundo.');
                         formData.delete('bg_file');
-                        btnSubmit.innerHTML = '<span>⏳</span> Preparando Fundo...';
+                        setUiText(btnSubmit, '[[sal0:clock]] Preparando Fundo...');
                         if (initialStatus) initialStatus.textContent = 'Preparando o fundo do YouTube...';
                         const filename = await prepareYoutubeBackground(backgroundUrl, current => {
                             if (initialStatus) initialStatus.textContent = `Preparando fundo: ${current.title || 'vídeo do YouTube'}...`;
@@ -6570,14 +6718,8 @@
             steps.forEach((s, idx) => {
                 const elem = document.getElementById(s.id);
                 if (!elem) return;
-                elem.classList.remove('active', 'completed');
-                if (currentIdx !== -1) {
-                    if (idx < currentIdx) {
-                        elem.classList.add('completed');
-                    } else if (idx === currentIdx) {
-                        elem.classList.add('active');
-                    }
-                }
+                elem.classList.toggle('completed', currentIdx !== -1 && idx < currentIdx);
+                elem.classList.toggle('active', currentIdx !== -1 && idx === currentIdx);
             });
         }
 
@@ -6600,6 +6742,7 @@
         }
 
         function startPolling(immediate = true) {
+            if (immediate) lastStatusRenderSignature = '';
             if (pollingInterval) clearTimeout(pollingInterval);
             pollingInterval = null;
             if (immediate) {
@@ -6709,6 +6852,8 @@
                 void loadCorrectionBackground(jobId, generation);
             } catch (error) {
                 if (jobId) throw error;
+                isShowingCorrection = false;
+                lastStatusRenderSignature = '';
                 console.error('Erro ao carregar painel de correção:', error);
             }
         }
@@ -6810,7 +6955,7 @@
 
                 const btnDelete = document.createElement('button');
                 btnDelete.type = "button";
-                btnDelete.innerHTML = "🗑️";
+                setUiText(btnDelete, "[[sal0:trash]]");
                 btnDelete.style.background = "none";
                 btnDelete.style.border = "none";
                 btnDelete.style.cursor = "pointer";
@@ -6838,7 +6983,7 @@
                 timeRow.style.fontSize = "0.75rem";
 
                 const startLabel = document.createElement('span');
-                startLabel.innerText = "⏱️ Início:";
+                setUiText(startLabel, "[[sal0:clock]] Início:");
                 startLabel.style.color = "var(--text-muted)";
 
                 const startInput = document.createElement('input');
@@ -6981,7 +7126,7 @@
                     }
                     document.querySelectorAll('.correction-segment [aria-invalid]').forEach(input => input.removeAttribute('aria-invalid'));
                     btnContinue.disabled = true;
-                    btnContinue.innerText = "⏳ Salvando e Renderizando...";
+                    setUiText(btnContinue, "[[sal0:clock]] Salvando e Renderizando...");
                     try {
                         const res = await authFetch('/api/continue_process', {
                             method: 'POST',
@@ -7004,7 +7149,7 @@
                         feedback.textContent = e.message;
                     } finally {
                         btnContinue.disabled = false;
-                        btnContinue.innerText = "🚀 Salvar e renderizar";
+                        setUiText(btnContinue, "[[sal0:render]] Salvar e renderizar");
                     }
                 };
             }
@@ -7013,7 +7158,7 @@
                 btnSkip.onclick = async () => {
                     if (window.cacheEditorActive) { closeCachedEditor(); await fetchStatus(); return; }
                     btnSkip.disabled = true;
-                    btnSkip.innerText = "⏳ Renderizando...";
+                    setUiText(btnSkip, "[[sal0:clock]] Renderizando...");
                     try {
                         const res = await authFetch('/api/skip_edit', { method: 'POST' });
                         if (res.ok) {
@@ -7030,7 +7175,7 @@
                         alert("Erro: " + e.message);
                     } finally {
                         btnSkip.disabled = false;
-                        btnSkip.innerText = "⏩ Pular e Renderizar Sem Alterar";
+                        setUiText(btnSkip, "[[sal0:skip]] Pular e Renderizar Sem Alterar");
                     }
                 };
             }
@@ -7059,6 +7204,7 @@
         }
 
 
+        let lastStatusRenderSignature = '';
         async function renderServerStatus(data, previousStatus = lastKnownServerStatus) {
             if (window.cacheEditorActive) return;
             const statusChanged = previousStatus !== data.status;
@@ -7066,6 +7212,16 @@
                 updateQueueCreationNotice(data);
                 return;
             }
+            const signature = JSON.stringify({
+                server: [data.status, data.step, data.progress, data.stage_progress, data.stage_detail,
+                    data.can_cancel, data.process_summary, data.result_kind, data.result_available_to_current_user,
+                    data.original_filename, data.subtitle_filename, data.original_subtitle_filename,
+                    data.translated_subtitle_filename, data.translation_error],
+                queued: latestQueueJobs.map(job => [job.id, job.status, job.cancel_requested]),
+                paused: processingQueuePaused, correctionReady: isShowingCorrection,
+            });
+            if (lastStatusRenderSignature === signature) return;
+            lastStatusRenderSignature = signature;
             if (isShowingCorrection && !['waiting_for_user_correction', 'awaiting_review'].includes(data.status)) {
                 document.getElementById('correctionAudio')?.pause();
             }
@@ -7074,7 +7230,7 @@
             const processCard = document.getElementById('processCard');
             const correctionCard = document.getElementById('correctionCard');
             const processStatusTitle = document.getElementById('processStatusTitle');
-            if (processStatusTitle) processStatusTitle.textContent = data.status === 'paused' ? '⏸ Pausado' : data.process_summary?.mode === 'Legendar vídeo' ? '▤ Legendando' : '⏳ Produzindo';
+            if (processStatusTitle) setUiText(processStatusTitle, data.status === 'paused' ? '[[sal0:pause]] Pausado' : data.process_summary?.mode === 'Legendar vídeo' ? '[[sal0:captions]] Legendando' : '[[sal0:clock]] Produzindo');
             const progressPercent = document.getElementById('progressPercent');
             const progressBarFill = document.getElementById('progressBarFill');
             const statusMessage = document.getElementById('statusMessage');
@@ -7109,7 +7265,7 @@
                 if (correctionCard) correctionCard.style.display = 'none';
                 if (downloadBox) downloadBox.style.display = 'none';
                 if (processCard) processCard.style.display = 'block';
-                if (processStatusTitle) processStatusTitle.textContent = processingQueuePaused ? '⏸ Fila pausada' : '⏳ Aguardando';
+                if (processStatusTitle) setUiText(processStatusTitle, processingQueuePaused ? '[[sal0:pause]] Fila pausada' : '[[sal0:clock]] Aguardando');
                 if (statusMessage) statusMessage.textContent = processingQueuePaused
                     ? 'Item adicionado. O processamento começa quando a fila for retomada.'
                     : 'Item adicionado à fila. Aguardando o início do processamento.';
@@ -7137,7 +7293,7 @@
                 if (progressBarFill) progressBarFill.style.width = '0%';
                 if (stageProgressText) stageProgressText.textContent = '';
                 for (const button of [btnSubmit, easySubmitBtn, subtitleSubmitBtn]) {
-                    if (button) { button.disabled = !queueCreationExpanded; button.textContent = '＋ Adicionar à fila'; }
+                    if (button) { button.disabled = !queueCreationExpanded; setUiText(button, '[[sal0:add]] Adicionar à fila'); }
                 }
                 if (downloadBox) downloadBox.style.display = 'none';
             } else if (data.status === "processing" || data.status === "downloading") {
@@ -7269,9 +7425,9 @@
                     if (btnDownloadOriginalSubtitles) btnDownloadOriginalSubtitles.style.display = 'none';
                     if (btnDownloadTranslatedSubtitles) btnDownloadTranslatedSubtitles.style.display = 'none';
                 }
-                if (btnSubmit) { btnSubmit.disabled = false; btnSubmit.innerHTML = '🎬 Criar Karaokê'; }
-                if (easySubmitBtn) { easySubmitBtn.disabled = false; easySubmitBtn.innerHTML = '⚡ Criar meu karaokê'; }
-                if (subtitleSubmitBtn) { subtitleSubmitBtn.disabled = false; subtitleSubmitBtn.innerHTML = '▤ Legendar vídeo'; }
+                if (btnSubmit) { btnSubmit.disabled = false; setUiText(btnSubmit, '[[sal0:karaoke]] Criar Karaokê'); }
+                if (easySubmitBtn) { easySubmitBtn.disabled = false; setUiText(easySubmitBtn, '[[sal0:bolt]] Criar meu karaokê'); }
+                if (subtitleSubmitBtn) { subtitleSubmitBtn.disabled = false; setUiText(subtitleSubmitBtn, '[[sal0:captions]] Legendar vídeo'); }
                 isShowingCorrection = false;
                 if (statusChanged && previousStatus !== 'unknown') {
                     await Promise.allSettled([fetchCacheInfo(), loadLibrary()]);
@@ -7282,9 +7438,9 @@
                 if (processCard) processCard.style.display = "none";
                 if (correctionCard) correctionCard.style.display = "none";
                 setCreationUiLocked(false);
-                if (btnSubmit) { btnSubmit.disabled = false; btnSubmit.innerHTML = '🎬 Criar Karaokê'; }
-                if (easySubmitBtn) { easySubmitBtn.disabled = false; easySubmitBtn.innerHTML = '⚡ Criar meu karaokê'; }
-                if (subtitleSubmitBtn) { subtitleSubmitBtn.disabled = false; subtitleSubmitBtn.innerHTML = '▤ Legendar vídeo'; }
+                if (btnSubmit) { btnSubmit.disabled = false; setUiText(btnSubmit, '[[sal0:karaoke]] Criar Karaokê'); }
+                if (easySubmitBtn) { easySubmitBtn.disabled = false; setUiText(easySubmitBtn, '[[sal0:bolt]] Criar meu karaokê'); }
+                if (subtitleSubmitBtn) { subtitleSubmitBtn.disabled = false; setUiText(subtitleSubmitBtn, '[[sal0:captions]] Legendar vídeo'); }
                 isShowingCorrection = false;
             }
         }
@@ -7445,7 +7601,7 @@
         function ytMessage(message) { const el = ytElement('ytPublishMessage'); if (el) el.textContent = message; }
         function ytNotice(id, message, kind = 'info') {
             const el = ytElement(id); if (!el) return;
-            el.textContent = message; el.dataset.kind = kind; el.hidden = !message;
+            setUiText(el, message); el.dataset.kind = kind; el.hidden = !message;
         }
         async function ytRequest(path, options = {}) {
             const reading = !options.method || options.method.toUpperCase() === 'GET';
@@ -7574,14 +7730,14 @@
         }
         async function refreshYoutubePublisher(full) {
             const refreshButton = ytElement('ytPlaylistsRefresh');
-            if (full) { refreshButton.disabled = true; refreshButton.textContent = '⏳ Buscando playlists…'; ytElement('ytPublishSave').disabled = true; }
+            if (full) { refreshButton.disabled = true; setUiText(refreshButton, '[[sal0:clock]] Buscando playlists…'); ytElement('ytPublishSave').disabled = true; }
             try {
                 const deviceGeneration = youtubeDeviceGeneration;
                 const status = await ytRequest('status');
                 const channel = status.channel_id || status.channel_title || '';
                 const sameChannel = !!channel && channel === youtubePlaylistChannel;
                 youtubeChannelConnected = !!status.connected;
-                ytNotice('ytPublishChannel', status.connected ? '✓ Canal conectado: ' + status.channel_title : (status.message || 'Canal não conectado. Use Reconectar canal pelo celular.'), status.connected ? 'success' : status.recovery === 'auth_required' ? 'error' : 'info');
+                ytNotice('ytPublishChannel', status.connected ? '[[sal0:check]] Canal conectado: ' + status.channel_title : (status.message || 'Canal não conectado. Use Reconectar canal pelo celular.'), status.connected ? 'success' : status.recovery === 'auth_required' ? 'error' : 'info');
                 if (!youtubeDeviceSetupSeen) { youtubeDeviceSetupSeen = true; }
                 if (deviceGeneration === youtubeDeviceGeneration) renderYoutubeDevice(status.device_session);
                 ytElement('ytDeviceReconnect').onclick = () => status.device_configured ? startYoutubeDevice(true) : (ytElement('ytDeviceSetup').open = true, ytElement('ytDeviceSetup').scrollIntoView({behavior:'smooth',block:'nearest'}));
@@ -7817,7 +7973,7 @@
                 try {
                     const result = await ytRequest('import-authorization', {method: 'POST', body: form});
                     ytElement('ytDesktopAuthorization').value = '';
-                    ytNotice('ytPublishChannel', '✓ Canal conectado: ' + result.channel_title, 'success');
+                    ytNotice('ytPublishChannel', '[[sal0:check]] Canal conectado: ' + result.channel_title, 'success');
                     ytNotice('ytConnectionMessage', 'Conexão concluída: ' + result.channel_title, 'success');
                     youtubeSettingsBusy = false;
                     await loadYoutubePublisher(); await loadYoutubePublicationOptions();
@@ -7891,12 +8047,12 @@
                     await ytRequest('settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
                         privacy: 'unlisted', default_publish: true, playlist_id: ytElement('ytDefaultPlaylist').value,
                         title_template: ytElement('ytPublishTemplate').value, users_can_publish: true, user_assignments: readYoutubeUserAssignments() }) });
-                    ytNotice('ytUsersMessage', '✓ Playlists salvas.', 'success'); await loadYoutubePublicationOptions();
+                    ytNotice('ytUsersMessage', '[[sal0:check]] Playlists salvas.', 'success'); await loadYoutubePublicationOptions();
                 } catch (error) { ytNotice('ytUsersMessage', 'Não foi possível salvar: ' + error.message, 'error'); }
                 finally { youtubeSettingsBusy = false; button.disabled = !youtubeChannelConnected || !youtubePlaylistsAvailable; button.textContent = 'Salvar playlists'; }
             };
-            setInterval(() => {
-                if (!document.hidden && currentUser?.role === 'admin' && ytElement('settingsTabContent')?.style.display !== 'none') loadYoutubePublisher(false);
+            startSerialPoll(async () => {
+                if (!document.hidden && currentUser?.role === 'admin' && ytElement('settingsTabContent')?.style.display !== 'none') await loadYoutubePublisher(false);
             }, 5000);
         });
     </script>

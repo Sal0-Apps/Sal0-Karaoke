@@ -2,6 +2,7 @@ import sys
 import tempfile
 import threading
 import types
+import io
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -21,10 +22,13 @@ HTML = (APP / "templates" / "index.html").read_text(encoding="utf-8")
 class FakeProcess:
     def __init__(self, returncode, lines):
         self.returncode = returncode
-        self.stdout = iter(lines)
+        self.stdout = io.StringIO("".join(lines))
         self.pid = 123
 
     def wait(self, timeout=None):
+        return self.returncode
+
+    def poll(self):
         return self.returncode
 
     def terminate(self):
@@ -38,7 +42,8 @@ class DemucsFallbackAndQueueTests(unittest.TestCase):
             cancel_event=threading.Event(),
             check_cancelled=lambda: None,
             set_active_process=lambda process: None,
-            clear_active_process=lambda: None,
+            clear_active_process=lambda process=None: None,
+            stop_process=lambda process: None,
         )
 
         with tempfile.TemporaryDirectory() as temporary_dir:
@@ -79,11 +84,6 @@ class DemucsFallbackAndQueueTests(unittest.TestCase):
         self.assertEqual(cmd[cmd.index("--jobs") + 1], "0")
         self.assertTrue(vocals.endswith("vocals.wav"))
         self.assertTrue(instrumental.endswith("no_vocals.wav"))
-
-    def test_demucs_reserves_one_cpu_thread_for_the_server(self):
-        source = Path(audio_processor.__file__).read_text(encoding="utf-8")
-        self.assertIn("reserved_threads = 1 if cpu_count > 1 else 0", source)
-        self.assertIn("demucs_thread_limit = max(1, cpu_count - reserved_threads)", source)
 
     def test_subtitle_only_returns_before_demucs(self):
         pipeline = MAIN[MAIN.index("def run_pipeline("):]

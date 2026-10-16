@@ -7,6 +7,7 @@ import subprocess
 import tempfile
 from pathlib import Path
 from subtitle_settings import normalize_subtitle_settings
+from media_covers import filter_path
 
 
 def media_has_motion_video(source):
@@ -61,7 +62,7 @@ def render_subtitle_video(source, subtitles, output, duration, runner=None, prog
                 'BorderStyle=3', 'Outline=2', 'Shadow=0', 'MarginL=32', 'MarginR=32', 'MarginV=24',
                 f"Alignment={dict(bottom=2, middle=5, top=8)[settings['text_position']]}",
             ])
-            command += ['-vf', f"{base_filter},subtitles='{caption_file}':force_style='{style}'",
+            command += ['-vf', f"{base_filter},subtitles='{filter_path(caption_file)}':force_style='{style}'",
                 '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23', '-pix_fmt', 'yuv420p',
                 '-c:a', 'aac', '-b:a', '320k', '-t', str(duration), '-shortest', '-movflags', '+faststart', temporary_output]
             if not runner(command, progress_callback=progress_callback, total_duration=duration):
