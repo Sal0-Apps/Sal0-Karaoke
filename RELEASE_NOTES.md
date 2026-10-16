@@ -1,8 +1,8 @@
 # 12.6.2
 
-- Removida a segunda transcrição automática da música inteira quando a guia tem diferenças. A conferência textual e o alinhamento acústico continuam ativos. A reanálise completa fica disponível explicitamente por `KARAOKE_WHISPER_GUIDE_RETRY=1`.
+- Precisão continua sendo a prioridade: diferenças da letra-guia mantêm a segunda transcrição automática do áudio completo, com busca mais ampla (beam de pelo menos 15) e maior paciência. Conferência textual, seleção da melhor hipótese e alinhamento acústico permanecem ativos, mesmo quando exigem mais tempo.
 - Whisper respeita `KARAOKE_CPU_THREADS`, afinidade e limites de CPU do Docker (cgroups v2/v1), evitando excesso de threads calculadas pelo total de CPUs do servidor.
-- Mantidos modelo, áudio integral, precisão FP32, busca da primeira passagem e tempos por palavra. Caches existentes, resultados de reanálises já concluídas e revisões manuais são reaproveitados.
+- Mantidos modelo, áudio integral, precisão FP32, parâmetros das duas passagens e tempos por palavra. Caches existentes, resultados de reanálises já concluídas e revisões manuais são reaproveitados. Um cache com diferenças ainda não reanalisadas não pode impedir a conferência completa.
 - Logs de desempenho separam decodificação, carregamento do modelo e reconhecimento em hh:mm:ss, com threads, precisão e tamanho da busca. A versão 12.6.1 permanece disponível para retorno.
 
 # 12.6.1
