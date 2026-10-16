@@ -10,7 +10,7 @@ from reprocess_cache import copy_reusable_inputs
 
 ACTIVE = {"queued", "processing"}
 STATUSES = ACTIVE | {"done", "error", "cancelled", "removed", "replaced"}
-SEGMENT_FILES = ("review_draft.json", "reviewed_segments.json", "subtitle_segments_original.json", "lyrics_guide_cache.json",
+SEGMENT_FILES = ("review_draft.json", "reviewed_segments.json", "display_segments.json", "subtitle_segments_original.json", "lyrics_guide_cache.json",
                  "transcribed_segments.json", "synced_acoustic_segments.json")
 
 

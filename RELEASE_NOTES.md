@@ -1,3 +1,12 @@
+# 12.6
+
+- Preservada a 12.5.1 na imagem versionada, release e branch de backup anterior à mudança de qualidade. Transcrições brutas e revisões manuais permanecem disponíveis.
+- Segunda análise acústica em CPU com MMS CTC. A guia pode recuperar palavras incorretas/omitidas em frases com contexto correspondente, mas cada mudança precisa de alinhamento e confiança no áudio. Letras de outra gravação não fornecem versos nem tempos externos.
+- Removidos texto no silêncio, caudas sem áudio, palavras fora da duração e duplicações do mesmo evento. Trechos de baixa confiança também consultam detecção de voz. Refrões cantados em momentos distintos são preservados.
+- A animação progressiva pode seguir marcações acústicas de caracteres; o destaque por palavra usa entrada mais rápida quando há alinhamento. Acentos, pontuação, espaços e texto são preservados.
+- Cache separado, cancelamento, progresso do primeiro download e alinhamento por trechos. Falha em um trecho não descarta os demais; falha no modelo conserva a transcrição e a limpeza, com indicação na interface. Editor lê o resultado exibido antes do reconhecimento bruto, mantendo as revisões manuais acima de ambos.
+- Validação com canto real e marcações independentes do JamendoLyrics, ensaio controlado de erro de palavra/tempos e silêncio final, testes de regressão e renderização. O ensaio mede alinhamento, não é uma promessa de redução de erro para todo tipo de gravação. Clientes Android e Windows continuam compatíveis.
+
 # 12.5.1
 
 - Links do YouTube são confirmados na fila antes do download. A transferência ocorre no worker, respeita a ordem e a pausa da fila, mostra andamento e aceita cancelamento; falhas ficam no item, preservando a origem para repetir.

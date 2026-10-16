@@ -23,10 +23,11 @@ from media_covers import add_cover_to_command
 from test_automatic_lyrics_and_search import load_function
 from reprocess_cache import copy_reusable_inputs
 from lyric_guide import prepare_lyrics_guide, review_lyrics_with_whisper
+from lyric_alignment import acoustic_baseline
 
 
 class SyncedAcousticAnimationTests(unittest.TestCase):
-    def run_stage(self, cache_version=None, verses=None, voice=None, reprocess=False, timing="auto", source_mode="vocals", backing_enabled=False, backing_volume=100, audio_cache_version=3):
+    def run_stage(self, cache_version=None, verses=None, voice=None, reprocess=False, timing="auto", source_mode="vocals", backing_enabled=False, backing_volume=100, audio_cache_version=3, reviewed=None):
         source = (ROOT / 'app/main.py').read_text()
         stage = source[source.index('            segments = None\n', source.index('# Passo 3: Transcrever vocais')):
                        source.index('            # --- NOVO: Passo de Pausa')]
@@ -38,6 +39,10 @@ class SyncedAcousticAnimationTests(unittest.TestCase):
         acoustic = voice if voice is not None else acoustic
         lyric_text = '\n'.join(segment['text'] for segment in lrc)
         with tempfile.TemporaryDirectory() as folder:
+            if reviewed:
+                (Path(folder) / 'reviewed_segments.json').write_text(json.dumps(reviewed))
+                (Path(folder) / 'stage_checkpoints.json').write_text(json.dumps(
+                    {'completed_stages': {'transcription_reviewed': {'saved': True}}}))
             cached = acoustic if cache_version == 3 else lrc
             (Path(folder) / 'synced_acoustic_segments.json').write_text(json.dumps(cached))
             vocal_source = 'original' if source_mode == 'original' else 'lead' if backing_enabled else 'all'
@@ -46,7 +51,9 @@ class SyncedAcousticAnimationTests(unittest.TestCase):
                         transcription_preset='standard', whisper_audio_version=audio_cache_version, whisper_quality_mode='max_quality',
                         lyrics_hint_hash=hashlib.sha256(' '.join(lyric_text.split()).encode()).hexdigest())
             transcriber = Mock(return_value=acoustic)
-            scope = dict(queue_cache=__import__("queue_cache"), os=os, hashlib=hashlib, json=json, synced_segments=lrc,
+            scope = dict(acoustic_baseline=acoustic_baseline,
+                refine_lyrics=Mock(side_effect=lambda audio,segments,*args,**kwargs:(segments,{'status':'cleaned','aligned_words':0})),
+                queue_cache=__import__("queue_cache"), os=os, hashlib=hashlib, json=json, synced_segments=lrc,
                 lyrics_text=lyric_text, cache_dir=folder, cached_meta=meta,
                 prepare_lyrics_guide=prepare_lyrics_guide, review_lyrics_with_whisper=review_lyrics_with_whisper,
                 cache_meta_file=str(Path(folder) / 'cache_meta.json'), vocal_source=vocal_source,
@@ -104,6 +111,13 @@ class SyncedAcousticAnimationTests(unittest.TestCase):
         transcriber.assert_not_called()
         self.assertEqual(scope['segments'][0]['words'][1]['start'], 11.6)
 
+    def test_resuming_a_human_review_skips_automatic_quality_and_preserves_manual_words(self):
+        reviewed = [dict(start=9.8, end=13, text='Minha revisão completa', words=[
+            dict(word='Minha revisão completa', start=9.8, end=13)])]
+        scope, _ = self.run_stage(cache_version=3, reviewed=reviewed)
+        scope['refine_lyrics'].assert_not_called()
+        self.assertEqual(scope['segments'], reviewed)
+
     def test_new_task_reuses_saved_whisper_analysis_without_calling_model(self):
         scope, transcriber = self.run_stage(reprocess=True)
         transcriber.assert_not_called()
@@ -115,7 +129,7 @@ class SyncedAcousticAnimationTests(unittest.TestCase):
         transcriber.assert_not_called()
         self.assertEqual(scope['synced_segments'], verses)
 
-    def test_guide_corrects_spelling_but_does_not_insert_unrecognized_verses(self):
+    def test_guide_spelling_is_kept_but_lexical_changes_require_acoustic_confirmation(self):
         verses = [dict(start=10, end=13, text='Olá lindo mundo'),
                   dict(start=13, end=17, text='Outra palavra correta')]
         voice = [dict(start=10.2, end=12.5, text='Ola limbo mundo', words=[
@@ -124,16 +138,17 @@ class SyncedAcousticAnimationTests(unittest.TestCase):
             dict(word=' mundo', start=11.6, end=12.5)])]
         for timing in ('auto', 'acoustic'):
             scope, _ = self.run_stage(verses=verses, voice=voice, timing=timing)
-            self.assertEqual([s['text'] for s in scope['segments']], ['Olá lindo mundo'])
+            self.assertEqual([s['text'] for s in scope['segments']], ['Olá limbo mundo'])
+            self.assertEqual(scope['refine_lyrics'].call_args.args[2], 'Olá lindo mundo\nOutra palavra correta')
             with tempfile.TemporaryDirectory() as folder:
                 target = Path(folder) / 'text.ass'
                 generate_ass_karaoke(scope['segments'], str(target), show_instrumental=False,
                                      show_next_line_preview=False)
                 output = target.read_text()
-                self.assertIn('lindo', output)
+                self.assertIn('limbo', output)
                 self.assertNotIn('correta', output)
                 self.assertTrue(scope['guide_report']['retry_attempted'])
-                self.assertNotIn('limbo', output)
+                self.assertNotIn('lindo', output)
 
     def test_empty_local_recognition_cannot_render_the_guide_instead(self):
         with self.assertRaisesRegex(ValueError, 'Nenhum vocal detectado'):
@@ -144,6 +159,7 @@ class SyncedAcousticAnimationTests(unittest.TestCase):
             scope, transcriber = self.run_stage(source_mode='original',
                 backing_enabled=True, backing_volume=gain)
             self.assertEqual(transcriber.call_args.args[0], 'original.mp4')
+            self.assertEqual(scope['refine_lyrics'].call_args.args[0], 'isolated-lead.wav')
             self.assertEqual(scope['instrumental_wav'], 'instrumental-with-backing.wav')
             self.assertEqual(scope['cached_meta']['transcribe_source'], 'original')
             self.assertEqual(scope['cached_meta']['vocal_source'], 'original')
@@ -167,6 +183,8 @@ class SyncedAcousticAnimationTests(unittest.TestCase):
             with self.subTest(backing=backing):
                 scope, transcriber = self.run_stage(backing_enabled=backing)
                 self.assertEqual(transcriber.call_args.args[0],
+                                 'isolated-lead.wav' if backing else 'vocals.wav')
+                self.assertEqual(scope['refine_lyrics'].call_args.args[0],
                                  'isolated-lead.wav' if backing else 'vocals.wav')
                 self.assertEqual(scope['cached_meta']['vocal_source'], 'lead' if backing else 'all')
 
@@ -275,7 +293,8 @@ class SyncedAcousticAnimationTests(unittest.TestCase):
         self.assertNotIn('synced_line', scope['segments'][0])
         self.assertEqual([s['text'] for s in scope['segments']], [s['text'] for s in verses])
         self.assertEqual(len(scope['notify_targets'].call_args_list), 0)  # Acoustic cache needs no decode notice.
-        scope['update_process_summary'].assert_called_once()
+        self.assertEqual(sum('lyrics_review' in call.kwargs for call in scope['update_process_summary'].call_args_list),1)
+        self.assertEqual(sum('lyric_quality' in call.kwargs for call in scope['update_process_summary'].call_args_list),1)
         with tempfile.TemporaryDirectory() as folder:
             target = Path(folder) / 'fallback.ass'
             generate_ass_karaoke(scope['segments'], str(target), show_instrumental=False)

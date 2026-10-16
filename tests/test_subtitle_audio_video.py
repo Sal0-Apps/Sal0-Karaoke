@@ -57,7 +57,8 @@ class AudioSubtitleVideoTests(unittest.TestCase):
                 def save_video(path,*args,**kwargs):
                     self.assertEqual(kwargs.get("result_kind"), "subtitle_video");shutil.copy2(path,library/'history'/'video.mp4');return 'video.mp4'
                 state=Mock();documents=Mock();videos=Mock();metadata=Mock()
-                ns={'queue_cache':__import__('queue_cache'),'os':os,'json':json,'shutil':shutil,'logger':logging.getLogger('test'),
+                ns={'refine_lyrics':lambda audio,segments,*args,**kwargs:(segments,{'status':'cleaned','aligned_words':0}),
+                    'queue_cache':__import__('queue_cache'),'os':os,'json':json,'shutil':shutil,'logger':logging.getLogger('test'),
                     'get_file_duration':lambda path:1,'stage_checkpoint':lambda *args:{},'save_stage_checkpoint':Mock(),
                     'notify_targets':Mock(),'telegram_notice':lambda *parts:' '.join(parts),'telegram_escape':str,
                     'update_state':state,'cover_full_media_timeline':lambda segments,duration:segments,

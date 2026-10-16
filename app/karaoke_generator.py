@@ -213,6 +213,20 @@ def synced_animation_text(segment, normal_color, highlight_color, line_breaks=()
     if ''.join(str(span.get('word', '')) for span in spans) != str(segment['text']):
         # An old/stale animation cache can never change the authoritative text.
         spans = [{'word': str(segment['text'])}]
+    if subtitle_mode == 'syllable':
+        acoustic_spans = []
+        for span in spans:
+            characters = span.get('alignment_chars') or []
+            text = str(span.get('word', ''))
+            if characters and ''.join(char.get('text', '') for char in characters) == text.strip():
+                prefix = text[:len(text)-len(text.lstrip())]
+                suffix = text[len(text.rstrip()):]
+                if prefix: acoustic_spans.append({'word': prefix})
+                acoustic_spans.extend({**char, 'word': char['text']} for char in characters)
+                if suffix: acoustic_spans.append({'word': suffix})
+            else:
+                acoustic_spans.append(span)
+        spans = acoustic_spans
     result = ''
     duration_cs = max(0, round((segment['end'] - segment['start']) * 100))
     offset = 0
@@ -227,7 +241,7 @@ def synced_animation_text(segment, normal_color, highlight_color, line_breaks=()
                 if subtitle_mode == 'word':
                     # Fade the whole word at its real onset, without a hard
                     # color switch or any change to the recognition clocks.
-                    fade_end_ms = start_cs * 10 + min(120, (end_cs - start_cs) * 10)
+                    fade_end_ms = start_cs * 10 + min(30 if span.get('alignment_chars') else 120, (end_cs - start_cs) * 10)
                     tags = (f"\\1c{normal_color}\\2c{normal_color}\\k0"
                             f"\\t({start_cs * 10},{fade_end_ms},\\1c{highlight_color})")
                 else:

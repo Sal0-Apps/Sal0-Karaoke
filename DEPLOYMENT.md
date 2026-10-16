@@ -25,7 +25,7 @@ Crie uma pasta própria para a instalação e salve nela o arquivo `compose.yaml
 ```yaml
 services:
   karaoke-app:
-    image: ghcr.io/sal0-apps/sal0-karaoke:12.5.1
+    image: ghcr.io/sal0-apps/sal0-karaoke:12.6
     container_name: karaoke-app
     ports:
       - "7885:7860"
@@ -183,7 +183,7 @@ Para conservar a identidade de atualização do Android, proteja uma chave de as
 
 Cada execução mantém seus arquivos em `/data/output/queue_jobs/<id>/cache/`, com índice persistente da fila. Não remova essas pastas enquanto quiser revisar os itens. Resultados concluídos, falhos, cancelados e removidos continuam disponíveis até a aceitação de uma nova origem após esgotar a fila do perfil. Reexecuções permanecem na mesma fila; resultados da Biblioteca e modelos continuam preservados. A mudança aplica-se às tarefas ainda disponíveis na atualização e às novas; arquivos que a versão anterior já descartou não são recuperáveis.
 
-Atualize apenas a imagem do servidor para `ghcr.io/sal0-apps/sal0-karaoke:12.5.1` ou `latest`. Os aplicativos Android e Windows existentes continuam compatíveis. Publicações substituídas no YouTube recebem outro link; o anterior só é removido após confirmar o novo vídeo, capa, playlists e privacidade. Playlists adicionais começam desmarcadas em novas criações, com a playlist do perfil mantida.
+Atualize apenas a imagem do servidor para `ghcr.io/sal0-apps/sal0-karaoke:12.6` ou `latest`. Os aplicativos Android e Windows existentes continuam compatíveis. Publicações substituídas no YouTube recebem outro link; o anterior só é removido após confirmar o novo vídeo, capa, playlists e privacidade. Playlists adicionais começam desmarcadas em novas criações, com a playlist do perfil mantida.
 
 ### Ícone no ZimaOS / CasaOS
 
@@ -198,3 +198,11 @@ O endereço renovado evita o reaproveitamento da imagem antiga. Atualize os dois
 ### Inclusão por link do YouTube
 
 A confirmação de `/api/process` grava a tarefa na fila sem aguardar a transferência do YouTube. O download só começa quando o worker alcança o item; ele mostra andamento e aceita cancelamento. Cada inclusão da interface leva um identificador: depois de uma falha de conexão, o cliente consulta a confirmação e pode repetir a requisição com o mesmo identificador sem duplicar a tarefa da fila atual. Erros da transferência ficam no item, com a origem e as escolhas preservadas para refazer. O salvamento opcional da origem na Biblioteca continua funcionando depois do download.
+
+### Sincronização e retorno à versão anterior (12.6)
+
+A etapa de alinhamento usa MMS CTC na CPU e consulta os vocais separados, sem mudar a fonte de reconhecimento escolhida para o Whisper nem remover trechos da linha do tempo. O modelo adicional tem aproximadamente 1,2 GB, é baixado uma vez em `/data/output/models/lyric_alignment` e liberado da RAM ao terminar. O primeiro uso exige acesso a `dl.fbaipublicfiles.com`. Progresso em MB e o estado do alinhador aparecem na tela. Falhas conservam os tempos anteriores e a limpeza de silêncio, com indicação de indisponibilidade; uma tentativa posterior pode repetir a etapa.
+
+Transcrições brutas continuam nos arquivos originais. O resultado de qualidade fica em `aligned_lyrics.json` e o texto exibido em `display_segments.json`; rascunhos e revisões manuais têm prioridade. Idiomas/escritas sem normalização compatível mantêm os tempos do Whisper e a verificação de silêncio. O sistema usa limiares conservadores e não promete resolver todos os estilos de canto.
+
+A branch `backup/pre-lyric-quality-12.5.1-2026-10-16` preserva o código anterior no commit `4cd19a4c19b3b9b03611a6d39ad0962b7ed8f300`. Para voltar ao servidor anterior, use `ghcr.io/sal0-apps/sal0-karaoke:12.5.1`, mantendo o mesmo volume, portas e limites. O volume de dados não deve ser removido. Para desativar somente a etapa de CTC na nova versão, existe `KARAOKE_ALIGNMENT=off`; a verificação de silêncio continua ativa. O uso dos pesos segue a licença própria descrita em `app/THIRD_PARTY_MODELS.md`.
