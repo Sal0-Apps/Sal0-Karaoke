@@ -259,7 +259,9 @@ def review_lyrics_with_whisper(lyrics, segments, cache_dir, context=None, retry=
     try:
         with open(cache_file, encoding='utf-8') as file:
             saved = json.load(file)
-        if saved.get('signature') == signature and not saved['report'].get('retry_error'):
+        retry_needed = (retry is not None and saved['report'].get('status') == 'differences'
+                        and not saved['report'].get('retry_attempted'))
+        if saved.get('signature') == signature and not saved['report'].get('retry_error') and not retry_needed:
             require_acoustic_word_timing(saved['segments'])
             if not any(segment.get('synced_line') or segment.get('animation_words') or segment.get('acoustic_animation') for segment in saved['segments']):
                 return saved['segments'], saved['report']

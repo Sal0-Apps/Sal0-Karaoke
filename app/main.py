@@ -6109,7 +6109,8 @@ def run_pipeline(
                     context={key: cached_meta.get(key) for key in (
                         "audio_hash", "vocal_source", "transcribe_source", "whisper_model",
                         "whisper_quality_mode", "whisper_audio_version", "transcription_preset")},
-                    retry=retry_guided_transcription, cancel=pm.check_cancelled)
+                    retry=(retry_guided_transcription if os.getenv("KARAOKE_WHISPER_GUIDE_RETRY", "").strip().lower()
+                           in {"1", "true", "yes", "on"} else None), cancel=pm.check_cancelled)
                 unresolved = guide_report["unmatched_words"] + guide_report["missing_guide_words"]
                 detail = (f'{guide_report["checked_words"]} palavras conferidas · '
                           f'{guide_report["corrected_words"]} correções de grafia · {unresolved} diferenças')

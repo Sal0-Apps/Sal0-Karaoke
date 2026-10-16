@@ -1,6 +1,9 @@
 import gc
 import os
 import logging
+import math
+import time
+from pathlib import Path
 from faster_whisper import WhisperModel
 from whisper_audio import load_whisper_audio
 from whisperx_align import stabilize_word_timestamps
@@ -62,6 +65,48 @@ TRANSCRIPTION_PRESETS = {
         },
     },
 }
+
+
+def _cpu_quota():
+    """Docker CPU quotas are independent of the host's logical CPU count."""
+    try:
+        quota, period = Path('/sys/fs/cgroup/cpu.max').read_text().split()
+        if quota != 'max' and float(quota) > 0 and float(period) > 0:
+            return max(1, math.ceil(float(quota) / float(period)))
+    except (OSError, ValueError, OverflowError):
+        pass
+    for directory in ('/sys/fs/cgroup/cpu', '/sys/fs/cgroup/cpu,cpuacct', '/sys/fs/cgroup'):
+        try:
+            quota = float(Path(directory, 'cpu.cfs_quota_us').read_text())
+            period = float(Path(directory, 'cpu.cfs_period_us').read_text())
+            if quota > 0 and period > 0:
+                return max(1, math.ceil(quota / period))
+        except (OSError, ValueError, OverflowError):
+            pass
+    return None
+
+
+def resolve_cpu_threads(requested=None):
+    host = max(1, os.cpu_count() or 1)
+    try:
+        host = min(host, len(os.sched_getaffinity(0)) or host)
+    except (AttributeError, OSError):
+        pass
+    quota = _cpu_quota()
+    available = min(host, quota) if quota else host
+    for value in (requested, os.getenv('KARAOKE_CPU_THREADS'), os.getenv('OMP_NUM_THREADS')):
+        try:
+            count = int(value)
+            if count > 0:
+                return min(count, available)
+        except (TypeError, ValueError, OverflowError):
+            pass
+    return available if quota else max(1, available - 1)
+
+
+def _runtime_clock(seconds):
+    total = max(0, round(seconds))
+    return f'{total // 3600:02d}:{total // 60 % 60:02d}:{total % 60:02d}'
 
 
 def _prepare_lyrics_hint(lyrics: str, max_chars: int = 1200) -> str | None:
@@ -166,9 +211,8 @@ def transcribe_vocals(
     - Tenta primeiro carregar por caminho direto local sem chamadas de rede.
     - Se não encontrar no disco, baixa do repositório oficial HuggingFace.
     """
-    if not cpu_threads or cpu_threads <= 0:
-        total_cpus = os.cpu_count() or 4
-        cpu_threads = max(1, total_cpus - 1)
+    started = time.monotonic()
+    cpu_threads = resolve_cpu_threads(cpu_threads)
 
     preset = TRANSCRIPTION_PRESETS.get(transcription_preset, TRANSCRIPTION_PRESETS["karaoke"])
     transcription_preset = transcription_preset if transcription_preset in TRANSCRIPTION_PRESETS else "karaoke"
@@ -187,6 +231,8 @@ def transcribe_vocals(
     )
 
     audio = load_whisper_audio(vocals_path)
+    decode_seconds = time.monotonic() - started
+    model_started = time.monotonic()
 
     repo_id = resolve_whisper_repo(model_size)
     save_dir = "/data/output/models/whisper"
@@ -247,6 +293,9 @@ def transcribe_vocals(
                 else:
                     raise RuntimeError(f"Erro fatal ao baixar e carregar o modelo Whisper '{model_size}': {ex_online}")
 
+    model_load_seconds = time.monotonic() - model_started
+    logger.info('Modelo Whisper pronto em %s; iniciando reconhecimento com %s threads.',
+                _runtime_clock(model_load_seconds), cpu_threads)
     logger.info(f"Iniciando transcrição (Silero VAD={enable_vad}): {vocals_path}")
     transcribe_options = {
         "task": "translate" if task == "translate" else "transcribe",
@@ -294,6 +343,7 @@ def transcribe_vocals(
                 logger.debug("Falha ao publicar conclusão do Whisper: %s", callback_error)
         return collected
 
+    recognition_started = time.monotonic()
     try:
         try:
             segments, info = model.transcribe(audio, **transcribe_options)
@@ -309,6 +359,7 @@ def transcribe_vocals(
             segments, info = model.transcribe(audio, **transcribe_options)
             segments = consume_segments(segments, info)
     finally:
+        recognition_seconds = time.monotonic() - recognition_started
         del model
         gc.collect()
 
@@ -345,7 +396,21 @@ def transcribe_vocals(
         "language": str(getattr(info, "language", "") or "").strip().lower(),
         "language_probability": float(getattr(info, "language_probability", 0.0) or 0.0),
         "task": "translate" if task == "translate" else "transcribe",
+        "runtime": {
+            "audio_seconds": round(audio.size / 16000, 3),
+            "decode_seconds": round(decode_seconds, 3),
+            "model_load_seconds": round(model_load_seconds, 3),
+            "recognition_seconds": round(recognition_seconds, 3),
+            "total_seconds": round(time.monotonic() - started, 3),
+            "cpu_threads": cpu_threads, "compute_type": compute_type,
+            "beam_size": beam_size, "guidance_retry": bool(guidance_retry),
+        },
     }
+    logger.info('Whisper concluído: áudio=%s, decodificação=%s, modelo=%s, reconhecimento=%s, total=%s; threads=%s, compute=%s, beam=%s, reanálise=%s.',
+        _runtime_clock(audio.size / 16000), _runtime_clock(decode_seconds),
+        _runtime_clock(model_load_seconds), _runtime_clock(recognition_seconds),
+        _runtime_clock(transcription_info['runtime']['total_seconds']), cpu_threads,
+        compute_type, beam_size, bool(guidance_retry))
     if return_info:
         return structured_segments, transcription_info
     return structured_segments

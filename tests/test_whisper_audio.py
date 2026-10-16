@@ -58,6 +58,68 @@ class WhisperAudioTests(unittest.TestCase):
         self.assertEqual(transcribe.call_args.kwargs['hotwords'], 'cantar você')
         self.assertEqual(transcribe.call_args.kwargs['initial_prompt'], 'cantar você cantar')
 
+    def test_cpu_setting_reaches_whisper_without_reducing_first_pass_precision_or_search(self):
+        info = SimpleNamespace(language='pt', language_probability=1, duration=.5)
+        transcribe = Mock(return_value=(iter([]), info))
+        model = Mock(return_value=SimpleNamespace(transcribe=transcribe))
+        module = self.load_transcriber(model)
+        with patch.object(module.os, 'makedirs'), patch.object(module, '_cpu_quota', return_value=3), \
+             patch.object(module.os, 'cpu_count', return_value=64), \
+             patch.object(module.os, 'sched_getaffinity', return_value=set(range(64))), \
+             patch.dict(module.os.environ, {'KARAOKE_CPU_THREADS':'3'}):
+            _, metadata = module.transcribe_vocals(str(self.audio), quality_mode='max_quality',
+                transcription_preset='difficult', return_info=True)
+        self.assertEqual(model.call_args.kwargs['cpu_threads'], 3)
+        self.assertEqual(model.call_args.kwargs['compute_type'], 'float32')
+        self.assertEqual(transcribe.call_args.kwargs['beam_size'], 10)
+        self.assertEqual(transcribe.call_args.kwargs['patience'], 1.5)
+        runtime = metadata['runtime']
+        self.assertEqual(runtime['cpu_threads'], 3)
+        self.assertFalse(runtime['guidance_retry'])
+        self.assertEqual(runtime['audio_seconds'], .5)
+        self.assertGreaterEqual(runtime['total_seconds'], runtime['recognition_seconds'])
+
+    def test_cpu_budget_caps_explicit_and_env_threads_but_keeps_smaller_requests(self):
+        module = self.load_transcriber(Mock())
+        with patch.object(module, '_cpu_quota', return_value=3), \
+             patch.object(module.os, 'cpu_count', return_value=32), \
+             patch.object(module.os, 'sched_getaffinity', return_value=set(range(8))), \
+             patch.dict(module.os.environ, {'KARAOKE_CPU_THREADS':'16', 'OMP_NUM_THREADS':'8'}):
+            self.assertEqual(module.resolve_cpu_threads(), 3)
+            self.assertEqual(module.resolve_cpu_threads(12), 3)
+            self.assertEqual(module.resolve_cpu_threads(2), 2)
+        with patch.object(module, '_cpu_quota', return_value=None), \
+             patch.object(module.os, 'cpu_count', return_value=32), \
+             patch.object(module.os, 'sched_getaffinity', return_value={0,1}), \
+             patch.dict(module.os.environ, {'KARAOKE_CPU_THREADS':'3'}):
+            self.assertEqual(module.resolve_cpu_threads(), 2)
+
+    def test_invalid_thread_values_fall_back_to_quota_or_affinity(self):
+        module = self.load_transcriber(Mock())
+        with patch.object(module.os, 'cpu_count', return_value=16), \
+             patch.object(module.os, 'sched_getaffinity', return_value=set(range(8))), \
+             patch.dict(module.os.environ, {'KARAOKE_CPU_THREADS':'invalid', 'OMP_NUM_THREADS':'0'}):
+            with patch.object(module, '_cpu_quota', return_value=3):
+                self.assertEqual(module.resolve_cpu_threads(-1), 3)
+            with patch.object(module, '_cpu_quota', return_value=None):
+                self.assertEqual(module.resolve_cpu_threads(), 7)
+
+    def test_cgroup_v2_v1_unlimited_and_fractional_cpu_quotas(self):
+        module = self.load_transcriber(Mock())
+        fixtures = [({'/sys/fs/cgroup/cpu.max':'300000 100000'}, 3),
+                    ({'/sys/fs/cgroup/cpu.max':'50000 100000'}, 1),
+                    ({'/sys/fs/cgroup/cpu.max':'max 100000',
+                      '/sys/fs/cgroup/cpu/cpu.cfs_quota_us':'200000',
+                      '/sys/fs/cgroup/cpu/cpu.cfs_period_us':'100000'}, 2),
+                    ({'/sys/fs/cgroup/cpu.max':'max 100000'}, None),
+                    ({'/sys/fs/cgroup/cpu.max':'broken'}, None)]
+        for contents, expected in fixtures:
+            def read(path):
+                if str(path) not in contents: raise FileNotFoundError(str(path))
+                return contents[str(path)]
+            with self.subTest(contents=contents), patch.object(module.Path, 'read_text', read):
+                self.assertEqual(module._cpu_quota(), expected)
+
     def test_guided_retry_uses_full_audio_and_ignores_provider_clocks(self):
         info = SimpleNamespace(language='pt', language_probability=1, duration=.5)
         word = SimpleNamespace(word=' cantar', start=.1, end=.4, probability=.92)

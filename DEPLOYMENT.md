@@ -25,7 +25,7 @@ Crie uma pasta própria para a instalação e salve nela o arquivo `compose.yaml
 ```yaml
 services:
   karaoke-app:
-    image: ghcr.io/sal0-apps/sal0-karaoke:12.6.1
+    image: ghcr.io/sal0-apps/sal0-karaoke:12.6.2
     container_name: karaoke-app
     ports:
       - "7885:7860"
@@ -183,7 +183,7 @@ Para conservar a identidade de atualização do Android, proteja uma chave de as
 
 Cada execução mantém seus arquivos em `/data/output/queue_jobs/<id>/cache/`, com índice persistente da fila. Não remova essas pastas enquanto quiser revisar os itens. Resultados concluídos, falhos, cancelados e removidos continuam disponíveis até a aceitação de uma nova origem após esgotar a fila do perfil. Reexecuções permanecem na mesma fila; resultados da Biblioteca e modelos continuam preservados. A mudança aplica-se às tarefas ainda disponíveis na atualização e às novas; arquivos que a versão anterior já descartou não são recuperáveis.
 
-Atualize apenas a imagem do servidor para `ghcr.io/sal0-apps/sal0-karaoke:12.6.1` ou `latest`. Os aplicativos Android e Windows existentes continuam compatíveis. Publicações substituídas no YouTube recebem outro link; o anterior só é removido após confirmar o novo vídeo, capa, playlists e privacidade. Playlists adicionais começam desmarcadas em novas criações, com a playlist do perfil mantida.
+Atualize apenas a imagem do servidor para `ghcr.io/sal0-apps/sal0-karaoke:12.6.2` ou `latest`. Os aplicativos Android e Windows existentes continuam compatíveis. Publicações substituídas no YouTube recebem outro link; o anterior só é removido após confirmar o novo vídeo, capa, playlists e privacidade. Playlists adicionais começam desmarcadas em novas criações, com a playlist do perfil mantida.
 
 ### Ícone no ZimaOS / CasaOS
 
@@ -215,3 +215,14 @@ As quebras da guia só são aplicadas quando o trecho reconhecido confirma as bo
 Uma repetição textual adjacente é apenas uma hipótese de erro. Antes de suprimi-la, o alinhador compara a probabilidade CTC das duas sequências com todos os quadros do áudio do trecho. Repetições explicitamente presentes na guia e refrões realmente cantados são preservados. Essa proteção não substitui a revisão de gravações difíceis.
 
 A versão anterior desta correção permanece em `ghcr.io/sal0-apps/sal0-karaoke:12.6` e no tag `v12.6` (commit `fd7e8bba17999ff76b10c8b916c285517b8bf3c6`). A 12.5.1 também continua disponível. Para retornar, use a imagem versionada mantendo o mesmo volume de dados.
+
+
+### Tempo do Whisper e orçamento de CPU (12.6.2)
+
+O Whisper usa `KARAOKE_CPU_THREADS` (por exemplo, `"3"` no Compose do VictorServer), limitado pelo orçamento do contêiner e pela afinidade de CPU. Na ausência dessa variável, considera `OMP_NUM_THREADS`; sem configuração explícita, usa a quota disponível ou reserva uma CPU quando não há quota. A primeira passagem mantém o modelo escolhido, FP32 no modo de qualidade máxima e os mesmos parâmetros de busca, sem corte da linha do tempo.
+
+A conferência de diferenças da guia deixou de disparar por padrão outra transcrição integral com beam 15 e maior paciência. A comparação textual e o alinhamento MMS continuam. Para uma reanálise integral deliberada, use `KARAOKE_WHISPER_GUIDE_RETRY=1`; ela pode aumentar bastante o tempo. Resultados de reanálise já existentes continuam reutilizáveis. Os caches não são apagados pela mudança de threads ou pela desativação da segunda passagem.
+
+O diagnóstico registra separadamente a decodificação, o carregamento do modelo, o reconhecimento e o total do Whisper, em hh:mm:ss, além dos valores de CPU/FP32/busca. Isso permite identificar se a espera ocorre antes do reconhecimento, durante ele ou na etapa acústica posterior. Os tempos dependem do modelo e do servidor; testes controlados não são uma medição da instalação do usuário.
+
+Para voltar, use `ghcr.io/sal0-apps/sal0-karaoke:12.6.1`, mantendo o volume de dados e as demais opções do contêiner.

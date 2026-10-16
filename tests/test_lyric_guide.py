@@ -115,6 +115,20 @@ class LyricGuideTests(unittest.TestCase):
         self.assertEqual(clocks(result), clocks(candidate))
         self.assertEqual(saved['report']['checked_words'], 7)
 
+    def test_explicit_retry_can_upgrade_default_check_and_default_then_reuses_better_cache(self):
+        guide = 'eu quero cantar com você nesta noite'
+        voice = acoustic('eu quero com voce nesta noite')
+        retry = Mock(return_value=acoustic('eu quero cantar com voce nesta noite'))
+        with tempfile.TemporaryDirectory() as folder:
+            initial, report = review_lyrics_with_whisper(guide, voice, folder)
+            self.assertFalse(report['retry_attempted'])
+            upgraded = review_lyrics_with_whisper(guide, voice, folder, retry=retry)
+            retry.assert_called_once()
+            self.assertTrue(upgraded[1]['retry_selected'])
+            reused = review_lyrics_with_whisper(guide, voice, folder)
+            self.assertEqual(upgraded, reused)
+            self.assertNotEqual(initial, reused[0])
+
     def test_worse_retry_keeps_first_whisper_decode(self):
         voice = acoustic('eu quero com voce nesta noite')
         with tempfile.TemporaryDirectory() as folder:

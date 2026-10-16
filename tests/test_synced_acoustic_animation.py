@@ -13,7 +13,7 @@ import unicodedata
 import array
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 ROOT = Path(__file__).parents[1]
 sys.path.insert(0, str(ROOT / 'app'))
@@ -27,7 +27,7 @@ from lyric_alignment import acoustic_baseline
 
 
 class SyncedAcousticAnimationTests(unittest.TestCase):
-    def run_stage(self, cache_version=None, verses=None, voice=None, reprocess=False, timing="auto", source_mode="vocals", backing_enabled=False, backing_volume=100, audio_cache_version=3, reviewed=None):
+    def run_stage(self, cache_version=None, verses=None, voice=None, reprocess=False, timing="auto", source_mode="vocals", backing_enabled=False, backing_volume=100, audio_cache_version=3, reviewed=None, guide_retry=False):
         source = (ROOT / 'app/main.py').read_text()
         stage = source[source.index('            segments = None\n', source.index('# Passo 3: Transcrever vocais')):
                        source.index('            # --- NOVO: Passo de Pausa')]
@@ -79,7 +79,8 @@ class SyncedAcousticAnimationTests(unittest.TestCase):
                          instrumental_wav='clean-instrumental.wav', preserve_backing_vocals=preserve)
             exec(compile(textwrap.dedent(preparation), 'voice-source-stage', 'exec'), scope)
             scope['notify_targets'].reset_mock()
-            exec(compile(textwrap.dedent(stage), 'transcription-stage', 'exec'), scope)
+            with patch.dict(os.environ, {'KARAOKE_WHISPER_GUIDE_RETRY': '1' if guide_retry else '0'}):
+                exec(compile(textwrap.dedent(stage), 'transcription-stage', 'exec'), scope)
             scope['first_transcription_calls'] = transcriber.call_count
             if reprocess:
                 next_cache = Path(folder) / 'next'
@@ -89,7 +90,8 @@ class SyncedAcousticAnimationTests(unittest.TestCase):
                     cached_meta=json.loads((next_cache / 'cache_meta.json').read_text()),
                     synced_segments=lrc, lyrics_text=lyric_text)
                 transcriber.reset_mock()
-                exec(compile(textwrap.dedent(stage), 'transcription-stage', 'exec'), scope)
+                with patch.dict(os.environ, {'KARAOKE_WHISPER_GUIDE_RETRY': '1' if guide_retry else '0'}):
+                    exec(compile(textwrap.dedent(stage), 'transcription-stage', 'exec'), scope)
         return scope, transcriber
 
     def test_synced_lyrics_do_not_bypass_voice_analysis_or_reuse_verse_only_cache(self):
@@ -147,7 +149,7 @@ class SyncedAcousticAnimationTests(unittest.TestCase):
                 output = target.read_text()
                 self.assertIn('limbo', output)
                 self.assertNotIn('correta', output)
-                self.assertTrue(scope['guide_report']['retry_attempted'])
+                self.assertFalse(scope['guide_report']['retry_attempted'])
                 self.assertNotIn('lindo', output)
 
     def test_empty_local_recognition_cannot_render_the_guide_instead(self):
@@ -191,11 +193,20 @@ class SyncedAcousticAnimationTests(unittest.TestCase):
     def test_guided_retry_uses_the_same_original_audio(self):
         verses = [dict(start=10, end=13, text='Olá lindo mundo'),
                   dict(start=13, end=17, text='Outra palavra correta')]
-        scope, transcriber = self.run_stage(source_mode='original', backing_enabled=True, verses=verses)
+        scope, transcriber = self.run_stage(source_mode='original', backing_enabled=True, verses=verses, guide_retry=True)
         self.assertTrue(scope['guide_report']['retry_attempted'])
         self.assertEqual(transcriber.call_count, 2)
         self.assertTrue(all(call.args[0] == 'original.mp4' for call in transcriber.call_args_list))
         self.assertTrue(all(call.kwargs['enable_vad'] is False for call in transcriber.call_args_list))
+
+    def test_guide_differences_do_not_decode_the_entire_song_twice_by_default(self):
+        verses = [dict(start=10, end=13, text='Olá lindo mundo'),
+                  dict(start=13, end=17, text='Outra palavra correta')]
+        scope, transcriber = self.run_stage(source_mode='original', verses=verses)
+        transcriber.assert_called_once()
+        self.assertEqual(transcriber.call_args.kwargs['quality_mode'], 'max_quality')
+        self.assertFalse(scope['guide_report']['retry_attempted'])
+        scope['refine_lyrics'].assert_called_once()
 
     def test_original_cache_is_reused_with_backing_enabled(self):
         scope, transcriber = self.run_stage(cache_version=3, source_mode='original', backing_enabled=True)
