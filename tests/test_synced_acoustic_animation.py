@@ -13,13 +13,13 @@ import unicodedata
 import array
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 ROOT = Path(__file__).parents[1]
 sys.path.insert(0, str(ROOT / 'app'))
 from lyrics_sync import parse_lrc, require_acoustic_word_timing, anchor_synced_animation, assess_synced_timing
 from karaoke_generator import generate_ass_karaoke, synced_animation_text
-from media_covers import add_cover_to_command
+from media_covers import add_cover_to_command, filter_path
 from test_automatic_lyrics_and_search import load_function
 from reprocess_cache import copy_reusable_inputs
 from lyric_guide import prepare_lyrics_guide, review_lyrics_with_whisper
@@ -27,7 +27,7 @@ from lyric_alignment import acoustic_baseline
 
 
 class SyncedAcousticAnimationTests(unittest.TestCase):
-    def run_stage(self, cache_version=None, verses=None, voice=None, reprocess=False, timing="auto", source_mode="vocals", backing_enabled=False, backing_volume=100, audio_cache_version=3, reviewed=None):
+    def run_stage(self, cache_version=None, verses=None, voice=None, reprocess=False, timing="auto", source_mode="vocals", backing_enabled=False, backing_volume=100, audio_cache_version=4, reviewed=None):
         source = (ROOT / 'app/main.py').read_text()
         stage = source[source.index('            segments = None\n', source.index('# Passo 3: Transcrever vocais')):
                        source.index('            # --- NOVO: Passo de Pausa')]
@@ -114,9 +114,19 @@ class SyncedAcousticAnimationTests(unittest.TestCase):
     def test_resuming_a_human_review_skips_automatic_quality_and_preserves_manual_words(self):
         reviewed = [dict(start=9.8, end=13, text='Minha revisão completa', words=[
             dict(word='Minha revisão completa', start=9.8, end=13)])]
-        scope, _ = self.run_stage(cache_version=3, reviewed=reviewed)
-        scope['refine_lyrics'].assert_not_called()
-        self.assertEqual(scope['segments'], reviewed)
+        for version in (3, 4):
+            with self.subTest(inference_version=version):
+                scope, _ = self.run_stage(cache_version=3, audio_cache_version=version, reviewed=reviewed)
+                scope['refine_lyrics'].assert_not_called()
+                self.assertEqual(scope['segments'], reviewed)
+
+    def test_numeric_runtime_override_refreshes_raw_recognition_once(self):
+        policy = {'WHISPER_DEVICE': 'cpu', 'WHISPER_COMPUTE_TYPE': 'int8_float32'}
+        with patch.dict(os.environ, policy):
+            scope, transcriber = self.run_stage(cache_version=3, reprocess=True)
+        self.assertEqual(scope['first_transcription_calls'], 1)
+        transcriber.assert_not_called()
+        self.assertEqual(scope['cached_meta']['whisper_runtime_policy'], policy)
 
     def test_new_task_reuses_saved_whisper_analysis_without_calling_model(self):
         scope, transcriber = self.run_stage(reprocess=True)
@@ -171,7 +181,7 @@ class SyncedAcousticAnimationTests(unittest.TestCase):
         self.assertEqual(scope['first_transcription_calls'], 1)
         transcriber.assert_not_called()
         self.assertEqual(scope['cached_meta']['transcribe_source'], 'original')
-        self.assertEqual(scope['cached_meta']['whisper_audio_version'], 3)
+        self.assertEqual(scope['cached_meta']['whisper_audio_version'], 4)
 
     def test_original_source_bypasses_demucs_conversion_without_backing(self):
         scope, transcriber = self.run_stage(source_mode='original')
@@ -208,7 +218,7 @@ class SyncedAcousticAnimationTests(unittest.TestCase):
         self.assertEqual(scope['first_transcription_calls'], 1)
         transcriber.assert_not_called()
         self.assertEqual(scope['cached_meta']['transcribe_source'], 'vocals')
-        self.assertEqual(scope['cached_meta']['whisper_audio_version'], 3)
+        self.assertEqual(scope['cached_meta']['whisper_audio_version'], 4)
 
     def test_recognized_text_is_irrelevant_even_when_all_words_are_wrong(self):
         verses = [dict(start=10, end=13, text='  Olá,  lindo mundo!  ')]
@@ -319,7 +329,7 @@ class SyncedAcousticAnimationTests(unittest.TestCase):
             subprocess.run(['ffmpeg', '-v', 'error', '-y', '-f', 'lavfi', '-i',
                 'color=red:s=320x180', '-frames:v', '1', '-threads', '1', str(cover)], check=True)
             command = ['ffmpeg', '-v', 'error', '-y', '-f', 'lavfi', '-i',
-                'color=black:s=320x180:r=25:d=4', '-i', str(audio), '-vf', 'ass=' + str(target),
+                'color=black:s=320x180:r=25:d=4', '-i', str(audio), '-vf', "ass='" + filter_path(target) + "'",
                 '-map', '0:v:0', '-map', '1:a:0', '-c:v', 'libx264', '-preset', 'ultrafast',
                 '-c:a', 'aac', '-b:a', '192k', '-t', '4', str(output)]
             subprocess.run(add_cover_to_command(command, cover, 4), check=True)
@@ -412,7 +422,7 @@ class SyncedAcousticAnimationTests(unittest.TestCase):
             masks = []
             for time in (.1, 12.5, 15, 19.8):
                 raw = subprocess.check_output(['ffmpeg','-v','error','-f','lavfi','-i',
-                    'color=c=black:s=640x360:r=25:d=21','-vf','ass='+str(target),'-ss',str(time),
+                    'color=c=black:s=640x360:r=25:d=21','-vf',"ass='"+filter_path(target)+"'",'-ss',str(time),
                     '-frames:v','1','-f','rawvideo','-pix_fmt','rgb24','-'])
                 masks.append(bytes(max(raw[i:i+3]) > 50 for i in range(0,len(raw),3)))
             self.assertGreater(sum(masks[0]),100)
@@ -439,7 +449,7 @@ class SyncedAcousticAnimationTests(unittest.TestCase):
                 font_size=24, show_instrumental=False, show_next_line_preview=False)
             def highlight_amount(time):
                 raw = subprocess.check_output(['ffmpeg','-v','error','-f','lavfi','-i',
-                    'color=c=black:s=640x360:r=25:d=3','-vf','ass='+str(target),'-ss',str(time),
+                    'color=c=black:s=640x360:r=25:d=3','-vf',"ass='"+filter_path(target)+"'",'-ss',str(time),
                     '-frames:v','1','-f','rawvideo','-pix_fmt','rgb24','-'])
                 # Measure color across antialiased glyphs too. At a 12px
                 # rendered font some platforms have very few solid pixels.

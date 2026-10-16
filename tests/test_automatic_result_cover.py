@@ -30,8 +30,8 @@ class ResultCoverTests(unittest.TestCase):
                 red, green, blue = color(preview); self.assertGreater(blue, red + 100)
                 self.assertEqual(video_thumbnail(video, cover=True), cover)
 
-    def test_explicit_cpu_cap_respects_affinity_and_does_not_repurpose_quota(self):
-        with patch('audio_processor.os.cpu_count', return_value=16), patch('audio_processor.os.sched_getaffinity', return_value=set(range(8))):
+    def test_explicit_cpu_cap_respects_affinity(self):
+        with patch('runtime_resources._cgroup_cpu_limits', return_value=[]), patch('audio_processor.os.cpu_count', return_value=16), patch('audio_processor.os.sched_getaffinity', return_value=set(range(8)), create=True):
             with patch.dict(os.environ, {'KARAOKE_CPU_THREADS': '3'}): self.assertEqual(get_effective_cpu_count(), 3)
             with patch.dict(os.environ, {'KARAOKE_CPU_THREADS': '32'}): self.assertEqual(get_effective_cpu_count(), 8)
             with patch.dict(os.environ, {'KARAOKE_CPU_THREADS': 'invalid'}): self.assertEqual(get_effective_cpu_count(), 8)

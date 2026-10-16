@@ -69,10 +69,33 @@ class LibreTranslateTests(unittest.TestCase):
             self.assertEqual(self.source.read_bytes(), ORIGINAL)
 
     def test_foreign_download_url_rejected(self):
-        client = self.client(self.results(url='http://other-server/result.srt'))
+        for url in ('http://other-server/result.srt',
+                    'https://translation.googleapis.com/result.srt',
+                    'https://translation.google%61pis.com/result.srt'):
+            with self.subTest(url=url):
+                client = self.client(self.results(url=url))
+                with self.assertRaises(lt.TranslationServiceError):
+                    client.translate_srt_file(self.source, self.destination)
+                self.assertEqual(client.session.request.call_count, 2)
+
+    def test_google_redirect_is_not_followed(self):
+        redirected = response({}, 302)
+        redirected.headers['Location'] = 'https://translation.googleapis.com/language/translate/v2'
+        client = self.client([redirected])
         with self.assertRaises(lt.TranslationServiceError):
-            client.translate_srt_file(self.source, self.destination)
-        self.assertEqual(client.session.request.call_count, 2)
+            client.languages()
+        client.session.request.assert_called_once()
+        self.assertFalse(client.session.request.call_args.kwargs['allow_redirects'])
+        self.assertEqual(client.session.request.call_args.args[1], CONFIG['url'] + '/languages')
+
+    def test_modified_client_url_is_checked_before_any_request(self):
+        for url in ('https://translation.googleapis.com.', 'https://translation.google%61pis.com'):
+            with self.subTest(url=url):
+                client = self.client([])
+                client.url = url
+                with self.assertRaises(ValueError):
+                    client.languages()
+                client.session.request.assert_not_called()
 
     def test_retry_repeats_complete_file(self):
         results = self.results()

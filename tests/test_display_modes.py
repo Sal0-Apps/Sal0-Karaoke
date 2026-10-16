@@ -17,11 +17,12 @@ sys.path.insert(0, str(Path(__file__).parents[1] / 'app'))
 from karaoke_generator import generate_ass_karaoke
 from lyrics_sync import anchor_synced_animation
 from video_renderer import render_karaoke_video, run_ffmpeg_with_logging
+from media_covers import filter_path
 
 
 def frame(path, time=0.5):
     raw = subprocess.check_output(['ffmpeg', '-v', 'error', '-f', 'lavfi', '-i',
-        'color=black:s=1280x720:r=25:d=5', '-vf', 'ass=' + str(path), '-ss', str(time),
+        'color=black:s=1280x720:r=25:d=5', '-vf', "ass='" + filter_path(path) + "'", '-ss', str(time),
         '-frames:v', '1', '-pix_fmt', 'rgb24', '-f', 'rawvideo', '-'])
     return np.frombuffer(raw, dtype=np.uint8).reshape(720, 1280, 3)
 

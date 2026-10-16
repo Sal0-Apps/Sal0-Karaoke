@@ -32,6 +32,7 @@ from pydantic import BaseModel, Field
 # Módulos do pipeline local
 from audio_processor import extract_audio, extract_audio_mp3, get_file_duration, separate_vocals
 from transcriber import transcribe_vocals
+from whisper_models import resolve_whisper_repo, get_model_local_dir
 from subtitle_translator import (
     SUPPORTED_TARGET_LANGUAGES,
     normalize_translation_language,
@@ -2057,68 +2058,7 @@ model_download_status = {
     "large-v3": {"status": "idle", "progress": 0, "error": None}
 }
 
-def resolve_whisper_repo(model_size: str) -> str:
-    """Mapeia os 5 modelos suportados para seus repositórios no Hugging Face (Sal0 Karaoke v4.6.1)."""
-    mapping = {
-        "large-v3-turbo": "deepdml/faster-whisper-large-v3-turbo",
-        "medium": "Systran/faster-whisper-medium",
-        "small": "Systran/faster-whisper-small",
-        "tiny": "Systran/faster-whisper-tiny",
-        "large-v3": "Systran/faster-whisper-large-v3"
-    }
-    return mapping.get(model_size.lower().strip(), model_size)
 
-def get_model_local_dir(model_size: str) -> str:
-    """Retorna o diretório local válido contendo os pesos reais (model.bin com tamanho válido) do modelo Whisper."""
-    key = model_size.lower().strip()
-
-    # Tamanho mínimo exigido em bytes para garantir que o modelo não está incompleto
-    min_size_bytes = 300 * 1024 * 1024  # 300 MB padrão (para medium, large, turbo)
-    if "tiny" in key:
-        min_size_bytes = 30 * 1024 * 1024   # 30 MB
-    elif "small" in key:
-        min_size_bytes = 150 * 1024 * 1024  # 150 MB
-
-    if key == "large-v3-turbo":
-        match_fn = lambda name: "turbo" in name or "large-v3-turbo" in name
-    elif key == "large-v3":
-        match_fn = lambda name: "large-v3" in name and "turbo" not in name
-    elif key == "medium":
-        match_fn = lambda name: "medium" in name
-    elif key == "small":
-        match_fn = lambda name: "small" in name
-    elif key == "tiny" or key == "base":
-        match_fn = lambda name: "tiny" in name or "base" in name
-    else:
-        match_fn = lambda name: key in name
-
-    search_roots = [
-        "/data/output/models/whisper",
-        "/root/.cache/huggingface/hub",
-        "/root/.cache/whisper",
-        os.path.expanduser("~/.cache/huggingface/hub"),
-        os.path.expanduser("~/.cache/whisper")
-    ]
-
-    for root in search_roots:
-        if not os.path.exists(root):
-            continue
-        try:
-            for entry in os.listdir(root):
-                entry_path = os.path.join(root, entry)
-                if os.path.isdir(entry_path) and match_fn(entry.lower()):
-                    for r, dirs, files in os.walk(entry_path):
-                        for f in files:
-                            if f in ["model.bin", "model.safetensors", "pytorch_model.bin", "model.pt"]:
-                                fpath = os.path.join(r, f)
-                                try:
-                                    if os.path.getsize(fpath) >= min_size_bytes:
-                                        return r
-                                except Exception:
-                                    pass
-        except Exception as e:
-            logger.warning(f"Erro ao verificar modelo em {root}: {e}")
-    return None
 
 def is_model_downloaded(model_size: str) -> bool:
     """Verifica nos diretórios locais se um dos 5 modelos Whisper já foi baixado com pesos válidos no disco."""
@@ -5066,9 +5006,13 @@ def run_subtitle_srt_pipeline(
         "whisper_model": whisper_model,
         "enable_vad": bool(enable_vad),
         "transcription_preset": transcription_preset,
-        "whisper_audio_version": 2,
+        "whisper_audio_version": 4,
         "whisper_quality_mode": "max_quality",
     }
+
+    runtime_policy = {key: os.environ[key] for key in ("WHISPER_DEVICE", "WHISPER_COMPUTE_TYPE") if os.environ.get(key)}
+    if runtime_policy:
+        cache_signature["whisper_runtime_policy"] = runtime_policy
 
     pm.check_cancelled()
     update_state("processing", "Preparing original audio", 15)
@@ -5945,6 +5889,7 @@ def run_pipeline(
             # lead separation, filters or silence cuts before Whisper.
             transcribe_audio = vocals_wav if transcribe_source == "vocals" else input_audio_path
             lyrics_hint_hash = hashlib.sha256(" ".join((lyrics_text or "").split()).encode("utf-8")).hexdigest()
+            runtime_policy = {key: os.environ[key] for key in ("WHISPER_DEVICE", "WHISPER_COMPUTE_TYPE") if os.environ.get(key)}
             whisper_meta_file = os.path.join(cache_dir, "whisper_cache_meta.json")
             if os.path.isfile(whisper_meta_file):
                 try:
@@ -5953,7 +5898,7 @@ def run_pipeline(
                     if whisper_meta.get("audio_hash") == cached_meta.get("audio_hash"):
                         for key in ("animation_timing_version", "vocal_source", "transcribe_source",
                                     "whisper_model", "enable_vad", "transcription_preset", "lyrics_hint_hash",
-                                    "whisper_audio_version", "whisper_quality_mode"):
+                                    "whisper_audio_version", "whisper_quality_mode", "whisper_runtime_policy"):
                             if key in whisper_meta:
                                 cached_meta[key] = whisper_meta[key]
                 except (OSError, ValueError, AttributeError):
@@ -5965,7 +5910,8 @@ def run_pipeline(
 
             if (os.path.exists(segments_cache_file) and
                 cached_meta.get("animation_timing_version") == 3 and
-                cached_meta.get("whisper_audio_version") == 3 and
+                cached_meta.get("whisper_audio_version") == 4 and
+                cached_meta.get("whisper_runtime_policy", {}) == runtime_policy and
                 cached_meta.get("whisper_quality_mode") == "max_quality" and
                 cached_meta.get("vocal_source", "all") == vocal_source and
                 cached_meta.get("transcribe_source") == transcribe_source and
@@ -6067,7 +6013,8 @@ def run_pipeline(
                         import json
                         json.dump(segments, f, indent=4)
                     cached_meta["animation_timing_version"] = 3
-                    cached_meta["whisper_audio_version"] = 3
+                    cached_meta["whisper_audio_version"] = 4
+                    cached_meta["whisper_runtime_policy"] = runtime_policy
                     cached_meta["whisper_quality_mode"] = "max_quality"
                     cached_meta["vocal_source"] = vocal_source
                     cached_meta["transcribe_source"] = transcribe_source
@@ -6477,9 +6424,28 @@ def notify_youtube_publication(job):
         get_notification_targets(owner), automatic=bool(job.get("automatic")))
 
 
+def notify_youtube_authorization_required(event):
+    targets = get_notification_targets(None)
+    if not targets:
+        return False
+    message = telegram_notice(
+        "⚠️", "YouTube: atualize a autorização do canal",
+        f"Canal: <b>{telegram_escape(event.get('channel_title') or 'Canal conectado')}</b>",
+        "O Google exige renovar ou reconectar a autorização para enviar vídeos.",
+        "Abra <b>Ajustes → YouTube → Publicação</b> e use <b>Verificar e renovar</b>. "
+        "Se o acesso tiver sido revogado, use <b>Reconectar canal</b>.",
+        "Os envios pendentes serão retomados após confirmar o mesmo canal.",
+    )
+    delivered = True
+    for target in targets:
+        result = TELEGRAM_DELIVERY.send_message(target["telegram_token"], target["telegram_chat_id"], message)
+        delivered = result.ok and delivered
+    return delivered
+
+
 youtube_publisher = install_youtube_publisher(
     app, get_current_user, require_admin, resolve_youtube_publication_video, check_youtube_oauth_admin, user_from_username,
-    on_published=notify_youtube_publication)
+    on_published=notify_youtube_publication, on_auth_required=notify_youtube_authorization_required)
 
 
 def probe_youtube_download_access(url):

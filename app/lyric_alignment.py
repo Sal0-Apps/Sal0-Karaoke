@@ -22,6 +22,7 @@ from lyric_guide import normalize_word, prepare_lyrics_guide, apply_guide_bounda
 from karaoke_generator import split_and_wrap_segments
 from whisper_audio import load_whisper_audio
 import process_manager as pm
+from runtime_resources import available_cpu_threads, release_cached_whisper
 
 logger = logging.getLogger('karaoke')
 QUALITY_VERSION = 2
@@ -111,7 +112,8 @@ class AudioEvidence:
         padding = (-len(self.audio)) % self.hop
         samples = np.pad(self.audio, (0,padding)) if padding else self.audio
         frames = samples.reshape(-1,self.hop)
-        self.rms = np.sqrt(np.mean(frames.astype(np.float64)**2, axis=1)) if len(frames) else np.array([])
+        # Accumulate in float64 without allocating two full-length float64 tracks.
+        self.rms = np.sqrt(np.einsum('ij,ij->i', frames, frames, dtype=np.float64) / self.hop) if len(frames) else np.array([])
         self.reference = float(np.quantile(self.rms,.98)) if len(self.rms) else 0.
         self.threshold = max(1e-8,self.reference*.005)
         self.active = self.rms > self.threshold
@@ -306,7 +308,8 @@ class MMSAligner:
         from torchaudio.pipelines import MMS_FA
         self.torch=torch;self.cancel=cancel
         self.old_threads=torch.get_num_threads()
-        torch.set_num_threads(max(1,int(os.getenv('KARAOKE_CPU_THREADS','3'))))
+        release_cached_whisper()
+        torch.set_num_threads(available_cpu_threads())
         try:
             directory=os.getenv('KARAOKE_ALIGNMENT_MODEL_DIR',MODEL_DIR)
             _download_model(directory,progress,cancel)

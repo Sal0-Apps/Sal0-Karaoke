@@ -3,6 +3,7 @@ import argparse
 import os
 
 from backing_progress import emit_progress, vr_progress
+from runtime_resources import available_cpu_threads
 
 BVE_MODEL = "UVR-BVE-4B_SN-44100-2.pth"
 
@@ -11,8 +12,11 @@ def separate_backing(vocals_path, output_dir, model_dir):
     import torch
     from audio_separator.separator import Separator
 
-    torch.set_num_threads(max(1, int(os.environ.get("OMP_NUM_THREADS", "1"))))
-    torch.set_num_interop_threads(1)
+    torch.set_num_threads(available_cpu_threads(os.environ.get("OMP_NUM_THREADS")))
+    try:
+        torch.set_num_interop_threads(1)
+    except RuntimeError:
+        pass
     separator = Separator(
         output_dir=output_dir,
         model_file_dir=model_dir,

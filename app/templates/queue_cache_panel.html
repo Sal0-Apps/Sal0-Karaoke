@@ -91,7 +91,7 @@ function clearCachedRevision() {
     window.cachedRevisionId = ''; window.cachedRevisionOptions = {};
     window.cachedRevisionTitle = '';
     if (typeof easyModeConfig !== 'undefined' && easyModeConfig) refreshEasySummary(easyModeConfig);
-    document.querySelector('#easyBackgroundDefaultChoice > span').textContent = '✨ Surpresa';
+    setUiText(document.querySelector('#easyBackgroundDefaultChoice > span'), '[[sal0:spark]] Surpresa');
     document.getElementById('cachedRevisionNotice').hidden = true;
     document.getElementById('cachedSubtitleStyle').hidden = true;
 }
@@ -111,7 +111,7 @@ function closeCachedEditor() {
     document.getElementById('correctionAudio')?.pause(); isShowingCorrection = false;
     document.querySelectorAll('#correctionCard .btn-cancel-task, #correctionCard .btn-add-queue').forEach(button => button.hidden = false);
     document.getElementById('cachedEditorSave')?.remove();
-    const skip = document.getElementById('btnSkipEdit'); if (skip) skip.textContent = '⏩ Pular e renderizar sem alterar';
+    const skip = document.getElementById('btnSkipEdit'); if (skip) setUiText(skip, '[[sal0:skip]] Pular e renderizar sem alterar');
 }
 async function openCachedEditor(id) {
     clearCachedRevision(); window.cacheEditorActive = true; window.cachedEditorId = id;
@@ -182,7 +182,7 @@ async function openCacheSettings(id, quick = false) {
         document.getElementById('easyBackingVolume').value = String(options.backing_vocals_volume ?? 100);
         setEasyBackgroundType(options.background_mode === 'original' ? 'original' : 'default');
         refreshEasySummary(options); updateQuickSelection();
-        document.querySelector('#easyBackgroundDefaultChoice > span').textContent = '🖼️ Manter este fundo';
+        setUiText(document.querySelector('#easyBackgroundDefaultChoice > span'), '[[sal0:image]] Manter este fundo');
         document.getElementById('easyDefaultBackgroundOption').textContent = options.background_filename ? 'Fundo em cache: ' + options.background_filename : options.background_mode === 'color' ? 'Manter a cor de fundo desta execução' : 'Manter o fundo desta execução';
     } else {
         // The origin stays in cache; Detailed keeps the existing collapsible visual controls.

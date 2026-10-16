@@ -10,6 +10,10 @@ __pycache__/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+.venv/
+.qa/
+/review-artifacts/
+/REVISAO.md
 
 # === BACKUPS E ARQUIVOS TEMPORÁRIOS LOCAIS ===
 v224_backup/

@@ -4,7 +4,9 @@ import logging
 import random
 import math
 import tempfile
-from media_covers import create_video_cover, add_cover_to_command
+from collections import deque
+from runtime_resources import available_cpu_threads, thread_environment
+from media_covers import create_video_cover, add_cover_to_command, filter_path
 from audio_processor import get_file_duration
 
 logger = logging.getLogger("karaoke")
@@ -68,19 +70,25 @@ def run_ffmpeg_with_logging(
     pm.check_cancelled()
     process = None
     try:
-        logger.info(f"Executando FFmpeg: {' '.join(cmd)}")
-        ffmpeg_cmd = cmd
+        threads = str(available_cpu_threads())
+        encoder_threads = [] if any(flag in cmd for flag in ("-threads", "-threads:v")) else ["-threads:v", threads]
+        ffmpeg_cmd = [cmd[0], "-hide_banner", "-nostdin", "-nostats",
+                      "-filter_threads", threads, "-filter_complex_threads", threads,
+                      *cmd[1:-1], *encoder_threads, cmd[-1]]
         if progress_callback and total_duration and total_duration > 0:
-            ffmpeg_cmd = [cmd[0], "-progress", "pipe:1", "-nostats", *cmd[1:]]
+            ffmpeg_cmd = [cmd[0], "-progress", "pipe:1", "-nostats", "-stats_period", "2", *ffmpeg_cmd[1:]]
+        logger.info("Executando FFmpeg com %s thread(s): %s", threads, " ".join(ffmpeg_cmd))
         process = subprocess.Popen(
             ffmpeg_cmd,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True,
-            env=env
+            env=thread_environment(env=env),
+            bufsize=1,
         )
         pm.set_active_process(process)
         last_progress = -1
+        diagnostics = deque(maxlen=12)
         if progress_callback:
             progress_callback(0)
         
@@ -99,35 +107,30 @@ def run_ffmpeg_with_logging(
                         last_progress = percent
                 except (TypeError, ValueError, ZeroDivisionError):
                     pass
-            # Filtrar logs repetitivos de frame para evitar inundação de logs, mantendo alertas de erro
-            if "frame=" in line_str or "size=" in line_str or "time=" in line_str or "speed=" in line_str or "Error" in line_str:
-                logger.info(f"[FFmpeg] {line_str}")
+            if line_str and not line_str.startswith(("frame=", "fps=", "stream_", "bitrate=", "total_size=", "out_time", "dup_frames=", "drop_frames=", "speed=", "progress=")):
+                diagnostics.append(line_str)
+                if any(word in line_str.lower() for word in ("error", "warning", "failed", "invalid")):
+                    logger.warning("[FFmpeg] %s", line_str)
+                else:
+                    logger.debug("[FFmpeg] %s", line_str)
         
         process.wait()
-        pm.clear_active_process()
         pm.check_cancelled()
         
         if process.returncode != 0:
-            raise RuntimeError(f"FFmpeg falhou com código de retorno {process.returncode}")
+            raise RuntimeError(f"FFmpeg falhou com código de retorno {process.returncode}: " + "\n".join(diagnostics))
         if progress_callback:
             progress_callback(100)
         return True
     except Exception as e:
-        pm.clear_active_process()
         logger.error(f"Exceção ao rodar FFmpeg: {e}")
         raise
     finally:
         if process is not None:
-            if process.poll() is None:
-                process.terminate()
-                try:
-                    process.wait(timeout=5)
-                except subprocess.TimeoutExpired:
-                    process.kill()
-                    process.wait()
+            pm.stop_process(process)
             if process.stdout:
                 process.stdout.close()
-        pm.clear_active_process()
+            pm.clear_active_process(process)
 
 def render_karaoke_video(
     instrumental_path: str,
@@ -155,7 +158,7 @@ def render_karaoke_video(
     logger.info(f"Duração do áudio instrumental: {duration:.2f} segundos.")
     
     if ass_path and os.path.exists(ass_path):
-        subtitles_filter = f"subtitles='{ass_path}'"
+        subtitles_filter = f"subtitles='{filter_path(ass_path)}'"
     else:
         subtitles_filter = None
     

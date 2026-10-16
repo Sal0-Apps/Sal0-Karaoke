@@ -3,38 +3,14 @@ import subprocess
 import logging
 import sys
 from pathlib import Path
+from runtime_resources import available_cpu_threads, thread_environment, release_cached_whisper
 
 logger = logging.getLogger("karaoke")
 
 
 def get_effective_cpu_count() -> int:
-    """Retorna a quantidade de CPUs realmente disponível para o processo.
-
-    A afinidade do processo é uma limitação real de execução. Já a cota de
-    CPU do cgroup representa tempo de CPU e não deve ser usada como número de
-    workers: em Docker ela pode valer ``1`` mesmo quando há vários CPUs
-    visíveis para o processo, causando subutilização artificial do PyTorch.
-    """
-    candidates = []
-
-    if hasattr(os, "sched_getaffinity"):
-        try:
-            affinity_count = len(os.sched_getaffinity(0))
-            if affinity_count > 0:
-                candidates.append(affinity_count)
-        except (OSError, AttributeError):
-            pass
-
-    host_count = os.cpu_count()
-    if host_count:
-        candidates.append(host_count)
-
-    available = max(1, min(candidates)) if candidates else 1
-    try:
-        configured = int(os.environ.get("KARAOKE_CPU_THREADS", "0"))
-    except ValueError:
-        configured = 0
-    return min(available, configured) if configured > 0 else available
+    """Compatibilidade para os consumidores do orçamento compartilhado de CPU."""
+    return available_cpu_threads()
 
 def get_file_duration(file_path: str) -> float:
     """Retorna a duração do arquivo de áudio/vídeo em segundos usando ffprobe."""
@@ -59,7 +35,7 @@ def extract_audio(input_path: str, output_wav_path: str) -> str:
     # Comando FFmpeg para extrair sem compressão intermediária em PCM float32
     cmd = [
         "ffmpeg",
-        "-y",
+        "-hide_banner", "-loglevel", "error", "-nostdin", "-y",
         "-i", input_path,
         "-vn",                   # Sem vídeo
         "-acodec", "pcm_f32le",  # Sem quantização intermediária para 16 bits
@@ -70,11 +46,11 @@ def extract_audio(input_path: str, output_wav_path: str) -> str:
     
     import process_manager as pm
     pm.check_cancelled()
+    process = None
     try:
         process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         pm.set_active_process(process)
         stdout, stderr = process.communicate()
-        pm.clear_active_process()
         pm.check_cancelled()
         
         if process.returncode != 0:
@@ -83,16 +59,19 @@ def extract_audio(input_path: str, output_wav_path: str) -> str:
         logger.info("Extração de áudio concluída com sucesso via FFmpeg.")
         return output_wav_path
     except Exception as e:
-        pm.clear_active_process()
         logger.error(f"Erro no FFmpeg ao extrair áudio: {e}")
         raise
+    finally:
+        pm.stop_process(process)
+        if process is not None:
+            pm.clear_active_process(process)
 
 def extract_audio_mp3(input_path: str, output_mp3_path: str) -> str:
     """Normaliza a primeira faixa de áudio de qualquer mídia compatível para MP3."""
     logger.info("Normalizando mídia para MP3: %s", input_path)
     cmd = [
         "ffmpeg",
-        "-y",
+        "-hide_banner", "-loglevel", "error", "-nostdin", "-y",
         "-i", input_path,
         "-map", "0:a:0",
         "-vn",
@@ -105,20 +84,23 @@ def extract_audio_mp3(input_path: str, output_mp3_path: str) -> str:
 
     import process_manager as pm
     pm.check_cancelled()
+    process = None
     try:
         process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         pm.set_active_process(process)
         stdout, stderr = process.communicate()
-        pm.clear_active_process()
         pm.check_cancelled()
         if process.returncode != 0:
             raise RuntimeError(f"FFmpeg não encontrou uma faixa de áudio utilizável: {stderr}")
         logger.info("Mídia normalizada para MP3 com sucesso: %s", output_mp3_path)
         return output_mp3_path
     except Exception as e:
-        pm.clear_active_process()
         logger.error(f"Erro no FFmpeg ao extrair MP3: {e}")
         raise
+    finally:
+        pm.stop_process(process)
+        if process is not None:
+            pm.clear_active_process(process)
 
 def separate_vocals(audio_path: str, temp_output_dir: str, update_callback=None) -> tuple[str, str]:
     """Usa Demucs em modo CPU para separar o áudio em vocais e instrumental (no_vocals)."""
@@ -148,7 +130,10 @@ def separate_vocals(audio_path: str, temp_output_dir: str, update_callback=None)
     
     import process_manager as pm
     pm.check_cancelled()
+    process = None
     try:
+        # Release the preceding track's retained Whisper before allocating Demucs.
+        release_cached_whisper()
         # Configurar variáveis de ambiente para salvar modelos do PyTorch/Demucs no disco persistente
         env = os.environ.copy()
         env["TORCH_HOME"] = "/data/output/models/torch"
@@ -157,30 +142,17 @@ def separate_vocals(audio_path: str, temp_output_dir: str, update_callback=None)
         env["TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD"] = "1"
 
         cpu_count = get_effective_cpu_count()
-        # Reserve um thread para o servidor, Telegram e demais tarefas do
-        # container. Em uma máquina com 4 threads, o Demucs ficará com 3;
-        # em máquinas diferentes a quantidade acompanha o hardware visível.
-        reserved_threads = 1 if cpu_count > 1 else 0
-        demucs_thread_limit = max(1, cpu_count - reserved_threads)
-        configured_threads = os.environ.get("DEMUCS_CPU_THREADS", "").strip()
-        try:
-            cpu_threads = int(configured_threads) if configured_threads else demucs_thread_limit
-        except ValueError:
-            cpu_threads = demucs_thread_limit
-        cpu_threads = max(1, min(cpu_threads, demucs_thread_limit))
+        cpu_threads = available_cpu_threads(os.environ.get("DEMUCS_CPU_THREADS"))
         # --jobs controla workers internos do Demucs, não a quantidade de
         # threads de CPU. Para uma única entrada, jobs=0 evita o caminho que
         # dividia o trabalho e acabava deixando a CPU quase ociosa.
         cmd[cmd.index("--jobs") + 1] = "0"
-        env["OMP_NUM_THREADS"] = str(cpu_threads)
-        env["MKL_NUM_THREADS"] = str(cpu_threads)
-        env["OPENBLAS_NUM_THREADS"] = str(cpu_threads)
-        env["NUMEXPR_NUM_THREADS"] = str(cpu_threads)
-        env["OMP_DYNAMIC"] = "FALSE"
-        env["MKL_DYNAMIC"] = "FALSE"
+        env = thread_environment(cpu_threads, env)
+        # The runner calls torch.set_num_threads: it must receive the same budget.
+        env["DEMUCS_CPU_THREADS"] = str(cpu_threads)
         logger.info(
             "Demucs CPU configurado com %s thread(s) de %s disponível(is); "
-            "1 thread reservada para o servidor; jobs internos: 0",
+            "jobs internos: 0",
             cpu_threads,
             cpu_count,
         )
@@ -196,7 +168,6 @@ def separate_vocals(audio_path: str, temp_output_dir: str, update_callback=None)
             bufsize=1,
         )
         pm.set_active_process(process)
-        cancelled_during_demucs = False
 
         # O htdemucs_ft é um conjunto de quatro análises. Cada uma informa
         # 0–100%, portanto o valor bruto reinicia várias vezes. Agregamos os
@@ -210,7 +181,6 @@ def separate_vocals(audio_path: str, temp_output_dir: str, update_callback=None)
         for line in process.stdout:
             if pm.cancel_event.is_set():
                 process.terminate()
-                cancelled_during_demucs = True
                 break
             line_str = line.strip()
             if line_str:
@@ -253,10 +223,7 @@ def separate_vocals(audio_path: str, temp_output_dir: str, update_callback=None)
                         last_raw_pct = raw_pct
                 
         process.wait()
-        pm.clear_active_process()
-
-        if cancelled_during_demucs:
-            pm.check_cancelled()
+        pm.check_cancelled()
         if process.returncode != 0:
             raise RuntimeError(f"Demucs falhou com código de retorno {process.returncode}")
 
@@ -281,6 +248,14 @@ def separate_vocals(audio_path: str, temp_output_dir: str, update_callback=None)
         
         return str(vocals_path), str(instrumental_path)
         
+    except InterruptedError:
+        raise
     except Exception as e:
         logger.error(f"Erro ao executar o Demucs: {e}")
         raise RuntimeError(f"Demucs falhou: {e}")
+    finally:
+        pm.stop_process(process)
+        if process is not None and process.stdout is not None:
+            process.stdout.close()
+        if process is not None:
+            pm.clear_active_process(process)

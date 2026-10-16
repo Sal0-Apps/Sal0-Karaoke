@@ -59,7 +59,7 @@ assert((await page.locator('#ytConnectionMessage').textContent()).includes('Ativ
 assert(await page.locator('#ytConnectionMessage').isVisible());
 failImport=false;
 await page.locator('#ytDesktopImport').click();
-await page.waitForFunction(()=>document.getElementById('ytPublishChannel').textContent.includes('✓ Canal conectado'));
+await page.waitForFunction(()=>document.getElementById('ytPublishChannel').textContent.includes('Canal conectado'));
 await page.waitForFunction(()=>document.querySelectorAll('#yt-user-playlist-0 option').length===3);
 assert(await page.locator('#ytPublishChannel').isVisible());
 assert.equal(await page.locator('#yt-user-playlist-0').inputValue(),'PL-one');

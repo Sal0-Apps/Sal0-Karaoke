@@ -1,3 +1,12 @@
+# 12.6.2
+
+- Corrigido o orçamento de threads do Demucs: o runner deixa de usar uma thread por padrão e utiliza os recursos atribuídos ao container. Demucs, Whisper, alinhamento e FFmpeg compartilham a mesma política, com liberação de memória entre etapas e preservação dos modelos e da qualidade.
+- Ícones SVG locais substituem emojis e símbolos da interface. Polling serial, atualizações de DOM somente quando há mudanças, preservação das seleções e editor responsivo mantêm o fluxo e o visual existentes.
+- Guia e vocabulário respeitam um orçamento combinado de tokens do Whisper. VAD sem palavras confere a faixa completa uma vez; falhas mantêm o modelo escolhido. Preservadas palavras curtas, linha do tempo original, alinhamento acústico e revisões manuais.
+- Publicações voltam à fila depois de renovar a autorização do mesmo canal; sessões de transferência expiradas são reiniciadas uma vez, sem reenviar vídeos com ID confirmado. O Telegram administrativo avisa quando é necessário renovar ou reconectar o canal, sem repetir a mesma notificação a cada consulta.
+- As credenciais Google do publicador só podem acessar caminhos da YouTube Data API, sem redirecionamentos. APIs Google de tradução/IA são bloqueadas como destino LibreTranslate. Limites de cota interrompem a operação; o aplicativo não ativa faturamento, compra créditos ou utiliza APIs Google pagas como alternativa. A configuração de faturamento da conta e serviços externos não são controladas pelo aplicativo: consulte `docs/GOOGLE_E_YOUTUBE.md`.
+- Testes de CPU, Whisper, modelos, cache, autorização, alertas, proteção de serviços Google e navegador adicionados à validação. Clientes Android e Windows atuais permanecem compatíveis; atualização apenas do servidor.
+
 # 12.6.1
 
 - As quebras dos versos da letra guia são reaplicadas depois do alinhamento acústico. Correspondências com bordas confirmadas não podem absorver a primeira palavra do próximo verso; regiões incertas continuam com divisão por frase. Texto, tempos e caracteres alinhados são preservados.
