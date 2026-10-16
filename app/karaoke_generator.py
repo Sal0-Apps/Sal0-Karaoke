@@ -76,6 +76,9 @@ def split_and_wrap_segments(
     chunks, current = [], []
     for index, entry in enumerate(word_stream):
         word = entry['word']
+        if current and word.get('lyric_line_start'):
+            chunks.append(current)
+            current = []
         current.append(word)
         clean = str(word.get('word', '')).strip()
         text = ''.join(str(item.get('word', '')) for item in current).strip()
@@ -101,7 +104,11 @@ def split_and_wrap_segments(
         )
         safety_limit = (count >= AUTO_MAX_PHRASE_WORDS or len(text) >= AUTO_MAX_PHRASE_CHARS
                         or duration >= AUTO_MAX_PHRASE_DURATION)
-        guided = next_marker[index] is not None
+        marker = next_marker[index]
+        # Automatic markers protect only their confirmed verse. An uncertain
+        # prefix must not absorb words from the next confirmed line.
+        guided = ('lyric_line_id' in word or (marker is not None
+                  and 'lyric_line_id' not in word_stream[marker]['word']))
         should_break = (bool(word.get('lyric_line_break')) or following is None
                         or (not guided and (natural_boundary or (safety_limit and not trailing_connector))))
         if should_break:

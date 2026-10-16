@@ -1,6 +1,7 @@
 """Validate user choices before creating files or releasing a review."""
 import math
 import re
+import copy
 
 from reprocess_cache import youtube_identity
 
@@ -112,6 +113,22 @@ def canonical_review_segments(segments, original_segments):
                     "start": w_start,
                     "end": w_end
                 })
+
+        original = original_segments[segment_index] if segment_index < len(original_segments) else {}
+        original_words = original.get('words', [])
+        for index, word in enumerate(words):
+            if index < len(original_words):
+                prior = original_words[index]
+                if (str(word['word']).strip() == str(prior.get('word', '')).strip()
+                        and abs(word['start'] - prior.get('start', -1)) < 1e-6
+                        and abs(word['end'] - prior.get('end', -1)) < 1e-6):
+                    for key in ('alignment_chars', 'alignment_score'):
+                        if key in prior:
+                            word[key] = copy.deepcopy(prior[key])
+            word['lyric_line_id'] = f'review:{segment_index}'
+        if words:
+            words[0]['lyric_line_start'] = True
+            words[-1]['lyric_line_break'] = True
 
         updated_segments.append({
             "start": s.start,

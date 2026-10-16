@@ -15,7 +15,7 @@ import time
 import numpy as np
 import requests
 
-from lyric_alignment import refine_lyrics
+from lyric_alignment import refine_lyrics, MMSAligner, supports_deletion
 from whisper_audio import load_whisper_audio
 
 DATASET='https://raw.githubusercontent.com/f90/jamendolyrics/f093b7a74e034deac21eb5ea3fc40769b29c35b0/'
@@ -61,9 +61,27 @@ def main():
         def unavailable(*args):raise AssertionError('Cached alignment must not reload its model')
         cached=refine_lyrics(source,segments,' '.join(text),root,decode=lambda _:audio,backend_factory=unavailable)
         assert cached[0]==result
+        # One recorded phrase versus an actual repeat of the same sung audio.
+        # A guide printed once must never delete the second sung occurrence.
+        phrase_indices=list(range(2,8))
+        left=float(rows[phrase_indices[0]]['word_start'])-.3
+        right=float(rows[phrase_indices[-1]]['word_end'])+.3
+        phrase_audio=whole[int(left*16000):int(right*16000)]
+        phrase=text[2:8]
+        aligner=MMSAligner(lambda *args:None,lambda:None)
+        try:
+            single=aligner.emission(phrase_audio)
+            repeated=aligner.emission(np.concatenate((phrase_audio,np.zeros(3200,np.float32),phrase_audio)))
+            single_prefers_deletion=supports_deletion(aligner,single,phrase*2,phrase)
+            repeat_prefers_deletion=supports_deletion(aligner,repeated,phrase*2,phrase)
+            assert single_prefers_deletion, 'Duplicated text must lose against one sung occurrence'
+            assert not repeat_prefers_deletion, 'An actually sung repeat must remain'
+        finally:
+            aligner.close()
         print(json.dumps(dict(engine='MMS CTC CPU',recording='Cortez - Feel (Stripped), CC BY',
             words=len(output),controlled_before_median_seconds=.4,after_median_seconds=round(float(np.median(errors)),4),
             corrected_guide_changes=report['guide_changes'],silent_words_removed=report['silent_or_invalid_words'],
+            unsupported_repeat_rejected=single_prefers_deletion,real_sung_repeat_preserved=not repeat_prefers_deletion,
             elapsed_seconds=round(time.monotonic()-started,2))),flush=True)
 
 

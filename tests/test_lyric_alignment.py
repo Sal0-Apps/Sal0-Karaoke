@@ -10,7 +10,8 @@ from unittest.mock import Mock, patch
 import numpy as np
 sys.path.insert(0,str(Path(__file__).parents[1]/'app'))
 from lyric_alignment import (AudioEvidence,clean_segments,roman_word,guided_candidate,
-    refine_lyrics,accept_alignment,invalidate_quality_outputs,QUALITY_VERSION,MMSAligner,acoustic_baseline)
+    refine_lyrics,accept_alignment,invalidate_quality_outputs,QUALITY_VERSION,MMSAligner,acoustic_baseline,
+    repetition_candidates,supports_deletion)
 from karaoke_generator import generate_ass_karaoke
 
 
@@ -37,6 +38,17 @@ class Backend:
 
 
 class EvidenceTests(unittest.TestCase):
+    def test_overlapping_phrase_with_slightly_different_clocks_is_one_event(self):
+        first = words('deixe uma luz acesa', 1)
+        duplicate = words('deixe uma luz acesa', 1.1)
+        later = words('deixe uma luz acesa', 6)
+        source = first + duplicate + later
+        before = copy.deepcopy(source)
+        result, report = clean_segments(source, AudioEvidence(sounding(10, .5, 9)))
+        self.assertEqual(sum(len(s['words']) for s in result), 8)
+        self.assertEqual(report['silent_or_invalid_words'], 4)
+        self.assertEqual(source, before)
+
     def test_words_in_introduction_gaps_and_silent_tail_are_removed_without_moving_audio(self):
         audio=sounding(12,start=2,end=4)
         source=words('intro',.1)+words('voz real',2.2)+words('fim inventado',7)
@@ -73,6 +85,27 @@ class EvidenceTests(unittest.TestCase):
 
 
 class GuideTests(unittest.TestCase):
+    def test_complete_adjacent_loop_can_be_proposed_even_with_low_guide_coverage(self):
+        raw = words('deixe uma luz acesa deixe uma luz acesa')[0]['words']
+        self.assertIn('deixe uma luz acesa'.split(), repetition_candidates(raw, 'deixe uma luz acesa'))
+        self.assertEqual(repetition_candidates(raw, 'deixe uma luz acesa\ndeixe uma luz acesa'), [])
+
+    def test_single_word_stutters_and_distant_refrains_are_not_loop_proposals(self):
+        self.assertEqual(repetition_candidates(words('não não não')[0]['words'], ''), [])
+        raw = words('deixe uma luz acesa', 1)[0]['words'] + words('deixe uma luz acesa', 10)[0]['words']
+        self.assertEqual(repetition_candidates(raw, ''), [])
+
+    def test_three_copies_can_reduce_to_one_but_never_below_an_explicit_guide_repeat(self):
+        line = 'deixe uma luz acesa'
+        raw = words(' '.join([line]*3))[0]['words']
+        self.assertIn(line.split(), repetition_candidates(raw, line))
+        proposals = repetition_candidates(raw, f'{line}\n{line}')
+        self.assertIn((line+' '+line).split(), proposals)
+        self.assertNotIn(line.split(), proposals)
+
+    def test_surviving_word_confidence_alone_cannot_authorize_a_deletion(self):
+        self.assertFalse(supports_deletion(Backend(lambda *a: None, lambda: None), None,
+                                           ['deixe', 'uma', 'luz'] * 2, ['deixe', 'uma', 'luz']))
     def test_lexical_guide_changes_return_to_asr_baseline_until_acoustically_confirmed(self):
         from lyric_guide import verify_lyrics_guide
         source=words('eu quero gastar com voce nesta noite')
@@ -111,6 +144,55 @@ class GuideTests(unittest.TestCase):
 
 
 class QualityTests(unittest.TestCase):
+    def test_unsupported_phrase_loop_is_removed_only_when_whole_audio_prefers_single_occurrence(self):
+        class Loop(Backend):
+            def sequence_score(self, emission, text):
+                return -100 if len(text) == 8 else -50
+        self.factory = Loop
+        result, report = self.refine(words('deixe uma luz acesa deixe uma luz acesa'), 'deixe uma luz acesa')
+        self.assertEqual(' '.join(s['text'] for s in result), 'deixe uma luz acesa')
+        self.assertEqual(report['repeated_words'], 4)
+        self.assertEqual(report['guide_verses'], 1)
+
+    def test_actually_sung_adjacent_repetition_is_kept_even_if_guide_prints_it_once(self):
+        class RealRepeat(Backend):
+            def sequence_score(self, emission, text):
+                return -40 if len(text) == 8 else -90
+        self.factory = RealRepeat
+        result, report = self.refine(words('deixe uma luz acesa deixe uma luz acesa'), 'deixe uma luz acesa')
+        self.assertEqual([s['text'] for s in result], ['deixe uma luz acesa'] * 2)
+        self.assertEqual(report['repeated_words'], 0)
+
+    def test_repeated_phrase_across_asr_analysis_chunks_is_still_checked(self):
+        line = 'deixe uma luz acesa quando eu voltar para casa nesta noite de chuva e vento'
+        class Loop(Backend):
+            def sequence_score(self, emission, text):
+                return -100 if len(text)>len(line.split()) else -20
+        self.factory = Loop
+        result, report = self.refine(words(line+' '+line, step=.26), line)
+        self.assertEqual(' '.join(s['text'] for s in result), line)
+        self.assertEqual(report['repeated_words'], len(line.split()))
+
+    def test_multiple_loop_hypotheses_keep_the_best_explanation_of_all_audio(self):
+        line = 'deixe uma luz acesa'
+        class Loop(Backend):
+            def sequence_score(self, emission, text):
+                return {4:-20, 8:-50, 12:-100}[len(text)]
+        self.factory = Loop
+        result, report = self.refine(words(' '.join([line]*3)), line)
+        self.assertEqual(' '.join(s['text'] for s in result), line)
+        self.assertEqual(report['repeated_words'], 8)
+
+    def test_alignment_then_cached_result_keep_boundaries_and_character_times(self):
+        source = words('deixe uma luz acesa quando eu voltar pra casa')
+        guide = 'deixe uma luz acesa\nquando eu voltar pra casa'
+        first, report = self.refine(source, guide)
+        second, cached_report = self.refine(source, guide)
+        self.assertEqual([s['text'] for s in first], guide.splitlines())
+        self.assertEqual(first, second)
+        self.assertEqual(report, cached_report)
+        self.assertTrue(first[1]['words'][0]['alignment_chars'])
+
     def setUp(self):
         self.temp=tempfile.TemporaryDirectory();self.addCleanup(self.temp.cleanup)
         self.root=Path(self.temp.name);self.audio=self.root/'source.wav';self.audio.write_bytes(b'fixture')

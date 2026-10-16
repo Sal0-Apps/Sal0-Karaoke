@@ -18,12 +18,13 @@ import unicodedata
 
 import numpy as np
 
-from lyric_guide import normalize_word, prepare_lyrics_guide
+from lyric_guide import normalize_word, prepare_lyrics_guide, apply_guide_boundaries
+from karaoke_generator import split_and_wrap_segments
 from whisper_audio import load_whisper_audio
 import process_manager as pm
 
 logger = logging.getLogger('karaoke')
-QUALITY_VERSION = 1
+QUALITY_VERSION = 2
 SAMPLE_RATE = 16000
 MODEL_URL = 'https://dl.fbaipublicfiles.com/mms/torchaudio/ctc_alignment_mling_uroman/model.pt'
 MODEL_DIR = '/data/output/models/lyric_alignment'
@@ -125,6 +126,105 @@ class AudioEvidence:
                 min(self.duration,(first+int(indices[-1])+1)*self.hop/self.rate))
 
 
+def remove_overlapping_phrases(words):
+    """Two near-identical clocks describe one event, not two sung refrains."""
+    normalized = [normalize_word(word['word']) for word in words]
+    kept = [True] * len(words)
+    previous = {}
+
+    def same_event(left, right):
+        overlap = min(left['end'], right['end']) - max(left['start'], right['start'])
+        shortest = min(left['end'] - left['start'], right['end'] - right['start'])
+        return (abs(left['start'] - right['start']) <= .25
+                and abs(left['end'] - right['end']) <= .35
+                and overlap >= shortest * .6)
+
+    for index in range(len(words) - 2):
+        if not all(kept[index:index+3]):
+            continue
+        key = tuple(normalized[index:index+3])
+        if not all(key):
+            continue
+        duplicate = False
+        for before in reversed(previous.get(key, [])[-8:]):
+            if before + 3 > index or not all(kept[before:before+3]):
+                continue
+            length = 0
+            while (index + length < len(words) and before + length < index
+                   and kept[before+length] and kept[index+length]
+                   and normalized[before+length] == normalized[index+length]
+                   and same_event(words[before+length], words[index+length])):
+                length += 1
+            if length >= 3:
+                kept[index:index+length] = [False] * length
+                duplicate = True
+                break
+        if not duplicate:
+            previous.setdefault(key, []).append(index)
+    return [word for word, keep in zip(words, kept) if keep], kept.count(False)
+
+
+def repetition_candidates(words, guide):
+    """Propose adjacent ASR loops; acoustic likelihood must approve a deletion."""
+    texts = [str(word['word']).strip() for word in words]
+    observed = [normalize_word(text) for text in texts]
+    expected = [normalize_word(text) for text in prepare_lyrics_guide(guide).split()]
+    proposals = []
+    seen = set()
+    for length in range(min(24, len(words)//2), 2, -1):
+        for start in range(len(words) - 2*length + 1):
+            phrase = observed[start:start+length]
+            if not all(phrase) or phrase != observed[start+length:start+2*length]:
+                continue
+            if words[start+length]['start'] - words[start+length-1]['end'] > .8:
+                continue
+            copies = 2
+            while observed[start+copies*length:start+(copies+1)*length] == phrase:
+                copies += 1
+            requested = 1
+            for index in range(len(expected)-length+1):
+                count = 0
+                while expected[index+count*length:index+(count+1)*length] == phrase:
+                    count += 1
+                requested = max(requested, count)
+            for keep in range(requested, copies):
+                candidate = texts[:start+keep*length] + texts[start+copies*length:]
+                key = tuple(candidate)
+                if key not in seen:
+                    proposals.append(candidate)
+                    seen.add(key)
+    return proposals[:3]
+
+
+def coalesce_repetition_windows(segments, guide):
+    """A short ASR chunk boundary must not hide a loop from acoustic comparison."""
+    result = []
+    for segment in segments:
+        if result:
+            previous = result[-1]
+            combined = previous['words'] + segment['words']
+            if (segment['end'] - previous['start'] <= 19.1
+                    and repetition_candidates(combined, guide)):
+                result[-1] = dict(start=previous['start'], end=segment['end'],
+                    text=''.join(word['word'] for word in combined).strip(), words=combined)
+                continue
+        result.append(segment)
+    return result
+
+
+def supports_deletion(backend, emission, original, candidate):
+    """Compare hypotheses against every audio frame, including the removed span.
+
+    A good mean score on the surviving words alone can hide an actually sung
+    repetition. CTC sequence likelihood penalizes that unexplained vocal audio.
+    """
+    score = getattr(backend, 'sequence_score', None)
+    if not callable(score):
+        return False
+    full, reduced = score(emission, original), score(emission, candidate)
+    return math.isfinite(reduced) and reduced > full + 5.
+
+
 def clean_segments(segments, evidence):
     """Remove words outside media/sound and invalid overlapping ASR loops."""
     words=[]; removed=0; trimmed=0
@@ -157,6 +257,8 @@ def clean_segments(segments, evidence):
             if duplicate:
                 removed+=1;continue
             words.append(item)
+    words, overlap_removed = remove_overlapping_phrases(words)
+    removed += overlap_removed
     words.sort(key=lambda word:(word['start'],word['end']))
     return regroup(words),dict(silent_or_invalid_words=removed,trimmed_words=trimmed)
 
@@ -246,6 +348,21 @@ class MMSAligner:
                                 end=tokens[-1].end*ratio,alignment_score=score,alignment_chars=chars))
         return aligned
 
+    def sequence_score(self, emission, words):
+        values, _ = emission
+        normalized = [roman_word(word) for word in words]
+        if not normalized or any(not word for word in normalized):
+            return -math.inf
+        targets = [token for word in self.tokenizer(normalized) for token in word]
+        self.cancel()
+        with self.torch.inference_mode():
+            loss = self.torch.nn.functional.ctc_loss(
+                values.log_softmax(-1).unsqueeze(1),
+                self.torch.tensor(targets, dtype=self.torch.long),
+                [values.size(0)], [len(targets)], blank=0, reduction='sum')
+        self.cancel()
+        return -float(loss)
+
     def close(self):
         if hasattr(self,'model'):del self.model
         self.torch.set_num_threads(self.old_threads)
@@ -325,7 +442,9 @@ def refine_lyrics(audio_path, segments, guide, cache_dir, context=None, progress
     audio=(decode or load_whisper_audio)(audio_path)
     evidence=AudioEvidence(audio)
     cleaned,report=clean_segments(segments,evidence)
+    cleaned=coalesce_repetition_windows(cleaned, guide)
     report.update(version=QUALITY_VERSION,status='cleaned',aligned_words=0,guide_changes=0,unsupported_voice_words=0,
+                  repeated_words=0,guide_verses=0,
                   rejected_groups=0,source=os.path.basename(str(audio_path)))
     backend=None;result=[]
     try:
@@ -348,9 +467,28 @@ def refine_lyrics(audio_path, segments, guide, cache_dir, context=None, progress
                     if candidate:
                         guided=backend.align(emission,candidate)
                         if (accept_alignment(guided,original,end-start,start)
+                                and (len(candidate) >= len(texts)
+                                     or supports_deletion(backend, emission, texts, candidate))
                                 and _mean_score(guided)>=_mean_score(baseline or [])*.8-.015):
                             chosen=guided
                             report['guide_changes']+=sum(tag!='equal' for tag,*_ in difflib.SequenceMatcher(None,texts,candidate,autojunk=False).get_opcodes())
+                    # A complete duplicated phrase can defeat local guide matching.
+                    # Test a bounded set of loop hypotheses on the same emissions.
+                    if chosen is baseline:
+                        best_loop = None
+                        best_score = -math.inf
+                        for reduced in repetition_candidates(original, guide):
+                            aligned = backend.align(emission, reduced)
+                            if (accept_alignment(aligned, original, end-start, start)
+                                    and _mean_score(aligned) >= _mean_score(baseline or [])*.8-.015
+                                    and supports_deletion(backend, emission, texts, reduced)):
+                                score = backend.sequence_score(emission, reduced)
+                                if score > best_score:
+                                    best_loop = aligned
+                                    best_score = score
+                        if best_loop:
+                            chosen = best_loop
+                            report['repeated_words'] += len(texts) - len(best_loop)
                     if chosen is baseline and baseline and len(baseline)==len(original):
                         unsupported={i for i,word in enumerate(baseline)
                             if word.get('alignment_score',1.)<.08
@@ -391,7 +529,10 @@ def refine_lyrics(audio_path, segments, guide, cache_dir, context=None, progress
     final,extra=clean_segments(regroup(result),evidence)
     report['silent_or_invalid_words']+=extra['silent_or_invalid_words'];report['trimmed_words']+=extra['trimmed_words']
     # Missing/quiet voice can yield an empty result; never restore hallucinated text.
-    report['discarded_words']=report['silent_or_invalid_words']+report['unsupported_voice_words']
+    report['discarded_words']=report['silent_or_invalid_words']+report['unsupported_voice_words']+report['repeated_words']
+    if guide:
+        final, report['guide_verses'] = apply_guide_boundaries(guide, final)
+        final = split_and_wrap_segments(final)
     temporary=target.with_suffix('.json.tmp')
     try:
         temporary.write_text(json.dumps(dict(signature=signature,segments=final,report=report),ensure_ascii=False))

@@ -1,5 +1,6 @@
 """Check lyric spelling against Whisper words, using only acoustic word clocks."""
 import difflib
+import copy
 import hashlib
 import json
 import logging
@@ -29,6 +30,70 @@ def prepare_lyrics_guide(value):
             continue
         lines.append(line)
     return '\n'.join(lines)
+
+
+def apply_guide_boundaries(lyrics, segments):
+    """Recover confirmed guide verses after CTC, without replacing text or clocks.
+
+    Whole-line matches have anchored edges. Small internal recognition mistakes
+    are tolerated, but a word from the following verse cannot extend a match.
+    Interval selection prevents overlapping guide lines from sharing a word.
+    Repeated sung occurrences can reuse a guide line printed only once.
+    """
+    result = copy.deepcopy(segments)
+    words = [word for segment in result for word in segment.get('words', [])]
+    for word in words:
+        for key in ('lyric_line_start', 'lyric_line_break', 'lyric_line_id'):
+            word.pop(key, None)
+    observed = [normalize_word(word.get('word', '')) for word in words]
+    positions = {}
+    for index, token in enumerate(observed):
+        if token:
+            positions.setdefault(token, []).append(index)
+    candidates = {}
+    for line_index, line in enumerate(prepare_lyrics_guide(lyrics).splitlines()):
+        expected = [normalize_word(token) for token in line.split() if normalize_word(token)]
+        size = len(expected)
+        if not 2 <= size <= 64:
+            continue
+        for start in positions.get(expected[0], []):
+            for length in (size, size - 1, size + 1) if size >= 5 else (size,):
+                end = start + length
+                if end > len(words) or observed[end - 1] != expected[-1]:
+                    continue
+                if words[end - 1]['end'] - words[start]['start'] > 35:
+                    continue
+                actual = observed[start:end]
+                matches = sum(block.size for block in difflib.SequenceMatcher(
+                    None, expected, actual, autojunk=False).get_matching_blocks())
+                if (size < 5 and actual != expected) or matches / max(size, length) < .8:
+                    continue
+                weight = matches - (max(size, length) - matches) * .6 + .05
+                candidates.setdefault(start, []).append((end, weight, line_index))
+    # Maximize confirmed coverage instead of greedily accepting overlapping lines.
+    best = [0.] * (len(words) + 1)
+    selected = {}
+    for start in range(len(words) - 1, -1, -1):
+        best[start] = best[start + 1]
+        for end, weight, line_index in candidates.get(start, []):
+            if weight + best[end] > best[start] + 1e-6:
+                best[start] = weight + best[end]
+                selected[start] = (end, line_index)
+    count = 0
+    index = 0
+    while index < len(words):
+        if index not in selected:
+            index += 1
+            continue
+        end, line_index = selected[index]
+        identifier = f'{line_index}:{index}'
+        for word in words[index:end]:
+            word['lyric_line_id'] = identifier
+        words[index]['lyric_line_start'] = True
+        words[end - 1]['lyric_line_break'] = True
+        count += 1
+        index = end
+    return result, count
 
 
 def _gap_pairs(expected, recognized):

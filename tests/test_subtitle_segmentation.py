@@ -8,11 +8,13 @@ import tempfile
 import unittest
 import unicodedata
 import sys
+from types import SimpleNamespace
 from pathlib import Path
 
 
 sys.path.insert(0, str(Path(__file__).parents[1] / "app"))
-from lyric_guide import verify_lyrics_guide
+from lyric_guide import verify_lyrics_guide, apply_guide_boundaries
+from processing_validation import canonical_review_segments
 
 MODULE_PATH = Path(__file__).parents[1] / "app" / "karaoke_generator.py"
 SPEC = importlib.util.spec_from_file_location("karaoke_generator", MODULE_PATH)
@@ -49,6 +51,120 @@ def make_words(texts, start=0.0, step=0.5):
 
 
 class SubtitleSegmentationTests(unittest.TestCase):
+    def review(self, source, edits=None):
+        payload = []
+        for segment in edits or source:
+            payload.append(SimpleNamespace(synced_line=False, start=segment['start'],
+                end=segment['end'], text=segment['text'], words=[SimpleNamespace(
+                    word=word['word'], start=word['start'], end=word['end']) for word in segment['words']]))
+        return canonical_review_segments(payload, source)
+
+    def test_saving_review_keeps_verse_boundaries_even_without_punctuation(self):
+        first = make_words('deixe uma luz acesa'.split())
+        second = make_words('quando eu voltar pra casa'.split(), start=2)
+        source = [dict(start=0, end=1.9, text='deixe uma luz acesa', words=first),
+                  dict(start=2, end=4.4, text='quando eu voltar pra casa', words=second)]
+        reviewed = self.review(source)
+        result = karaoke_generator.split_and_wrap_segments(reviewed)
+        self.assertEqual([s['text'] for s in result], [s['text'] for s in source])
+
+    def test_review_without_changes_preserves_measured_character_animation(self):
+        items = make_words(['casa'])
+        items[0]['alignment_chars'] = [dict(text=c, start=i*.1, end=(i+1)*.1)
+                                       for i,c in enumerate('casa')]
+        source = [dict(start=0, end=.4, text='casa', words=items)]
+        reviewed = self.review(source)
+        self.assertEqual(reviewed[0]['words'][0]['alignment_chars'], items[0]['alignment_chars'])
+        reviewed[0]['words'][0]['alignment_chars'][0]['text'] = 'x'
+        self.assertEqual(items[0]['alignment_chars'][0]['text'], 'c')
+
+    def test_reviewed_word_or_clock_changes_do_not_reuse_stale_character_marks(self):
+        items = make_words(['casa'])
+        items[0]['alignment_chars'] = [dict(text='casa', start=0, end=.4)]
+        source = [dict(start=0, end=.4, text='casa', words=items)]
+        for change in ('word', 'clock'):
+            edits = copy.deepcopy(source)
+            if change == 'word': edits[0]['text'] = 'rua'
+            else: edits[0]['start'] = .1; edits[0]['end'] = .6
+            reviewed = self.review(source, edits)
+            self.assertNotIn('alignment_chars', reviewed[0]['words'][0])
+
+    def guided(self, guide, text, step=.5):
+        words = make_words(text.split(), step=step)
+        source = [dict(start=0, end=words[-1]['end'], text=text, words=words)]
+        before = copy.deepcopy(source)
+        marked, count = apply_guide_boundaries(guide, source)
+        result = karaoke_generator.split_and_wrap_segments(marked)
+        self.assertEqual(source, before)
+        self.assertEqual([(w['word'], w['start'], w['end']) for s in result for w in s['words']],
+                         [(w['word'], w['start'], w['end']) for w in words])
+        return result, count
+
+    def test_aligned_lowercase_verses_follow_guide_edges_instead_of_asr_chunks(self):
+        phrases = ['deixe uma luz acesa', 'quando eu voltar pra casa', 'vou encontrar meu caminho']
+        result, count = self.guided('\n'.join(phrases), ' '.join(phrases))
+        self.assertEqual([s['text'] for s in result], phrases)
+        self.assertEqual(count, 3)
+
+    def test_first_words_of_confirmed_verse_cannot_stay_in_an_uncertain_previous_line(self):
+        result, count = self.guided('uma luz fica acesa\nquando eu voltar pra casa',
+                                   'palavras diferentes antes quando eu voltar pra casa')
+        self.assertEqual([s['text'] for s in result],
+                         ['palavras diferentes antes', 'quando eu voltar pra casa'])
+        self.assertEqual(count, 1)
+
+    def test_small_internal_word_error_does_not_move_the_next_verse_start(self):
+        result, count = self.guided('eu deixei uma luz acesa\nquando eu voltar pra casa',
+                                   'eu deixei outra luz acesa quando eu voltar pra casa')
+        self.assertEqual([s['text'] for s in result],
+                         ['eu deixei outra luz acesa', 'quando eu voltar pra casa'])
+        self.assertEqual(count, 2)
+
+    def test_guide_boundaries_cannot_borrow_an_extra_word_from_the_following_verse(self):
+        result, _ = self.guided('eu deixei uma luz acesa\nquando eu voltar pra casa',
+                                'eu deixei uma luz acesa quando eu voltar pra casa')
+        self.assertEqual(result[0]['words'][-1]['word'].strip(), 'acesa')
+        self.assertEqual(result[1]['words'][0]['word'].strip(), 'quando')
+
+    def test_one_printed_chorus_divides_every_later_sung_occurrence(self):
+        line = 'deixe uma luz acesa'
+        result, count = self.guided(line, f'{line} {line} {line}')
+        self.assertEqual([s['text'] for s in result], [line] * 3)
+        self.assertEqual(count, 3)
+
+    def test_lrc_times_never_override_real_word_clocks_when_marking_lines(self):
+        result, count = self.guided('[99:00]deixe uma luz acesa\n[99:10]quando eu voltar pra casa',
+                                   'deixe uma luz acesa quando eu voltar pra casa')
+        self.assertEqual(count, 2)
+        self.assertEqual(result[1]['start'], 2)
+
+    def test_unrelated_or_one_word_guide_does_not_impose_new_verses(self):
+        for guide in ('outro canto distante\nmais uma melodia', 'uma'):
+            result, count = self.guided(guide, 'deixe uma luz acesa quando eu voltar pra casa')
+            self.assertEqual(count, 0)
+            self.assertEqual(len(result), 1)
+
+    def test_long_unformatted_guide_does_not_disable_phrase_safety_limits(self):
+        text = ' '.join(f'palavra{i}' for i in range(80))
+        result, count = self.guided(text, text)
+        self.assertEqual(count, 0)
+        self.assertGreater(len(result), 1)
+
+    def test_rendered_events_and_preview_use_the_same_confirmed_guide_verses(self):
+        phrases = ['deixe uma luz acesa', 'quando eu voltar pra casa']
+        result, _ = self.guided('\n'.join(phrases), ' '.join(phrases))
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / 'verses.ass'
+            karaoke_generator.generate_ass_karaoke(result, str(path), show_instrumental=False,
+                                                   show_next_line_preview=True)
+            events = [line for line in path.read_text().splitlines() if line.startswith('Dialogue:')]
+        active = [line for line in events if ',Default,' in line]
+        self.assertEqual(len(active), 2)
+        def plain(line):
+            return re.sub(r'\{[^}]*\}', '', line.split(',', 9)[-1]).replace(r'\N', '')
+        self.assertEqual([plain(line) for line in active], phrases)
+        self.assertEqual(plain(next(line for line in events if ',NextLine,' in line)), phrases[1])
+
     def test_guide_corrects_misheard_words_between_confirmed_phrases(self):
         words = make_words(['eu', 'quero', 'gastar', 'com', 'você', 'nesta', 'noite'])
         original = [{'start': 0, 'end': 3.5, 'words': words, 'text': ''}]
