@@ -1,3 +1,11 @@
+# 12.6.1
+
+- As quebras dos versos da letra guia são reaplicadas depois do alinhamento acústico. Correspondências com bordas confirmadas não podem absorver a primeira palavra do próximo verso; regiões incertas continuam com divisão por frase. Texto, tempos e caracteres alinhados são preservados.
+- Frases duplicadas com tempos sobrepostos passam a ser reconhecidas mesmo com pequenas diferenças de relógio. Repetições em momentos distintos só são removidas quando a probabilidade CTC da sequência completa prefere a hipótese sem o excesso; confiança média das palavras restantes não basta. Refrões realmente cantados e repetições explícitas da guia são protegidos.
+- Salvar a revisão mantém as divisões dos versos e conserva a animação acústica das palavras que não foram alteradas. Mudanças de palavra ou de tempo invalidam as marcações de caracteres correspondentes.
+- Cache automático de qualidade e renderização atualizado, mantendo transcrição bruta, áudio e revisões manuais. A versão 12.6 permanece disponível para retorno.
+- Testes de divisão, prévia/renderização, cache, erros internos da letra e repetições; ensaio em CPU compara uma frase cantada uma vez com o mesmo áudio efetivamente repetido.
+
 # 12.6
 
 - Preservada a 12.5.1 na imagem versionada, release e branch de backup anterior à mudança de qualidade. Transcrições brutas e revisões manuais permanecem disponíveis.

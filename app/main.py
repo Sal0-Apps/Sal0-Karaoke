@@ -5748,7 +5748,7 @@ def run_pipeline(
             cached_meta["audio_hash"] = new_audio_hash
 
         invalidate_subtitle_display_cache(cache_dir, cached_meta, {
-            "version": 4, "font_size": font_size, "text_color": text_color,
+            "version": 5, "font_size": font_size, "text_color": text_color,
             "text_position": text_position, "subtitle_mode": subtitle_mode,
             "words_per_line": words_per_line, "max_chars_line": max_chars_line,
             "break_on_punctuation": break_on_punctuation, "show_instrumental": show_instrumental,

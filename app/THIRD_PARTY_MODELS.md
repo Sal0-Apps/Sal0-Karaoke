@@ -20,3 +20,7 @@ https://github.com/f90/jamendolyrics/tree/f093b7a74e034deac21eb5ea3fc40769b29c35
 The controlled test offsets the input word clocks by 400 ms, replaces one word
 and appends three words in digital silence. Reported timing differences measure
 that alignment test; they are not a general ASR transcription benchmark.
+
+The CPU test also compares a single recorded phrase with a real repetition made
+from the same sung audio. Full-sequence CTC likelihood must reject duplicated
+text for one occurrence and preserve both actually sung occurrences.
