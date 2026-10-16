@@ -61,7 +61,7 @@ from backing_vocals import preserve_backing_vocals
 from processing_validation import validate_processing_options, validate_review_segments, canonical_review_segments
 import queue_cache
 import queue_submissions
-from lyric_alignment import refine_lyrics, acoustic_baseline, QUALITY_VERSION
+from lyric_alignment import refine_lyrics, acoustic_baseline
 
 # Configurar logs
 logging.basicConfig(
@@ -5757,7 +5757,7 @@ def run_pipeline(
 
         # Upgrade prior verse-based reviews once; external clocks never enter
         # the guide signature or control subtitles in this acoustic policy.
-        clock_hash = hashlib.sha256(json.dumps({"lyrics_policy_version": GUIDE_POLICY_VERSION, "quality_version": QUALITY_VERSION,
+        clock_hash = hashlib.sha256(json.dumps({"lyrics_policy_version": GUIDE_POLICY_VERSION,
             "lyrics": prepare_lyrics_guide(lyrics_text), "whisper_model": whisper_model,
             "transcription_preset": transcription_preset,
             "voice_source": ("original" if transcribe_source == "original" else
@@ -6122,6 +6122,12 @@ def run_pipeline(
             pm.check_cancelled()
 
             draft = queue_cache.read_draft(cache_dir)
+            if not draft:
+                checkpoints = queue_cache.read_json(os.path.join(cache_dir, "stage_checkpoints.json"), {})
+                if "transcription_reviewed" in checkpoints.get("completed_stages", {}):
+                    reviewed = queue_cache.read_json(os.path.join(cache_dir, "reviewed_segments.json"))
+                    if isinstance(reviewed, list) and reviewed:
+                        draft = reviewed
             if not draft:
                 if lyrics_text:
                     segments = acoustic_baseline(segments, guide_report["checks"])

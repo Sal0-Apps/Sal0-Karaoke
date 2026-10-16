@@ -27,7 +27,7 @@ from lyric_alignment import acoustic_baseline
 
 
 class SyncedAcousticAnimationTests(unittest.TestCase):
-    def run_stage(self, cache_version=None, verses=None, voice=None, reprocess=False, timing="auto", source_mode="vocals", backing_enabled=False, backing_volume=100, audio_cache_version=3):
+    def run_stage(self, cache_version=None, verses=None, voice=None, reprocess=False, timing="auto", source_mode="vocals", backing_enabled=False, backing_volume=100, audio_cache_version=3, reviewed=None):
         source = (ROOT / 'app/main.py').read_text()
         stage = source[source.index('            segments = None\n', source.index('# Passo 3: Transcrever vocais')):
                        source.index('            # --- NOVO: Passo de Pausa')]
@@ -39,6 +39,10 @@ class SyncedAcousticAnimationTests(unittest.TestCase):
         acoustic = voice if voice is not None else acoustic
         lyric_text = '\n'.join(segment['text'] for segment in lrc)
         with tempfile.TemporaryDirectory() as folder:
+            if reviewed:
+                (Path(folder) / 'reviewed_segments.json').write_text(json.dumps(reviewed))
+                (Path(folder) / 'stage_checkpoints.json').write_text(json.dumps(
+                    {'completed_stages': {'transcription_reviewed': {'saved': True}}}))
             cached = acoustic if cache_version == 3 else lrc
             (Path(folder) / 'synced_acoustic_segments.json').write_text(json.dumps(cached))
             vocal_source = 'original' if source_mode == 'original' else 'lead' if backing_enabled else 'all'
@@ -106,6 +110,13 @@ class SyncedAcousticAnimationTests(unittest.TestCase):
         scope, transcriber = self.run_stage(cache_version=3)
         transcriber.assert_not_called()
         self.assertEqual(scope['segments'][0]['words'][1]['start'], 11.6)
+
+    def test_resuming_a_human_review_skips_automatic_quality_and_preserves_manual_words(self):
+        reviewed = [dict(start=9.8, end=13, text='Minha revisão completa', words=[
+            dict(word='Minha revisão completa', start=9.8, end=13)])]
+        scope, _ = self.run_stage(cache_version=3, reviewed=reviewed)
+        scope['refine_lyrics'].assert_not_called()
+        self.assertEqual(scope['segments'], reviewed)
 
     def test_new_task_reuses_saved_whisper_analysis_without_calling_model(self):
         scope, transcriber = self.run_stage(reprocess=True)
