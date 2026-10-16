@@ -3,7 +3,8 @@ const HTML = require('./load_html.cjs')();
 const icon = fs.readFileSync('app/templates/app-icon-v8.png');
 const processing = () => ({status: 'processing', progress: 23, step: 'Separating vocals',
     stage_progress: 8, stage_detail: 'Análise 1 de 4', can_cancel: true,
-    process_summary: {title: 'Música em andamento', lyrics: 'Letra sincronizada', model: 'Large V3 Turbo', background: 'Vídeo original'}});
+    process_summary: {title: 'Música em andamento', lyrics: 'Letra sincronizada', model: 'Large V3 Turbo', background: 'Vídeo original',
+        timing: '17 palavras alinhadas · 3 sem apoio removidas'}});
 const activeJob = () => ({id: 'active', status: 'processing', title: 'Música em andamento', owner_username: 'owner'});
 
 (async () => {
@@ -335,6 +336,21 @@ const activeJob = () => ({id: 'active', status: 'processing', title: 'Música em
         await page.setViewportSize({width: 1440, height: 1000});
         await page.evaluate(() => setTheme('light'));
         await page.screenshot({path: 'queue-creation-editor-desktop.png'});
+
+        // Timing and a model fallback remain visible on the completed result.
+        await page.evaluate(() => setQueueCreationExpanded(false));
+        queuePaused = false; jobs = [];
+        serverStatus = {status: 'done', result_available_to_current_user: true,
+            original_filename: 'ready.mp4', process_summary: processing().process_summary};
+        await refresh();
+        assert(await page.locator('#resultTimingSummary').isVisible());
+        assert.equal(await page.locator('#resultTimingSummary').textContent(), processing().process_summary.timing);
+        serverStatus.process_summary.timing = 'Alinhador indisponível · tempos do Whisper e silêncio conferido';
+        await refresh();
+        assert((await page.locator('#resultTimingSummary').textContent()).includes('indisponível'));
+        serverStatus = processing(); jobs = [activeJob()];
+        await refresh();
+        assert(!await page.locator('#downloadBox').isVisible());
         assert.deepEqual(errors, []);
         console.log('Queue creation: three modes, lost YouTube acknowledgements, idempotent network/manual retries, download progress, uninterrupted drafts/loading, partial retry, review race, privacy, pause and five viewport sizes passed.');
     } finally { await browser.close(); }

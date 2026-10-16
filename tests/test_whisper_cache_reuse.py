@@ -38,7 +38,7 @@ class WhisperCacheReuseTests(unittest.TestCase):
                 (root/name).write_text('preserved')
             scope = dict(hashlib=hashlib, json=json, os=os, cache_dir=folder,
                 cache_meta_file=str(root/'cache_meta.json'), cached_meta=meta,
-                load_stage_checkpoints=load, GUIDE_POLICY_VERSION=GUIDE_POLICY_VERSION,
+                load_stage_checkpoints=load, GUIDE_POLICY_VERSION=GUIDE_POLICY_VERSION,QUALITY_VERSION=1,
                 prepare_lyrics_guide=prepare_lyrics_guide, lyrics_text='[00:01]eu canto assim',
                 output_options={}, whisper_model='medium', transcription_preset='karaoke',
                 keep_backing_vocals=True, transcribe_source='vocals', new_audio_hash='audio-one')

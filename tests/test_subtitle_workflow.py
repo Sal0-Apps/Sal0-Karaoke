@@ -86,6 +86,7 @@ class SubtitlePipelineTests(unittest.TestCase):
             Path(result).write_bytes(b'mp4')
         state = Mock(); delivery = Mock()
         pipeline = load_function('run_subtitle_srt_pipeline', os=os, json=json, shutil=shutil,
+            refine_lyrics=lambda audio,segments,*args,**kwargs:(segments,{'status':'cleaned','aligned_words':0}),
             normalize_subtitle_settings=normalize_subtitle_settings, get_file_duration=lambda _:1,
             stage_checkpoint=lambda _, stage:checkpoints.get(stage,{}), save_stage_checkpoint=Mock(),
             update_state=state, update_process_summary=Mock(), notify_targets=Mock(),

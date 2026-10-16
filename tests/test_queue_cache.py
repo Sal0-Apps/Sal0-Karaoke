@@ -495,5 +495,14 @@ class QueueCacheTests(unittest.TestCase):
         self.scope['load_processing_queue']()
         self.assertEqual(self.scope['processing_queue'][0]['pipeline']['input_audio_path'],str(media))
 
+    def test_editor_loads_displayed_alignment_before_raw_words_and_manual_review_before_both(self):
+        job=self.job('QUALITY');cache=Path(job['pipeline']['cache_dir'])
+        aligned=[{'start':1,'end':2,'text':'Texto alinhado','words':[{'word':' Texto alinhado','start':1,'end':2}]}]
+        (cache/'display_segments.json').write_text(json.dumps(aligned))
+        self.assertEqual(self.client.get('/api/queue-cache/QUALITY/segments').json()['segments'],aligned)
+        reviewed=[{'start':1.5,'end':3,'text':'Minha revisão','words':[{'word':' Minha revisão','start':1.5,'end':3}]}]
+        (cache/'reviewed_segments.json').write_text(json.dumps(reviewed))
+        self.assertEqual(self.client.get('/api/queue-cache/QUALITY/segments').json()['segments'],reviewed)
+
 
 if __name__=='__main__':unittest.main()

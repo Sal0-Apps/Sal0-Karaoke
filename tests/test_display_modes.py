@@ -113,6 +113,24 @@ class DisplayModeTests(unittest.TestCase):
             for bound in bounds[1:]:
                 self.assertTrue(all(abs(a - b) <= 1 for a, b in zip(bounds[0], bound)))
 
+    def test_measured_letters_stop_highlighting_during_an_internal_vocal_pause(self):
+        word = dict(word='casa', start=1, end=2.4, alignment_chars=[
+            dict(text='c', start=1, end=1.05), dict(text='a', start=1.1, end=1.3),
+            dict(text='s', start=2.2, end=2.25), dict(text='a', start=2.3, end=2.4)])
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / 'measured.ass'
+            generate_ass_karaoke([dict(start=1, end=2.4, text='casa', words=[word])],
+                str(path), subtitle_mode='syllable', show_instrumental=False,
+                show_next_line_preview=False)
+            def highlighted(time):
+                pixels = frame(path, time)
+                return np.count_nonzero((pixels[:, :, 0] < 40) & (pixels[:, :, 1:].min(axis=2) > 220))
+            before, first, pause, complete = [highlighted(t) for t in (.96, 1.4, 2, 2.36)]
+            self.assertEqual(before, 0)
+            self.assertGreater(first, 100)
+            self.assertEqual(first, pause)
+            self.assertGreater(complete, pause)
+
     def test_active_baseline_and_preview_top_stay_fixed_across_verse_lengths(self):
         segments = [dict(start=0, end=1, text='One short phrase', words=[]),
                     dict(start=1, end=2, text='A substantially longer phrase spanning several visual rows without moving the preview', words=[]),
