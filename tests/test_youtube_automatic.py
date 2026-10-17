@@ -43,6 +43,20 @@ class AutomaticPublicationTests(unittest.TestCase):
         self.publisher.save('settings.json', dict(defaults=dict(playlist_id='PL-admin')))
         self.assertIsNone(self.publisher.publication_options(self.user, None))
 
+    def test_old_clients_omitting_checkbox_keep_opt_out_unless_default_explicitly_requested(self):
+        main = Path(__file__).parents[1] / 'app' / 'main.py'
+        function = next(node for node in ast.parse(main.read_text(encoding='utf-8')).body
+                        if isinstance(node, ast.FunctionDef) and node.name == 'process_karaoke')
+        call = next(node for node in ast.walk(function) if isinstance(node, ast.Call)
+                    and isinstance(node.func, ast.Attribute) and node.func.attr == 'publication_options')
+        expression = ast.Expression(body=call)
+        for use_default, requested, enabled in [(False, False, False), (True, False, True), (False, True, True)]:
+            scope = dict(youtube_publisher=self.publisher, current_user=self.user,
+                         youtube_publish=requested, youtube_use_profile_default=use_default,
+                         youtube_playlist_id='', youtube_title='', youtube_extra_playlists=False, additional=[])
+            result = eval(compile(expression, str(main), 'eval'), scope)
+            self.assertEqual(bool(result), enabled)
+
     def test_automatic_intent_is_durable_before_cover_or_live_playlist_requests(self):
         options = self.publisher.publication_options(self.user, True)
         options['additional_playlists'] = ['PL-extra']

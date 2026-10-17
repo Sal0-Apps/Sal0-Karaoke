@@ -38,9 +38,9 @@ const HTML = require('./load_html.cjs')();
         for (const prefix of ['easy', 'full']) {
             const result = await page.evaluate(prefix => {
                 const data = new FormData(); attachYoutubePublicationChoice(data, prefix);
-                return data.get('youtube_publish');
+                return [data.get('youtube_publish'), data.get('youtube_use_profile_default')];
             }, prefix);
-            assert.equal(result, null);
+            assert.deepEqual(result, [null, 'true']);
         }
         ready = true; await page.evaluate(() => loadYoutubePublicationOptions());
         for (const prefix of ['easy', 'full']) {

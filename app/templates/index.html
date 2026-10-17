@@ -7718,7 +7718,9 @@
         function attachYoutubePublicationChoice(formData, prefix) {
             const checkbox = ytElement(prefix + 'YoutubePublish');
             // Unavailable options mean "use my configured default", not opt-out.
-            if (checkbox.disabled && !checkbox.dataset.userChoice) formData.delete('youtube_publish');
+            const useDefault = checkbox.disabled && !checkbox.dataset.userChoice;
+            formData.set('youtube_use_profile_default', String(Boolean(useDefault)));
+            if (useDefault) formData.delete('youtube_publish');
             else formData.set('youtube_publish', String(checkbox.checked));
         }
         for (const prefix of ['easy', 'full']) {

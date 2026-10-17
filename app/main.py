@@ -4126,7 +4126,8 @@ def process_karaoke(
     lyrics_mode: str = Form("auto"),
     lyrics_selected: bool = Form(False),
     lyrics_source_key: str = Form(""),
-    youtube_publish: bool | None = Form(None),
+    youtube_publish: bool = Form(False),
+    youtube_use_profile_default: bool = Form(False),
     youtube_playlist_id: str = Form(""),
     youtube_title: str = Form(""),
     lyrics_timing: str = Form("acoustic"),
@@ -4185,7 +4186,7 @@ def process_karaoke(
     youtube_playlist_id = ""  # Automatic creation always includes the assigned profile playlist.
     try:
         publication_options = None if subtitle_only else youtube_publisher.publication_options(
-            current_user, youtube_publish, youtube_playlist_id, youtube_title,
+            current_user, None if youtube_use_profile_default else youtube_publish, youtube_playlist_id, youtube_title,
             **({"additional_playlists": additional} if youtube_extra_playlists else {}))
     except Exception as error:
         from youtube_publisher import PublicationError
