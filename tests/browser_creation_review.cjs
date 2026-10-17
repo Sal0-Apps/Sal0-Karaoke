@@ -76,7 +76,7 @@ for (const script of HTML.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/g)) new 
         });
         await page.goto('http://karaoke.test');
         await page.locator('[data-quick-source="upload"]').waitFor();
-        await page.waitForFunction(() => easyModeConfig.whisper_model === 'medium');
+        await page.waitForFunction(() => easyModeConfig?.whisper_model === 'medium');
         assert.equal(await page.locator('#transcribeSource').inputValue(), 'original');
         assert.equal(await page.locator('#easyModeSource').inputValue(), 'original');
         assert((await page.locator('#easySummaryModel').textContent()).includes('Áudio original'));

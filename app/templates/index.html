@@ -1856,7 +1856,7 @@
 </details>
                     </details>
 <div id="easyYoutubePublication" style="display:none;margin:1rem 0">
-                    <label style="display:flex;gap:.5rem;align-items:center"><input type="checkbox" id="easyYoutubePublish" value="true"> Publicar no YouTube ao concluir</label>
+                    <label style="display:flex;gap:.5rem;align-items:center"><input type="checkbox" id="easyYoutubePublish" value="true" checked disabled> Publicar no YouTube ao concluir</label>
                     <label for="easyYoutubePlaylist" class="compact-note">Playlist deste vídeo</label>
                     <select id="easyYoutubePlaylist" class="select-input"></select>
                     <details><summary>Alterar título (opcional)</summary>
@@ -2242,7 +2242,7 @@
                     </div>
 
             <div id="fullYoutubePublication" style="display:none;margin:1rem 0">
-                    <label style="display:flex;gap:.5rem;align-items:center"><input type="checkbox" id="fullYoutubePublish" name="youtube_publish" value="true"> Publicar no YouTube ao concluir</label>
+                    <label style="display:flex;gap:.5rem;align-items:center"><input type="checkbox" id="fullYoutubePublish" name="youtube_publish" value="true" checked disabled> Publicar no YouTube ao concluir</label>
                     <label for="fullYoutubePlaylist" class="compact-note">Playlist de publicação</label>
                     <select id="fullYoutubePlaylist" name="youtube_playlist_id" class="select-input"></select>
                     <label for="fullYoutubeTitle" class="compact-note">Título no YouTube (opcional)</label>
@@ -2613,6 +2613,26 @@
                 <p id="translationToolsMessage" class="compact-note" role="status" style="overflow-wrap: anywhere;"></p>
                 <p class="compact-note">Depois de atualizar o container LibreTranslate, teste novamente aqui. O botão consulta a API e envia e baixa um SRT de teste; a atualização da imagem é feita no CasaOS/Docker. A configuração permanece salva após reiniciar o Karaokê.</p>
             </div>
+            </details>
+
+            <details class="card settings-panel" id="karaokeVisualSettingsSection" style="display:none;">
+                <summary class="settings-panel-summary" aria-expanded="false" aria-controls="karaokeVisualSettingsBody">
+                    <span class="settings-panel-heading"><span class="card-title">Animação e instrumental</span><span class="settings-panel-trigger"><span data-panel-label data-closed-label="Abrir ajustes">Abrir ajustes</span><span class="settings-panel-chevron" aria-hidden="true"><svg class="sal0-icon" viewBox="0 0 24 24"><use href="#sal0-chevron-down"></use></svg></span></span></span>
+                    <span class="settings-panel-overview">Estilo das palavras, brilho e contagem para voltar a cantar.</span>
+                </summary>
+                <div id="karaokeVisualSettingsBody" class="settings-panel-body">
+                    <p class="compact-note">Aplicado aos karaokês de todas as contas. O destaque acompanha a voz; o estilo não antecipa os tempos das palavras.</p>
+                    <div class="form-grid">
+                        <div class="form-group"><label for="karaokeAnimationStyle" class="label">Animação das palavras</label><select id="karaokeAnimationStyle" class="select-input"><option value="smooth">Suave, com acabamento luminoso</option><option value="classic">Varredura clássica</option></select></div>
+                        <div class="form-group"><label for="karaokeHighlightGlow" class="label">Brilho durante o canto</label><select id="karaokeHighlightGlow" class="select-input"><option value="true">Ativado</option><option value="false">Desativado</option></select></div>
+                        <div class="form-group"><label for="karaokeInstrumentalStyle" class="label">Estilo do instrumental</label><select id="karaokeInstrumentalStyle" class="select-input"><option value="progress">Texto com barra de progresso</option><option value="classic">Texto clássico</option></select></div>
+                        <div class="form-group"><label for="karaokeInstrumentalColor" class="label">Cor do instrumental</label><input id="karaokeInstrumentalColor" type="color" value="#38bdf8" class="input-text" style="min-height:44px;"></div>
+                        <div class="form-group"><label for="karaokeMinimumRest" class="label">Pausa mínima para mostrar o aviso (segundos)</label><input id="karaokeMinimumRest" type="number" min="1.5" max="10" step="0.1" value="2" class="input-text"></div>
+                        <div class="form-group"><label for="karaokeCountdown" class="label">Contagem antes do canto (segundos)</label><input id="karaokeCountdown" type="number" min="1" max="5" step="1" value="3" class="input-text"></div>
+                    </div>
+                    <button type="button" id="btnSaveKaraokeVisuals" class="btn-primary"><svg class="sal0-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#sal0-save"></use></svg> Salvar animação e instrumental</button>
+                    <p id="karaokeVisualsMessage" class="compact-note" role="status" aria-live="polite"></p>
+                </div>
             </details>
 
             <details class="card settings-panel" id="easyModeSettingsSection">
@@ -2992,7 +3012,7 @@
                 </ol>
                 <p>A API tem cota gratuita e pode limitar projetos sem auditoria a vídeos privados. Guarde a autorização como uma senha. Backing vocals e vídeo do modo SRT mostram porcentagem da etapa e avisam o avanço no Telegram; o LibreTranslate informa apenas início e término.</p>
             </details>
-            <p class="compact-note">Versão do servidor: 12.6.2. A transcrição é local; fontes, modelos e integrações podem acessar serviços externos. Use conteúdo autorizado.</p>
+            <p class="compact-note">Versão do servidor: 12.7. A transcrição é local; fontes, modelos e integrações podem acessar serviços externos. Use conteúdo autorizado.</p>
             <p class="compact-note">Use o servidor pela rede local ou VPN. A busca/importação do YouTube não concede direitos sobre a mídia. OAuth autoriza o acesso ao canal, não o uso de músicas. Confira as permissões do conteúdo e os termos do YouTube antes de importar ou publicar. Não listado permite acesso a quem tiver o link; resultados SRT nunca vão ao YouTube.</p>
             <p class="compact-note"><a href="https://www.youtube.com/static?template=terms" target="_blank" rel="noopener noreferrer">Termos do YouTube</a> · <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer">Privacidade do Google</a> · <a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener noreferrer">Revogar acesso ao canal</a></p>
         </div>
@@ -3128,7 +3148,7 @@
         function applyRoleUI() {
             const admin = currentUser?.role === 'admin';
             document.querySelector('.settings-grid')?.classList.toggle('user-settings', !admin);
-            ['youtubePublisherSection', 'modelManagerSection', 'youtubeToolsSection', 'translationToolsSection', 'subtitleModeSettingsSection', 'easyModeSettingsSection', 'externalUrlSection', 'userManagementSection', 'logsSection'].forEach(id => {
+            ['youtubePublisherSection', 'modelManagerSection', 'youtubeToolsSection', 'translationToolsSection', 'subtitleModeSettingsSection', 'karaokeVisualSettingsSection', 'easyModeSettingsSection', 'externalUrlSection', 'userManagementSection', 'logsSection'].forEach(id => {
                 const element = document.getElementById(id);
                 if (element) element.style.display = admin ? '' : 'none';
             });
@@ -3482,6 +3502,37 @@
             if (response.ok) applySubtitleSettings(await response.json());
         }
 
+        function applyKaraokeVisuals(config) {
+            document.getElementById('karaokeAnimationStyle').value = config.animation_style || 'smooth';
+            document.getElementById('karaokeHighlightGlow').value = String(config.highlight_glow ?? true);
+            document.getElementById('karaokeInstrumentalStyle').value = config.instrumental_style || 'progress';
+            document.getElementById('karaokeInstrumentalColor').value = config.instrumental_color || '#38bdf8';
+            document.getElementById('karaokeMinimumRest').value = config.min_instrumental_gap ?? 2;
+            document.getElementById('karaokeCountdown').value = config.countdown_seconds ?? 3;
+        }
+        async function fetchKaraokeVisuals() {
+            const response = await authFetch('/api/admin/karaoke-visuals');
+            if (response.ok) applyKaraokeVisuals(await response.json());
+        }
+        document.getElementById('btnSaveKaraokeVisuals').addEventListener('click', async event => {
+            const button = event.currentTarget, message = document.getElementById('karaokeVisualsMessage');
+            const minimum = document.getElementById('karaokeMinimumRest'), countdown = document.getElementById('karaokeCountdown');
+            if (!minimum.reportValidity() || !countdown.reportValidity()) return;
+            button.disabled = true; message.textContent = 'Salvando…';
+            try {
+                const response = await authFetch('/api/admin/karaoke-visuals', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({
+                    animation_style: document.getElementById('karaokeAnimationStyle').value,
+                    highlight_glow: document.getElementById('karaokeHighlightGlow').value === 'true',
+                    instrumental_style: document.getElementById('karaokeInstrumentalStyle').value,
+                    instrumental_color: document.getElementById('karaokeInstrumentalColor').value,
+                    min_instrumental_gap: Number(minimum.value), countdown_seconds: Number(countdown.value)
+                })});
+                const result = await response.json();
+                if (!response.ok) throw new Error(typeof result.detail === 'string' ? result.detail : 'Não foi possível salvar.');
+                applyKaraokeVisuals(result); message.textContent = 'Salvo. O estilo será aplicado nas próximas renderizações de karaokê.';
+            } catch (error) { message.textContent = error.message; }
+            finally { button.disabled = false; }
+        });
         async function fetchEasyModeConfig() {
             try {
                 const response = await authFetch('/api/easy-mode');
@@ -5181,7 +5232,7 @@
                 const button = document.getElementById('easySubmitBtn');
                 const formData = new FormData();
                 formData.set('easy_mode', 'true');
-                formData.set('youtube_publish', String(document.getElementById('easyYoutubePublish').checked));
+                attachYoutubePublicationChoice(formData, 'easy');
                 formData.set('youtube_playlist_id', document.getElementById('easyYoutubePlaylist').value);
                 formData.set('youtube_title', document.getElementById('easyYoutubeTitle').value.trim());
                 addYoutubeExtras(formData, 'easy');
@@ -6614,7 +6665,7 @@
                 queueReady,
             ];
             if (currentUser?.role === 'admin') {
-                initialLoads.push(loadYoutubePublisher(), fetchExternalUrlConfig(), fetchUsers(), fetchModelsStatus(), fetchYoutubeToolsStatus(), fetchTranslationSettings());
+                initialLoads.push(loadYoutubePublisher(), fetchExternalUrlConfig(), fetchUsers(), fetchModelsStatus(), fetchYoutubeToolsStatus(), fetchTranslationSettings(), fetchKaraokeVisuals());
             }
             await Promise.allSettled(initialLoads);
             if (!window.cacheEditorActive) setCreatorMode(currentCreatorMode);
@@ -6648,6 +6699,7 @@
                 const initialStatus = document.getElementById('creationLoadingDetail');
 
                 const formData = new FormData(karaokêForm);
+                attachYoutubePublicationChoice(formData, 'full');
                 addYoutubeExtras(formData, "full");
                 formData.set('app_base_url', window.location.origin);
                 let audioFiles = [];
@@ -7663,6 +7715,19 @@
                 container.append(row);
             }
         }
+        function attachYoutubePublicationChoice(formData, prefix) {
+            const checkbox = ytElement(prefix + 'YoutubePublish');
+            // Unavailable options mean "use my configured default", not opt-out.
+            const useDefault = checkbox.disabled && !checkbox.dataset.userChoice;
+            formData.set('youtube_use_profile_default', String(Boolean(useDefault)));
+            if (useDefault) formData.delete('youtube_publish');
+            else formData.set('youtube_publish', String(checkbox.checked));
+        }
+        for (const prefix of ['easy', 'full']) {
+            ytElement(prefix + 'YoutubePublish').addEventListener('change', event => {
+                event.target.dataset.userChoice = 'true';
+            });
+        }
         async function loadYoutubePublicationOptions() {
             try {
                 const response = await authFetch('/api/youtube/publication-options');
@@ -7672,7 +7737,7 @@
                     const container = ytElement(prefix + 'YoutubePublication');
                     container.style.display = options.enabled ? 'block' : 'none';
                     const checkbox = ytElement(prefix + 'YoutubePublish');
-                    if (!window.cachedRevisionId) checkbox.checked = options.enabled && options.can_publish && options.default_publish;
+                    if (!window.cachedRevisionId && !checkbox.dataset.userChoice) checkbox.checked = options.enabled && options.can_publish && options.default_publish;
                     checkbox.disabled = !options.can_publish;
                     const select = ytElement(prefix + 'YoutubePlaylist');
                     select.replaceChildren();

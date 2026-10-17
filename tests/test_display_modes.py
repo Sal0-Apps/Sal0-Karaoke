@@ -43,6 +43,9 @@ class DisplayModeTests(unittest.TestCase):
                     font_size=50, text_color='#00FFFF', text_position='middle', subtitle_mode=mode,
                     words_per_line=0, max_chars_line=0, break_on_punctuation=True, show_instrumental=False,
                     show_next_line_preview=False, keep_first_line_visible=False,
+                    instrumental_wav='instrumental.wav', get_file_duration=lambda _: 3,
+                    karaoke_visual_settings={'animation_style': 'classic', 'instrumental_style': 'classic'},
+                    queue_cache=SimpleNamespace(read_json=lambda *args: {}),
                     pm=SimpleNamespace(check_cancelled=Mock()), save_stage_checkpoint=Mock())
                 exec(compile(textwrap.dedent(stage), 'server-subtitle-stage', 'exec'), scope)
                 self.assertEqual(generator.call_args.kwargs['subtitle_mode'], mode)

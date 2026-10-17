@@ -25,7 +25,7 @@ import process_manager as pm
 from runtime_resources import available_cpu_threads, release_cached_whisper
 
 logger = logging.getLogger('karaoke')
-QUALITY_VERSION = 2
+QUALITY_VERSION = 3
 SAMPLE_RATE = 16000
 MODEL_URL = 'https://dl.fbaipublicfiles.com/mms/torchaudio/ctc_alignment_mling_uroman/model.pt'
 MODEL_DIR = '/data/output/models/lyric_alignment'
@@ -227,7 +227,7 @@ def supports_deletion(backend, emission, original, candidate):
     return math.isfinite(reduced) and reduced > full + 5.
 
 
-def clean_segments(segments, evidence):
+def clean_segments(segments, evidence, voice_regions=None):
     """Remove words outside media/sound and invalid overlapping ASR loops."""
     words=[]; removed=0; trimmed=0
     for segment in segments or []:
@@ -239,11 +239,24 @@ def clean_segments(segments, evidence):
             if not math.isfinite(start+end) or end<=start or end<=0 or start>=evidence.duration or not str(source.get('word','')).strip():
                 removed+=1;continue
             start,end=max(0.,start),min(evidence.duration,end)
-            bounds=evidence.bounds(start,end)
+            if voice_regions:
+                supported = [max(start, left) for left, right in voice_regions
+                             if min(end, right) > max(start, left)]
+                if supported and min(supported) - start > .25:
+                    onset = min(supported)
+                    lead = evidence.rms[int(start*evidence.rate/evidence.hop):int(onset*evidence.rate/evidence.hop)]
+                    voice = evidence.rms[int(onset*evidence.rate/evidence.hop):math.ceil(end*evidence.rate/evidence.hop)]
+                    # A faint Demucs instrumental leak is not the sung onset.
+                    # Strong/quiet actual singing remains supported by its own
+                    # energy; a missed VAD region alone never deletes a word.
+                    if len(lead) and len(voice) and np.quantile(lead,.9) < np.quantile(voice,.75)*.1:
+                        start = onset
+            bounds=evidence.bounds(start,end,margin=0)
             if bounds is None:
                 removed+=1;continue
             # Long unsupported tails must not keep a completed verse on screen.
-            corrected_start=max(start,bounds[0]-.08) if bounds[0]-start>.18 else start
+            # Do not add a visual lead-in before the first supported sound.
+            corrected_start=max(start,bounds[0]) if bounds[0]-start>.03 else start
             corrected_end=min(end,bounds[1]+.08) if end-bounds[1]>.18 else end
             if corrected_end<=corrected_start:
                 removed+=1;continue
@@ -380,7 +393,7 @@ def detect_voice_regions(audio):
     """Silero only supplies supporting evidence; the waveform stays intact."""
     try:
         from faster_whisper.vad import get_speech_timestamps, VadOptions
-        options=VadOptions(threshold=.25,min_speech_duration_ms=100,min_silence_duration_ms=250,speech_pad_ms=160)
+        options=VadOptions(threshold=.25,min_speech_duration_ms=100,min_silence_duration_ms=250,speech_pad_ms=0)
         return [(item['start']/SAMPLE_RATE,item['end']/SAMPLE_RATE)
                 for item in get_speech_timestamps(audio,options)]
     except InterruptedError:raise
@@ -529,7 +542,7 @@ def refine_lyrics(audio_path, segments, guide, cache_dir, context=None, progress
     finally:
         if backend is not None:backend.close()
     cancel()
-    final,extra=clean_segments(regroup(result),evidence)
+    final,extra=clean_segments(regroup(result),evidence,voice_regions)
     report['silent_or_invalid_words']+=extra['silent_or_invalid_words'];report['trimmed_words']+=extra['trimmed_words']
     # Missing/quiet voice can yield an empty result; never restore hallucinated text.
     report['discarded_words']=report['silent_or_invalid_words']+report['unsupported_voice_words']+report['repeated_words']
@@ -538,7 +551,8 @@ def refine_lyrics(audio_path, segments, guide, cache_dir, context=None, progress
         final = split_and_wrap_segments(final)
     temporary=target.with_suffix('.json.tmp')
     try:
-        temporary.write_text(json.dumps(dict(signature=signature,segments=final,report=report),ensure_ascii=False))
+        temporary.write_text(json.dumps(dict(signature=signature,segments=final,report=report,
+                                            voice_regions=voice_regions),ensure_ascii=False))
         cancel();os.replace(temporary,target)
     finally:
         temporary.unlink(missing_ok=True)

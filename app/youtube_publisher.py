@@ -516,14 +516,14 @@ class YouTubePublisher:
             raise PublicationError('Use a playlist atribuída à sua conta pelo administrador.')
         return selected
 
-    def validate_additional_playlists(self, values, primary):
+    def validate_additional_playlists(self, values, primary, verify_remote=True):
         if values is None:
             return []
         if not isinstance(values, list) or len(values) > 20 or any(
                 not isinstance(value, str) or not re.fullmatch(r'[A-Za-z0-9_-]{1,128}', value) for value in values):
             raise PublicationError('Escolha até 20 playlists adicionais válidas.')
         values = list(dict.fromkeys(value for value in values if value != primary))
-        if values and not set(values).issubset({item['id'] for item in self.playlists()}):
+        if verify_remote and values and not set(values).issubset({item['id'] for item in self.playlists()}):
             raise PublicationError('Uma playlist adicional não pertence ao canal conectado.')
         return values
 
@@ -547,6 +547,13 @@ class YouTubePublisher:
 
     def publication_options(self, user, requested=False, playlist_id='', title='', additional_playlists=None):
         # Every account starts checked in the UI; each video still submits its own choice.
+        if requested is None:
+            # A loading/temporarily unavailable UI must not silently opt out.
+            settings = self.settings(user.get('username'))
+            assigned = (settings['playlist_id'] if user.get('role') == 'admin' else
+                        settings['user_assignments'].get(user.get('username'), {}).get('playlist_id'))
+            token = self.read('token.json')
+            requested = bool(assigned and token.get('channel_id') and token.get('refresh_token'))
         if not requested:
             return None
         settings = self.settings(user.get('username'))
@@ -603,7 +610,10 @@ class YouTubePublisher:
         if playlist_id and not re.fullmatch(r'[A-Za-z0-9_-]{1,128}', playlist_id):
             raise PublicationError('Identificador de playlist inválido.')
         playlist_id = self.validate_profile_playlist(requester or {'role':'admin'}, playlist_id)
-        additional_playlists = self.validate_additional_playlists(additional_playlists, playlist_id)
+        # The creation request validated these targets. Persist the intent
+        # without another remote dependency; publish() rechecks channel ownership.
+        additional_playlists = self.validate_additional_playlists(additional_playlists, playlist_id,
+                                                                 verify_remote=not automatic)
         previous = None
         if replaces_video_id:
             previous = next((item for item in self.read('jobs.json', []) if item.get('video_id') == replaces_video_id
@@ -644,7 +654,7 @@ class YouTubePublisher:
                     raise PublicationError('A capa deve ser JPEG ou PNG de até 2 MB.')
                 cover = folder / (job_id + ('.png' if data.startswith(b'\x89PNG') else '.jpg'))
                 cover.write_bytes(data)
-            else:
+            elif not automatic:
                 import shutil
                 shutil.copyfile(video_thumbnail(video, cover=True), cover)
             job = {'id': job_id, 'identity': identity, 'video': str(video), 'thumbnail': str(cover),
@@ -664,6 +674,8 @@ class YouTubePublisher:
 
     def enqueue_automatic(self, video, original_title, options):
         title = options.get('title_override') or options['title_template'].replace('{title}', original_title)[:100]
+        if not options.get('title_override'):
+            title = re.sub(r'[\x00-\x1f<>]', '', title).strip() or 'Sal0 Karaokê'
         return self.enqueue(video, title, options['privacy'], options.get('playlist_id', ''), channel_id=options['channel_id'], requester=options.get('requester'), automatic=True, additional_playlists=options.get('additional_playlists'), replaces_video_id=options.get('replaces_video_id'))
 
     @staticmethod
@@ -793,6 +805,15 @@ class YouTubePublisher:
             available_playlists = {p['id'] for p in self.playlists()}
             if not set(targets).issubset(available_playlists):
                 raise PublicationError('A playlist não pertence ao canal conectado.')
+        if not job.get('thumbnail_done'):
+            # Automatic jobs are durable before thumbnail generation. A failed
+            # frame extraction stays visible/retryable in this same queue job.
+            if not Path(job['thumbnail']).is_file():
+                import shutil
+                try:
+                    shutil.copyfile(video_thumbnail(job['video'], cover=True), job['thumbnail'])
+                except Exception as error:
+                    raise PublicationError('Não foi possível preparar a capa. Retome a mesma publicação pelo painel.') from error
         video_id = self.upload_video(job)
         if not job.get('thumbnail_done'):
             with open(job['thumbnail'], 'rb') as cover:
