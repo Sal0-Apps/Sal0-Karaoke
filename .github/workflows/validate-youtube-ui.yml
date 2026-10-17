@@ -57,6 +57,9 @@ jobs:
           python -m unittest discover -s tests -p test_whisper_refinements.py -v
           python -m unittest discover -s tests -p test_alignment_resources.py -v
           python -m unittest discover -s tests -p test_youtube_renewal_alerts.py -v
+          python -m unittest discover -s tests -p test_youtube_automatic.py -v
+          python -m unittest discover -s tests -p test_karaoke_timing.py -v
+          python -m unittest discover -s tests -p test_karaoke_visuals.py -v
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
@@ -73,6 +76,7 @@ jobs:
           NODE_PATH=/tmp/sal0-ui/node_modules node tests/browser_subtitle_lyrics.cjs
           NODE_PATH=/tmp/sal0-ui/node_modules node tests/browser_lyrics_search.cjs
           NODE_PATH=/tmp/sal0-ui/node_modules node tests/browser_interface_refinements.cjs
+          NODE_PATH=/tmp/sal0-ui/node_modules node tests/browser_karaoke_visuals.cjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -88,4 +92,5 @@ jobs:
             subtitle-*.png
             lyrics-search-*.png
             review-artifacts/interface-*.png
+            review-artifacts/karaoke-visuals-*.png
           if-no-files-found: ignore

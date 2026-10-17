@@ -8,7 +8,7 @@ O código original é software livre sob a [licença MIT](LICENSE). Dependência
 
 O Sal0 Karaokê é destinado a uma instalação pessoal, acessada pela rede local ou por VPN, como ZeroTier. O repositório aberto disponibiliza o código e os pacotes; o projeto não opera um serviço público de processamento nem coleta centralmente as mídias das instalações. Não é necessário expor a porta do app à internet. O processamento principal é local, mas as integrações escolhidas podem se comunicar com serviços externos.
 
-Na **12.6.2**, o servidor utiliza o orçamento real de CPU, preserva memória entre etapas de IA e refina o contexto do Whisper sem trocar o modelo selecionado. Ícones SVG locais e atualizações sem reconstruções repetidas mantêm o visual e o fluxo. A renovação do YouTube recupera os envios afetados, com alerta administrativo pelo Telegram. A integração não ativa faturamento nem usa APIs Google pagas como alternativa; [confira o escopo e os limites dessa proteção](docs/GOOGLE_E_YOUTUBE.md).
+Na **12.7**, animações respeitam o início medido de cada palavra, pausas instrumentais seguem os intervalos do canto e a publicação automática mantém sua intenção mesmo durante o carregamento do painel. O administrador configura animação, brilho, cor e barra do instrumental, pausa mínima e contagem em **Ajustes → Animação e instrumental**. [Detalhes da atualização](docs/ATUALIZACAO_12_7.md).
 
 Na **12.6.1**, as quebras confirmadas da guia dividem os versos depois do alinhamento, sem levar o início de um verso ao anterior. Duplicações com tempos sobrepostos são filtradas; repetições em tempos distintos só são retiradas quando a hipótese reduzida explica melhor o áudio completo do trecho. A 12.6 continua disponível para retorno. Desde a **12.6**, uma segunda análise alinha palavras e partes da animação ao áudio vocal. Mudanças da letra-guia exigem apoio acústico; palavras sem som, sobreposições duplicadas e caudas silenciosas são filtradas sem cortar a música. A transcrição original fica preservada, e o editor abre o resultado efetivamente exibido; revisões manuais têm prioridade. O modelo adicional é baixado uma vez com progresso, persistido no volume e liberado da memória ao concluir. A 12.5.1 continua disponível para retorno. Links do YouTube entram na fila sem aguardar o download. A transferência acontece no worker com andamento e cancelamento; inclusões interrompidas pela rede têm confirmação recuperável sem duplicar a tarefa. Web e Compose usam o mesmo ícone, com endereço renovado para o ZimaOS. A fila mostra primeiro o item em processamento, depois os pendentes na ordem de execução e, abaixo, os encerrados. **Apagar cache da fila** limpa os arquivos temporários de todo o seu perfil após esgotar os pendentes, preservando os resultados e outras contas. A limpeza tem confirmação e indicação de erros; consultas antigas não repõem itens apagados. Mantidas as melhorias da 12.2.2: a fila carrega independentemente das configurações; Rápido e Detalhado restauram as escolhas e a letra-guia da execução, preservando o fundo em cache; o editor abre sem esperar a prévia de mídia. **Fila de processamento** mantém todos os itens com botões compactos de **Legendas**, **Rápido** e **Detalhado**, guarda os arquivos e permite editar legendas e refazer qualquer item no Rápido ou Detalhado. O cache permanece após o término e é trocado ao aceitar uma nova origem para a próxima fila, ou removido pelo botão de limpeza. Playlists adicionais são opcionais e começam desmarcadas; a do perfil continua incluída. Revisões podem substituir o vídeo anterior no YouTube após a confirmação do novo, atualizando também seu link no Telegram. Mantidos os painéis de Ajustes recolhidos.
 
@@ -140,14 +140,14 @@ Em **Playlist de cada usuário**, a administração define uma playlist válida 
 
 ## Início rápido com Docker
 
-A versão de distribuição desta documentação é **12.6.2**. O título e o rodapé da página mostram apenas o nome da aplicação. A versão do servidor pode ser consultada no Manual; a versão do APK aparece nas configurações nativas.
+A versão de distribuição desta documentação é **12.7**. O título e o rodapé da página mostram apenas o nome da aplicação. A versão do servidor pode ser consultada no Manual; a versão do APK aparece nas configurações nativas.
 
 Crie um arquivo `compose.yaml`:
 
 ```yaml
 services:
   karaoke-app:
-    image: ghcr.io/sal0-apps/sal0-karaoke:12.6.2
+    image: ghcr.io/sal0-apps/sal0-karaoke:12.7
     container_name: karaoke-app
     ports:
       - "7885:7860"

@@ -3,6 +3,8 @@ import logging
 import math
 import re
 import unicodedata
+import copy
+from karaoke_visuals import normalize_visuals
 
 logger = logging.getLogger("karaoke")
 
@@ -11,6 +13,7 @@ AUTO_MAX_CHARS_LINE = 54
 AUTO_MAX_PHRASE_WORDS = 24
 AUTO_MAX_PHRASE_CHARS = 160
 AUTO_MAX_PHRASE_DURATION = 14.0
+
 
 def format_time(seconds: float) -> str:
     """Converte segundos para o formato de tempo do ASS: H:MM:SS.CS (Centisegundos)."""
@@ -124,91 +127,63 @@ def split_and_wrap_segments(
                 len(segments), len(result), words_per_line, max_chars_line)
     return result
 
-def insert_instrumental_breaks(segments: list[dict]) -> list[dict]:
-    """
-    Insere avisos visuais de 'Instrumental' e contagens regressivas (3, 2, 1)
-    quando houver pausas (gaps) maiores ou iguais a 3 segundos entre os versos ou na introdução.
-    """
+def insert_instrumental_breaks(segments: list[dict], media_duration=None, visual_settings=None) -> list[dict]:
+    """Locate rests in measured words, independently of verse display clocks."""
     if not segments:
         return []
-        
-    new_segments = []
-    
-    # 1. Tratar a introdução da música se ela for longa (>= 3 segundos)
-    first_start = segments[0]["start"]
-    if first_start >= 3.0:
-        if first_start > 3.0:
-            new_segments.append({
-                "start": 0.0,
-                "end": first_start - 3.0,
-                "text": "Instrumental",
-                "words": []
-            })
-        new_segments.append({
-            "start": max(0.0, first_start - 3.0),
-            "end": max(0.0, first_start - 2.0),
-            "text": "Instrumental (3)",
-            "words": []
-        })
-        new_segments.append({
-            "start": max(0.0, first_start - 2.0),
-            "end": max(0.0, first_start - 1.0),
-            "text": "Instrumental (2)",
-            "words": []
-        })
-        new_segments.append({
-            "start": max(0.0, first_start - 1.0),
-            "end": first_start,
-            "text": "Instrumental (1)",
-            "words": []
-        })
-        
-    # 2. Tratar os intervalos entre todos os versos
-    for idx in range(len(segments)):
-        curr_seg = segments[idx]
-        new_segments.append(curr_seg)
-        
-        if idx < len(segments) - 1:
-            next_seg = segments[idx + 1]
-            gap_duration = next_seg["start"] - curr_seg["end"]
-            
-            if gap_duration >= 3.0:
-                gap_start = curr_seg["end"]
-                gap_end = next_seg["start"]
-                
-                # Inserir o rótulo puramente instrumental se houver espaço
-                if gap_duration > 3.0:
-                    new_segments.append({
-                        "start": gap_start,
-                        "end": gap_end - 3.0,
-                        "text": "Instrumental",
-                        "words": []
-                    })
-                    
-                # Inserir a contagem regressiva nos últimos 3 segundos antes do próximo verso
-                new_segments.append({
-                    "start": gap_end - 3.0,
-                    "end": gap_end - 2.0,
-                    "text": "Instrumental (3)",
-                    "words": []
-                })
-                new_segments.append({
-                    "start": gap_end - 2.0,
-                    "end": gap_end - 1.0,
-                    "text": "Instrumental (2)",
-                    "words": []
-                })
-                new_segments.append({
-                    "start": gap_end - 1.0,
-                    "end": gap_end,
-                    "text": "Instrumental (1)",
-                    "words": []
-                })
-                
-    return new_segments
+    settings = normalize_visuals(visual_settings)
+    lyrics = copy.deepcopy(segments)
+    activity = []
+    for segment in lyrics:
+        measured = segment.get('words') or segment.get('animation_words') or []
+        intervals = []
+        for word in measured:
+            try:
+                start, end = float(word['start']), float(word['end'])
+            except (KeyError, TypeError, ValueError):
+                continue
+            if math.isfinite(start + end) and end > start >= 0:
+                intervals.append((start, end))
+        activity.extend(intervals or [(float(segment['start']), float(segment['end']))])
+    merged = []
+    for start, end in sorted(activity):
+        if merged and start <= merged[-1][1]:
+            merged[-1] = (merged[-1][0], max(end, merged[-1][1]))
+        else:
+            merged.append((start, end))
+    gaps, previous = [], 0.0
+    for start, end in merged:
+        if start - previous >= settings['min_instrumental_gap']:
+            gaps.append((previous, start, True))
+        previous = max(previous, end)
+    if media_duration is not None and math.isfinite(float(media_duration)) and float(media_duration) - previous >= settings['min_instrumental_gap']:
+        gaps.append((previous, float(media_duration), False))
+    output = []
+    for segment in lyrics:
+        intervals = [(segment['start'], segment['end'])]
+        for left, right, _ in gaps:
+            intervals = [(a, b) for start, end in intervals
+                         for a, b in ((start, min(end, left)), (max(start, right), end)) if b > a]
+        for start, end in intervals:
+            output.append({**segment, 'start': start, 'end': end})
+    for start, end, singing_follows in gaps:
+        count = min(settings['countdown_seconds'], int(end - start)) if singing_follows else 0
+        # Avoid flashing a label for only a few frames before the countdown.
+        if count and 0 < end - start - count < .35:
+            count -= 1
+        if end - count > start:
+            output.append(dict(start=start, end=end-count, text='Instrumental', words=[], instrumental=True,
+                               rest_start=start, rest_end=end))
+        for number in range(count, 0, -1):
+            output.append(dict(start=end-number, end=end-number+1,
+                               text=f'Instrumental ({number})', words=[], instrumental=True,
+                               rest_start=start, rest_end=end))
+    return sorted(output, key=lambda segment: segment['start'])
 
-def synced_animation_text(segment, normal_color, highlight_color, line_breaks=(), subtitle_mode='syllable'):
+
+def synced_animation_text(segment, normal_color, highlight_color, line_breaks=(), subtitle_mode='syllable', visual_settings=None):
     """Keep original text visible; only the selected color animation uses clocks."""
+    settings = normalize_visuals(visual_settings if visual_settings is not None else {'animation_style': 'classic'})
     spans = segment.get('animation_words')
     if not spans and not segment.get('synced_line') and segment.get('words'):
         spans = [dict(word) for word in segment['words']]
@@ -229,7 +204,12 @@ def synced_animation_text(segment, normal_color, highlight_color, line_breaks=()
                 prefix = text[:len(text)-len(text.lstrip())]
                 suffix = text[len(text.rstrip()):]
                 if prefix: acoustic_spans.append({'word': prefix})
-                acoustic_spans.extend({**char, 'word': char['text']} for char in characters)
+                for char in characters:
+                    item = {**char, 'word': char['text']}
+                    if 'start' in item and 'end' in item and 'start' in span and 'end' in span:
+                        item['start'] = max(float(span['start']), float(item['start']))
+                        item['end'] = min(float(span['end']), float(item['end']))
+                    acoustic_spans.append(item)
                 if suffix: acoustic_spans.append({'word': suffix})
             else:
                 acoustic_spans.append(span)
@@ -238,11 +218,11 @@ def synced_animation_text(segment, normal_color, highlight_color, line_breaks=()
     duration_cs = max(0, round((segment['end'] - segment['start']) * 100))
     offset = 0
     for span in spans:
-        tags = f"\\1c{normal_color}\\2c{normal_color}\\k0"
+        tags = f"\\1c{normal_color}\\2c{normal_color}\\3c&H00000000\\bord3\\blur0\\k0"
         if 'start' in span and 'end' in span:
-            start_cs = min(duration_cs, max(0, round((span['start'] - segment['start']) * 100)))
+            start_cs = min(duration_cs, max(0, math.ceil((span['start'] - segment['start']) * 100 - 1e-7)))
             end_cs = min(duration_cs, max(start_cs + 1, round((span['end'] - segment['start']) * 100)))
-            if end_cs > start_cs:
+            if end_cs > start_cs and span['end'] > span['start']:
                 # libass >= 0.17 supports an absolute karaoke start (\kt).
                 # Pauses need no invisible characters that could shift or wrap text.
                 if subtitle_mode == 'word':
@@ -254,6 +234,14 @@ def synced_animation_text(segment, normal_color, highlight_color, line_breaks=()
                 else:
                     # ASS sweeps from secondary (pending) to primary (sung).
                     tags = f"\\1c{highlight_color}\\2c{normal_color}\\kt{start_cs}\\kf{end_cs - start_cs}"
+                if settings['animation_style'] == 'smooth':
+                    # A gentle border glow follows the same onset, never a lead-in.
+                    tags += r'\3c&H00000000\bord3\blur0.4\shad0'
+                    if settings['highlight_glow']:
+                        onset, finish = start_cs * 10, end_cs * 10
+                        peak = min(onset + 90, finish)
+                        tags += (f'\\t({onset},{peak},\\3c{highlight_color}\\bord3.5)'
+                                 f'\\t({peak},{max(peak+1,finish)},\\3c&H00000000\\bord3)')
         word = span['word']
         # Visual wrapping never changes the source text or its timing data.
         for boundary in sorted((b for b in line_breaks if offset <= b < offset + len(word)), reverse=True):
@@ -345,7 +333,9 @@ def generate_ass_karaoke(
     break_on_punctuation: bool = True,
     show_instrumental: bool = True,
     show_next_line_preview: bool = False,
-    keep_first_line_visible: bool = False
+    keep_first_line_visible: bool = False,
+    media_duration: float = None,
+    visual_settings: dict = None,
 ):
     """
     Gera um arquivo de legenda ASS customizado.
@@ -354,6 +344,8 @@ def generate_ass_karaoke(
     - 'phrase': Exibe as frases/linhas inteiras sincronizadas estaticamente.
     """
     logger.info(f"Gerando legenda ASS ({subtitle_mode}): fonte={font_size}, cor={text_color_hex}, pos={text_position}, show_inst={show_instrumental}, preview={show_next_line_preview}")
+    visual_settings = normalize_visuals(visual_settings if visual_settings is not None else
+                                       {'animation_style': 'classic', 'instrumental_style': 'classic'})
     
     # 1. Aplicar quebra de frase e limite de palavras
     segments = split_and_wrap_segments(
@@ -365,14 +357,14 @@ def generate_ass_karaoke(
     
     # 2. Inserir pausas instrumentais se ativado
     if show_instrumental:
-        segments = insert_instrumental_breaks(segments)
+        segments = insert_instrumental_breaks(segments, media_duration, visual_settings)
     
     # 3. Manter o verso atual até o próximo, sem lacunas ou versos sobrepostos.
     for idx in range(len(segments) - 1):
         curr = segments[idx]
         nxt = segments[idx + 1]
-        if (not curr.get("synced_line") and "Instrumental" not in nxt["text"]
-                and "Instrumental" not in curr["text"]):
+        if (not curr.get("synced_line") and not nxt.get('instrumental')
+                and not curr.get('instrumental')):
             # ASR word clocks can overlap slightly. Only the display interval
             # is bounded here; original word clocks and LRC intervals stay intact.
             if nxt["start"] > curr["start"]:
@@ -427,12 +419,12 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 
     lines = [ass_header]
     
-    first_lyrics_seg = next((seg for seg in segments if "Instrumental" not in seg['text']), None)
+    first_lyrics_seg = next((seg for seg in segments if not seg.get('instrumental')), None)
     persistent_intro = bool(keep_first_line_visible and first_lyrics_seg and first_lyrics_seg['start'] > 0)
     intro_preview_layout = None
     instrumental_layout = None
     if persistent_intro:
-        if show_instrumental and first_lyrics_seg['start'] >= 3:
+        if show_instrumental and any(seg.get('instrumental') and seg['start'] < first_lyrics_seg['start'] for seg in segments):
             instrumental_layout = synced_display_layout('Instrumental (3)', font_size, words_per_line, max_chars_line)
             intro_preview_layout = synced_display_layout(first_lyrics_seg['text'], int(font_size * .85),
                                                          words_per_line, max_chars_line, height_limit=170)
@@ -449,11 +441,11 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         start_time_str = format_time(seg["start"])
         end_time_str = format_time(seg["end"])
         next_seg = segments[idx + 1] if show_next_line_preview and idx + 1 < len(segments) else None
-        preview_seg = next_seg if next_seg and 'Instrumental' not in next_seg['text'] else None
-        if show_next_line_preview and 'Instrumental' in seg['text']:
+        preview_seg = next_seg if next_seg and not next_seg.get('instrumental') else None
+        if show_next_line_preview and seg.get('instrumental'):
             upcoming = next((candidate for candidate in segments[idx + 1:]
-                             if 'Instrumental' not in candidate['text']), None)
-            if upcoming and seg['start'] >= upcoming['start'] - 3:
+                             if not candidate.get('instrumental')), None)
+            if upcoming and seg['start'] >= upcoming['start'] - visual_settings['countdown_seconds']:
                 preview_seg = upcoming
         intro_instrumental = bool(persistent_intro and intro_preview_layout and
                                   seg['start'] < first_lyrics_seg['start'])
@@ -468,9 +460,29 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         active_pos, preview_pos = synced_display_positions(active_layout, preview_layout, text_position,
                                                            show_next_line_preview or intro_instrumental)
         text = synced_animation_text(seg, ass_primary_color, ass_secondary_color,
-                                     active_layout['breaks'], subtitle_mode)
+                                     active_layout['breaks'], subtitle_mode, visual_settings)
+        if seg.get('instrumental') and visual_settings['instrumental_style'] == 'progress':
+            color = html_color_to_ass(visual_settings['instrumental_color'])
+            text = f'{{\\1c{color}\\2c{color}\\fsp2\\bord2\\shad0\\blur0.4}}' + seg['text']
+            # Vector graphics keep the meter crisp at any output resolution.
+            baseline = int(re.search(r'\\pos\(640,(\d+)\)', active_pos)[1])
+            if r'\an8' in active_pos:
+                baseline += active_layout['height']
+            elif r'\an5' in active_pos:
+                baseline += active_layout['height'] // 2
+            y = min(710, baseline + 12)
+            duration = seg['rest_end'] - seg['rest_start']
+            initial = 100 * (seg['start'] - seg['rest_start']) / duration
+            final = 100 * (seg['end'] - seg['rest_start']) / duration
+            clock = max(1, round((seg['end'] - seg['start']) * 1000))
+            common = f'\\an7\\pos(440,{y})\\p1\\bord0\\shad0\\1c{color}'
+            shape = 'm 0 0 l 400 0 400 4 0 4'
+            background = '{' + common + r'\1a&HB0&}' + shape
+            foreground = ('{' + common + f'\\fscx{initial:.4f}\\t(0,{clock},\\fscx{final:.4f})' + '}' + shape)
+            for meter in (background, foreground):
+                lines.append(f'Dialogue: 0,{start_time_str},{end_time_str},Default,,0,0,0,,{meter}\n')
         fade = (r'{\fad(80,0)}' if not seg.get('synced_line') and subtitle_mode in {'word', 'syllable'}
-                and 'Instrumental' not in seg['text'] else '')
+                and not seg.get('instrumental') else '')
         lines.append(f"Dialogue: 0,{start_time_str},{end_time_str},Default,,0,0,0,,{active_pos}{fade}{text}\n")
         if preview_seg and not intro_instrumental:
             preview_text = synced_animation_text({'text': preview_seg['text'], 'start': 0, 'end': 1},

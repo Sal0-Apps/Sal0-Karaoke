@@ -1,3 +1,12 @@
+# 12.7
+
+- Animação respeita o início acústico da palavra: caracteres não podem acender antes dela; a limpeza não acrescenta antecipação visual e confere vazamentos baixos do instrumental com apoio do detector de voz. Mesma gravação, modelo e divisão por letra-guia.
+- Instrumentais usam intervalos das palavras, inclusive pausas dentro de uma estrofe, introdução e encerramento. Contagem se adapta ao espaço disponível e não aparece no final sem próximo canto.
+- Novo painel administrativo **Animação e instrumental**: acabamento suave ou clássico, brilho, estilo clássico ou barra de progresso, cor, pausa mínima e duração da contagem. Configuração persistida em `/data/output/karaoke_animation.json`; mudanças invalidam somente os resultados de apresentação correspondentes.
+- Publicação automática nos modos Rápido e Avançado distingue painel carregando de opção desmarcada. A playlist configurada define o padrão; desmarcar explicitamente continua impedindo o envio. A fila é gravada antes de extrair a capa ou consultar novamente playlists adicionais; falhas ficam visíveis para retomar a mesma publicação. Títulos automáticos eliminam caracteres recusados pelo YouTube.
+- Novos testes de renderização, início de voz, instrumental, permissões administrativas e envio automático, com revisão de interface em desktop/celular. Clientes Android e Windows atuais continuam compatíveis. A versão 12.6.2 permanece disponível para retorno.
+- Mantidas as proteções Google: sem ativação de faturamento, compra de cota ou uso de APIs Google pagas como alternativa.
+
 # 12.6.2
 
 - Corrigido o orçamento de threads do Demucs: o runner deixa de usar uma thread por padrão e utiliza os recursos atribuídos ao container. Demucs, Whisper, alinhamento e FFmpeg compartilham a mesma política, com liberação de memória entre etapas e preservação dos modelos e da qualidade.

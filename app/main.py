@@ -4126,7 +4126,7 @@ def process_karaoke(
     lyrics_mode: str = Form("auto"),
     lyrics_selected: bool = Form(False),
     lyrics_source_key: str = Form(""),
-    youtube_publish: bool = Form(False),
+    youtube_publish: bool | None = Form(None),
     youtube_playlist_id: str = Form(""),
     youtube_title: str = Form(""),
     lyrics_timing: str = Form("acoustic"),
@@ -5691,8 +5691,11 @@ def run_pipeline(
         if new_audio_hash:
             cached_meta["audio_hash"] = new_audio_hash
 
+        from karaoke_visuals import load_visuals
+        karaoke_visual_settings = load_visuals()
         invalidate_subtitle_display_cache(cache_dir, cached_meta, {
-            "version": 5, "font_size": font_size, "text_color": text_color,
+            "visual_settings": karaoke_visual_settings,
+            "version": 6, "font_size": font_size, "text_color": text_color,
             "text_position": text_position, "subtitle_mode": subtitle_mode,
             "words_per_line": words_per_line, "max_chars_line": max_chars_line,
             "break_on_punctuation": break_on_punctuation, "show_instrumental": show_instrumental,
@@ -6181,7 +6184,9 @@ def run_pipeline(
                     break_on_punctuation=break_on_punctuation,
                     show_instrumental=show_instrumental,
                     show_next_line_preview=show_next_line_preview,
-                    keep_first_line_visible=keep_first_line_visible
+                    keep_first_line_visible=keep_first_line_visible,
+                    media_duration=get_file_duration(instrumental_wav),
+                    visual_settings=karaoke_visual_settings,
                 )
             else:
                 update_state("processing", "Using subtitle checkpoint", 80)
@@ -6384,6 +6389,8 @@ def download_subtitles(
 
 # The publisher uses the existing admin authorization and profile-aware history.
 from youtube_publisher import install_routes as install_youtube_publisher
+from karaoke_visuals import install_routes as install_karaoke_visual_routes
+install_karaoke_visual_routes(app, get_current_user, require_admin)
 
 
 def resolve_youtube_publication_video(owner_key, filename, user):
