@@ -551,7 +551,8 @@ def refine_lyrics(audio_path, segments, guide, cache_dir, context=None, progress
         final = split_and_wrap_segments(final)
     temporary=target.with_suffix('.json.tmp')
     try:
-        temporary.write_text(json.dumps(dict(signature=signature,segments=final,report=report),ensure_ascii=False))
+        temporary.write_text(json.dumps(dict(signature=signature,segments=final,report=report,
+                                            voice_regions=voice_regions),ensure_ascii=False))
         cancel();os.replace(temporary,target)
     finally:
         temporary.unlink(missing_ok=True)

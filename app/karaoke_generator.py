@@ -127,7 +127,7 @@ def split_and_wrap_segments(
                 len(segments), len(result), words_per_line, max_chars_line)
     return result
 
-def insert_instrumental_breaks(segments: list[dict], media_duration=None, visual_settings=None) -> list[dict]:
+def insert_instrumental_breaks(segments: list[dict], media_duration=None, visual_settings=None, voice_regions=None) -> list[dict]:
     """Locate rests in measured words, independently of verse display clocks."""
     if not segments:
         return []
@@ -145,6 +145,15 @@ def insert_instrumental_breaks(segments: list[dict], media_duration=None, visual
             if math.isfinite(start + end) and end > start >= 0:
                 intervals.append((start, end))
         activity.extend(intervals or [(float(segment['start']), float(segment['end']))])
+    # Recognized words are not the only evidence of singing. A quiet/missed
+    # word detected in the vocal track must also prevent an instrumental cue.
+    for region in voice_regions if isinstance(voice_regions, (list, tuple)) else []:
+        try:
+            start, end = map(float, region)
+        except (TypeError, ValueError):
+            continue
+        if math.isfinite(start + end) and end > start >= 0:
+            activity.append((start, end))
     merged = []
     for start, end in sorted(activity):
         if merged and start <= merged[-1][1]:
@@ -336,6 +345,7 @@ def generate_ass_karaoke(
     keep_first_line_visible: bool = False,
     media_duration: float = None,
     visual_settings: dict = None,
+    voice_regions: list = None,
 ):
     """
     Gera um arquivo de legenda ASS customizado.
@@ -357,7 +367,7 @@ def generate_ass_karaoke(
     
     # 2. Inserir pausas instrumentais se ativado
     if show_instrumental:
-        segments = insert_instrumental_breaks(segments, media_duration, visual_settings)
+        segments = insert_instrumental_breaks(segments, media_duration, visual_settings, voice_regions)
     
     # 3. Manter o verso atual até o próximo, sem lacunas ou versos sobrepostos.
     for idx in range(len(segments) - 1):

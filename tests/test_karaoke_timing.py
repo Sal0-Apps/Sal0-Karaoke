@@ -44,6 +44,11 @@ class TimingTests(unittest.TestCase):
         self.assertEqual([s['text'] for s in rests], ['Instrumental', 'Instrumental (2)', 'Instrumental (1)'])
         self.assertTrue(all(1 <= s['start'] < s['end'] <= 3.4 for s in rests))
 
+    def test_detected_singing_without_a_recognized_word_blocks_false_instrumental(self):
+        source = [verse(0, 10, [dict(word='A', start=0, end=1), dict(word='B', start=8, end=9)])]
+        result = insert_instrumental_breaks(source, 10, voice_regions=[(1, 8)])
+        self.assertFalse(any(s.get('instrumental') for s in result))
+
     def test_overlapping_voice_and_lyric_named_instrumental_never_become_rests(self):
         a = verse(0, 5, [dict(word='Instrumental', start=0, end=5)])
         b = verse(2, 6, [dict(word='cantado', start=2, end=6)])

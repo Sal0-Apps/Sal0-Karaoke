@@ -6160,6 +6160,10 @@ def run_pipeline(
             pm.check_cancelled()
 
             # Passo 4: Gerar legendas ASS com efeitos de karaokê
+            activity_cache = queue_cache.read_json(os.path.join(cache_dir, "aligned_lyrics.json"), {})
+            vocal_activity = (activity_cache.get("voice_regions") if isinstance(activity_cache, dict)
+                              and isinstance(activity_cache.get("report"), dict)
+                              and activity_cache["report"].get("version") == 3 else None)
             ass_path = os.path.join(cache_dir, "karaoke.ass")
             subtitles_checkpoint = stage_checkpoint(cache_dir, "subtitles_generated")
             if not subtitles_checkpoint or not os.path.isfile(ass_path):
@@ -6188,6 +6192,7 @@ def run_pipeline(
                     keep_first_line_visible=keep_first_line_visible,
                     media_duration=get_file_duration(instrumental_wav),
                     visual_settings=karaoke_visual_settings,
+                    voice_regions=vocal_activity,
                 )
             else:
                 update_state("processing", "Using subtitle checkpoint", 80)
