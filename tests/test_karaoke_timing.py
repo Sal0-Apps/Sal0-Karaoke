@@ -98,9 +98,11 @@ class TimingTests(unittest.TestCase):
             modern, classic = [Path(folder) / name for name in ('modern.ass', 'classic.ass')]
             generate_ass_karaoke(source, str(modern), media_duration=9, visual_settings=DEFAULTS)
             generate_ass_karaoke(source, str(classic), media_duration=9,
-                                 visual_settings=dict(animation_style='classic', instrumental_style='classic'))
+                                 visual_settings=dict(animation_style='classic', instrumental_style='classic',
+                                                      instrumental_color='#FF0000'))
             self.assertIn(r'\p1', modern.read_text())
             self.assertNotIn(r'\p1', classic.read_text())
+            self.assertIn(r'\1c&H000000FF\2c&H000000FF}Instrumental', classic.read_text())
             self.assertIn('0:00:04.00,0:00:06.00', modern.read_text())
             self.assertIn('0:00:04.00,0:00:06.00', classic.read_text())
 

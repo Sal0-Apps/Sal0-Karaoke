@@ -471,6 +471,9 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                                                            show_next_line_preview or intro_instrumental)
         text = synced_animation_text(seg, ass_primary_color, ass_secondary_color,
                                      active_layout['breaks'], subtitle_mode, visual_settings)
+        if seg.get('instrumental'):
+            color = html_color_to_ass(visual_settings['instrumental_color'])
+            text = f'{{\\1c{color}\\2c{color}}}' + seg['text']
         if seg.get('instrumental') and visual_settings['instrumental_style'] == 'progress':
             color = html_color_to_ass(visual_settings['instrumental_color'])
             text = f'{{\\1c{color}\\2c{color}\\fsp2\\bord2\\shad0\\blur0.4}}' + seg['text']
