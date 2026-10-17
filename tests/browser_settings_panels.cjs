@@ -34,7 +34,7 @@ const HTML = require('./load_html.cjs')();
         await page.waitForFunction(() => currentUser?.role === 'admin');
         await page.locator('#tabBtnSettings').click();
         const panels = page.locator('.settings-grid > .settings-panel');
-        assert.equal(await panels.count(),10);
+        assert.equal(await panels.count(),11);
         assert.equal(await page.locator('.settings-grid details[open]').count(),0);
         for (const panel of await panels.all()) {
             assert(await panel.isVisible());
@@ -96,7 +96,7 @@ const HTML = require('./load_html.cjs')();
         role = 'user';
         await page.reload(); await page.locator('#tabBtnSettings').click();
         await page.waitForFunction(() => currentUser?.role === 'user');
-        assert.equal((await panels.all()).length,10);
+        assert.equal((await panels.all()).length,11);
         const visible = [];
         for (const panel of await panels.all()) if (await panel.isVisible()) visible.push(await panel.getAttribute('id'));
         assert.deepEqual(visible,['telegramSection']);
