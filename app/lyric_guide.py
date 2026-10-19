@@ -8,12 +8,11 @@ import math
 import os
 import re
 import unicodedata
-from functools import lru_cache
 
 from lyrics_sync import require_acoustic_word_timing
 
 logger = logging.getLogger('karaoke')
-GUIDE_POLICY_VERSION = 2
+GUIDE_POLICY_VERSION = 3
 
 
 def normalize_word(value):
@@ -139,6 +138,113 @@ def _safe_spelling_pair(guide, recognized):
     return True
 
 
+def _contextual_guide_matches(official, words, allow_distant=False):
+    """Suggest one-for-one corrections; uncertainty never removes ASR words.
+
+    Exact neighboring words locate a candidate in the guide. Two anchors allow
+    a spelling variation; a short phrase with one adjacent anchor needs a much
+    closer, unique spelling. Candidate positions stay ordered with their local
+    anchors, so a missing word cannot shift corrections onto its neighbor.
+    """
+    expected = [normalize_word(token) for token in official]
+    observed = [normalize_word(word.get('word', '')) for word in words]
+    positions, contexts = {}, set()
+    for index, token in enumerate(expected):
+        # Identical printed choruses offer the same local evidence. Index one
+        # occurrence per context instead of comparing every repetition again.
+        context = tuple(expected[max(0, index - 6):index + 7])
+        context = (min(index, 6), min(len(expected) - index - 1, 6), context)
+        if context in contexts:
+            continue
+        contexts.add(context)
+        positions.setdefault(token, []).append(index)
+    matches, ambiguous, proposals = {}, set(), []
+
+    def near(left, right):
+        try:
+            gap = float(right['start']) - float(left['end'])
+        except (KeyError, TypeError, ValueError):
+            return True  # This is a text proposal; the acoustic caller validates clocks.
+        return math.isfinite(gap) and gap <= 4.
+
+    for index, actual in enumerate(observed):
+        if not actual or len(str(words[index].get('word', '')).split()) != 1:
+            continue
+        candidates = {}
+        for neighbor in range(max(0, index - 3), min(len(words), index + 4)):
+            if neighbor == index or not near(words[min(index, neighbor)], words[max(index, neighbor)]):
+                continue
+            for anchor in positions.get(observed[neighbor], ()):
+                candidate = anchor + index - neighbor
+                if 0 <= candidate < len(official):
+                    candidates.setdefault(candidate, set()).add(neighbor)
+        choices = {}
+        for source, anchors in candidates.items():
+            wanted = expected[source]
+            similarity = difflib.SequenceMatcher(None, actual, wanted).ratio()
+            adjacent = any(abs(anchor - index) == 1 for anchor in anchors)
+            exact = actual == wanted
+            trusted = (exact or (len(anchors) >= 2 and similarity >= .6)
+                       or (adjacent and similarity >= .82 and min(len(actual), len(wanted)) >= 3)
+                       or (allow_distant and adjacent and len(anchors) >= 2))
+            if not trusted or not _safe_spelling_pair(official[source], words[index].get('word', '')):
+                continue
+            # Do not turn an extra recognition into a second copy of the next
+            # correctly recognized word unless the guide also repeats it there.
+            collision = any(0 <= index + step < len(words)
+                            and observed[index + step] == wanted
+                            and (not 0 <= source + step < len(expected) or expected[source + step] != wanted)
+                            for step in (-1, 1))
+            if not exact and collision:
+                continue
+            score = len(anchors) + similarity
+            previous = choices.get(wanted)
+            if previous is None or score > previous['score']:
+                choices[wanted] = dict(source=source, score=score, similarity=similarity,
+                                       anchors=len(anchors))
+        ranked = sorted(choices.values(), key=lambda item: item['score'], reverse=True)
+        if not ranked:
+            continue
+        if actual in choices:
+            # A deletion in the guide/recognition can give the shifted window
+            # more votes. Never sacrifice an already anchored exact word to it.
+            matches[index] = choices[actual]['source']
+            continue
+        best = ranked[0]
+        ambiguous_distant = (allow_distant and best['similarity'] < .6 and len(ranked) > 1
+                             and best['anchors'] == ranked[1]['anchors'])
+        if len(ranked) > 1 and (best['score'] - ranked[1]['score'] < .2 or ambiguous_distant):
+            ambiguous.add(index)
+            proposals.append(dict(index=index, recognized=words[index].get('word', '').strip(),
+                                  guide=None, status='ambiguous', candidates=[official[item['source']] for item in ranked[:3]]))
+            continue
+        matches[index] = best['source']
+        if observed[index] != expected[best['source']]:
+            proposals.append(dict(index=index, recognized=str(words[index].get('word', '')).strip(),
+                                  guide=official[best['source']], guide_index=best['source'],
+                                  similarity=round(best['similarity'], 4), anchors=best['anchors'],
+                                  status='proposed'))
+    return matches, ambiguous, proposals
+
+
+def guide_correction_candidate(lyrics, words, *, allow_distant=False):
+    """Return a same-size lexical hypothesis for CTC, or None when unnecessary.
+
+    Original tokens fill every uncertain position. No guide-only word, phrase,
+    timestamp or repetition is inserted into this acoustic hypothesis. Distant
+    alternatives are only for a caller that compares both complete sequences
+    against the audio; they still require unique, neighboring exact context.
+    """
+    official = [token for token in prepare_lyrics_guide(lyrics).split() if normalize_word(token)]
+    if not official or not words or len(official) > 12000:
+        return None
+    matches, _, _ = _contextual_guide_matches(official, words, allow_distant=allow_distant)
+    original = [str(word.get('word', '')).strip() for word in words]
+    candidate = [official[matches[index]] if index in matches else token
+                 for index, token in enumerate(original)]
+    return candidate if any(normalize_word(a) != normalize_word(b) for a, b in zip(candidate, original)) else None
+
+
 def verify_lyrics_guide(lyrics, segments):
     """Check every recognized word; correct trusted spelling without moving time.
 
@@ -147,11 +253,10 @@ def verify_lyrics_guide(lyrics, segments):
     cannot supply replacement verses or their clocks.
     """
     guide = prepare_lyrics_guide(lyrics)
-    official, guide_lines = [], []
+    official = []
     for line in guide.splitlines():
         tokens = [token for token in line.split() if normalize_word(token)]
         if tokens:
-            guide_lines.append((len(official), tokens))
             official.extend(tokens)
     result, words = [], []
     for segment in segments or []:
@@ -169,42 +274,10 @@ def verify_lyrics_guide(lyrics, segments):
     matcher = difflib.SequenceMatcher(None, expected, recognized, autojunk=False)
     blocks = matcher.get_matching_blocks()
     exact = [(block.a+i, block.b+i) for block in blocks for i in range(block.size)]
-    coverage = len(exact) / max(1, len(recognized))
     pairs = {transcript: source for source, transcript in exact}
-    if coverage >= .35:
-        for tag, a, b, c, d in matcher.get_opcodes():
-            if tag != 'replace':
-                continue
-            for oa, ta in _gap_pairs(expected[a:b], recognized[c:d]):
-                source, target = a+oa, c+ta
-                similarity = difflib.SequenceMatcher(None, expected[source], recognized[target]).ratio()
-                context = sum(index in pairs for index in range(max(0, target-2), min(len(words), target+3)) if index != target)
-                if (similarity >= .5 and context >= 2
-                        and _safe_spelling_pair(official[source], words[target].get('word', ''))):
-                    pairs[target] = source
-
-    # A guide often prints its chorus once. Check later occurrences too,
-    # without copying missing verses or interpreting provider timestamps.
-    normalized_lines = [(start, [normalize_word(token) for token in tokens])
-                        for start, tokens in guide_lines if len(tokens) >= 3]
-    for target in range(len(words)):
-        choices = []
-        for start, tokens in normalized_lines:
-            window = recognized[target:target+len(tokens)]
-            if len(window) != len(tokens) or all(target+i in pairs for i in range(len(tokens))):
-                continue
-            equal = sum(a == b for a, b in zip(tokens, window))
-            if equal / len(tokens) >= .6:
-                score = sum(difflib.SequenceMatcher(None, a, b).ratio() for a, b in zip(tokens, window)) / len(tokens)
-                if score >= .75:
-                    choices.append((score, start, tokens))
-        if choices:
-            _, start, tokens = max(choices, key=lambda item: item[0])
-            for offset, token in enumerate(tokens):
-                index = target+offset
-                similarity = difflib.SequenceMatcher(None, token, recognized[index]).ratio()
-                if similarity >= .5 and _safe_spelling_pair(official[start+offset], words[index].get('word', '')):
-                    pairs.setdefault(index, start+offset)
+    contextual, ambiguous, proposals = _contextual_guide_matches(official, words)
+    for target, source in contextual.items():
+        pairs.setdefault(target, source)
 
     checks, corrected, similarities = [], 0, []
     for index, word in enumerate(words):
@@ -212,7 +285,7 @@ def verify_lyrics_guide(lyrics, segments):
         source = pairs.get(index)
         suggested = official[source] if source is not None else None
         similarity = difflib.SequenceMatcher(None, recognized[index], expected[source]).ratio() if source is not None else 0
-        status = 'unmatched'
+        status = 'ambiguous' if index in ambiguous else 'unmatched'
         if suggested is not None:
             leading = original[:len(original)-len(original.lstrip())]
             trailing = original[len(original.rstrip()):]
@@ -237,7 +310,8 @@ def verify_lyrics_guide(lyrics, segments):
         verified_words=len(pairs), corrected_words=corrected, unmatched_words=unmatched,
         missing_guide_words=len(missing), matching_ratio=round(len(pairs)/max(1, len(words)), 4),
         comparison_score=sum(similarities)/max(1, len(words)+len(missing)),
-        retry_vocabulary=' '.join(dict.fromkeys(retry_words)), checks=checks)
+        retry_vocabulary=' '.join(dict.fromkeys(retry_words)), checks=checks,
+        ambiguous_words=len(ambiguous), correction_proposals=proposals)
     return result, report
 
 
@@ -246,387 +320,6 @@ def _mean_probability(segments):
               if isinstance(word.get('probability'), (int, float))
               and math.isfinite(word['probability']) and 0 <= word['probability'] <= 1]
     return sum(values)/len(values) if values else None
-
-
-def _strict_source_words(segments, official):
-    """Keep acoustic clocks; join only contiguous fragments of a guide token."""
-    words, invalid, seen = [], [], set()
-    for segment_index, segment in enumerate(segments or []):
-        for word in segment.get('words', []):
-            source_index = len(words) + len(invalid)
-            text = str(word.get('word', '')).strip()
-            try:
-                start, end = float(word['start']), float(word['end'])
-            except (KeyError, TypeError, ValueError):
-                start, end = math.nan, math.nan
-            identity = (normalize_word(text), start, end, word.get('_strict_span_id'), word.get('_strict_span_part'))
-            if (not normalize_word(text) or len(text.split()) != 1
-                    or not math.isfinite(start + end) or start < 0 or end <= start
-                    or identity in seen):
-                invalid.append(dict(source_indices=[source_index], recognized=text,
-                                    guide=None, status='invalid', start=word.get('start'), end=word.get('end')))
-                continue
-            seen.add(identity)
-            acoustic_word = copy.deepcopy(word)
-            acoustic_word.update(start=start, end=end)
-            words.append(dict(word=acoustic_word, segment=segment_index,
-                              sources=[source_index], normalized=normalize_word(text)))
-    contractions = {normalize_word(token) for token in official
-                    if any(mark in token for mark in ("'", '’', '-'))}
-    joined, index = [], 0
-    while index < len(words):
-        unit = words[index]
-        for count in (3, 2):
-            pieces = words[index:index + count]
-            if len(pieces) != count or not contractions:
-                continue
-            normalized = ''.join(piece['normalized'] for piece in pieces)
-            contiguous = all(
-                -.03 <= float(right['word']['start']) - float(left['word']['end']) <= .12
-                and right['sources'][0] == left['sources'][-1] + 1
-                for left, right in zip(pieces, pieces[1:]))
-            if normalized not in contractions or not contiguous or any('_strict_span_id' in piece['word'] for piece in pieces):
-                continue
-            merged = copy.deepcopy(unit)
-            merged['sources'] = [source for piece in pieces for source in piece['sources']]
-            merged['normalized'] = normalized
-            merged['word']['word'] = ''.join(str(piece['word']['word']).strip() for piece in pieces)
-            merged['word']['start'] = min(float(piece['word']['start']) for piece in pieces)
-            merged['word']['end'] = max(float(piece['word']['end']) for piece in pieces)
-            for field in ('probability', 'alignment_score'):
-                values = [piece['word'].get(field) for piece in pieces]
-                if all(isinstance(value, (int, float)) and math.isfinite(value) for value in values):
-                    merged['word'][field] = min(values)
-            merged['word'].pop('alignment_chars', None)
-            unit = merged
-            index += count - 1
-            break
-        joined.append(unit)
-        index += 1
-    return joined, invalid
-
-
-def _strict_phrase_candidates(official, units, similarity_score=None):
-    """Locally align ordered phrases, allowing omissions but never creating clocks.
-
-    Two exact context anchors are required. A fuzzy word additionally needs two
-    nearby anchors. The bounded ASR window keeps this pass small on a CPU server.
-    """
-    expected = [normalize_word(token) for token in official]
-    observed = [unit['normalized'] for unit in units]
-    similarity_score = similarity_score or (lambda actual, wanted: difflib.SequenceMatcher(None, actual, wanted).ratio())
-    positions = {}
-    for index, token in enumerate(expected):
-        positions.setdefault(token, []).append(index)
-    fuzzy_context = []
-    for index in range(len(observed)):
-        counts = {}
-        for neighbor in range(max(0, index - 3), min(len(observed), index + 4)):
-            if neighbor == index:
-                continue
-            possible = set()
-            for anchor in positions.get(observed[neighbor], ()):
-                possible.update(range(max(0, anchor - 5), anchor) if neighbor > index
-                                else range(anchor + 1, min(len(expected), anchor + 6)))
-            for target in possible:
-                counts[target] = counts.get(target, 0) + 1
-        fuzzy_context.append({target for target, count in counts.items() if count >= 2})
-
-    def pair_similarity(source, target):
-        if observed[source] == expected[target]:
-            return 1.
-        return similarity_score(observed[source], expected[target]) if target in fuzzy_context[source] else 0.
-
-    width = len(expected) + 1
-    directions = [bytearray(width) for _ in range(len(observed) + 1)]
-    previous = [0.] * width
-    candidates = {}
-    for row, actual in enumerate(observed, 1):
-        current = [0.] * width
-        endpoints = []
-        for column, wanted in enumerate(expected, 1):
-            similarity = pair_similarity(row - 1, column - 1)
-            reward = 3. if similarity == 1 else (.2 + similarity if similarity >= .5 else -3.)
-            values = (0., previous[column - 1] + reward,
-                      previous[column] - 1.5, current[column - 1] - 1.5)
-            move = max(range(4), key=values.__getitem__)
-            current[column], directions[row][column] = values[move], move
-            if move == 1 and values[move] >= 4.:
-                endpoints.append((column, values[move]))
-        best = max((score for _, score in endpoints), default=0.)
-        contexts = set()
-        for column, score in endpoints:
-            if score < best - 1.5:
-                continue
-            context = tuple(expected[max(0, column - len(units)):column])
-            context_key = (round(score, 4), context)
-            if context_key in contexts:
-                continue
-            contexts.add(context_key)
-            source, target, mapping, exact = row, column, {}, set()
-            while source and target and directions[source][target]:
-                move = directions[source][target]
-                if move == 1:
-                    similarity = pair_similarity(source - 1, target - 1)
-                    if similarity >= .5 and _safe_spelling_pair(official[target - 1], units[source - 1]['word']['word']):
-                        mapping[source - 1] = target - 1
-                        if observed[source - 1] == expected[target - 1]:
-                            exact.add(source - 1)
-                    source, target = source - 1, target - 1
-                elif move == 2:
-                    source -= 1
-                else:
-                    target -= 1
-            if len(exact) < 2 or not mapping:
-                continue
-            left, right = min(mapping), max(mapping) + 1
-            guide_span = max(mapping.values()) - min(mapping.values()) + 1
-            if len(mapping) / max(right - left, guide_span) < .55:
-                continue
-            mapping = {index: guide_index for index, guide_index in mapping.items()
-                       if index in exact or sum(abs(anchor - index) <= 3 for anchor in exact) >= 2}
-            if not mapping:
-                continue
-            key = tuple(sorted((index, expected[guide_index]) for index, guide_index in mapping.items()))
-            candidate = dict(start=min(mapping), end=max(mapping) + 1, mapping=mapping,
-                             score=score + .1 * len(mapping))
-            if key not in candidates or candidate['score'] > candidates[key]['score']:
-                candidates[key] = candidate
-        previous = current
-    return list(candidates.values())
-
-
-def _strict_exact_cover(official, units):
-    """Fast path for already canonical/reviewed phrases, including refrains."""
-    expected = [normalize_word(token) for token in official]
-    observed = [unit['normalized'] for unit in units]
-    positions = {}
-    for index, token in enumerate(expected):
-        positions.setdefault(token, []).append(index)
-    mapping, index = {}, 0
-    while index < len(observed):
-        best_start, best_size = 0, 0
-        for start in positions.get(observed[index], ()):
-            size = 0
-            while (index + size < len(observed) and start + size < len(expected)
-                   and observed[index + size] == expected[start + size]):
-                size += 1
-            if size > best_size:
-                best_start, best_size = start, size
-        if best_size < 2:
-            return None
-        mapping.update((index + offset, best_start + offset) for offset in range(best_size))
-        index += best_size
-    return mapping
-
-
-def _enforce_guide_tokens(lyrics, segments):
-    """Final lexical contract: emit only contextual guide words on local clocks.
-
-    This function does not infer voice activity from text. Callers must retain
-    their acoustic checks, including on cache/review/fallback paths. External
-    LRC clocks never replace the observed start/end of an emitted word.
-    """
-    guide = prepare_lyrics_guide(lyrics)
-    count = sum(len(segment.get('words', [])) for segment in segments or [])
-    report = dict(policy='strict_guide', version=GUIDE_POLICY_VERSION,
-                  input_words=count, kept_words=count, removed_words=0,
-                  corrected_words=0, merged_words=0, ambiguous_words=0, invalid_words=0, checks=[])
-    if not guide:
-        report['status'] = 'no_guide'
-        return copy.deepcopy(segments), report
-    official = [token for token in guide.split() if normalize_word(token)]
-    units, invalid = _strict_source_words(segments, official)
-    report['invalid_words'] = len(invalid)
-    accepted, ambiguous = {}, set()
-    if len(official) == 1:
-        # A deliberately one-word refrain still requires its own observed event.
-        accepted = {index: 0 for index, unit in enumerate(units)
-                    if unit['normalized'] == normalize_word(official[0])}
-    elif official and len(official) <= 12000:
-        @lru_cache(maxsize=65536)
-        def similarity_score(actual, wanted):
-            return 1. if actual == wanted else difflib.SequenceMatcher(None, actual, wanted).ratio()
-
-        groups, group = [], []
-        for index, unit in enumerate(units):
-            if group and (float(unit['word']['start']) - float(units[group[-1]]['word']['end']) > 2.5
-                          or float(unit['word']['start']) < float(units[group[-1]]['word']['start'])):
-                groups.append(group)
-                group = []
-            group.append(index)
-        if group:
-            groups.append(group)
-        for indices in groups:
-            exact = _strict_exact_cover(official, [units[index] for index in indices])
-            if exact is not None:
-                accepted.update((indices[index], guide_index) for index, guide_index in exact.items())
-                continue
-            candidates = []
-            for offset in range(0, len(indices), 20):
-                window = indices[offset:offset + 32]
-                if len(window) < 2:
-                    continue
-                for candidate in _strict_phrase_candidates(official, [units[index] for index in window], similarity_score):
-                    candidate['mapping'] = {offset + index: guide_index
-                                            for index, guide_index in candidate['mapping'].items()}
-                    candidate['start'] += offset
-                    candidate['end'] += offset
-                    candidates.append(candidate)
-            starts = {}
-            for candidate in candidates:
-                starts.setdefault(candidate['start'], []).append(candidate)
-            scores, selected = [0.] * (len(indices) + 1), {}
-            for index in range(len(indices) - 1, -1, -1):
-                scores[index] = scores[index + 1]
-                for candidate in starts.get(index, []):
-                    value = candidate['score'] + scores[candidate['end']]
-                    if value > scores[index] + 1e-6:
-                        scores[index], selected[index] = value, candidate
-            index = 0
-            while index < len(indices):
-                chosen = selected.get(index)
-                if chosen is None:
-                    index += 1
-                    continue
-                for local, guide_index in chosen['mapping'].items():
-                    alternatives = [other for other in candidates
-                                    if local in other['mapping'] and other['score'] >= chosen['score'] - .25
-                                    and len(set(other['mapping']) & set(chosen['mapping'])) >= .8 * len(chosen['mapping'])]
-                    choices = {normalize_word(official[other['mapping'][local]]) for other in alternatives}
-                    actual_index = indices[local]
-                    if len(choices) > 1:
-                        ambiguous.add(actual_index)
-                    else:
-                        accepted[actual_index] = guide_index
-                index = chosen['end']
-    result, by_segment, checks = [], {}, list(invalid)
-    retained_sources = 0
-    for index, unit in enumerate(units):
-        word, source_indices = copy.deepcopy(unit['word']), unit['sources']
-        target = accepted.get(index)
-        check = dict(source_indices=source_indices, recognized=str(word['word']).strip(),
-                     guide=official[target] if target is not None else None,
-                     start=word['start'], end=word['end'])
-        if target is None:
-            check['status'] = 'ambiguous' if index in ambiguous else 'unmatched'
-            report['ambiguous_words'] += len(source_indices) if index in ambiguous else 0
-        else:
-            canonical = official[target]
-            changed = str(word['word']).strip() != canonical
-            check['status'] = 'corrected' if changed else 'matched'
-            word['word'] = ' ' + canonical
-            if changed:
-                word.pop('alignment_chars', None)
-                report['corrected_words'] += 1
-            by_segment.setdefault(unit['segment'], []).append(word)
-            retained_sources += len(source_indices)
-            report['merged_words'] += len(source_indices) - 1
-        checks.append(check)
-    for index, segment in enumerate(segments or []):
-        words = by_segment.get(index, [])
-        if not words:
-            continue
-        cleaned = copy.deepcopy(segment)
-        for field in ('synced_line', 'acoustic_animation', 'animation_words'):
-            cleaned.pop(field, None)
-        cleaned.update(start=words[0]['start'], end=max(word['end'] for word in words),
-                       text=''.join(word['word'] for word in words).strip(), words=words)
-        result.append(cleaned)
-    result, _ = apply_guide_boundaries(guide, result)
-    report.update(kept_words=sum(len(segment['words']) for segment in result),
-                  removed_words=count - retained_sources, checks=checks,
-                  status='unrelated' if not result else ('filtered' if count != retained_sources
-                          or report['corrected_words'] or report['merged_words'] else 'verified'))
-    return result, report
-
-
-def enforce_guide_text(lyrics, segments):
-    """Enforce canonical guide text, preserving an explicitly timed manual phrase.
-
-    A manually reviewed phrase may have one clock for several words. Virtual
-    tokens are used only for comparison: an accepted phrase is returned with
-    that one original interval. Partial/ambiguous phrases are withheld whole.
-    """
-    if not prepare_lyrics_guide(lyrics):
-        return _enforce_guide_tokens(lyrics, segments)
-    expanded, spans, source_index = copy.deepcopy(segments or []), {}, 0
-    for segment in expanded:
-        words = []
-        for source in segment.get('words', []):
-            for key in list(source):
-                if key.startswith('_strict_span_'):
-                    source.pop(key)
-            tokens = str(source.get('word', '')).split()
-            if len(tokens) <= 1:
-                words.append(source)
-                source_index += 1
-                continue
-            identifier = len(spans)
-            spans[identifier] = dict(word=copy.deepcopy(source), tokens=tokens,
-                                     source_indices=set(range(source_index, source_index + len(tokens))))
-            for part, token in enumerate(tokens):
-                word = copy.deepcopy(source)
-                word.update(word=' ' + token, _strict_span_id=identifier, _strict_span_part=part)
-                words.append(word)
-                source_index += 1
-        segment['words'] = words
-    result, report = _enforce_guide_tokens(lyrics, expanded)
-    if not spans:
-        return result, report
-    official = [normalize_word(token) for token in prepare_lyrics_guide(lyrics).split() if normalize_word(token)]
-    observed = {}
-    for segment in result:
-        for word in segment['words']:
-            if '_strict_span_id' in word:
-                observed.setdefault(word['_strict_span_id'], []).append(word)
-    accepted, rejected_sources = {}, set()
-    for identifier, span in spans.items():
-        words = observed.get(identifier, [])
-        normalized = [normalize_word(word['word']) for word in words]
-        complete = (len(words) == len(span['tokens']) and
-                    [word['_strict_span_part'] for word in words] == list(range(len(span['tokens']))))
-        contiguous = complete and any(official[start:start + len(words)] == normalized
-                                      for start in range(len(official) - len(words) + 1))
-        if contiguous:
-            word = copy.deepcopy(span['word'])
-            for field in list(word):
-                if field.startswith('lyric_line_'):
-                    word.pop(field)
-            canonical = ' '.join(item['word'].strip() for item in words)
-            word.update(word=' ' + canonical, start=words[0]['start'], end=words[0]['end'])
-            if canonical != str(span['word']['word']).strip():
-                word.pop('alignment_chars', None)
-            accepted[identifier] = word
-        else:
-            rejected_sources.update(span['source_indices'])
-            report['removed_words'] += len(words)
-            report['kept_words'] -= len(words)
-            report['corrected_words'] -= sum(item['word'].strip() != span['tokens'][item['_strict_span_part']]
-                                             for item in words)
-    collapsed = []
-    for segment in result:
-        words, seen = [], set()
-        for word in segment['words']:
-            identifier = word.get('_strict_span_id')
-            if identifier is None:
-                words.append(word)
-            elif identifier in accepted and identifier not in seen:
-                words.append(copy.deepcopy(accepted[identifier]))
-                seen.add(identifier)
-        if words:
-            segment.update(start=words[0]['start'], end=max(word['end'] for word in words),
-                           text=''.join(word['word'] for word in words).strip(), words=words)
-            collapsed.append(segment)
-    for check in report['checks']:
-        if rejected_sources.intersection(check['source_indices']):
-            check.update(guide=None, status='span_rejected')
-    report.update(phrase_spans=len(accepted), rejected_spans=len(spans) - len(accepted))
-    if not collapsed:
-        report['status'] = 'unrelated'
-    elif report['rejected_spans']:
-        report['status'] = 'filtered'
-    return collapsed, report
 
 
 def review_lyrics_with_whisper(lyrics, segments, cache_dir, context=None, retry=None, cancel=None):

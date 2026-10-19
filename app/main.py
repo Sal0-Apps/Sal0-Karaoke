@@ -5696,8 +5696,7 @@ def run_pipeline(
         karaoke_visual_settings = load_visuals()
         invalidate_subtitle_display_cache(cache_dir, cached_meta, {
             "visual_settings": karaoke_visual_settings,
-            "version": 7, "font_size": font_size, "text_color": text_color,
-            "guide_contract": GUIDE_POLICY_VERSION if prepare_lyrics_guide(lyrics_text) else None,
+            "version": 8, "font_size": font_size, "text_color": text_color,
             "text_position": text_position, "subtitle_mode": subtitle_mode,
             "words_per_line": words_per_line, "max_chars_line": max_chars_line,
             "break_on_punctuation": break_on_punctuation, "show_instrumental": show_instrumental,
@@ -5706,15 +5705,29 @@ def run_pipeline(
 
         # Upgrade prior verse-based reviews once; external clocks never enter
         # the guide signature or control subtitles in this acoustic policy.
-        clock_hash = hashlib.sha256(json.dumps({"lyrics_policy_version": GUIDE_POLICY_VERSION,
+        clock_policy = {"lyrics_policy_version": GUIDE_POLICY_VERSION,
             "lyrics": prepare_lyrics_guide(lyrics_text), "whisper_model": whisper_model,
             "transcription_preset": transcription_preset,
             "voice_source": ("original" if transcribe_source == "original" else
                              "lead" if keep_backing_vocals else "all"),
-            "whisper_audio_version": 3, "audio_hash": new_audio_hash}, sort_keys=True).encode()).hexdigest()
+            "whisper_audio_version": 3, "audio_hash": new_audio_hash}
+        clock_hash = hashlib.sha256(json.dumps(clock_policy, sort_keys=True).encode()).hexdigest()
         if cached_meta.get("lyrics_clock_hash") != clock_hash:
             checkpoints = load_stage_checkpoints(cache_dir)
+            policy_only_upgrade = any(cached_meta.get("lyrics_clock_hash") == hashlib.sha256(
+                json.dumps({**clock_policy, "lyrics_policy_version": previous}, sort_keys=True).encode()).hexdigest()
+                for previous in (1, 2))
+            preserve_review = False
+            if policy_only_upgrade:
+                try:
+                    with open(os.path.join(cache_dir, "reviewed_segments.json"), encoding="utf-8") as reviewed_file:
+                        reviewed = json.load(reviewed_file)
+                    preserve_review = isinstance(reviewed, list) and bool(reviewed)
+                except (OSError, ValueError):
+                    pass
             for stage in ("transcription_reviewed", "subtitles_generated", "video_rendered"):
+                if stage == "transcription_reviewed" and preserve_review:
+                    continue
                 checkpoints.get("completed_stages", {}).pop(stage, None)
             with open(os.path.join(cache_dir, "stage_checkpoints.json"), "w", encoding="utf-8") as f:
                 json.dump(checkpoints, f, indent=4)
@@ -6040,7 +6053,15 @@ def run_pipeline(
             require_acoustic_word_timing(segments)
             save_stage_checkpoint(cache_dir, "transcription_ready", "transcrição do Whisper concluída", 74)
 
-            if lyrics_text:
+            draft = queue_cache.read_draft(cache_dir)
+            if not draft:
+                checkpoints = queue_cache.read_json(os.path.join(cache_dir, "stage_checkpoints.json"), {})
+                if "transcription_reviewed" in checkpoints.get("completed_stages", {}):
+                    reviewed = queue_cache.read_json(os.path.join(cache_dir, "reviewed_segments.json"))
+                    if isinstance(reviewed, list) and reviewed:
+                        draft = reviewed
+
+            if lyrics_text and not draft:
                 update_state("processing", "Checking lyrics guide", 74, stage_progress=0,
                              stage_detail="Conferindo todas as palavras reconhecidas com a letra-guia")
 
@@ -6073,16 +6094,9 @@ def run_pipeline(
                 logger.info("Conferência da letra-guia: %s. Todos os tempos vêm do Whisper.", detail)
             pm.check_cancelled()
 
-            draft = queue_cache.read_draft(cache_dir)
-            if not draft:
-                checkpoints = queue_cache.read_json(os.path.join(cache_dir, "stage_checkpoints.json"), {})
-                if "transcription_reviewed" in checkpoints.get("completed_stages", {}):
-                    reviewed = queue_cache.read_json(os.path.join(cache_dir, "reviewed_segments.json"))
-                    if isinstance(reviewed, list) and reviewed:
-                        draft = reviewed
             if not draft:
                 if lyrics_text:
-                    segments = acoustic_baseline(segments, guide_report["checks"], guide=lyrics_text)
+                    segments = acoustic_baseline(segments, guide_report["checks"])
                 def publish_alignment_progress(percent, detail):
                     phase = ("Downloading timing model" if detail.startswith("Baixando alinhador") else
                              "Loading timing model" if detail.startswith("Carregando o modelo") else "Aligning lyrics with voice")
@@ -6105,12 +6119,6 @@ def run_pipeline(
                 with open(os.path.join(cache_dir, "reviewed_segments.json"), "w", encoding="utf-8") as file:
                     json.dump(segments, file, ensure_ascii=False, indent=2)
                 save_stage_checkpoint(cache_dir, "transcription_reviewed", "revisão das legendas concluída", 78)
-
-                if prepare_lyrics_guide(lyrics_text):
-                    from lyric_guide import enforce_guide_text
-                    segments, draft_guide_report = enforce_guide_text(lyrics_text, segments)
-                    if not segments:
-                        raise ValueError("A revisão salva não corresponde à letra-guia. Confira a guia antes de refazer o vídeo.")
 
             # --- NOVO: Passo de Pausa e Correção de Legendas (se ativado pelo usuário) ---
             review_checkpoint = stage_checkpoint(cache_dir, "transcription_reviewed")
@@ -6167,22 +6175,11 @@ def run_pipeline(
             pm.check_cancelled()
 
             # Passo 4: Gerar legendas ASS com efeitos de karaokê
-            strict_guide = bool(prepare_lyrics_guide(lyrics_text))
-            if strict_guide:
-                from guided_output import finalize_guided_output
-                update_state("processing", "Checking lyrics guide", 79)
-                segments, final_guide_report = finalize_guided_output(vocals_wav, segments, lyrics_text, cache_dir,
-                    context={key: cached_meta.get(key) for key in ("audio_hash", "vocal_source", "lyrics_clock_hash")},
-                    progress=lambda percent, detail: update_state("processing", "Checking lyrics guide", 79, stage_detail=detail),
-                    cancel=pm.check_cancelled)
-                vocal_activity = final_guide_report.get("voice_regions")
-                update_process_summary(guide_contract=final_guide_report.get("guide_contract", {}))
-            else:
-                from lyric_alignment import QUALITY_VERSION
-                activity_cache = queue_cache.read_json(os.path.join(cache_dir, "aligned_lyrics.json"), {})
-                vocal_activity = (activity_cache.get("voice_regions") if isinstance(activity_cache, dict)
-                                  and isinstance(activity_cache.get("report"), dict)
-                                  and activity_cache["report"].get("version") == QUALITY_VERSION else None)
+            from lyric_alignment import QUALITY_VERSION
+            activity_cache = queue_cache.read_json(os.path.join(cache_dir, "aligned_lyrics.json"), {})
+            vocal_activity = (activity_cache.get("voice_regions") if isinstance(activity_cache, dict)
+                              and isinstance(activity_cache.get("report"), dict)
+                              and activity_cache["report"].get("version") == QUALITY_VERSION else None)
             ass_path = os.path.join(cache_dir, "karaoke.ass")
             subtitles_checkpoint = stage_checkpoint(cache_dir, "subtitles_generated")
             if not subtitles_checkpoint or not os.path.isfile(ass_path):
@@ -6212,7 +6209,6 @@ def run_pipeline(
                     media_duration=get_file_duration(instrumental_wav),
                     visual_settings=karaoke_visual_settings,
                     voice_regions=vocal_activity,
-                    strict_guide=strict_guide,
                 )
             else:
                 update_state("processing", "Using subtitle checkpoint", 80)

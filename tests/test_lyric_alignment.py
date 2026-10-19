@@ -96,7 +96,7 @@ class GuideTests(unittest.TestCase):
         raw = words('deixe uma luz acesa', 1)[0]['words'] + words('deixe uma luz acesa', 10)[0]['words']
         self.assertEqual(repetition_candidates(raw, ''), [])
 
-    def test_three_copies_can_reduce_to_one_when_audio_disagrees_with_printed_repeats(self):
+    def test_three_copies_offer_every_audio_hypothesis_despite_printed_guide_repeats(self):
         line = 'deixe uma luz acesa'
         raw = words(' '.join([line]*3))[0]['words']
         self.assertIn(line.split(), repetition_candidates(raw, line))
@@ -128,14 +128,18 @@ class GuideTests(unittest.TestCase):
         self.assertIsNotNone(result)
         self.assertEqual(''.join(c['text'] for c in result[0]['alignment_chars']),"Don't")
 
-    def test_context_can_propose_obvious_different_word_and_missing_inner_word(self):
+    def test_context_proposes_local_substitutions_without_inserting_missing_words(self):
         guide='eu quero cantar com você nesta noite'
+        proposed=guided_candidate(guide,words('eu quero gastar com voce nesta noite')[0]['words'])
+        self.assertIsNotNone(proposed)
+        self.assertEqual(proposed[2], 'cantar')
+        self.assertEqual(len(proposed),7)
+        self.assertIsNone(guided_candidate(guide,words('eu quero com voce nesta noite')[0]['words']))
         self.assertEqual(guided_candidate(guide,words('eu quero viver com voce nesta noite')[0]['words']),guide.split())
-        self.assertEqual(guided_candidate(guide,words('eu quero com voce nesta noite')[0]['words']),guide.split())
 
     def test_unrelated_guide_cannot_supply_a_verse_and_external_times_are_ignored(self):
         self.assertIsNone(guided_candidate('outra letra com palavras diferentes',words('eu quero cantar nesta noite')[0]['words']))
-        raw=words('eu quero viver com voce nesta noite')[0]['words']
+        raw=words('eu quero gastar com voce nesta noite')[0]['words']
         self.assertEqual(guided_candidate('[99:59]eu quero cantar com você nesta noite',raw),
                          guided_candidate('[00:01]eu quero cantar com você nesta noite',raw))
 
@@ -207,15 +211,22 @@ class QualityTests(unittest.TestCase):
         return refine_lyrics(self.audio,source,guide,self.root,decode=self.decode,backend_factory=self.factory,**options)
 
     def test_guide_changes_require_acoustic_support_and_do_not_overwrite_raw_transcription(self):
-        source=words('eu quero viver com voce nesta noite');before=copy.deepcopy(source)
+        source=words('eu quero gastar com voce nesta noite');before=copy.deepcopy(source)
+        class Supported(Backend):
+            def sequence_score(self,emission,text):
+                return -20 if 'cantar' in text else -60
+        def factory(progress,cancel):
+            backend=Supported(progress,cancel);self.backends.append(backend);return backend
+        self.factory=factory
         raw=self.root/'transcribed_segments.json';raw.write_text(json.dumps(source))
         result,report=self.refine(source,'eu quero cantar com você nesta noite')
-        self.assertEqual(result[0]['text'],'eu quero cantar com você nesta noite')
+        self.assertIn('cantar',result[0]['text'])
+        self.assertNotIn('gastar',result[0]['text'])
         self.assertGreater(report['guide_changes'],0);self.assertEqual(report['aligned_words'],7)
         self.assertEqual(source,before);self.assertEqual(json.loads(raw.read_text()),before)
         self.assertTrue(self.backends[0].closed)
 
-    def test_rejected_guide_alignment_omits_out_of_guide_word_without_inventing_replacement(self):
+    def test_rejected_guide_alignment_keeps_supported_original_instead_of_forcing_guide(self):
         class Reject(Backend):
             def align(self,emission,text):
                 result=super().align(emission,text)
@@ -223,11 +234,8 @@ class QualityTests(unittest.TestCase):
                     for word in result:word['alignment_score']=.001
                 return result
         self.factory=Reject
-        result,report=self.refine(words('eu quero viver com voce nesta noite'),'eu quero cantar com você nesta noite')
-        self.assertNotIn('viver',result[0]['text'])
-        self.assertNotIn('cantar',result[0]['text'])
-        self.assertEqual(report['guide_changes'],0)
-        self.assertEqual(report['guide_removed_words'],1)
+        result,report=self.refine(words('eu quero gastar com voce nesta noite'),'eu quero cantar com você nesta noite')
+        self.assertIn('gastar',result[0]['text']);self.assertEqual(report['guide_changes'],0)
 
     def test_ctc_and_voice_detector_reject_unvoiced_hallucination_even_with_background_audio(self):
         class RejectNoise(Backend):

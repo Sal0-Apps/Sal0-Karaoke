@@ -18,14 +18,15 @@ import unicodedata
 
 import numpy as np
 
-from lyric_guide import normalize_word, prepare_lyrics_guide, apply_guide_boundaries
+from lyric_guide import (normalize_word, prepare_lyrics_guide, apply_guide_boundaries,
+                         guide_correction_candidate)
 from karaoke_generator import split_and_wrap_segments
 from whisper_audio import load_whisper_audio
 import process_manager as pm
 from runtime_resources import available_cpu_threads, release_cached_whisper
 
 logger = logging.getLogger('karaoke')
-QUALITY_VERSION = 4
+QUALITY_VERSION = 5
 SAMPLE_RATE = 16000
 MODEL_URL = 'https://dl.fbaipublicfiles.com/mms/torchaudio/ctc_alignment_mling_uroman/model.pt'
 MODEL_DIR = '/data/output/models/lyric_alignment'
@@ -42,52 +43,26 @@ def roman_word(text):
 
 
 def guided_candidate(guide, words):
-    """Find an ordered, strongly anchored local phrase; CTC must still verify it."""
+    """Propose local substitutions without adding words or changing any clocks.
+
+    Short local corrections use conservative lexical context. Strongly anchored
+    longer phrases can also propose distant ASR errors, preserving the baseline
+    correction ability. Every proposal keeps the word count and requires strong
+    complete-window CTC preference before changing the recognized text.
+    """
+    candidate = guide_correction_candidate(guide, words, allow_distant=True)
+    if not candidate or len(candidate) != len(words):
+        return None
     observed = [normalize_word(word['word']) for word in words]
-    tokens = prepare_lyrics_guide(guide).split()
-    expected = [normalize_word(token) for token in tokens]
-    if len(observed) < 3 or not expected or len(expected) > 12000:
-        return None
-    # Smith-Waterman: local context permits a chorus printed once to match again,
-    # while a missing guide verse cannot shift the rest of the recording.
-    rows = np.zeros((len(observed)+1, len(expected)+1), dtype=np.float32)
-    moves = np.zeros(rows.shape, dtype=np.uint8)
-    best = (0., 0, 0)
-    for i, actual in enumerate(observed, 1):
-        for j, wanted in enumerate(expected, 1):
-            reward = 2.5 if actual == wanted else -1.4
-            choices = (0., rows[i-1,j-1]+reward, rows[i-1,j]-1.5, rows[i,j-1]-1.5)
-            move = max(range(4), key=choices.__getitem__)
-            rows[i,j], moves[i,j] = choices[move], move
-            if choices[move] > best[0]:
-                best = (choices[move], i, j)
-    _, end_i, end_j = best
-    i, j = end_i, end_j
-    exact = 0
-    while i and j and moves[i,j]:
-        move = moves[i,j]
-        if move == 1:
-            exact += observed[i-1] == expected[j-1]
-            i, j = i-1, j-1
-        elif move == 2:
-            i -= 1
-        else:
-            j -= 1
-    if (end_i-i < .7*len(observed) or exact < max(2, math.ceil(.5*len(observed)))
-            or i > 1 or end_i < len(observed)-1 or end_j-j > 1.6*(end_i-i)+3):
-        return None
-    candidate = [str(word['word']).strip() for word in words[:i]] + tokens[j:end_j] + [str(word['word']).strip() for word in words[end_i:]]
     if [normalize_word(token) for token in candidate] == observed:
         return None
-    if not candidate or any(not roman_word(token) for token in candidate):
+    if any(not roman_word(token) for token in candidate):
         return None
     return candidate
 
 
-def acoustic_baseline(segments, checks, guide=None):
-    """Keep guide corrections; unguided legacy callers may recover ASR spelling."""
-    if prepare_lyrics_guide(guide):
-        return copy.deepcopy(segments)
+def acoustic_baseline(segments, checks):
+    """Keep harmless guide spelling; require CTC to validate lexical substitutions."""
     result=copy.deepcopy(segments);index=0
     for segment in result:
         for word in segment.get('words',[]):
@@ -184,8 +159,8 @@ def repetition_candidates(words, guide):
             copies = 2
             while observed[start+copies*length:start+(copies+1)*length] == phrase:
                 copies += 1
-            # Printed repetitions are hypotheses, never a minimum number of
-            # occurrences. Only the likelihood of the complete audio may delete.
+            # The printed guide cannot establish how many times a phrase was
+            # actually sung. Every shorter hypothesis needs full-window CTC.
             for keep in range(1, copies):
                 candidate = texts[:start+keep*length] + texts[start+copies*length:]
                 key = tuple(candidate)
@@ -212,47 +187,78 @@ def coalesce_repetition_windows(segments, guide):
 
 
 def supports_deletion(backend, emission, original, candidate):
-    """Compare hypotheses against every audio frame, including the removed span.
+    """Require strong CTC preference on every frame for a changed hypothesis.
 
-    A good mean score on the surviving words alone can hide an actually sung
-    repetition. CTC sequence likelihood penalizes that unexplained vocal audio.
+    Forced alignment can assign plausible clocks and scores to a wrong word or
+    omit a genuinely sung repetition. Complete-window sequence likelihood must
+    prefer the proposed text; missing or nonfinite scores preserve the ASR.
     """
     score = getattr(backend, 'sequence_score', None)
     if not callable(score):
         return False
     full, reduced = score(emission, original), score(emission, candidate)
-    return math.isfinite(reduced) and reduced > full + 5.
+    return math.isfinite(full) and math.isfinite(reduced) and reduced > full + 5.
 
 
-def _original_subsequence(original, aligned, window_start):
-    """Map a deletion-only hypothesis back to the nearest original clocks.
+def confirmed_guide_candidate(backend, emission, original, candidate):
+    """Keep only substitutions supported alone, together and in final context.
 
-    This is bounded to the current <=20 second alignment window. The model's
-    clocks choose between identical printed copies but never replace human time.
+    One very strong correction must not pay for another wrong guide word.
+    Every score reuses the same acoustic emissions; tuple memoization avoids
+    repeating CTC evaluations as weak substitutions return to the ASR text.
     """
-    wanted = [normalize_word(word['word']) for word in aligned]
-    observed = [normalize_word(word['word']) for word in original]
-    rows = np.full((len(wanted)+1,len(observed)+1), np.inf, dtype=np.float64)
-    take = np.zeros(rows.shape, dtype=np.bool_)
-    rows[0,:] = 0.
-    for i, token in enumerate(wanted,1):
-        for j, source in enumerate(observed,1):
-            rows[i,j] = rows[i,j-1]
-            if token == source:
-                distance = (abs(original[j-1]['start']-(aligned[i-1]['start']+window_start))
-                            + abs(original[j-1]['end']-(aligned[i-1]['end']+window_start)))
-                candidate = rows[i-1,j-1]+distance
-                if candidate < rows[i,j]:
-                    rows[i,j], take[i,j] = candidate, True
-    if not math.isfinite(rows[-1,-1]):
+    score = getattr(backend, 'sequence_score', None)
+    if not callable(score) or len(candidate) != len(original):
         return None
-    indices, i, j = [], len(wanted), len(observed)
-    while i:
-        if take[i,j]:
-            indices.append(j-1)
-            i -= 1
-        j -= 1
-    return [copy.deepcopy(original[index]) for index in reversed(indices)]
+    changed = [index for index, (actual, proposed) in enumerate(zip(original, candidate))
+               if normalize_word(actual) != normalize_word(proposed)]
+    if not changed:
+        return None
+    scores = {}
+
+    def likelihood(words):
+        key = tuple(words)
+        if key not in scores:
+            scores[key] = float(score(emission, list(words)))
+        return scores[key]
+
+    baseline = likelihood(original)
+    if not math.isfinite(baseline):
+        return None
+    selected = list(candidate)
+    supported = []
+    for index in changed:
+        isolated = list(original)
+        isolated[index] = candidate[index]
+        value = likelihood(isolated)
+        if math.isfinite(value) and value > baseline + 5.:
+            supported.append(index)
+        else:
+            selected[index] = original[index]
+
+    # Each failed round removes one substitution, so at most N rounds suffice.
+    for _ in range(len(supported)):
+        combined = likelihood(selected)
+        if not math.isfinite(combined) or combined <= baseline + 5.:
+            return None
+        weak = []
+        for index in supported:
+            without = selected.copy()
+            without[index] = original[index]
+            value = likelihood(without)
+            if not math.isfinite(value):
+                return None
+            gain = combined - value
+            if gain <= 5.:
+                weak.append((gain, index))
+        if not weak:
+            return selected
+        # Removing only the weakest keeps independently valid corrections when
+        # two proposed words interfere with one another in the joint sequence.
+        _, rejected = min(weak)
+        selected[rejected] = original[rejected]
+        supported.remove(rejected)
+    return None
 
 
 def clean_segments(segments, evidence, voice_regions=None):
@@ -407,21 +413,6 @@ class MMSAligner:
         self.cancel()
         return -float(loss)
 
-    def word_has_voice(self, emission, word):
-        """Require nonblank phonetic evidence, not just a forced CTC path."""
-        values, duration = emission
-        frames = values.size(0)
-        if duration <= 0 or frames == 0:
-            return False
-        first = max(0, int(word['start'] / duration * frames))
-        last = min(frames, math.ceil(word['end'] / duration * frames))
-        if last <= first:
-            return False
-        probabilities = values[first:last].softmax(-1)
-        phonetic = probabilities[:, 1:].max(-1).values
-        audible = (phonetic >= .15) & (phonetic >= probabilities[:, 0] * .75)
-        return int(audible.sum()) >= min(2, last-first)
-
     def close(self):
         if hasattr(self,'model'):del self.model
         self.torch.set_num_threads(self.old_threads)
@@ -450,143 +441,10 @@ def has_voice(start,end,regions):
     return any(min(end+.12,right)-max(start-.12,left)>=min(.04,(end-start)*.2) for left,right in regions)
 
 
-def _digest(value):
-    return hashlib.sha256(json.dumps(value, sort_keys=True, ensure_ascii=False).encode()).hexdigest()
-
-
-def _evidence_key(audio_path, guide, context, voice_regions):
-    source = Path(audio_path)
-    info = source.stat()
-    return _digest(dict(version=QUALITY_VERSION, guide=prepare_lyrics_guide(guide),
-        source=dict(path=str(source.resolve()), size=info.st_size, modified=info.st_mtime_ns),
-        context=context or {}, voice_regions=voice_regions,
-        engine=os.getenv('KARAOKE_ALIGNMENT', 'mms'), voice_policy='guide_voice_v1'))
-
-
-def _merge_regions(regions):
-    merged = []
-    for start, end in sorted(regions):
-        if end <= start:
-            continue
-        if merged and start <= merged[-1][1] + .02:
-            merged[-1] = (merged[-1][0], max(end, merged[-1][1]))
-        else:
-            merged.append((start, end))
-    return [[float(start), float(end)] for start, end in merged]
-
-
-def _strict_voice_filter(segments, evidence, voice_regions):
-    """Sound alone is not singing: require VAD or fresh strong CTC evidence.
-
-    An unavailable detector (None) and a detector that found no voice ([]) both
-    need CTC confirmation, but remain distinct in the diagnostics. Strong CTC
-    can rescue quiet singing and sustained vowels missed by a speech detector.
-    """
-    regions = []
-    for region in voice_regions if voice_regions is not None else []:
-        try:
-            start, end = map(float, region)
-        except (TypeError, ValueError):
-            continue
-        if math.isfinite(start + end) and end > start:
-            start, end = max(0., start), min(evidence.duration, end)
-            if end > start:
-                regions.append((start, end))
-    kept, rescued, omitted, trimmed, confirmed = [], [], 0, 0, 0
-    for segment in segments:
-        for original in segment.get('words', []):
-            word = copy.deepcopy(original)
-            score = word.pop('_fresh_ctc_voice_score', None)
-            ctc_bounds = word.pop('_fresh_ctc_voice_bounds', None)
-            strong = isinstance(score, (int, float)) and math.isfinite(score) and score >= .25
-            start, end = word['start'], word['end']
-            try:
-                ctc_start, ctc_end = map(float, ctc_bounds)
-                ctc_start, ctc_end = max(start, ctc_start), min(end, ctc_end)
-                strong = strong and math.isfinite(ctc_start+ctc_end) and ctc_end-ctc_start >= min(.025,(end-start)*.2)
-            except (TypeError, ValueError):
-                strong = False
-            intersections = [(max(start, left), min(end, right)) for left, right in regions
-                             if min(end, right) - max(start, left) >= min(.025, (end-start)*.2)]
-            if not intersections and not strong:
-                omitted += 1
-                continue
-            if strong:
-                confirmed += 1
-                # A human phrase clock must not turn a short CTC confirmation
-                # into voice evidence over its entire, possibly silent envelope.
-                intersections.append((ctc_start, ctc_end))
-                rescued.append((ctc_start, ctc_end))
-            if intersections:
-                left = min(interval[0] for interval in intersections)
-                right = max(interval[1] for interval in intersections)
-                if left > start + .03:
-                    word['start'] = left
-                if end > right + .08:
-                    word['end'] = right + .04
-            if word['start'] != start or word['end'] != end:
-                word.pop('alignment_chars', None)
-                trimmed += 1
-            kept.append(word)
-    return regroup(kept), _merge_regions(regions + rescued), dict(
-        ambiguous_voice_words=omitted, voice_trimmed_words=trimmed,
-        ctc_confirmed_words=confirmed,
-        voice_detector=('unavailable' if voice_regions is None else 'voice' if regions else 'no_voice'))
-
-
-def _guide_gate(guide, segments):
-    # The lexical policy lives in one place and also checks cache-hit output.
-    from lyric_guide import enforce_guide_text
-    return enforce_guide_text(guide, segments)
-
-
-def _read_validated_output(audio_path, segments, guide, cache_dir, context, voice_regions):
-    """Fast path for the already verified output of this exact audio and guide."""
-    try:
-        saved = json.loads((Path(cache_dir) / 'aligned_lyrics.json').read_text(encoding='utf-8'))
-        report = saved['report']
-        expected = _evidence_key(audio_path, guide, context, voice_regions)
-        if (saved.get('display_evidence_key') != expected or report.get('version') != QUALITY_VERSION
-                or report.get('strict_voice_policy') != 'guide_voice_v1'
-                or saved['segments'] != segments
-                or report.get('voice_regions') != saved.get('voice_regions')
-                or report.get('cache_signature') != _digest(dict(evidence=expected,
-                    segments=saved['segments'], voice_regions=saved.get('voice_regions')))
-                or saved.get('display_signature') != _digest(dict(
-                    segments=saved['segments'], voice_regions=saved.get('voice_regions')))):
-            return None
-        checked, contract = _guide_gate(guide, saved['segments'])
-        report = copy.deepcopy(report)
-        if checked != saved['segments']:
-            report['guide_contract'] = contract
-            report['cache_signature'] = _digest(dict(evidence=expected, segments=checked,
-                                                     voice_regions=saved.get('voice_regions')))
-        return checked, report
-    except (OSError, ValueError, KeyError, TypeError):
-        return None
-
-
-def validate_display_evidence(audio_path, segments, guide, cache_dir, context=None,
-                              progress=None, cancel=None, **options):
-    """Validate drafts/cache output without rewriting accepted human clocks.
-
-    The cache stores only a derived display result; raw ASR and human review
-    files remain untouched. Fresh already-verified output needs no second model.
-    """
-    (cancel or pm.check_cancelled)()
-    if prepare_lyrics_guide(guide):
-        cached = _read_validated_output(audio_path, segments, guide, cache_dir, context,
-                                        options.get('voice_regions'))
-        if cached is not None:
-            return cached
-    return refine_lyrics(audio_path, segments, guide, cache_dir, context=context,
-        progress=progress, cancel=cancel, preserve_timing=True, **options)
-
-
 def invalidate_quality_outputs(cache_dir):
     """Old rendered results cannot hide the new timing; preserve every human review."""
     path=Path(cache_dir)/'stage_checkpoints.json'
-    try: saved=json.loads(path.read_text(encoding='utf-8'))
+    try: saved=json.loads(path.read_text())
     except (OSError,ValueError): saved={'completed_stages':{}}
     if saved.get('lyric_quality_version')==QUALITY_VERSION:return
     completed=saved.setdefault('completed_stages',{})
@@ -595,7 +453,7 @@ def invalidate_quality_outputs(cache_dir):
         completed.pop(stage,None)
     saved['lyric_quality_version']=QUALITY_VERSION
     temporary=path.with_suffix('.json.quality.tmp')
-    temporary.write_text(json.dumps(saved,ensure_ascii=False), encoding='utf-8')
+    temporary.write_text(json.dumps(saved,ensure_ascii=False))
     os.replace(temporary,path)
 
 
@@ -614,43 +472,27 @@ def accept_alignment(aligned, original, window_duration, window_start=None):
 
 
 def refine_lyrics(audio_path, segments, guide, cache_dir, context=None, progress=None,
-                  cancel=None, backend_factory=None, decode=None, voice_regions=None,
-                  preserve_timing=False):
+                  cancel=None, backend_factory=None, decode=None, voice_regions=None):
     """A second pass: use guide text only when supported by acoustic alignment."""
     cancel=cancel or pm.check_cancelled;progress=progress or (lambda percent,detail:None)
     cancel()
-    strict = bool(prepare_lyrics_guide(guide))
-    requested_voice_regions = copy.deepcopy(voice_regions)
-    display_evidence_key = _evidence_key(audio_path, guide, context, requested_voice_regions)
     info=os.stat(audio_path)
     signature=hashlib.sha256(json.dumps(dict(version=QUALITY_VERSION,segments=segments,
         guide=prepare_lyrics_guide(guide),source=dict(size=info.st_size,mtime=info.st_mtime_ns),
-        context=context or {},engine=os.getenv('KARAOKE_ALIGNMENT','mms'),
-        voice_regions=requested_voice_regions, preserve_timing=preserve_timing),
+        context=context or {},engine=os.getenv('KARAOKE_ALIGNMENT','mms')),
         sort_keys=True,ensure_ascii=False).encode()).hexdigest()
     target=Path(cache_dir)/'aligned_lyrics.json'
     try:
-        saved=json.loads(target.read_text(encoding='utf-8'))
-        if saved['signature']==signature and saved['report'].get('status')=='aligned':
-            cached = (_read_validated_output(audio_path, saved['segments'], guide, cache_dir,
-                                             context, requested_voice_regions) if strict else
-                      (saved['segments'], saved['report']))
-            if cached is not None:
-                cancel();invalidate_quality_outputs(cache_dir);progress(100,'Alinhamento acústico recuperado do cache.')
-                return cached
+        saved=json.loads(target.read_text())
+        if (saved['signature']==signature and saved['report'].get('status')=='aligned'
+                and saved['report'].get('version')==QUALITY_VERSION):
+            cancel();invalidate_quality_outputs(cache_dir);progress(100,'Alinhamento acústico recuperado do cache.')
+            return saved['segments'],saved['report']
     except (OSError,ValueError,KeyError,TypeError):pass
     progress(0,'Verificando voz e silêncio sem cortar a linha do tempo…')
     audio=(decode or load_whisper_audio)(audio_path)
     evidence=AudioEvidence(audio)
-    # Voice detection must also run when MMS is unavailable/disabled. Never
-    # confuse a successful empty VAD result with an unavailable detector.
-    if strict and voice_regions is None:
-        voice_regions=detect_voice_regions(audio)
     cleaned,report=clean_segments(segments,evidence)
-    for segment in cleaned:
-        for word in segment['words']:
-            word.pop('_fresh_ctc_voice_score', None)
-            word.pop('_fresh_ctc_voice_bounds', None)
     cleaned=coalesce_repetition_windows(cleaned, guide)
     report.update(version=QUALITY_VERSION,status='cleaned',aligned_words=0,guide_changes=0,unsupported_voice_words=0,
                   repeated_words=0,guide_verses=0,
@@ -660,7 +502,7 @@ def refine_lyrics(audio_path, segments, guide, cache_dir, context=None, progress
         eligible=any(segment['end']-segment['start']<=19.1 and all(roman_word(w['word']) for w in segment['words']) for segment in cleaned)
         if eligible and os.getenv('KARAOKE_ALIGNMENT','mms').lower() not in {'off','0','false'}:
             backend=(backend_factory or MMSAligner)(progress,cancel)
-            if not strict and voice_regions is None and backend_factory is None:
+            if voice_regions is None and backend_factory is None:
                 voice_regions=detect_voice_regions(audio)
         for index,segment in enumerate(cleaned):
             cancel();original=segment['words'];selected=copy.deepcopy(original)
@@ -671,39 +513,32 @@ def refine_lyrics(audio_path, segments, guide, cache_dir, context=None, progress
                     emission=backend.emission(audio[int(start*SAMPLE_RATE):math.ceil(end*SAMPLE_RATE)])
                     texts=[str(w['word']).strip() for w in original]
                     baseline=backend.align(emission,texts)
-                    candidate=guided_candidate(guide,original) if not preserve_timing else None
+                    candidate=guided_candidate(guide,original)
                     chosen=baseline
+                    if candidate:
+                        candidate=confirmed_guide_candidate(backend,emission,texts,candidate)
                     if candidate:
                         guided=backend.align(emission,candidate)
                         if (accept_alignment(guided,original,end-start,start)
-                                and (len(candidate) >= len(texts)
-                                     or supports_deletion(backend, emission, texts, candidate))
                                 and _mean_score(guided)>=_mean_score(baseline or [])*.8-.015):
                             chosen=guided
                             report['guide_changes']+=sum(tag!='equal' for tag,*_ in difflib.SequenceMatcher(None,texts,candidate,autojunk=False).get_opcodes())
                     # A complete duplicated phrase can defeat local guide matching.
                     # Test a bounded set of loop hypotheses on the same emissions.
-                    original_subset = None
                     if chosen is baseline:
                         best_loop = None
-                        best_original = None
                         best_score = -math.inf
                         for reduced in repetition_candidates(original, guide):
                             aligned = backend.align(emission, reduced)
                             if (accept_alignment(aligned, original, end-start, start)
                                     and _mean_score(aligned) >= _mean_score(baseline or [])*.8-.015
                                     and supports_deletion(backend, emission, texts, reduced)):
-                                matching = _original_subsequence(original, aligned, start) if preserve_timing else None
-                                if preserve_timing and matching is None:
-                                    continue
                                 score = backend.sequence_score(emission, reduced)
                                 if score > best_score:
                                     best_loop = aligned
-                                    best_original = matching
                                     best_score = score
                         if best_loop:
                             chosen = best_loop
-                            original_subset = best_original
                             report['repeated_words'] += len(texts) - len(best_loop)
                     if chosen is baseline and baseline and len(baseline)==len(original):
                         unsupported={i for i,word in enumerate(baseline)
@@ -711,40 +546,23 @@ def refine_lyrics(audio_path, segments, guide, cache_dir, context=None, progress
                             and not has_voice(word['start']+start,word['end']+start,voice_regions)
                             and not has_voice(original[i]['start'],original[i]['end'],voice_regions)}
                         if unsupported:
-                            if strict:
-                                for word_index, word in enumerate(selected):
-                                    if word_index in unsupported:
-                                        continue
-                                    confirmation = baseline[word_index]
-                                    probe = getattr(backend, 'word_has_voice', None)
-                                    if not callable(probe) or probe(emission, confirmation):
-                                        word['_fresh_ctc_voice_score'] = confirmation.get('alignment_score',0.)
-                                        word['_fresh_ctc_voice_bounds'] = (confirmation['start']+start,confirmation['end']+start)
                             selected=[word for i,word in enumerate(selected) if i not in unsupported]
                             report['unsupported_voice_words']+=len(unsupported)
                             result.extend(selected)
                             continue
                     if accept_alignment(chosen,original,end-start,start):
-                        selected=copy.deepcopy((original_subset if original_subset is not None else original)
-                                               if preserve_timing else chosen)
-                        for word, confirmation in zip(selected, chosen):
-                            if strict:
-                                probe = getattr(backend, 'word_has_voice', None)
-                                if not callable(probe) or probe(emission, confirmation):
-                                    word['_fresh_ctc_voice_score'] = confirmation.get('alignment_score', 0.)
-                                    word['_fresh_ctc_voice_bounds'] = (confirmation['start']+start, confirmation['end']+start)
-                            if not preserve_timing:
-                                word['start']+=start;word['end']+=start
-                                for char in word.get('alignment_chars',[]):
-                                    if 'start' in char:char['start']+=start;char['end']+=start
+                        selected=copy.deepcopy(chosen)
+                        for word in selected:
+                            word['start']+=start;word['end']+=start
+                            for char in word.get('alignment_chars',[]):
+                                if 'start' in char:char['start']+=start;char['end']+=start
                         report['aligned_words']+=len(selected)
                     else:
                         report['rejected_groups']+=1
             except InterruptedError:
                 raise
             except Exception:
-                logger.exception('Não foi possível alinhar um trecho; mantendo-o para verificação final de voz e guia.'
-                                 if strict else 'Não foi possível alinhar um trecho; preservando apenas esse trecho original.')
+                logger.exception('Não foi possível alinhar um trecho; preservando apenas esse trecho original.')
                 selected=copy.deepcopy(original)
                 report['retryable_failures']=report.get('retryable_failures',0)+1
 
@@ -753,8 +571,7 @@ def refine_lyrics(audio_path, segments, guide, cache_dir, context=None, progress
     except InterruptedError:
         raise
     except Exception as error:
-        logger.exception('Alinhamento indisponível; verificando guia e evidência vocal antes de exibir palavras.'
-                         if strict else 'Alinhamento indisponível; preservando transcrição e limpeza de silêncio.')
+        logger.exception('Alinhamento indisponível; preservando transcrição e limpeza de silêncio.')
         result=[word for segment in cleaned for word in segment['words']]
         report.update(status='fallback',aligned_words=0,guide_changes=0,error=str(error)[:300])
     finally:
@@ -762,27 +579,15 @@ def refine_lyrics(audio_path, segments, guide, cache_dir, context=None, progress
     cancel()
     final,extra=clean_segments(regroup(result),evidence,voice_regions)
     report['silent_or_invalid_words']+=extra['silent_or_invalid_words'];report['trimmed_words']+=extra['trimmed_words']
-    if strict:
-        final, voice_regions, vocal_report = _strict_voice_filter(final, evidence, voice_regions)
-        report.update(vocal_report, strict_voice_policy='guide_voice_v1')
-        before = sum(len(segment.get('words', [])) for segment in final)
-        final, report['guide_contract'] = _guide_gate(guide, final)
-        report['guide_removed_words'] = max(0, before-sum(len(segment.get('words', [])) for segment in final))
     # Missing/quiet voice can yield an empty result; never restore hallucinated text.
-    report['discarded_words']=(report['silent_or_invalid_words']+report['unsupported_voice_words']+
-        report['repeated_words']+report.get('ambiguous_voice_words',0)+report.get('guide_removed_words',0))
+    report['discarded_words']=report['silent_or_invalid_words']+report['unsupported_voice_words']+report['repeated_words']
     if guide:
-        if not preserve_timing:
-            final, report['guide_verses'] = apply_guide_boundaries(guide, final)
+        final, report['guide_verses'] = apply_guide_boundaries(guide, final)
         final = split_and_wrap_segments(final)
-    report['voice_regions'] = voice_regions
-    report['cache_signature'] = _digest(dict(evidence=display_evidence_key,
-                                            segments=final,voice_regions=voice_regions))
     temporary=target.with_suffix('.json.tmp')
     try:
         temporary.write_text(json.dumps(dict(signature=signature,segments=final,report=report,
-            voice_regions=voice_regions,display_evidence_key=display_evidence_key,
-            display_signature=_digest(dict(segments=final,voice_regions=voice_regions))),ensure_ascii=False), encoding='utf-8')
+                                            voice_regions=voice_regions),ensure_ascii=False))
         cancel();os.replace(temporary,target)
     finally:
         temporary.unlink(missing_ok=True)

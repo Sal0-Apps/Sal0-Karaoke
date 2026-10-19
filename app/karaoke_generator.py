@@ -127,8 +127,7 @@ def split_and_wrap_segments(
                 len(segments), len(result), words_per_line, max_chars_line)
     return result
 
-def insert_instrumental_breaks(segments: list[dict], media_duration=None, visual_settings=None, voice_regions=None,
-                               use_segment_intervals=False) -> list[dict]:
+def insert_instrumental_breaks(segments: list[dict], media_duration=None, visual_settings=None, voice_regions=None) -> list[dict]:
     """Locate rests in measured words, independently of verse display clocks."""
     if not segments:
         return []
@@ -136,7 +135,7 @@ def insert_instrumental_breaks(segments: list[dict], media_duration=None, visual
     lyrics = copy.deepcopy(segments)
     activity = []
     for segment in lyrics:
-        measured = [] if use_segment_intervals else (segment.get('words') or segment.get('animation_words') or [])
+        measured = segment.get('words') or segment.get('animation_words') or []
         intervals = []
         for word in measured:
             try:
@@ -189,69 +188,6 @@ def insert_instrumental_breaks(segments: list[dict], media_duration=None, visual
                                text=f'Instrumental ({number})', words=[], instrumental=True,
                                rest_start=start, rest_end=end))
     return sorted(output, key=lambda segment: segment['start'])
-
-
-def _strict_lyric_windows(segments, voice_regions):
-    """Restrict display, without rewriting the authoritative text or acoustic clocks.
-
-    Word and vocal envelopes are independent requirements. None means vocal
-    evidence was unavailable; an empty measured list means no singing. Joining
-    gaps of at most 80 ms avoids flicker from brief consonants/breaths, without
-    padding the beginning/end of a word or bridging an actual musical rest.
-    """
-    def clock(item):
-        try:
-            start, end = float(item['start']), float(item['end'])
-        except (KeyError, TypeError, ValueError):
-            return None
-        return (start, end) if math.isfinite(start + end) and end > start >= 0 else None
-
-    def merge(intervals):
-        result = []
-        for start, end in sorted(intervals):
-            if result and start - result[-1][1] <= .08 + 1e-7:
-                result[-1] = (result[-1][0], max(result[-1][1], end))
-            else:
-                result.append((start, end))
-        return result
-
-    vocals = None
-    if voice_regions is not None:
-        vocals = []
-        for region in voice_regions:
-            try:
-                start, end = region
-            except (TypeError, ValueError):
-                continue
-            interval = clock(dict(start=start, end=end))
-            if interval:
-                vocals.append(interval)
-        vocals = merge(vocals)
-
-    result = []
-    for verse_id, segment in enumerate(segments):
-        parent = clock(segment)
-        if not parent or segment.get('instrumental'):
-            continue
-        measured = segment.get('words') or segment.get('animation_words') or []
-        words = [interval for word in measured if (interval := clock(word))]
-        # A manually timed phrase remains a valid clock when it has no words.
-        windows = merge([(max(parent[0], start), min(parent[1], end))
-                         for start, end in (words if measured else [parent])
-                         if min(parent[1], end) > max(parent[0], start)])
-        if vocals is not None:
-            windows = merge([(max(start, left), min(end, right))
-                             for start, end in windows for left, right in vocals
-                             if min(end, right) > max(start, left)])
-        for start, end in windows:
-            # ASS has centisecond precision. Round inward so the renderer never
-            # anticipates singing or leaks a lyric beyond the measured envelope.
-            start = math.ceil(start * 100 - 1e-7) / 100
-            end = math.floor(end * 100 + 1e-7) / 100
-            if end - start < .04 - 1e-7:
-                continue  # Isolated 10–20 ms evidence must not flash a whole verse.
-            result.append({**segment, 'start': start, 'end': end, '_strict_verse_id': verse_id})
-    return sorted(result, key=lambda segment: segment['start'])
 
 
 def synced_animation_text(segment, normal_color, highlight_color, line_breaks=(), subtitle_mode='syllable', visual_settings=None):
@@ -410,7 +346,6 @@ def generate_ass_karaoke(
     media_duration: float = None,
     visual_settings: dict = None,
     voice_regions: list = None,
-    strict_guide: bool = False,
 ):
     """
     Gera um arquivo de legenda ASS customizado.
@@ -430,23 +365,15 @@ def generate_ass_karaoke(
         break_on_punctuation=break_on_punctuation
     )
     
-    if strict_guide:
-        segments = _strict_lyric_windows(segments, voice_regions)
-
     # 2. Inserir pausas instrumentais se ativado
     if show_instrumental:
-        if strict_guide and not segments and media_duration is not None and math.isfinite(float(media_duration)) and float(media_duration) > 0:
-            segments = [dict(start=0, end=float(media_duration), text='Instrumental', words=[],
-                             instrumental=True, rest_start=0, rest_end=float(media_duration))]
-        else:
-            segments = insert_instrumental_breaks(segments, media_duration, visual_settings, voice_regions,
-                                                  use_segment_intervals=strict_guide)
+        segments = insert_instrumental_breaks(segments, media_duration, visual_settings, voice_regions)
     
     # 3. Manter o verso atual até o próximo, sem lacunas ou versos sobrepostos.
     for idx in range(len(segments) - 1):
         curr = segments[idx]
         nxt = segments[idx + 1]
-        if (not strict_guide and not curr.get("synced_line") and not nxt.get('instrumental')
+        if (not curr.get("synced_line") and not nxt.get('instrumental')
                 and not curr.get('instrumental')):
             # ASR word clocks can overlap slightly. Only the display interval
             # is bounded here; original word clocks and LRC intervals stay intact.
@@ -503,7 +430,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
     lines = [ass_header]
     
     first_lyrics_seg = next((seg for seg in segments if not seg.get('instrumental')), None)
-    persistent_intro = bool(not strict_guide and keep_first_line_visible and first_lyrics_seg and first_lyrics_seg['start'] > 0)
+    persistent_intro = bool(keep_first_line_visible and first_lyrics_seg and first_lyrics_seg['start'] > 0)
     intro_preview_layout = None
     instrumental_layout = None
     if persistent_intro:
@@ -524,19 +451,12 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         start_time_str = format_time(seg["start"])
         end_time_str = format_time(seg["end"])
         next_seg = segments[idx + 1] if show_next_line_preview and idx + 1 < len(segments) else None
-        if strict_guide and show_next_line_preview:
-            # A verse split around a rest is still one verse, never its own preview.
-            next_seg = next((candidate for candidate in segments[idx + 1:]
-                             if not candidate.get('instrumental') and
-                             candidate.get('_strict_verse_id') != seg.get('_strict_verse_id')), None)
         preview_seg = next_seg if next_seg and not next_seg.get('instrumental') else None
-        if show_next_line_preview and not strict_guide and seg.get('instrumental'):
+        if show_next_line_preview and seg.get('instrumental'):
             upcoming = next((candidate for candidate in segments[idx + 1:]
                              if not candidate.get('instrumental')), None)
             if upcoming and seg['start'] >= upcoming['start'] - visual_settings['countdown_seconds']:
                 preview_seg = upcoming
-        if strict_guide and seg.get('instrumental'):
-            preview_seg = None
         intro_instrumental = bool(persistent_intro and intro_preview_layout and
                                   seg['start'] < first_lyrics_seg['start'])
         if intro_instrumental:
@@ -574,7 +494,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
             foreground = ('{' + common + f'\\fscx{initial:.4f}\\t(0,{clock},\\fscx{final:.4f})' + '}' + shape)
             for meter in (background, foreground):
                 lines.append(f'Dialogue: 0,{start_time_str},{end_time_str},Default,,0,0,0,,{meter}\n')
-        fade = (r'{\fad(80,0)}' if not strict_guide and not seg.get('synced_line') and subtitle_mode in {'word', 'syllable'}
+        fade = (r'{\fad(80,0)}' if not seg.get('synced_line') and subtitle_mode in {'word', 'syllable'}
                 and not seg.get('instrumental') else '')
         lines.append(f"Dialogue: 0,{start_time_str},{end_time_str},Default,,0,0,0,,{active_pos}{fade}{text}\n")
         if preview_seg and not intro_instrumental:

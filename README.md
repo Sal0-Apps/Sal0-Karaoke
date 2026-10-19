@@ -8,7 +8,7 @@ O código original é software livre sob a [licença MIT](LICENSE). Dependência
 
 O Sal0 Karaokê é destinado a uma instalação pessoal, acessada pela rede local ou por VPN, como ZeroTier. O repositório aberto disponibiliza o código e os pacotes; o projeto não opera um serviço público de processamento nem coleta centralmente as mídias das instalações. Não é necessário expor a porta do app à internet. O processamento principal é local, mas as integrações escolhidas podem se comunicar com serviços externos.
 
-Na **12.7.1**, a saída automática com letra-guia fica limitada às palavras dela confirmadas na voz. Palavras e frases parecidas são conferidas no contexto; incertezas ficam sem texto, e pausas ocultam letras e prévias sem deslocar a música. O modelo selecionado e o fluxo permanecem os mesmos. [Letra-guia estrita](docs/LETRA_GUIA_ESTRITA.md) · [Detalhes da atualização](docs/ATUALIZACAO_12_7_1.md).
+Na **12.7.2**, a exibição contínua dos versos da 12.7 foi restaurada. O recorte por palavra e o filtro estrito da 12.7.1 foram retirados após causarem piscadas e omissões. A guia volta a conferir o reconhecimento: substituições precisam de contexto e confirmação acústica; diferenças incertas ficam disponíveis para revisão. [Detalhes da correção](docs/ATUALIZACAO_12_7_2.md).
 
 Na **12.7**, animações respeitam o início medido de cada palavra, pausas instrumentais seguem os intervalos do canto e a publicação automática mantém sua intenção mesmo durante o carregamento do painel. O administrador configura animação, brilho, cor e barra do instrumental, pausa mínima e contagem em **Ajustes → Animação e instrumental**. [Detalhes da atualização](docs/ATUALIZACAO_12_7.md).
 
@@ -18,7 +18,7 @@ Na **12.6.1**, as quebras confirmadas da guia dividem os versos depois do alinha
 
 Na **12.6.2**, o servidor utiliza o orçamento real de CPU, preserva memória entre etapas de IA e refina o contexto do Whisper sem trocar o modelo selecionado. Ícones SVG locais e atualizações sem reconstruções repetidas mantêm o visual e o fluxo. A renovação do YouTube recupera os envios afetados, com alerta administrativo pelo Telegram. A integração não ativa faturamento nem usa APIs Google pagas como alternativa; [confira o escopo e os limites dessa proteção](docs/GOOGLE_E_YOUTUBE.md).
 
-- [Letra-guia estrita: conferência e silêncios](docs/LETRA_GUIA_ESTRITA.md)
+- [Letra-guia e estabilidade dos versos](docs/ATUALIZACAO_12_7_2.md)
 - [CPU e instalação da revisão](docs/HARDWARE.md)
 - [Validação das alterações](docs/VALIDACAO_REVISAO.md)
 
@@ -68,7 +68,7 @@ O container `libretranslate/libretranslate:latest` pode ser atualizado separadam
 - Fundo surpresa escolhido da coleção preparada pelo administrador.
 - Separação local de fontes com Demucs e transcrição com Faster-Whisper.
 - Busca opcional de letra-guia, edição manual e aviso quando a busca não encontra resultado.
-- Com letra-guia, o texto automático se limita às palavras dela confirmadas na gravação. A conferência considera palavras e frases parecidas no contexto, mantém os tempos medidos e omite o que não foi confirmado. Sem guia, o Whisper transcreve normalmente. Horários da LRC não controlam a legenda.
+- A letra-guia confere palavras parecidas no contexto. Substituições precisam de confirmação acústica; uma diferença incerta não apaga a frase reconhecida. Sem guia, o Whisper transcreve normalmente. Horários da LRC não controlam a legenda.
 - Separação inteligente de backing vocals, com volume ajustável, preservando as vozes de apoio no instrumental sem remixar a voz principal.
 - Perfis de voz, modelos Whisper e opção de transcrever o original ou os vocais separados.
 
@@ -85,7 +85,7 @@ A extensão reconhecida pelo seletor não garante que todo codec seja reproduzid
 - SRT no idioma original e tradução opcional para português, inglês ou espanhol.
 - Resultados originais preservados quando a tradução opcional não pode ser concluída.
 
-Transcrição, tradução e sincronização são estimativas de modelos. A guia limita o texto automático, mas a confirmação na voz pode omitir um trecho difícil; ela não garante reconhecimento perfeito. Revise resultados destinados a publicação, exibição ou acessibilidade.
+Transcrição, tradução e sincronização são estimativas de modelos. A guia ajuda a conferir o reconhecimento, mas não garante uma transcrição perfeita. Revise resultados destinados a publicação, exibição ou acessibilidade.
 
 ### Fila, progresso e manutenção
 
@@ -143,14 +143,14 @@ Em **Playlist de cada usuário**, a administração define uma playlist válida 
 
 ## Início rápido com Docker
 
-A versão de distribuição desta documentação é **12.7.1**. O título e o rodapé da página mostram apenas o nome da aplicação. A versão do servidor pode ser consultada no Manual; a versão do APK aparece nas configurações nativas.
+A versão de distribuição desta documentação é **12.7.2**. O título e o rodapé da página mostram apenas o nome da aplicação. A versão do servidor pode ser consultada no Manual; a versão do APK aparece nas configurações nativas.
 
 Crie um arquivo `compose.yaml`:
 
 ```yaml
 services:
   karaoke-app:
-    image: ghcr.io/sal0-apps/sal0-karaoke:12.7.1
+    image: ghcr.io/sal0-apps/sal0-karaoke:12.7.2
     container_name: karaoke-app
     ports:
       - "7885:7860"
@@ -209,15 +209,15 @@ A manutenção é mínima. Não há SLA, garantia de respostas rápidas, revisã
 
 O código original permanece sob [MIT](LICENSE), permitindo uso, estudo, modificação e redistribuição com preservação dos avisos exigidos. Bibliotecas, modelos, fontes, imagens e executáveis de terceiros mantêm suas próprias condições. Consulte [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
-Quando um vídeo de fundo decorativo é maior que a música, o início do trecho é escolhido aleatoriamente a cada nova renderização, cabendo a música inteira até o fim do fundo. Vídeos curtos continuam em loop. O vídeo original da música mantém o início e a sincronização. O Whisper mede o canto; com guia, só as palavras dela confirmadas na voz entram no texto automático, preservando os tempos da gravação.
+Quando um vídeo de fundo decorativo é maior que a música, o início do trecho é escolhido aleatoriamente a cada nova renderização, cabendo a música inteira até o fim do fundo. Vídeos curtos continuam em loop. O vídeo original da música mantém o início e a sincronização. O Whisper mede o canto; a guia ajuda a conferir o texto, com substituições verificadas pelo alinhamento acústico.
 
 ### Exibição das frases e animação
 
-Pausas, pontuação e versos confirmados da guia organizam o texto. Limites de palavras e caracteres controlam a quebra visual. Verso e prévia usam posições fixas, e o destaque segue os tempos das palavras. Com guia, letras e prévias desaparecem nas pausas, inclusive dentro de um verso; a opção de manter a primeira linha não antecipa a letra antes da voz. O modo por palavras mantém sua transição de cor. Refazer recria o visual com as regras atuais, reaproveitando a análise compatível.
+Pausas, pontuação e versos confirmados da guia organizam o texto. Limites de palavras e caracteres controlam a quebra visual. Verso e prévia usam posições fixas, e o destaque segue os tempos das palavras. A apresentação da 12.7 mantém o verso legível nas pausas curtas entre palavras; os controles de prévia, primeira linha visível e intervalos instrumentais seguem suas configurações existentes. O modo por palavras mantém sua transição de cor. Refazer recria o visual com as regras atuais, reaproveitando a análise compatível.
 
 ### Whisper com conferência da letra-guia
 
 
-Com uma letra-guia válida, o texto automático fica restrito às palavras dela confirmadas na voz. Palavras ou frases reconhecidas de forma parecida são conferidas no contexto e podem receber a forma correspondente da guia sem deslocar os tempos medidos. Trechos sem confirmação suficiente ficam de fora; não são completados por adivinhação. A gravação conserva sua duração e seus silêncios. Os horários e offsets de LRC não posicionam as palavras; as quebras de verso são reaplicadas quando confirmadas no canto. Letras e prévias ficam ocultas na introdução, nas pausas internas e no encerramento sem voz, mesmo com o aviso instrumental desligado. Sem guia, o reconhecimento normal continua disponível. O modelo Whisper escolhido, a fonte de transcrição, o alinhamento local e os controles visuais existentes são preservados. Vídeos antigos precisam ser refeitos para aplicar a correção; revisões manuais continuam disponíveis no editor. Veja [comportamento e limites da letra-guia estrita](docs/LETRA_GUIA_ESTRITA.md).
+A letra-guia confere palavras e frases parecidas, sem preencher versos ou eliminar trechos por ausência de correspondência. Mudanças lexicais automáticas precisam explicar melhor o áudio completo da janela; caso contrário, o trecho reconhecido permanece para revisão. A apresentação voltou à 12.7: o verso fica legível entre as palavras, com os mesmos estilos, prévias e controles de instrumental. Tempos de LRC não deslocam o canto. O modelo Whisper escolhido e a gravação são preservados. Refaça vídeos antigos para aplicar a correção; revisões manuais continuam prioritárias. Veja [comportamento e limites da correção](docs/ATUALIZACAO_12_7_2.md).
 
 Downloads novos selecionam o melhor vídeo e áudio disponíveis no YouTube, sem teto de 1080p, inclusive para fundos. Isso pode aumentar o espaço e o tempo necessários. Os arquivos já em cache não ganham qualidade retroativamente; para substituir um download antigo, solicite novamente o link. A separação trabalha em PCM float32 a 44,1 kHz, a cópia de análise Whisper usa PCM float32 mono a 16 kHz e o vídeo exporta AAC a 320 kbps. A precisão máxima do Whisper é aplicada ao modelo escolhido, com maior custo em CPU/RAM. Mais precisão numérica e qualidade de origem não garantem transcrição perfeita nem restauram detalhes ausentes na fonte. O cache da análise é preservado entre tarefas compatíveis, incluindo letras sincronizadas e SRT; a revisão e a renderização continuam independentes.

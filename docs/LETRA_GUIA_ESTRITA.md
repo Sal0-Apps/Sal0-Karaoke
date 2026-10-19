@@ -1,5 +1,7 @@
 # Letra-guia estrita — 12.7.1
 
+Este comportamento foi retirado na 12.7.2 após causar piscadas e omissões. Consulte a [correção com base na 12.7](ATUALIZACAO_12_7_2.md). O restante deste documento descreve a versão antiga.
+
 Quando há uma letra-guia válida, a saída automática utiliza somente palavras dela confirmadas na gravação. A guia pode ser colada, editada ou encontrada pela busca existente. Texto manual continua tendo prioridade na escolha da guia da mídia.
 
 ## Conferência pela voz
