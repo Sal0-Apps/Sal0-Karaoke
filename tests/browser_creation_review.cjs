@@ -136,7 +136,10 @@ for (const script of HTML.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/g)) new 
         assert.equal(await page.locator('#enableVad').inputValue(), 'false');
         assert.equal(await page.locator('#lyricsTiming').inputValue(), 'acoustic');
         assert.equal(await page.locator('#easyLyricsTiming').inputValue(), 'acoustic');
-        assert((await page.locator('#easyLyricsPolicy').textContent()).includes('O Whisper define'));
+        const guidePolicy = await page.locator('#easyLyricsPolicy').textContent();
+        assert(guidePolicy.includes('só as palavras dela confirmadas na voz'));
+        assert(guidePolicy.includes('Trechos incertos ficam de fora'));
+        assert(guidePolicy.includes('os tempos seguem a gravação'));
         assert.equal(await page.evaluate(() => friendlyStageName('Verifying lyrics with Whisper')), 'Conferindo palavras pela voz');
         reviewCache = true;
         serverStatus = 'waiting_for_user_correction';
