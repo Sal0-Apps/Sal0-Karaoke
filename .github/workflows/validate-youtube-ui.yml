@@ -30,6 +30,10 @@ jobs:
           python -m unittest discover -s tests -p test_web_stack_compatibility.py -v
           python -m unittest discover -s tests -p test_whisper_audio.py -v
           python -m unittest discover -s tests -p test_lyric_guide.py -v
+          python -m unittest discover -s tests -p test_strict_lyric_guide.py -v
+          python -m unittest discover -s tests -p test_strict_voice_evidence.py -v
+          python -m unittest discover -s tests -p test_guided_output.py -v
+          python -m unittest discover -s tests -p test_guided_silence_render.py -v
           python -m unittest discover -s tests -p test_lyric_alignment.py -v
           python -m unittest discover -s tests -p test_youtube_connection_feedback.py -v
           python -m unittest discover -s tests -p test_youtube_publisher.py -v

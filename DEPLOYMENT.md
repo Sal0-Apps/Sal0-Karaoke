@@ -25,7 +25,7 @@ Crie uma pasta própria para a instalação e salve nela o arquivo `compose.yaml
 ```yaml
 services:
   karaoke-app:
-    image: ghcr.io/sal0-apps/sal0-karaoke:12.7
+    image: ghcr.io/sal0-apps/sal0-karaoke:12.7.1
     container_name: karaoke-app
     ports:
       - "7885:7860"
@@ -70,6 +70,12 @@ Somente `/data` deve receber o volume persistente. Não monte um diretório vazi
 | `/data/users.json` e `/data/sessions.json` | Contas e sessões |
 
 O backup deve incluir o volume inteiro. Copiar apenas resultados não preserva contas, fila, configurações ou checkpoints. Não adicione `data`, backups, logs, chaves Android ou credenciais ao Git.
+
+## Letra-guia estrita na 12.7.1
+
+Atualize o servidor para `ghcr.io/sal0-apps/sal0-karaoke:12.7.1`, preservando o volume `/data`, portas e recursos atribuídos ao container. Não há migração de contas nem necessidade de atualizar os clientes Android e Windows existentes. A imagem `12.7` permanece como opção de retorno com o mesmo volume.
+
+Com guia, a saída automática usa somente o texto dela confirmado na voz e oculta letras e prévias nos silêncios. Tempos do áudio não são deslocados; trechos incertos ficam sem texto. Refazer um item aplica a política nova às etapas automáticas correspondentes. Resultados já renderizados e revisões salvas não são apagados. Consulte [letra-guia estrita](docs/LETRA_GUIA_ESTRITA.md) e [notas da 12.7.1](docs/ATUALIZACAO_12_7_1.md).
 
 ## Mensagens do Telegram na 12.2
 
@@ -183,7 +189,7 @@ Para conservar a identidade de atualização do Android, proteja uma chave de as
 
 Cada execução mantém seus arquivos em `/data/output/queue_jobs/<id>/cache/`, com índice persistente da fila. Não remova essas pastas enquanto quiser revisar os itens. Resultados concluídos, falhos, cancelados e removidos continuam disponíveis até a aceitação de uma nova origem após esgotar a fila do perfil. Reexecuções permanecem na mesma fila; resultados da Biblioteca e modelos continuam preservados. A mudança aplica-se às tarefas ainda disponíveis na atualização e às novas; arquivos que a versão anterior já descartou não são recuperáveis.
 
-Atualize apenas a imagem do servidor para `ghcr.io/sal0-apps/sal0-karaoke:12.7` ou `latest`. Os aplicativos Android e Windows existentes continuam compatíveis. Publicações substituídas no YouTube recebem outro link; o anterior só é removido após confirmar o novo vídeo, capa, playlists e privacidade. Playlists adicionais começam desmarcadas em novas criações, com a playlist do perfil mantida.
+Atualize apenas a imagem do servidor para `ghcr.io/sal0-apps/sal0-karaoke:12.7.1` ou `latest`. Os aplicativos Android e Windows existentes continuam compatíveis. Publicações substituídas no YouTube recebem outro link; o anterior só é removido após confirmar o novo vídeo, capa, playlists e privacidade. Playlists adicionais começam desmarcadas em novas criações, com a playlist do perfil mantida.
 
 ### Ícone no ZimaOS / CasaOS
 
