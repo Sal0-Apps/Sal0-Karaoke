@@ -2,7 +2,7 @@
 
 - Restaurada a apresentação dos versos da 12.7. Retirado o recorte por palavra/atividade vocal que fez a 12.7.1 piscar e suprimir trechos.
 - Removido o filtro estrito que descartava palavras e frases inteiras por falta de correspondência na guia. A revisão manual tem prioridade e não passa por uma nova filtragem ou inferência ao renderizar.
-- A guia confere o texto com propostas contextuais. Mudanças lexicais automáticas exigem ganho de probabilidade CTC sobre o áudio completo da janela; empate, falha ou evidência insuficiente preservam a frase reconhecida. A guia não insere ou remove palavras para forçar uma correspondência.
+- A guia confere o texto com propostas contextuais. Mudanças lexicais automáticas exigem ganho de probabilidade CTC individual e do conjunto sobre o áudio completo da janela; uma correção não compensa outra que piora a correspondência. Empate, falha ou evidência insuficiente preservam a frase reconhecida. A guia não insere ou remove palavras para forçar uma correspondência.
 - Repetições são comparadas pelo áudio, sem usar a quantidade de refrões impressos como mínimo obrigatório. Mantidos modelo Whisper, estilos do administrador, fluxo, integrações e proteções de faturamento.
 - Cache acústico e apresentação da 12.7.1 são invalidados ao refazer. Áudio bruto e revisões manuais permanecem. Testes verificam continuidade dos versos, pausas naturais, revisão, substituições aceitas/rejeitadas e renderização real.
 - [Detalhes da correção](docs/ATUALIZACAO_12_7_2.md).

@@ -8,7 +8,7 @@ O verso permanece legível entre palavras e respirações curtas. As animações
 
 ## Guia para conferência
 
-A guia ajuda a propor correções no contexto. Propostas lexicais mantêm a quantidade de palavras da frase e precisam explicar melhor o áudio completo da janela de alinhamento, comparadas com o reconhecimento original. Uma proposta incerta, uma falha de modelo ou um empate não apagam a frase: ela permanece disponível para revisão. Repetições só são removidas quando a hipótese reduzida explica melhor o canto; a quantidade de refrões impressos não decide quantas vezes a gravação canta.
+A guia ajuda a propor correções no contexto. Propostas lexicais mantêm a quantidade de palavras da frase. Cada substituição é comparada individualmente com o reconhecimento original, usando o áudio completo da janela. O conjunto final também precisa ser melhor; uma correção não pode mascarar outra que piora a correspondência com a voz. Uma proposta incerta, uma falha de modelo ou um empate não apagam a frase: ela permanece disponível para revisão. Repetições só são removidas quando a hipótese reduzida explica melhor o canto; a quantidade de refrões impressos não decide quantas vezes a gravação canta.
 
 A transcrição bruta, os tempos do áudio e as revisões manuais são preservados. Não há preenchimento de versos somente a partir da guia. A revisão confirmada pelo usuário não é submetida a outra filtragem nem carrega novamente os modelos ao renderizar. O Whisper selecionado e os componentes locais existentes são mantidos.
 

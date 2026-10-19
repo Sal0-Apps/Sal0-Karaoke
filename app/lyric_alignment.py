@@ -200,6 +200,67 @@ def supports_deletion(backend, emission, original, candidate):
     return math.isfinite(full) and math.isfinite(reduced) and reduced > full + 5.
 
 
+def confirmed_guide_candidate(backend, emission, original, candidate):
+    """Keep only substitutions supported alone, together and in final context.
+
+    One very strong correction must not pay for another wrong guide word.
+    Every score reuses the same acoustic emissions; tuple memoization avoids
+    repeating CTC evaluations as weak substitutions return to the ASR text.
+    """
+    score = getattr(backend, 'sequence_score', None)
+    if not callable(score) or len(candidate) != len(original):
+        return None
+    changed = [index for index, (actual, proposed) in enumerate(zip(original, candidate))
+               if normalize_word(actual) != normalize_word(proposed)]
+    if not changed:
+        return None
+    scores = {}
+
+    def likelihood(words):
+        key = tuple(words)
+        if key not in scores:
+            scores[key] = float(score(emission, list(words)))
+        return scores[key]
+
+    baseline = likelihood(original)
+    if not math.isfinite(baseline):
+        return None
+    selected = list(candidate)
+    supported = []
+    for index in changed:
+        isolated = list(original)
+        isolated[index] = candidate[index]
+        value = likelihood(isolated)
+        if math.isfinite(value) and value > baseline + 5.:
+            supported.append(index)
+        else:
+            selected[index] = original[index]
+
+    # Each failed round removes one substitution, so at most N rounds suffice.
+    for _ in range(len(supported)):
+        combined = likelihood(selected)
+        if not math.isfinite(combined) or combined <= baseline + 5.:
+            return None
+        weak = []
+        for index in supported:
+            without = selected.copy()
+            without[index] = original[index]
+            value = likelihood(without)
+            if not math.isfinite(value):
+                return None
+            gain = combined - value
+            if gain <= 5.:
+                weak.append((gain, index))
+        if not weak:
+            return selected
+        # Removing only the weakest keeps independently valid corrections when
+        # two proposed words interfere with one another in the joint sequence.
+        _, rejected = min(weak)
+        selected[rejected] = original[rejected]
+        supported.remove(rejected)
+    return None
+
+
 def clean_segments(segments, evidence, voice_regions=None):
     """Remove words outside media/sound and invalid overlapping ASR loops."""
     words=[]; removed=0; trimmed=0
@@ -455,9 +516,10 @@ def refine_lyrics(audio_path, segments, guide, cache_dir, context=None, progress
                     candidate=guided_candidate(guide,original)
                     chosen=baseline
                     if candidate:
+                        candidate=confirmed_guide_candidate(backend,emission,texts,candidate)
+                    if candidate:
                         guided=backend.align(emission,candidate)
                         if (accept_alignment(guided,original,end-start,start)
-                                and supports_deletion(backend, emission, texts, candidate)
                                 and _mean_score(guided)>=_mean_score(baseline or [])*.8-.015):
                             chosen=guided
                             report['guide_changes']+=sum(tag!='equal' for tag,*_ in difflib.SequenceMatcher(None,texts,candidate,autojunk=False).get_opcodes())

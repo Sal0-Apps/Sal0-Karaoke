@@ -57,6 +57,26 @@ class ConservativeVoiceEvidenceTests(unittest.TestCase):
     def text(result):
         return ' '.join(segment['text'] for segment in result)
 
+    def refine_pair(self, scores):
+        calls, emissions = [], []
+        class Scored(SupportedCTC):
+            def emission(self, audio):
+                value = super().emission(audio)
+                emissions.append(value)
+                return value
+
+            def sequence_score(self, emission, text):
+                calls.append((emission, tuple(text)))
+                return scores[('cantar' in text, 'noite' in text)]
+        source = segments('eu quero gastar com voce nesta noiva')
+        result, report = self.refine(source, 'eu quero cantar com você nesta noite',
+                                    backend_factory=Scored)
+        self.assertEqual(len(emissions), 1)
+        self.assertTrue(all(emission is emissions[0] for emission, _ in calls))
+        keys = [text for _, text in calls]
+        self.assertEqual(len(keys), len(set(keys)), 'Each complete hypothesis is scored once')
+        return result, report
+
     def test_unavailable_alignment_and_vad_preserve_the_complete_phrase(self):
         source = segments('eu quero gastar com voce nesta noite')
         before = copy.deepcopy(source)
@@ -115,6 +135,37 @@ class ConservativeVoiceEvidenceTests(unittest.TestCase):
         self.assertGreater(report['guide_changes'], 0)
         self.assertEqual(len(set(emissions)), 1)
         self.assertEqual(source, before)
+
+    def test_one_good_correction_cannot_mask_an_individually_bad_correction(self):
+        result, report = self.refine_pair({(False, False): -100, (True, False): -60,
+                                          (False, True): -110, (True, True): -65})
+        self.assertIn('cantar', self.text(result))
+        self.assertIn('noiva', self.text(result))
+        self.assertNotIn('noite', self.text(result))
+        self.assertGreater(report['guide_changes'], 0)
+
+    def test_final_marginal_check_prunes_a_harmful_interaction_between_good_corrections(self):
+        result, _ = self.refine_pair({(False, False): -100, (True, False): -60,
+                                     (False, True): -65, (True, True): -64})
+        self.assertIn('cantar', self.text(result))
+        self.assertIn('noiva', self.text(result))
+        self.assertNotIn('noite', self.text(result))
+
+    def test_individual_gains_do_not_override_a_rejected_joint_sequence(self):
+        result, report = self.refine_pair({(False, False): -100, (True, False): -60,
+                                          (False, True): -65, (True, True): -99})
+        self.assertIn('gastar', self.text(result))
+        self.assertIn('noiva', self.text(result))
+        self.assertEqual(report['guide_changes'], 0)
+
+    def test_two_corrections_supported_alone_together_and_marginally_are_kept(self):
+        result, report = self.refine_pair({(False, False): -100, (True, False): -80,
+                                          (False, True): -85, (True, True): -60})
+        self.assertIn('cantar', self.text(result))
+        self.assertIn('noite', self.text(result))
+        self.assertNotIn('gastar', self.text(result))
+        self.assertNotIn('noiva', self.text(result))
+        self.assertGreater(report['guide_changes'], 0)
 
     def test_missing_guide_word_is_not_inserted_even_with_high_alignment_confidence(self):
         source = segments('eu quero com voce nesta noite')
