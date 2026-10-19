@@ -1,11 +1,15 @@
-"""The final guide contract must also hold for old caches and manual drafts."""
+"""Regressions for the words lost by the retired strict guide filter."""
 import copy
+import hashlib
+import json
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parents[1] / 'app'))
-from lyric_guide import enforce_guide_text, normalize_word, GUIDE_POLICY_VERSION
+from lyric_guide import (GUIDE_POLICY_VERSION, guide_correction_candidate,
+                         review_lyrics_with_whisper, verify_lyrics_guide)
 
 
 def acoustic(text, start=4., step=.4):
@@ -23,202 +27,166 @@ def clocks(segments):
     return [(word['start'], word['end']) for segment in segments for word in segment['words']]
 
 
-class StrictGuideTests(unittest.TestCase):
-    def assert_contract(self, guide, result):
-        from lyric_guide import prepare_lyrics_guide
-        canonical = set(prepare_lyrics_guide(guide).split())
-        self.assertTrue(all(word['word'].strip() in canonical for segment in result for word in segment['words']))
+class ConservativeGuideTests(unittest.TestCase):
+    def test_unmatched_words_at_edges_and_inside_are_preserved(self):
+        source = acoustic('abertura eu canto improviso aqui encerramento')
+        result, report = verify_lyrics_guide('eu canto aqui', source)
+        self.assertEqual(result, source)
+        self.assertEqual(report['checked_words'], 6)
+        self.assertEqual(report['unmatched_words'], 3)
 
-    def test_exact_phrase_preserves_clocks_and_input(self):
-        source = acoustic('eu canto aqui')
-        before = copy.deepcopy(source)
-        result, report = enforce_guide_text('eu canto aqui', source)
-        self.assertEqual(text(result), 'eu canto aqui')
-        self.assertEqual(clocks(result), clocks(source))
-        self.assertEqual(source, before)
-        self.assertEqual(report['status'], 'verified')
-        self.assertEqual(report['version'], GUIDE_POLICY_VERSION)
+    def test_unrelated_or_reversed_guide_does_not_empty_the_recording(self):
+        for guide, heard in [('eu canto aqui', 'uma gravação completamente diferente'),
+                             ('a luz da noite ilumina casa', 'casa ilumina noite luz')]:
+            with self.subTest(guide=guide):
+                source = acoustic(heard)
+                result, _ = verify_lyrics_guide(guide, source)
+                self.assertEqual(result, source)
 
-    def test_unknown_words_at_both_edges_and_inside_never_survive(self):
-        guide = 'eu canto aqui'
-        source = acoustic('fantasma eu canto bobagem aqui encerramento')
-        result, report = enforce_guide_text(guide, source)
-        self.assertEqual(text(result), guide)
-        self.assertEqual(report['removed_words'], 3)
-        self.assertEqual(clocks(result), [clocks(source)[index] for index in (1, 2, 4)])
-        self.assert_contract(guide, result)
+    def test_a_lone_common_word_survives_without_two_anchors(self):
+        source = acoustic('você')
+        result, _ = verify_lyrics_guide('eu canto com você', source)
+        self.assertEqual(result, source)
 
-    def test_unrelated_guide_yields_empty_instead_of_replacing_the_song(self):
-        result, report = enforce_guide_text('eu canto aqui', acoustic('uma gravação completamente diferente'))
-        self.assertEqual(result, [])
-        self.assertEqual(report['status'], 'unrelated')
-        self.assertEqual(report['removed_words'], 4)
-
-    def test_dictionary_membership_without_phrase_order_is_insufficient(self):
-        guide = 'a luz da noite ilumina casa'
-        result, report = enforce_guide_text(guide, acoustic('casa ilumina noite luz'))
-        self.assertEqual(result, [])
-        self.assertEqual(report['removed_words'], 4)
-
-    def test_similar_word_uses_two_local_anchors_and_its_original_clock(self):
+    def test_strong_contextual_correction_preserves_every_word_clock(self):
         guide = 'eu quero cantar com você nesta noite'
         source = acoustic('eu quero gastar com voce nesta noite')
-        result, report = enforce_guide_text(guide, source)
+        before = copy.deepcopy(source)
+        result, report = verify_lyrics_guide(guide, source)
         self.assertEqual(text(result), guide)
         self.assertEqual(clocks(result), clocks(source))
-        self.assertGreaterEqual(report['corrected_words'], 2)
-        self.assert_contract(guide, result)
+        self.assertEqual(source, before)
+        self.assertEqual(report['correction_proposals'][0]['guide'], 'cantar')
+        self.assertEqual(guide_correction_candidate(guide, source[0]['words']), guide.split())
 
-    def test_context_selects_between_similar_phrases(self):
+    def test_short_unique_spelling_needs_a_local_neighbor(self):
+        source = acoustic('hello word')
+        self.assertEqual(guide_correction_candidate('hello world', source[0]['words']), ['hello', 'world'])
+        result, _ = verify_lyrics_guide('hello world', source)
+        self.assertEqual(text(result), 'hello world')
+        self.assertEqual(clocks(result), clocks(source))
+        isolated = acoustic('word')
+        self.assertEqual(verify_lyrics_guide('world', isolated)[0], isolated)
+        self.assertIsNone(guide_correction_candidate('world', isolated[0]['words'], allow_distant=True))
+
+    def test_distinct_context_selects_the_appropriate_similar_phrase(self):
         guide = 'eu quero cantar com você\nela disse que vai contar tudo'
-        result, _ = enforce_guide_text(guide, acoustic('eu quero centar com voce'))
+        source = acoustic('eu quero centar com voce')
+        result, _ = verify_lyrics_guide(guide, source)
         self.assertEqual(text(result), 'eu quero cantar com você')
+        self.assertEqual(clocks(result), clocks(source))
 
-    def test_ambiguous_similar_word_is_removed_but_exact_context_survives(self):
+    def test_equally_plausible_phrases_keep_the_original_word(self):
         guide = 'eu quero cantar com você\neu quero contar com você'
-        result, report = enforce_guide_text(guide, acoustic('eu quero centar com voce'))
-        self.assertEqual(text(result), 'eu quero com você')
+        source = acoustic('eu quero centar com voce')
+        result, report = verify_lyrics_guide(guide, source)
+        self.assertEqual(text(result), 'eu quero centar com você')
+        self.assertEqual(clocks(result), clocks(source))
         self.assertEqual(report['ambiguous_words'], 1)
-        self.assert_contract(guide, result)
+        self.assertEqual(report['checks'][2]['status'], 'ambiguous')
+        for distant in (False, True):
+            self.assertIsNone(guide_correction_candidate(guide, source[0]['words'], allow_distant=distant))
 
-    def test_lone_common_word_does_not_authorize_an_unrelated_fragment(self):
-        result, _ = enforce_guide_text('eu canto com você', acoustic('você'))
-        self.assertEqual(result, [])
+    def test_distant_substitution_is_only_an_explicit_acoustic_hypothesis(self):
+        guide = 'eu quero cantar com você nesta noite'
+        source = acoustic('eu quero viver com voce nesta noite')
+        result, _ = verify_lyrics_guide(guide, source)
+        self.assertEqual(text(result), 'eu quero viver com você nesta noite')
+        self.assertIsNone(guide_correction_candidate(guide, source[0]['words']))
+        self.assertEqual(guide_correction_candidate(guide, source[0]['words'], allow_distant=True), guide.split())
 
-    def test_missing_guide_words_are_never_inserted(self):
+    def test_distant_proposal_cannot_choose_between_equal_phrase_contexts(self):
+        guide = 'eu quero cantar com você\neu quero viver com você'
+        source = acoustic('eu quero banana com voce')
+        self.assertIsNone(guide_correction_candidate(guide, source[0]['words'], allow_distant=True))
+
+    def test_missing_inner_word_is_not_inserted_or_shifted_onto_a_neighbor(self):
         guide = 'eu quero cantar com você nesta noite'
         source = acoustic('eu quero com voce nesta noite')
-        result, _ = enforce_guide_text(guide, source)
+        result, report = verify_lyrics_guide(guide, source)
         self.assertEqual(text(result), 'eu quero com você nesta noite')
         self.assertEqual(clocks(result), clocks(source))
+        self.assertEqual(report['missing_guide_words'], 1)
+        self.assertIsNone(guide_correction_candidate(guide, source[0]['words'], allow_distant=True))
 
-    def test_a_printed_chorus_can_be_reused_at_distinct_observed_times(self):
+    def test_extra_word_does_not_duplicate_an_adjacent_match(self):
         guide = 'eu quero cantar com você'
-        source = acoustic('eu quero cantar com voce', 1) + acoustic('eu quero cantar com voce', 10)
-        result, _ = enforce_guide_text(guide, source)
-        self.assertEqual(text(result), guide + ' ' + guide)
+        source = acoustic('eu quero cantarr cantar com voce')
+        result, _ = verify_lyrics_guide(guide, source)
+        self.assertEqual(text(result), 'eu quero cantarr cantar com você')
         self.assertEqual(clocks(result), clocks(source))
+        self.assertIsNone(guide_correction_candidate(guide, source[0]['words'], allow_distant=True))
 
-    def test_printed_repetition_never_creates_an_unobserved_occurrence(self):
+    def test_sung_repetitions_survive_without_creating_printed_repetitions(self):
+        guide = 'eu quero cantar com você'
+        source = acoustic(' '.join(['eu quero gastar com voce'] * 4))
+        result, _ = verify_lyrics_guide(guide, source)
+        self.assertEqual(text(result), ' '.join([guide] * 4))
+        self.assertEqual(clocks(result), clocks(source))
         line = 'deixe uma luz acesa'
-        source = acoustic(line)
-        result, _ = enforce_guide_text(line + '\n' + line, source)
-        self.assertEqual(text(result), line)
-        self.assertEqual(clocks(result), clocks(source))
+        one_occurrence = acoustic(line)
+        self.assertEqual(verify_lyrics_guide(line + '\n' + line, one_occurrence)[0], one_occurrence)
+        single_word = acoustic('ah improviso ah')
+        self.assertEqual(verify_lyrics_guide('ah', single_word)[0], single_word)
 
-    def test_single_word_refrain_keeps_only_exact_separate_observations(self):
-        source = acoustic('ah absurdo ah')
-        result, report = enforce_guide_text('ah', source)
-        self.assertEqual(text(result), 'ah ah')
-        self.assertEqual(report['removed_words'], 1)
-
-    def test_contiguous_contraction_fragments_merge_without_retiming_neighbors(self):
+    def test_contraction_fragments_keep_their_original_intervals(self):
         guide = "My words I'll keep them down"
         source = acoustic("My words I 'll keep them down")
-        result, report = enforce_guide_text(guide, source)
+        source[0]['words'][3]['word'] = "'ll"
+        result, _ = verify_lyrics_guide(guide, source)
         self.assertEqual(text(result), guide)
-        self.assertEqual(report['merged_words'], 1)
-        self.assertEqual(clocks(result), clocks(source)[:2] + [(clocks(source)[2][0], clocks(source)[3][1])] + clocks(source)[4:])
-        self.assert_contract(guide, result)
+        self.assertEqual(clocks(result), clocks(source))
+        self.assertIsNone(guide_correction_candidate(guide, source[0]['words'], allow_distant=True))
 
-    def test_contraction_fragments_separated_in_time_cannot_copy_a_full_word(self):
-        guide = "My words I'll keep them down"
-        source = acoustic("My words I 'll keep them down")
-        for word in source[0]['words'][3:]:
-            word['start'] += .6
-            word['end'] += .6
-        result, report = enforce_guide_text(guide, source)
-        self.assertNotIn("I'll", text(result))
-        self.assertEqual(report['merged_words'], 0)
-        self.assert_contract(guide, result)
+    def test_manual_phrase_spans_survive_without_synthetic_word_clocks(self):
+        for phrase in ('Minha revisão completa', 'eu canto improviso aqui', 'aqui canto eu'):
+            with self.subTest(phrase=phrase):
+                source = [dict(start=8, end=14, text=phrase,
+                               words=[dict(word=phrase, start=8, end=14)])]
+                result, _ = verify_lyrics_guide('eu canto aqui', source)
+                self.assertEqual(result, source)
+                self.assertIsNone(guide_correction_candidate('eu canto aqui', source[0]['words'], allow_distant=True))
 
-    def test_outdated_cache_flags_and_segment_text_cannot_bypass_the_gate(self):
-        source = acoustic('eu canto invasora aqui')
-        source[0].update(text='OUTDATED TEXT', synced_line=True, acoustic_animation=True,
-                         animation_words=[dict(word='forbidden')], guide_verified=True)
-        result, report = enforce_guide_text('eu canto aqui', source)
-        self.assertEqual(text(result), 'eu canto aqui')
-        self.assertNotIn('animation_words', result[0])
-        self.assertNotIn('synced_line', result[0])
-        self.assertEqual(report['removed_words'], 1)
-
-    def test_lrc_clock_hints_do_not_move_or_insert_any_word(self):
-        source = acoustic('eu canto aqui', start=42)
-        first, _ = enforce_guide_text('[00:01]eu canto aqui', source)
-        second, _ = enforce_guide_text('[99:59]eu canto aqui', source)
+    def test_external_lrc_clocks_do_not_change_local_clocks_or_proposals(self):
+        source = acoustic('hello word', start=42)
+        first, _ = verify_lyrics_guide('[00:01]hello world', source)
+        second, _ = verify_lyrics_guide('[99:59]hello world', source)
         self.assertEqual(first, second)
         self.assertEqual(clocks(first), clocks(source))
+        self.assertEqual(guide_correction_candidate('[00:01]hello world', source[0]['words']),
+                         guide_correction_candidate('[99:59]hello world', source[0]['words']))
 
-    def test_invalid_and_duplicate_clocks_are_rejected_without_synthetic_times(self):
-        source = acoustic('eu canto aqui')
-        source[0]['words'] += [copy.deepcopy(source[0]['words'][1]),
-                              dict(word=' eu', start=float('nan'), end=20),
-                              dict(word=' eu', start=20, end=19)]
-        result, report = enforce_guide_text('eu canto aqui', source)
-        self.assertEqual(text(result), 'eu canto aqui')
-        self.assertEqual(report['invalid_words'], 3)
+    def test_a_long_rest_cannot_supply_an_adjacent_correction_anchor(self):
+        source = acoustic('hello word')
+        source[0]['words'][1].update(start=18, end=18.3)
+        source[0]['end'] = 18.3
+        self.assertEqual(verify_lyrics_guide('hello world', source)[0], source)
+        self.assertIsNone(guide_correction_candidate('hello world', source[0]['words'], allow_distant=True))
 
-    def test_no_guide_preserves_all_existing_text_and_metadata(self):
-        source = acoustic('texto sem nenhuma restrição')
-        source[0]['manual_note'] = 'keep'
-        result, report = enforce_guide_text('', source)
+    def test_old_strict_cache_cannot_restore_a_truncated_result(self):
+        guide = 'eu canto aqui'
+        source = acoustic('eu canto improviso aqui')
+        signature = hashlib.sha256(json.dumps(dict(version=2, guide=guide, segments=source,
+            context={}), sort_keys=True, ensure_ascii=False).encode()).hexdigest()
+        with tempfile.TemporaryDirectory() as folder:
+            cache = Path(folder) / 'lyrics_guide_cache.json'
+            cache.write_text(json.dumps(dict(signature=signature, segments=acoustic(guide),
+                                           report=dict(version=2))), encoding='utf-8')
+            result, report = review_lyrics_with_whisper(guide, source, folder)
         self.assertEqual(result, source)
-        self.assertEqual(report['status'], 'no_guide')
-        self.assertIsNot(result, source)
+        self.assertEqual(report['version'], GUIDE_POLICY_VERSION)
 
-    def test_manual_phrase_retains_one_interval_without_inventing_word_clocks(self):
-        source = [dict(start=8, end=14, text='Minha revisão completa', words=[
-            dict(word='Minha revisão completa', start=8, end=14)])]
-        result, report = enforce_guide_text('Minha revisão completa', source)
-        self.assertEqual(text(result), 'Minha revisão completa')
-        self.assertEqual(len(result[0]['words']), 1)
-        self.assertEqual(clocks(result), [(8, 14)])
-        self.assertEqual(report['phrase_spans'], 1)
-
-    def test_partial_or_reversed_manual_phrase_cannot_reuse_an_entire_line_clock(self):
-        for phrase in ('eu canto invasora aqui', 'aqui canto eu'):
-            with self.subTest(phrase=phrase):
-                source = [dict(start=8, end=14, text=phrase, words=[dict(word=phrase, start=8, end=14)])]
-                result, report = enforce_guide_text('eu canto aqui', source)
-                self.assertEqual(result, [])
-                self.assertEqual(report['rejected_spans'], 1)
-
-    def test_manual_phrase_and_neighboring_word_share_lexical_context(self):
-        source = [dict(start=8, end=11, text='eu canto aqui', words=[
-            dict(word='eu canto', start=8, end=10), dict(word=' aqui', start=10.5, end=11)])]
-        result, _ = enforce_guide_text('eu canto aqui', source)
-        self.assertEqual(text(result), 'eu canto aqui')
-        self.assertEqual(clocks(result), [(8, 10), (10.5, 11)])
-
-    def test_slow_phrase_with_a_short_musical_rest_keeps_real_word_clocks(self):
-        source = acoustic('eu canto aqui', step=2.)
-        result, _ = enforce_guide_text('eu canto aqui', source)
-        self.assertEqual(text(result), 'eu canto aqui')
-        self.assertEqual(clocks(result), clocks(source))
-
-    def test_gate_is_idempotent_for_cached_words_ambiguity_and_atomic_phrases(self):
-        cases = [
-            ('eu canto aqui', acoustic('extra eu canto invasora aqui')),
-            ('eu quero cantar com você\neu quero contar com você', acoustic('eu quero centar com voce')),
-            ("My words I'll keep them down", acoustic("My words I 'll keep them down")),
-            ('Minha revisão completa', [dict(start=8, end=14, text='Minha revisão completa', words=[
-                dict(word='Minha revisão completa', start=8, end=14)])]),
-        ]
-        for guide, source in cases:
-            with self.subTest(guide=guide):
-                first, _ = enforce_guide_text(guide, source)
-                second, _ = enforce_guide_text(guide, first)
-                self.assertEqual(first, second)
-
-    def test_long_recording_checks_corrections_and_extras_across_analysis_windows(self):
-        line = 'eu quero cantar com você nesta noite de chuva e vento'
-        guide = '\n'.join([line] * 7)
-        heard = 'eu quero gastar com voce nesta noite de chuva e vento'
-        source = acoustic(' '.join([heard + (' invasora' if index % 3 == 0 else '') for index in range(7)]))
-        result, report = enforce_guide_text(guide, source)
-        self.assertEqual(text(result), ' '.join([line] * 7))
-        self.assertEqual(report['removed_words'], 3)
-        self.assert_contract(guide, result)
+    def test_output_is_idempotent_and_hypotheses_do_not_mutate_input(self):
+        guide = 'eu quero cantar com você'
+        source = acoustic('extra eu quero gastar com voce improviso')
+        before = copy.deepcopy(source)
+        candidate = guide_correction_candidate(guide, source[0]['words'])
+        self.assertEqual(len(candidate), len(source[0]['words']))
+        self.assertEqual((candidate[0], candidate[-1]), ('extra', 'improviso'))
+        first, _ = verify_lyrics_guide(guide, source)
+        second, _ = verify_lyrics_guide(guide, first)
+        self.assertEqual(first, second)
+        self.assertEqual(source, before)
 
 
 if __name__ == '__main__':

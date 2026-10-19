@@ -15,10 +15,71 @@ ROOT = Path(__file__).parents[1]
 sys.path.insert(0, str(ROOT / 'app'))
 from reprocess_cache import copy_reusable_inputs, file_fingerprint
 from lyric_guide import prepare_lyrics_guide, GUIDE_POLICY_VERSION
+import queue_cache
 from test_automatic_lyrics_and_search import load_function
 
 
 class WhisperCacheReuseTests(unittest.TestCase):
+    def policy_upgrade(self, folder, policy=2, review='valid', **changes):
+        source = (ROOT / 'app/main.py').read_text(encoding='utf-8')
+        start = source.index('        # Upgrade prior verse-based reviews once;')
+        end = source.index('        save_stage_checkpoint(cache_dir, "input_ready"', start)
+        code = compile(textwrap.dedent(source[start:end]), 'guide-policy-migration', 'exec')
+        root = Path(folder)
+        stages = {name: {'saved': True} for name in ('audio_extracted', 'vocals_separated',
+            'transcription_ready', 'transcription_reviewed', 'subtitles_generated', 'video_rendered')}
+        checkpoint = root / 'stage_checkpoints.json'
+        checkpoint.write_text(json.dumps(dict(completed_stages=stages)), encoding='utf-8')
+        raw = [dict(start=1, end=3, text='Recognition before user review', words=[
+            dict(word='Recognition before user review', start=1, end=3)])]
+        human = [dict(start=1, end=3, text='Minha revisão completa', words=[
+            dict(word='Minha revisão completa', start=1, end=3)])]
+        (root / 'transcribed_segments.json').write_text(json.dumps(raw), encoding='utf-8')
+        (root / 'vocals.wav').write_bytes(b'untouched audio')
+        if review == 'valid':
+            (root / 'reviewed_segments.json').write_text(json.dumps(human), encoding='utf-8')
+        elif review != 'missing':
+            (root / 'reviewed_segments.json').write_text(review, encoding='utf-8')
+        previous = dict(lyrics_policy_version=policy, lyrics=prepare_lyrics_guide('Eu canto assim'),
+            whisper_model='medium', transcription_preset='karaoke', voice_source='all',
+            whisper_audio_version=3, audio_hash='audio-one')
+        meta = dict(lyrics_clock_hash=hashlib.sha256(json.dumps(previous, sort_keys=True).encode()).hexdigest())
+        load = load_function('load_stage_checkpoints', os=os, json=json)
+        scope = dict(hashlib=hashlib, json=json, os=os, queue_cache=queue_cache,
+            cache_dir=folder, cache_meta_file=str(root / 'cache_meta.json'), cached_meta=meta,
+            load_stage_checkpoints=load, GUIDE_POLICY_VERSION=GUIDE_POLICY_VERSION,
+            prepare_lyrics_guide=prepare_lyrics_guide, lyrics_text='Eu canto assim',
+            output_options={}, whisper_model='medium', transcription_preset='karaoke',
+            keep_backing_vocals=False, transcribe_source='vocals', new_audio_hash='audio-one')
+        scope.update(changes)
+        before = {path.name: path.read_bytes() for path in root.iterdir() if path != checkpoint}
+        exec(code, scope)
+        for name, content in before.items():
+            self.assertEqual((root / name).read_bytes(), content, f'Migration changed {name}')
+        return load(folder)['completed_stages']
+
+    def test_known_policy_upgrade_keeps_confirmed_human_review_and_raw_recognition(self):
+        for policy in (1, 2):
+            with self.subTest(policy=policy), tempfile.TemporaryDirectory() as folder:
+                remaining = self.policy_upgrade(folder, policy=policy)
+                self.assertEqual(set(remaining), {'audio_extracted', 'vocals_separated',
+                    'transcription_ready', 'transcription_reviewed'})
+
+    def test_policy_upgrade_does_not_keep_review_for_different_audio_guide_model_or_voice_source(self):
+        variants = [dict(new_audio_hash='different-audio'), dict(lyrics_text='Outra letra cantada'),
+            dict(whisper_model='large-v3'), dict(transcribe_source='original'),
+            dict(keep_backing_vocals=True), dict(transcription_preset='difficult')]
+        for changes in variants:
+            with self.subTest(changes=changes), tempfile.TemporaryDirectory() as folder:
+                remaining = self.policy_upgrade(folder, **changes)
+                self.assertEqual(set(remaining), {'audio_extracted', 'vocals_separated', 'transcription_ready'})
+
+    def test_policy_upgrade_requires_a_real_nonempty_review_before_preserving_checkpoint(self):
+        for review in ('missing', '[]', '{}', 'not-json'):
+            with self.subTest(review=review), tempfile.TemporaryDirectory() as folder:
+                remaining = self.policy_upgrade(folder, review=review)
+                self.assertEqual(set(remaining), {'audio_extracted', 'vocals_separated', 'transcription_ready'})
+
     def test_policy_upgrade_discards_lrc_reviews_but_preserves_audio_and_raw_whisper(self):
         source = (ROOT / 'app/main.py').read_text()
         start = source.index('        # Upgrade prior verse-based reviews once;')

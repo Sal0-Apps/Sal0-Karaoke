@@ -1,5 +1,7 @@
 # Atualização 12.7.1
 
+Esta versão foi substituída pela [12.7.2](ATUALIZACAO_12_7_2.md), que restaura a apresentação da 12.7 e remove a filtragem estrita após regressões de piscadas e omissões. As instruções abaixo são históricas.
+
 Use `ghcr.io/sal0-apps/sal0-karaoke:12.7.1`, preservando o volume `/data`, as portas e os recursos atribuídos ao container. Os clientes Android e Windows existentes continuam compatíveis. A imagem `12.7` permanece disponível para retorno; o histórico da [atualização 12.7](ATUALIZACAO_12_7.md) foi preservado.
 
 ## Letra confirmada na gravação
