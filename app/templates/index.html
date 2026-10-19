@@ -1838,8 +1838,8 @@
 
                         <div class="quick-extra-audio">
                             <label for="easyLyricsTiming">Como sincronizar a letra</label>
-                            <select id="easyLyricsTiming" class="select-input" disabled aria-describedby="easyLyricsPolicy"><option value="acoustic">Whisper + conferência da letra-guia</option></select>
-                            <p id="easyLyricsPolicy" class="compact-note">O Whisper define a letra e os tempos pela voz. A letra disponível serve como guia para conferir e corrigir as palavras.</p>
+                            <select id="easyLyricsTiming" class="select-input" disabled aria-describedby="easyLyricsPolicy"><option value="acoustic">Letra-guia confirmada pela voz</option></select>
+                            <p id="easyLyricsPolicy" class="compact-note">Com guia, só as palavras dela confirmadas na voz entram na legenda. Trechos incertos ficam de fora; os tempos seguem a gravação.</p>
                             <label for="easyKeepBackingVocals">Vozes de apoio</label>
                             <select id="easyKeepBackingVocals" class="select-input"><option value="true">Manter vozes de apoio; retirar a voz principal</option><option value="false">Retirar todas as vozes</option></select>
                             <label for="easyBackingVolume">Volume das vozes de apoio (%)</label>
@@ -2035,9 +2035,9 @@
                             </div>
                             <label for="lyricsTiming" class="compact-note">Fonte da letra e sincronização</label>
                             <select id="lyricsTiming" name="lyrics_timing" class="select-input" disabled>
-                                <option value="acoustic">Whisper + conferência da letra-guia</option>
+                                <option value="acoustic">Letra-guia confirmada pela voz</option>
                             </select>
-                            <p class="compact-note">Toda letra, inclusive LRC, serve apenas como guia. O Whisper reconhece as palavras e seus tempos; a conferência corrige grafias confiáveis e pode reanalisar diferenças. O áudio é completo, sem VAD.</p>
+                            <p class="compact-note">Com guia, só o texto dela confirmado no canto é exibido. Palavras e frases parecidas são conferidas no contexto, sem deslocar os tempos. Trechos incertos e silêncios ficam sem letra. Os horários da LRC não são usados.</p>
                             <p id="lyricsSourceLabel" class="compact-note" aria-live="polite">Selecione a música para vincular uma letra.</p>
                             <p id="lyricsModeHint" style="font-size: 0.7rem; color: var(--text-muted); margin: 0.35rem 0 0.45rem;">A letra é uma guia. Texto manual sempre tem prioridade.</p>
                             <textarea id="lyricsText" name="lyrics_text" placeholder="Cole ou edite a letra aqui..." class="input-text" style="height: 72px; resize: vertical; background: var(--input-bg); border: 1px solid var(--glass-border);"></textarea>
@@ -2922,9 +2922,9 @@
                     <li>Abra <strong>Letra</strong> para buscar ou colar uma letra-guia. O texto manual tem prioridade; se não houver letra, a transcrição usa o Whisper.</li>
                     <li>Defina o fundo e a animação: sílabas, palavras, linhas ou frase estática.</li>
                     <li>Em <strong>Vozes de apoio</strong>, mantenha ou desative os backing vocals e ajuste seu volume. A opção usa uma segunda separação local da voz principal.</li>
-                    <li>O Whisper define as palavras e os tempos pela gravação. Toda letra encontrada, inclusive LRC, serve como guia de conferência. Os horários da LRC são ignorados. Diferenças podem gerar uma segunda análise local; versos ausentes não são copiados sem reconhecimento da voz.</li>
+                    <li>Com guia, só as palavras dela confirmadas na gravação entram na legenda. Palavras e frases parecidas são conferidas no contexto, sem deslocar os tempos. Incertezas ficam sem texto; os horários da LRC são ignorados. Sem guia, o Whisper transcreve normalmente.</li>
                     <li>Em <strong>Mais ajustes</strong>, altere cor, tamanho, posição, limites dos versos, prévia da próxima frase, VAD e fonte da transcrição. Você também pode salvar um perfil e habilitar somente a remoção de vocais.</li>
-                    <li>Ative a revisão para corrigir texto e tempos antes de finalizar. O karaokê preserva o áudio completo, com VAD desativado para manter silêncios e notas sustentadas.</li>
+                    <li>Ative a revisão para corrigir texto e tempos antes de finalizar. O áudio completo é preservado. Com guia, letras e prévias ficam ocultas nos trechos sem canto confirmado, inclusive em pausas dentro do verso.</li>
                 </ol>
             </details>
             <details>
@@ -3012,7 +3012,7 @@
                 </ol>
                 <p>A API tem cota gratuita e pode limitar projetos sem auditoria a vídeos privados. Guarde a autorização como uma senha. Backing vocals e vídeo do modo SRT mostram porcentagem da etapa e avisam o avanço no Telegram; o LibreTranslate informa apenas início e término.</p>
             </details>
-            <p class="compact-note">Versão do servidor: 12.7. A transcrição é local; fontes, modelos e integrações podem acessar serviços externos. Use conteúdo autorizado.</p>
+            <p class="compact-note">Versão do servidor: 12.7.1. A transcrição é local; fontes, modelos e integrações podem acessar serviços externos. Use conteúdo autorizado.</p>
             <p class="compact-note">Use o servidor pela rede local ou VPN. A busca/importação do YouTube não concede direitos sobre a mídia. OAuth autoriza o acesso ao canal, não o uso de músicas. Confira as permissões do conteúdo e os termos do YouTube antes de importar ou publicar. Não listado permite acesso a quem tiver o link; resultados SRT nunca vão ao YouTube.</p>
             <p class="compact-note"><a href="https://www.youtube.com/static?template=terms" target="_blank" rel="noopener noreferrer">Termos do YouTube</a> · <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer">Privacidade do Google</a> · <a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener noreferrer">Revogar acesso ao canal</a></p>
         </div>
@@ -6193,7 +6193,7 @@
                     updateLyricsBadge(lyricsText.value);
                     if (lyricsSearchQuery) lyricsSearchQuery.value = `${payload.track_name} — ${payload.artist_name}`;
                     if (lyricsSearchResults) lyricsSearchResults.replaceChildren();
-                    setLyricsSearchStatus('Letra importada como guia. O Whisper define os tempos e confere as palavras com esse texto.');
+                    setLyricsSearchStatus('Guia importada. Só suas palavras confirmadas na voz serão exibidas; os tempos seguem a gravação.');
                     return true;
                 } catch (error) {
                     if (error.name === 'AbortError' || !isCurrentLookup()) return false;

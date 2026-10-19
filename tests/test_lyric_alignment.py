@@ -88,20 +88,21 @@ class GuideTests(unittest.TestCase):
     def test_complete_adjacent_loop_can_be_proposed_even_with_low_guide_coverage(self):
         raw = words('deixe uma luz acesa deixe uma luz acesa')[0]['words']
         self.assertIn('deixe uma luz acesa'.split(), repetition_candidates(raw, 'deixe uma luz acesa'))
-        self.assertEqual(repetition_candidates(raw, 'deixe uma luz acesa\ndeixe uma luz acesa'), [])
+        self.assertIn('deixe uma luz acesa'.split(),
+                      repetition_candidates(raw, 'deixe uma luz acesa\ndeixe uma luz acesa'))
 
     def test_single_word_stutters_and_distant_refrains_are_not_loop_proposals(self):
         self.assertEqual(repetition_candidates(words('não não não')[0]['words'], ''), [])
         raw = words('deixe uma luz acesa', 1)[0]['words'] + words('deixe uma luz acesa', 10)[0]['words']
         self.assertEqual(repetition_candidates(raw, ''), [])
 
-    def test_three_copies_can_reduce_to_one_but_never_below_an_explicit_guide_repeat(self):
+    def test_three_copies_can_reduce_to_one_when_audio_disagrees_with_printed_repeats(self):
         line = 'deixe uma luz acesa'
         raw = words(' '.join([line]*3))[0]['words']
         self.assertIn(line.split(), repetition_candidates(raw, line))
         proposals = repetition_candidates(raw, f'{line}\n{line}')
         self.assertIn((line+' '+line).split(), proposals)
-        self.assertNotIn(line.split(), proposals)
+        self.assertIn(line.split(), proposals)
 
     def test_surviving_word_confidence_alone_cannot_authorize_a_deletion(self):
         self.assertFalse(supports_deletion(Backend(lambda *a: None, lambda: None), None,
@@ -214,7 +215,7 @@ class QualityTests(unittest.TestCase):
         self.assertEqual(source,before);self.assertEqual(json.loads(raw.read_text()),before)
         self.assertTrue(self.backends[0].closed)
 
-    def test_rejected_guide_alignment_keeps_supported_original_instead_of_forcing_guide(self):
+    def test_rejected_guide_alignment_omits_out_of_guide_word_without_inventing_replacement(self):
         class Reject(Backend):
             def align(self,emission,text):
                 result=super().align(emission,text)
@@ -223,7 +224,10 @@ class QualityTests(unittest.TestCase):
                 return result
         self.factory=Reject
         result,report=self.refine(words('eu quero viver com voce nesta noite'),'eu quero cantar com você nesta noite')
-        self.assertIn('viver',result[0]['text']);self.assertEqual(report['guide_changes'],0)
+        self.assertNotIn('viver',result[0]['text'])
+        self.assertNotIn('cantar',result[0]['text'])
+        self.assertEqual(report['guide_changes'],0)
+        self.assertEqual(report['guide_removed_words'],1)
 
     def test_ctc_and_voice_detector_reject_unvoiced_hallucination_even_with_background_audio(self):
         class RejectNoise(Backend):

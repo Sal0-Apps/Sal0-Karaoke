@@ -1,3 +1,12 @@
+# 12.7.1
+
+- Letra-guia estrita: a saída automática usa somente palavras da guia confirmadas na voz. A conferência contextual de palavras e frases parecidas conserva os tempos medidos; trechos incertos são omitidos.
+- Letras e prévias deixam de permanecer na introdução, nas pausas internas e no encerramento sem canto. A proteção vale com o aviso instrumental ligado ou desligado e não desloca nem recorta a gravação.
+- Guias de outra gravação e repetições sem confirmação não completam versos por adivinhação. Sem guia, o reconhecimento normal continua disponível; editor, cores, animações e opções existentes são preservados.
+- Mesmo modelo Whisper selecionado e mesmos componentes locais de alinhamento. Nenhuma integração paga, compra de cota ou ativação de faturamento foi adicionada.
+- Testes de guia, evidência vocal, saída e renderização real com FFmpeg passam a integrar a validação. Atualização apenas do servidor, preservando `/data`; a 12.7 continua disponível para retorno.
+- Detalhes: [letra-guia estrita](docs/LETRA_GUIA_ESTRITA.md) e [atualização 12.7.1](docs/ATUALIZACAO_12_7_1.md).
+
 # 12.7
 
 - Animação respeita o início acústico da palavra: caracteres não podem acender antes dela; a limpeza não acrescenta antecipação visual e confere vazamentos baixos do instrumental com apoio do detector de voz. Mesma gravação, modelo e divisão por letra-guia.

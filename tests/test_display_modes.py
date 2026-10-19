@@ -16,6 +16,7 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).parents[1] / 'app'))
 from karaoke_generator import generate_ass_karaoke
 from lyrics_sync import anchor_synced_animation
+from lyric_guide import prepare_lyrics_guide
 from video_renderer import render_karaoke_video, run_ffmpeg_with_logging
 from media_covers import filter_path
 
@@ -45,6 +46,7 @@ class DisplayModeTests(unittest.TestCase):
                     show_next_line_preview=False, keep_first_line_visible=False,
                     instrumental_wav='instrumental.wav', get_file_duration=lambda _: 3,
                     karaoke_visual_settings={'animation_style': 'classic', 'instrumental_style': 'classic'},
+                    lyrics_text='', prepare_lyrics_guide=prepare_lyrics_guide,
                     queue_cache=SimpleNamespace(read_json=lambda *args: {}),
                     pm=SimpleNamespace(check_cancelled=Mock()), save_stage_checkpoint=Mock())
                 exec(compile(textwrap.dedent(stage), 'server-subtitle-stage', 'exec'), scope)

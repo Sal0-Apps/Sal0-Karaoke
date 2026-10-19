@@ -116,9 +116,20 @@ class SyncedAcousticAnimationTests(unittest.TestCase):
             dict(word='Minha revisão completa', start=9.8, end=13)])]
         for version in (3, 4):
             with self.subTest(inference_version=version):
-                scope, _ = self.run_stage(cache_version=3, audio_cache_version=version, reviewed=reviewed)
+                scope, _ = self.run_stage(cache_version=3, audio_cache_version=version, reviewed=reviewed,
+                    verses=[dict(start=9.8, end=13, text='Minha revisão completa')])
                 scope['refine_lyrics'].assert_not_called()
-                self.assertEqual(scope['segments'], reviewed)
+                self.assertEqual(scope['segments'][0]['text'], reviewed[0]['text'])
+                self.assertEqual(len(scope['segments'][0]['words']), 1)
+                word = scope['segments'][0]['words'][0]
+                self.assertEqual(word['word'].strip(), reviewed[0]['text'])
+                self.assertEqual((word['start'], word['end']), (9.8, 13))
+
+    def test_old_review_outside_the_guide_cannot_bypass_the_contract(self):
+        reviewed = [dict(start=9.8, end=13, text='Minha revisão completa', words=[
+            dict(word='Minha revisão completa', start=9.8, end=13)])]
+        with self.assertRaisesRegex(ValueError, 'não corresponde à letra-guia'):
+            self.run_stage(cache_version=3, reviewed=reviewed)
 
     def test_numeric_runtime_override_refreshes_raw_recognition_once(self):
         policy = {'WHISPER_DEVICE': 'cpu', 'WHISPER_COMPUTE_TYPE': 'int8_float32'}
@@ -139,7 +150,7 @@ class SyncedAcousticAnimationTests(unittest.TestCase):
         transcriber.assert_not_called()
         self.assertEqual(scope['synced_segments'], verses)
 
-    def test_guide_spelling_is_kept_but_lexical_changes_require_acoustic_confirmation(self):
+    def test_guide_corrections_reach_the_acoustic_checker_and_the_renderer(self):
         verses = [dict(start=10, end=13, text='Olá lindo mundo'),
                   dict(start=13, end=17, text='Outra palavra correta')]
         voice = [dict(start=10.2, end=12.5, text='Ola limbo mundo', words=[
@@ -148,17 +159,17 @@ class SyncedAcousticAnimationTests(unittest.TestCase):
             dict(word=' mundo', start=11.6, end=12.5)])]
         for timing in ('auto', 'acoustic'):
             scope, _ = self.run_stage(verses=verses, voice=voice, timing=timing)
-            self.assertEqual([s['text'] for s in scope['segments']], ['Olá limbo mundo'])
+            self.assertEqual([s['text'] for s in scope['segments']], ['Olá lindo mundo'])
             self.assertEqual(scope['refine_lyrics'].call_args.args[2], 'Olá lindo mundo\nOutra palavra correta')
             with tempfile.TemporaryDirectory() as folder:
                 target = Path(folder) / 'text.ass'
                 generate_ass_karaoke(scope['segments'], str(target), show_instrumental=False,
                                      show_next_line_preview=False)
                 output = target.read_text()
-                self.assertIn('limbo', output)
+                self.assertIn('lindo', output)
                 self.assertNotIn('correta', output)
                 self.assertTrue(scope['guide_report']['retry_attempted'])
-                self.assertNotIn('lindo', output)
+                self.assertNotIn('limbo', output)
 
     def test_empty_local_recognition_cannot_render_the_guide_instead(self):
         with self.assertRaisesRegex(ValueError, 'Nenhum vocal detectado'):
