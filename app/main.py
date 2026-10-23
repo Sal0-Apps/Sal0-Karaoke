@@ -1949,7 +1949,10 @@ def get_youtube_status(user: dict, kind: str) -> dict:
     )
 
 @app.get("/api/youtube-preset-status/audio")
-def get_yt_preset_audio_status(current_user: dict = Depends(get_current_user)):
+def get_yt_preset_audio_status(current_user: dict = Depends(get_current_user), download_id: str = Query("", max_length=32)):
+    key = youtube_status_key(current_user, "audio")
+    if download_id:
+        return yt_preset_statuses.get(f"{key}:{download_id}", {"status": "idle", "progress": 0})
     return get_youtube_status(current_user, "audio")
 
 @app.get("/api/youtube-preset-status/bg")
@@ -2145,73 +2148,50 @@ def start_model_download(req: ModelDownloadRequest, current_user: dict = Depends
 
     return {"message": f"Download do modelo {model_size} iniciado."}
 
-def run_youtube_download_bg(url: str, owner: dict):
+def run_youtube_download_bg(url: str, owner: dict, download_id: str = ""):
+    """Import media independently of the active job, its cache and cancellation."""
     status_key = youtube_status_key(owner, "audio")
+    own_key = f"{status_key}:{download_id}" if download_id else status_key
     paths = get_user_paths(owner)
-    cache_dir = paths["cache"]
-    os.makedirs(cache_dir, exist_ok=True)
-    cache_meta_file = os.path.join(cache_dir, "cache_meta.json")
 
-    yt_preset_statuses[status_key] = {"status": "downloading", "progress": 15, "title": "Conectando ao YouTube...", "filename": "", "error": None}
+    def publish(status):
+        status["download_id"] = download_id
+        yt_preset_statuses[own_key] = status
+        if yt_preset_statuses.get(status_key, {}).get("download_id", "") == download_id:
+            yt_preset_statuses[status_key] = status
 
+    def progress(percent, detail):
+        publish({"status": "downloading", "progress": percent, "title": detail,
+                 "filename": "", "error": None})
+
+    publish({"status": "downloading", "progress": None, "title": "Conectando ao YouTube...",
+             "filename": "", "error": None})
     try:
-        # Limpar áudios e segmentos legados da música anterior
-        for old_f in ["original_converted.wav", "vocals.wav", "instrumental.wav", "transcribed_segments.json"]:
-            old_p = os.path.join(cache_dir, old_f)
-            if os.path.exists(old_p):
-                try:
-                    os.remove(old_p)
-                except Exception:
-                    pass
+        os.makedirs(paths["output"], exist_ok=True)
+        with tempfile.TemporaryDirectory(prefix="video-download-", dir=paths["output"]) as staging:
+            input_path, title = download_youtube(url, staging, progress_callback=progress)
+            ext = os.path.splitext(input_path)[1]
+            publish({"status": "downloading", "progress": 100, "title": "Salvando na Biblioteca...",
+                     "filename": "", "error": None})
+            videos_dir = os.path.join(paths["library"], "videos")
+            os.makedirs(videos_dir, exist_ok=True)
+            safe_title = "".join(c for c in title if c.isalnum() or c in ' ._-').strip()
+            safe_title = safe_title.encode("utf-8")[:200].decode("utf-8", errors="ignore").rstrip(" .") or "youtube_download"
+            # Concurrent imports and existing queue sources must never overwrite each other.
+            dest_filename = f"{safe_title}_{(download_id or uuid.uuid4().hex)[:8]}{ext}"
+            staged_file = os.path.join(videos_dir, ".downloading-" + uuid.uuid4().hex)
+            try:
+                shutil.copy2(input_path, staged_file)
+                os.replace(staged_file, os.path.join(videos_dir, dest_filename))
+            finally:
+                if os.path.exists(staged_file):
+                    os.remove(staged_file)
+        publish({"status": "done", "progress": 100, "title": title,
+                 "filename": dest_filename, "error": None})
+    except Exception as exc:
+        logger.exception("Erro no download independente do vídeo do YouTube")
+        publish({"status": "error", "progress": 0, "title": "", "filename": "", "error": str(exc)})
 
-        input_audio_path, title = download_youtube(url, cache_dir)
-        ext = os.path.splitext(input_audio_path)[1]
-
-        yt_preset_statuses[status_key]["title"] = title
-        yt_preset_statuses[status_key]["progress"] = 70
-
-        cached_meta = {
-            "youtube_url": url,
-            "download_quality_version": 2,
-            "original_filename": title,
-            "audio_filename": title + ext,
-            "input_ext": ext,
-            "has_bg": False,
-            "bg_ext": None,
-            "bg_filename": None,
-            "lyrics_text": ""
-        }
-        with open(cache_meta_file, "w", encoding="utf-8") as f:
-            json.dump(cached_meta, f, indent=4)
-
-        dest_filename = os.path.basename(input_audio_path)
-        try:
-            lib_video_dir = os.path.join(paths["library"], "videos")
-            os.makedirs(lib_video_dir, exist_ok=True)
-            safe_title = "".join([c for c in title if c.isalnum() or c in ' ._-']).strip() or "youtube_download"
-            dest_filename = f"{safe_title}{ext}"
-            dest_file = os.path.join(lib_video_dir, dest_filename)
-            shutil.copy2(input_audio_path, dest_file)
-            logger.info(f"Vídeo do YouTube adicionado à biblioteca: {dest_file}")
-        except Exception as copy_err:
-            logger.error(f"Erro ao salvar vídeo do YouTube na biblioteca: {copy_err}")
-
-        yt_preset_statuses[status_key] = {
-            "status": "done",
-            "progress": 100,
-            "title": title,
-            "filename": dest_filename,
-            "error": None
-        }
-    except Exception as e:
-        logger.error(f"Erro no download do YouTube em background: {e}")
-        yt_preset_statuses[status_key] = {
-            "status": "error",
-            "progress": 0,
-            "title": "",
-            "filename": "",
-            "error": str(e)
-        }
 
 def download_bg_youtube(url: str, cache_dir: str) -> tuple[str, str]:
     """Baixa apenas o fluxo de vídeo do YouTube (sem áudio) para uso como fundo com expurgo e overwrites: True."""
@@ -2312,21 +2292,19 @@ def download_youtube_preset(
     data: YouTubePresetModel,
     current_user: dict = Depends(get_current_user)
 ):
-    if processing_lock.locked():
-        raise HTTPException(
-            status_code=429,
-            detail="O servidor está ocupado processando outro vídeo. Por favor, aguarde alguns minutos."
-        )
-
     url = data.youtube_url.strip()
     if not url:
         raise HTTPException(status_code=400, detail="URL do YouTube vazia.")
 
-    yt_preset_statuses[youtube_status_key(current_user, "audio")] = {
-        "status": "starting", "progress": 5, "title": "Identificando vídeo...", "filename": "", "error": None
-    }
-    threading.Thread(target=run_youtube_download_bg, args=(url, dict(current_user)), daemon=True).start()
-    return {"status": "started"}
+    download_id = uuid.uuid4().hex
+    status = {"status": "starting", "progress": None, "title": "Identificando vídeo...",
+              "filename": "", "error": None, "download_id": download_id}
+    key = youtube_status_key(current_user, "audio")
+    yt_preset_statuses[key] = status
+    yt_preset_statuses[f"{key}:{download_id}"] = status
+    threading.Thread(target=run_youtube_download_bg,
+                     args=(url, dict(current_user), download_id), daemon=True).start()
+    return {"status": "started", "download_id": download_id}
 
 # Gerenciamento de Perfis de Uso Persistentes em JSON
 @app.post("/api/download-bg-youtube-preset")

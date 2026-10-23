@@ -2835,6 +2835,8 @@
                             </div>
                             <div id="libAudioYoutubeTitleBadge" class="youtube-identification" aria-live="polite"><span><svg class="sal0-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sal0-play"></use></svg></span><span id="libAudioYoutubeTitleText"></span></div>
                             <div id="audioYtProgressBox" class="library-import-progress"><span id="audioYtStatusTitle">Preparando...</span> · <strong id="audioYtStatusPercent">0%</strong></div>
+                            <div id="audioYtSelectedBadge" class="library-import-progress" aria-live="polite"><span id="audioYtSelectedText"></span></div>
+                            <p class="compact-note">Você pode baixar enquanto outra música está em processamento.</p>
                         </form>
                     </div>
                 </div>
@@ -3012,7 +3014,7 @@
                 </ol>
                 <p>A API tem cota gratuita e pode limitar projetos sem auditoria a vídeos privados. Guarde a autorização como uma senha. Backing vocals e vídeo do modo SRT mostram porcentagem da etapa e avisam o avanço no Telegram; o LibreTranslate informa apenas início e término.</p>
             </details>
-            <p class="compact-note">Versão do servidor: 12.7.2. A transcrição é local; fontes, modelos e integrações podem acessar serviços externos. Use conteúdo autorizado.</p>
+            <p class="compact-note">Versão do servidor: 12.7.3. A transcrição é local; fontes, modelos e integrações podem acessar serviços externos. Use conteúdo autorizado.</p>
             <p class="compact-note">Use o servidor pela rede local ou VPN. A busca/importação do YouTube não concede direitos sobre a mídia. OAuth autoriza o acesso ao canal, não o uso de músicas. Confira as permissões do conteúdo e os termos do YouTube antes de importar ou publicar. Não listado permite acesso a quem tiver o link; resultados SRT nunca vão ao YouTube.</p>
             <p class="compact-note"><a href="https://www.youtube.com/static?template=terms" target="_blank" rel="noopener noreferrer">Termos do YouTube</a> · <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer">Privacidade do Google</a> · <a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener noreferrer">Revogar acesso ao canal</a></p>
         </div>
@@ -3797,7 +3799,7 @@
                 throw new Error(error.detail || 'Não foi possível iniciar o download do YouTube.');
             }
             const started = await startResponse.json().catch(() => ({}));
-            const statusUrl = isBackground ? '/api/youtube-preset-status/bg' + (started.download_id ? `?download_id=${encodeURIComponent(started.download_id)}` : '') : '/api/youtube-preset-status/audio';
+            const statusUrl = '/api/youtube-preset-status/' + (isBackground ? 'bg' : 'audio') + (started.download_id ? `?download_id=${encodeURIComponent(started.download_id)}` : '');
             for (let attempt = 0; attempt < 600; attempt += 1) {
                 await new Promise(resolve => setTimeout(resolve, 1000));
                 const statusResponse = await authFetch(statusUrl);
@@ -5658,8 +5660,8 @@
                     if (progressBox) progressBox.style.display = "block";
                     if (selectedBadge) selectedBadge.style.display = "none";
                     if (statusTitle) setUiText(statusTitle, "[[sal0:clock]] Conectando ao YouTube...");
-                    if (statusPercent) statusPercent.innerText = "10%";
-                    if (progressBar) progressBar.style.width = "10%";
+                    if (statusPercent) statusPercent.innerText = "Conectando…";
+                    if (progressBar) progressBar.style.width = "0%";
 
                     try {
                         const res = await authFetch('/api/download-youtube-preset', {
@@ -5668,18 +5670,23 @@
                             body: JSON.stringify({ youtube_url: url })
                         });
 
-                        if (!res.ok) throw new Error("Falha ao iniciar download.");
+                        if (!res.ok) {
+                            const error = await res.json().catch(() => ({}));
+                            throw new Error(error.detail || "Falha ao iniciar download.");
+                        }
+                        const started = await res.json();
+                        const statusUrl = '/api/youtube-preset-status/audio' + (started.download_id ? `?download_id=${encodeURIComponent(started.download_id)}` : '');
 
                         if (audioYtPollInterval) stopSerialPoll(audioYtPollInterval);
                         audioYtPollInterval = startSerialPoll(async () => {
                             try {
-                                const stRes = await timedAuthFetch('/api/youtube-preset-status/audio');
+                                const stRes = await timedAuthFetch(statusUrl);
                                 if (stRes.ok) {
                                     const stData = await stRes.json();
                                     if (stData.status === "downloading") {
-                                        if (statusTitle) setUiText(statusTitle, `[[sal0:clock]] Baixando do YouTube: "${stData.title || 'Música'}"...`);
-                                        if (statusPercent) statusPercent.innerText = `${stData.progress || 50}%`;
-                                        if (progressBar) progressBar.style.width = `${stData.progress || 50}%`;
+                                        if (statusTitle) setUiText(statusTitle, `[[sal0:clock]] ${stData.title || 'Baixando do YouTube…'}`);
+                                        if (statusPercent) statusPercent.innerText = (stData.progress == null ? "Transferindo…" : `${stData.progress}%`);
+                                        if (progressBar) progressBar.style.width = `${stData.progress ?? 0}%`;
                                     } else if (stData.status === "done") {
                                         stopSerialPoll(audioYtPollInterval);
                                         if (progressBox) progressBox.style.display = "none";
@@ -5688,7 +5695,7 @@
 
                                         // Recarregar a biblioteca sem alterar a criação em andamento.
                                         await loadLibrary();
-                                        if (selectedBadge) selectedBadge.style.display = "none";
+                                        if (selectedBadge) selectedBadge.style.display = "flex";
                                         if (selectedText) setUiText(selectedText, `[[sal0:check]] Mídia guardada: "${stData.filename}"`);
                                     } else if (stData.status === "error") {
                                         stopSerialPoll(audioYtPollInterval);

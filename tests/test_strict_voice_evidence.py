@@ -232,6 +232,70 @@ class ConservativeVoiceEvidenceTests(unittest.TestCase):
         self.assertEqual(self.text(result), line+' '+line)
         self.assertEqual(report['repeated_words'], 0)
 
+    def test_correction_keeps_neighboring_context_across_alignment_chunks(self):
+        class Confirmed(SupportedCTC):
+            def sequence_score(self, emission, text):
+                return -20 if 'cantar' in text else -60
+        # The middle word is regrouped into its own acoustic window. Its
+        # neighbors still identify the guide phrase, but never supply clocks.
+        source = segments('eu quero', start=1.) + segments('gastar', start=2.6)
+        source += segments('com voce nesta noite', start=3.6)
+        result, report = self.refine(source, 'eu quero cantar com você nesta noite',
+                                    backend_factory=Confirmed)
+        self.assertIn('cantar', self.text(result))
+        self.assertNotIn('gastar', self.text(result))
+        self.assertEqual(sum(len(s['words']) for s in result), 7)
+        self.assertEqual(report['guide_changes'], 1)
+
+    def test_correcting_one_word_does_not_skip_repetition_check(self):
+        line = 'eu quero cantar com voce'
+        class CorrectedLoop(SupportedCTC):
+            def sequence_score(self, emission, text):
+                return -100 + 20 * text.count('cantar') + (40 if len(text) == 5 else 0)
+        source = segments('eu quero gastar com voce ' + line)
+        result, report = self.refine(source, line, backend_factory=CorrectedLoop)
+        self.assertEqual(self.text(result), line)
+        self.assertEqual(report['repeated_words'], 5)
+        self.assertGreater(report['guide_changes'], 0)
+
+    def test_correction_does_not_remove_a_refrain_that_the_audio_confirms(self):
+        line = 'eu quero cantar com voce'
+        class SungTwice(SupportedCTC):
+            def sequence_score(self, emission, text):
+                return -100 + 20 * text.count('cantar') - (40 if len(text) == 5 else 0)
+        source = segments('eu quero gastar com voce ' + line)
+        result, report = self.refine(source, line, backend_factory=SungTwice)
+        self.assertEqual(self.text(result), line + ' ' + line)
+        self.assertEqual(report['repeated_words'], 0)
+
+    def test_correcting_one_word_does_not_skip_unvoiced_tail_check(self):
+        class CorrectedNoise(SupportedCTC):
+            def sequence_score(self, emission, text):
+                return -20 if 'cantar' in text else -60
+            def align(self, emission, text):
+                result = super().align(emission, text)
+                result[-1]['alignment_score'] = .06
+                return result
+        source = segments('eu quero gastar com voce fantasma')
+        result, report = self.refine(source, 'eu quero cantar com voce',
+            voice_regions=[(.8, 2.9)], backend_factory=CorrectedNoise)
+        self.assertEqual(self.text(result), 'eu quero cantar com voce')
+        self.assertEqual(report['unsupported_voice_words'], 1)
+
+    def test_corrected_quiet_word_survives_without_voice_detector_evidence(self):
+        class CorrectedQuiet(SupportedCTC):
+            def sequence_score(self, emission, text):
+                return -20 if 'cantar' in text else -60
+            def align(self, emission, text):
+                result = super().align(emission, text)
+                result[-1]['alignment_score'] = .06
+                return result
+        source = segments('eu quero gastar com voce')
+        result, report = self.refine(source, 'eu quero cantar com voce',
+            voice_regions=None, backend_factory=CorrectedQuiet)
+        self.assertEqual(self.text(result), 'eu quero cantar com voce')
+        self.assertEqual(report['unsupported_voice_words'], 0)
+
     def test_quiet_long_note_survives_missing_vad(self):
         self.audio *= .0001
         source = segments('cantar', duration=5.)
@@ -250,7 +314,7 @@ class ConservativeVoiceEvidenceTests(unittest.TestCase):
         factory = Mock(side_effect=RuntimeError('model unavailable after old cache'))
         result, report = self.refine(source, backend_factory=factory)
         self.assertEqual(self.text(result), source[0]['text'])
-        self.assertEqual(report['version'], 5)
+        self.assertEqual(report['version'], alignment.QUALITY_VERSION)
         self.assertEqual(report['status'], 'fallback')
         factory.assert_called_once()
 

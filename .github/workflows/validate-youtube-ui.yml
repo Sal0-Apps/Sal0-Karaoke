@@ -10,18 +10,28 @@ permissions:
   contents: read
 jobs:
   validate:
-    runs-on: ubuntu-latest
+    # Playwright 1.51.1 provides browser dependencies for Ubuntu 24.04.
+    runs-on: ubuntu-24.04
     timeout-minutes: 12
     steps:
       - uses: actions/checkout@v4
+      - name: Use Ubuntu archive mirrors
+        run: |
+          # The Azure package mirror can stall FFmpeg/browser dependency downloads.
+          if [ -f /etc/apt/apt-mirrors.txt ]; then
+            printf '%s\n' 'https://archive.ubuntu.com/ubuntu/' | sudo tee /etc/apt/apt-mirrors.txt >/dev/null
+          fi
+          if [ -f /etc/apt/apt-mirrors-security.txt ]; then
+            printf '%s\n' 'https://security.ubuntu.com/ubuntu/' | sudo tee /etc/apt/apt-mirrors-security.txt >/dev/null
+          fi
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
       - run: |
           python -m pip install requests==2.34.2 fastapi==0.142.2 starlette==1.7.0 python-multipart==0.0.32 jinja2==3.1.6 httpx numpy "yt-dlp[default]"
           if ! command -v ffmpeg >/dev/null || ! command -v ffprobe >/dev/null; then
-            sudo timeout 240 apt-get update -qq
-            sudo timeout 240 apt-get install -y ffmpeg
+            sudo timeout 240 apt-get -o Acquire::Retries=2 -o Acquire::https::Timeout=30 update -qq
+            sudo timeout 240 apt-get -o Acquire::Retries=2 -o Acquire::https::Timeout=30 install -y --no-install-recommends ffmpeg
           fi
           python -m compileall -q app
           python -m unittest discover -s tests -p test_queue_cache.py -v
@@ -54,6 +64,7 @@ jobs:
           python -m unittest discover -s tests -p test_processing_flow.py -v
           python -m unittest discover -s tests -p test_easy_mode_config.py -v
           python -m unittest discover -s tests -p test_queue_lyrics_and_background.py -v
+          python -m unittest discover -s tests -p test_independent_video_download.py -v
           python -m unittest discover -s tests -p test_display_modes.py -v
           python -m unittest discover -s tests -p test_whisper_cache_reuse.py -v
           python -m unittest discover -s tests -p test_runtime_resources.py -v
@@ -81,6 +92,7 @@ jobs:
           NODE_PATH=/tmp/sal0-ui/node_modules node tests/browser_lyrics_search.cjs
           NODE_PATH=/tmp/sal0-ui/node_modules node tests/browser_interface_refinements.cjs
           NODE_PATH=/tmp/sal0-ui/node_modules node tests/browser_karaoke_visuals.cjs
+          NODE_PATH=/tmp/sal0-ui/node_modules node tests/browser_independent_download.cjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -97,4 +109,5 @@ jobs:
             lyrics-search-*.png
             review-artifacts/interface-*.png
             review-artifacts/karaoke-visuals-*.png
+            review-artifacts/download-*.png
           if-no-files-found: ignore
