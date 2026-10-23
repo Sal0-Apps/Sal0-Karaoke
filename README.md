@@ -8,6 +8,8 @@ O código original é software livre sob a [licença MIT](LICENSE). Dependência
 
 O Sal0 Karaokê é destinado a uma instalação pessoal, acessada pela rede local ou por VPN, como ZeroTier. O repositório aberto disponibiliza o código e os pacotes; o projeto não opera um serviço público de processamento nem coleta centralmente as mídias das instalações. Não é necessário expor a porta do app à internet. O processamento principal é local, mas as integrações escolhidas podem se comunicar com serviços externos.
 
+Na **12.7.3**, a Biblioteca importa vídeos do YouTube durante o processamento, com arquivos e progresso separados por download. A conferência da letra mantém o contexto entre trechos e verifica repetições e palavras sem voz também depois de corrigir a guia. [Detalhes e validação](docs/ATUALIZACAO_12_7_3.md).
+
 Na **12.7.2**, a exibição contínua dos versos da 12.7 foi restaurada. O recorte por palavra e o filtro estrito da 12.7.1 foram retirados após causarem piscadas e omissões. A guia volta a conferir o reconhecimento: substituições precisam de contexto e confirmação acústica; diferenças incertas ficam disponíveis para revisão. [Detalhes da correção](docs/ATUALIZACAO_12_7_2.md).
 
 Na **12.7**, animações respeitam o início medido de cada palavra, pausas instrumentais seguem os intervalos do canto e a publicação automática mantém sua intenção mesmo durante o carregamento do painel. O administrador configura animação, brilho, cor e barra do instrumental, pausa mínima e contagem em **Ajustes → Animação e instrumental**. [Detalhes da atualização](docs/ATUALIZACAO_12_7.md).
@@ -18,6 +20,7 @@ Na **12.6.1**, as quebras confirmadas da guia dividem os versos depois do alinha
 
 Na **12.6.2**, o servidor utiliza o orçamento real de CPU, preserva memória entre etapas de IA e refina o contexto do Whisper sem trocar o modelo selecionado. Ícones SVG locais e atualizações sem reconstruções repetidas mantêm o visual e o fluxo. A renovação do YouTube recupera os envios afetados, com alerta administrativo pelo Telegram. A integração não ativa faturamento nem usa APIs Google pagas como alternativa; [confira o escopo e os limites dessa proteção](docs/GOOGLE_E_YOUTUBE.md).
 
+- [Downloads durante o processamento e conferência da letra](docs/ATUALIZACAO_12_7_3.md)
 - [Letra-guia e estabilidade dos versos](docs/ATUALIZACAO_12_7_2.md)
 - [CPU e instalação da revisão](docs/HARDWARE.md)
 - [Validação das alterações](docs/VALIDACAO_REVISAO.md)
@@ -143,14 +146,14 @@ Em **Playlist de cada usuário**, a administração define uma playlist válida 
 
 ## Início rápido com Docker
 
-A versão de distribuição desta documentação é **12.7.2**. O título e o rodapé da página mostram apenas o nome da aplicação. A versão do servidor pode ser consultada no Manual; a versão do APK aparece nas configurações nativas.
+A versão de distribuição desta documentação é **12.7.3**. O título e o rodapé da página mostram apenas o nome da aplicação. A versão do servidor pode ser consultada no Manual; a versão do APK aparece nas configurações nativas.
 
 Crie um arquivo `compose.yaml`:
 
 ```yaml
 services:
   karaoke-app:
-    image: ghcr.io/sal0-apps/sal0-karaoke:12.7.2
+    image: ghcr.io/sal0-apps/sal0-karaoke:12.7.3
     container_name: karaoke-app
     ports:
       - "7885:7860"

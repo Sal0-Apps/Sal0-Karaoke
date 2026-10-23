@@ -54,6 +54,7 @@ jobs:
           python -m unittest discover -s tests -p test_processing_flow.py -v
           python -m unittest discover -s tests -p test_easy_mode_config.py -v
           python -m unittest discover -s tests -p test_queue_lyrics_and_background.py -v
+          python -m unittest discover -s tests -p test_independent_video_download.py -v
           python -m unittest discover -s tests -p test_display_modes.py -v
           python -m unittest discover -s tests -p test_whisper_cache_reuse.py -v
           python -m unittest discover -s tests -p test_runtime_resources.py -v
@@ -81,6 +82,7 @@ jobs:
           NODE_PATH=/tmp/sal0-ui/node_modules node tests/browser_lyrics_search.cjs
           NODE_PATH=/tmp/sal0-ui/node_modules node tests/browser_interface_refinements.cjs
           NODE_PATH=/tmp/sal0-ui/node_modules node tests/browser_karaoke_visuals.cjs
+          NODE_PATH=/tmp/sal0-ui/node_modules node tests/browser_independent_download.cjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -97,4 +99,5 @@ jobs:
             lyrics-search-*.png
             review-artifacts/interface-*.png
             review-artifacts/karaoke-visuals-*.png
+            review-artifacts/download-*.png
           if-no-files-found: ignore

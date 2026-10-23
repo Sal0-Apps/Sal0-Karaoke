@@ -26,7 +26,7 @@ import process_manager as pm
 from runtime_resources import available_cpu_threads, release_cached_whisper
 
 logger = logging.getLogger('karaoke')
-QUALITY_VERSION = 5
+QUALITY_VERSION = 6
 SAMPLE_RATE = 16000
 MODEL_URL = 'https://dl.fbaipublicfiles.com/mms/torchaudio/ctc_alignment_mling_uroman/model.pt'
 MODEL_DIR = '/data/output/models/lyric_alignment'
@@ -494,6 +494,12 @@ def refine_lyrics(audio_path, segments, guide, cache_dir, context=None, progress
     evidence=AudioEvidence(audio)
     cleaned,report=clean_segments(segments,evidence)
     cleaned=coalesce_repetition_windows(cleaned, guide)
+    # Regrouping is an acoustic/memory boundary, not a boundary in the lyrics.
+    # Keep nearby recognized anchors for every occurrence of a refrain. Each
+    # proposed word still needs its own window's acoustic confirmation below.
+    context_words = [word for segment in cleaned for word in segment['words']]
+    contextual_candidate = guide_correction_candidate(guide, context_words, allow_distant=True)
+    word_offset = 0
     report.update(version=QUALITY_VERSION,status='cleaned',aligned_words=0,guide_changes=0,unsupported_voice_words=0,
                   repeated_words=0,guide_verses=0,
                   rejected_groups=0,source=os.path.basename(str(audio_path)))
@@ -506,6 +512,8 @@ def refine_lyrics(audio_path, segments, guide, cache_dir, context=None, progress
                 voice_regions=detect_voice_regions(audio)
         for index,segment in enumerate(cleaned):
             cancel();original=segment['words'];selected=copy.deepcopy(original)
+            candidate = contextual_candidate[word_offset:word_offset+len(original)] if contextual_candidate else None
+            word_offset += len(original)
             start=max(0.,segment['start']-.45);end=min(evidence.duration,segment['end']+.45)
             try:
                 if backend and end-start<=20 and all(roman_word(w['word']) for w in original):
@@ -513,7 +521,8 @@ def refine_lyrics(audio_path, segments, guide, cache_dir, context=None, progress
                     emission=backend.emission(audio[int(start*SAMPLE_RATE):math.ceil(end*SAMPLE_RATE)])
                     texts=[str(w['word']).strip() for w in original]
                     baseline=backend.align(emission,texts)
-                    candidate=guided_candidate(guide,original)
+                    if candidate and any(not roman_word(token) for token in candidate):
+                        candidate = None
                     chosen=baseline
                     if candidate:
                         candidate=confirmed_guide_candidate(backend,emission,texts,candidate)
@@ -525,14 +534,19 @@ def refine_lyrics(audio_path, segments, guide, cache_dir, context=None, progress
                             report['guide_changes']+=sum(tag!='equal' for tag,*_ in difflib.SequenceMatcher(None,texts,candidate,autojunk=False).get_opcodes())
                     # A complete duplicated phrase can defeat local guide matching.
                     # Test a bounded set of loop hypotheses on the same emissions.
-                    if chosen is baseline:
+                    # A spelling correction must not bypass repetition cleanup.
+                    # Use corrected tokens when available so a mistyped second
+                    # occurrence can be compared with the first on the audio.
+                    loop_words = chosen if chosen is not baseline else original
+                    if loop_words:
+                        loop_texts = [str(word['word']).strip() for word in loop_words]
                         best_loop = None
                         best_score = -math.inf
-                        for reduced in repetition_candidates(original, guide):
+                        for reduced in repetition_candidates(loop_words, guide):
                             aligned = backend.align(emission, reduced)
                             if (accept_alignment(aligned, original, end-start, start)
-                                    and _mean_score(aligned) >= _mean_score(baseline or [])*.8-.015
-                                    and supports_deletion(backend, emission, texts, reduced)):
+                                    and _mean_score(aligned) >= _mean_score(chosen or [])*.8-.015
+                                    and supports_deletion(backend, emission, loop_texts, reduced)):
                                 score = backend.sequence_score(emission, reduced)
                                 if score > best_score:
                                     best_loop = aligned
@@ -540,16 +554,12 @@ def refine_lyrics(audio_path, segments, guide, cache_dir, context=None, progress
                         if best_loop:
                             chosen = best_loop
                             report['repeated_words'] += len(texts) - len(best_loop)
-                    if chosen is baseline and baseline and len(baseline)==len(original):
-                        unsupported={i for i,word in enumerate(baseline)
+                    unsupported = set()
+                    if chosen and len(chosen)==len(original):
+                        unsupported={i for i,word in enumerate(chosen)
                             if word.get('alignment_score',1.)<.08
                             and not has_voice(word['start']+start,word['end']+start,voice_regions)
                             and not has_voice(original[i]['start'],original[i]['end'],voice_regions)}
-                        if unsupported:
-                            selected=[word for i,word in enumerate(selected) if i not in unsupported]
-                            report['unsupported_voice_words']+=len(unsupported)
-                            result.extend(selected)
-                            continue
                     if accept_alignment(chosen,original,end-start,start):
                         selected=copy.deepcopy(chosen)
                         for word in selected:
@@ -559,6 +569,11 @@ def refine_lyrics(audio_path, segments, guide, cache_dir, context=None, progress
                         report['aligned_words']+=len(selected)
                     else:
                         report['rejected_groups']+=1
+                    # This evidence applies equally after an accepted guide
+                    # correction. Unknown VAD is never evidence of silence.
+                    if unsupported:
+                        selected=[word for i,word in enumerate(selected) if i not in unsupported]
+                        report['unsupported_voice_words']+=len(unsupported)
             except InterruptedError:
                 raise
             except Exception:
