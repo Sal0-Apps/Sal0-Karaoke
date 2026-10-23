@@ -1,3 +1,13 @@
+# 12.7.3
+
+- A Biblioteca permite baixar vídeos do YouTube durante outro processamento. Cada importação tem pasta temporária, arquivo final e progresso próprios, preservando o cache da música em execução. O arquivo só aparece depois da gravação completa; erros de salvamento ficam visíveis.
+- A letra-guia conserva o contexto reconhecido entre janelas acústicas, ajudando a conferir palavras dos refrões sem usar os tempos externos da guia.
+- Corrigir uma palavra deixa de pular a comparação de repetições e a verificação de palavras sem voz. Remoções continuam exigindo evidência acústica; refrões realmente cantados e casos incertos são preservados.
+- Mantidas a apresentação contínua dos versos, as revisões manuais e o modelo Whisper escolhido. Ao usar Refazer, o cache automático de alinhamento e os resultados derivados são recalculados; áudio bruto e revisões permanecem disponíveis.
+- Validação local com 639 testes Python, navegador em celular/desktop e ensaio controlado de canto real em CPU. CI ajustado para Ubuntu 24.04 e instalação de dependências pelo servidor oficial do Ubuntu.
+- Atualização somente do servidor. Clientes Android e Windows existentes continuam compatíveis. A imagem 12.7.2 permanece disponível para retorno.
+- [Detalhes e limites da atualização](docs/ATUALIZACAO_12_7_3.md).
+
 # 12.7.2
 
 - Restaurada a apresentação dos versos da 12.7. Retirado o recorte por palavra/atividade vocal que fez a 12.7.1 piscar e suprimir trechos.
