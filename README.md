@@ -8,6 +8,8 @@ O código original é software livre sob a [licença MIT](LICENSE). Dependência
 
 O Sal0 Karaokê é destinado a uma instalação pessoal, acessada pela rede local ou por VPN, como ZeroTier. O repositório aberto disponibiliza o código e os pacotes; o projeto não opera um serviço público de processamento nem coleta centralmente as mídias das instalações. Não é necessário expor a porta do app à internet. O processamento principal é local, mas as integrações escolhidas podem se comunicar com serviços externos.
 
+Na **12.7.4**, a letra completa é alinhada com a voz pelo Whisper escolhido, recuperando palavras e versos omitidos. A conferência acústica ajusta os tempos sem apagar refrões confirmados quando o detector de fala falha. [Detalhes e validação](docs/ATUALIZACAO_12_7_4.md).
+
 Na **12.7.3**, a Biblioteca importa vídeos do YouTube durante o processamento, com arquivos e progresso separados por download. A conferência da letra mantém o contexto entre trechos e verifica repetições e palavras sem voz também depois de corrigir a guia. [Detalhes e validação](docs/ATUALIZACAO_12_7_3.md).
 
 Na **12.7.2**, a exibição contínua dos versos da 12.7 foi restaurada. O recorte por palavra e o filtro estrito da 12.7.1 foram retirados após causarem piscadas e omissões. A guia volta a conferir o reconhecimento: substituições precisam de contexto e confirmação acústica; diferenças incertas ficam disponíveis para revisão. [Detalhes da correção](docs/ATUALIZACAO_12_7_2.md).
@@ -146,14 +148,14 @@ Em **Playlist de cada usuário**, a administração define uma playlist válida 
 
 ## Início rápido com Docker
 
-A versão de distribuição desta documentação é **12.7.3**. O título e o rodapé da página mostram apenas o nome da aplicação. A versão do servidor pode ser consultada no Manual; a versão do APK aparece nas configurações nativas.
+A versão de distribuição desta documentação é **12.7.4**. O título e o rodapé da página mostram apenas o nome da aplicação. A versão do servidor pode ser consultada no Manual; a versão do APK aparece nas configurações nativas.
 
 Crie um arquivo `compose.yaml`:
 
 ```yaml
 services:
   karaoke-app:
-    image: ghcr.io/sal0-apps/sal0-karaoke:12.7.3
+    image: ghcr.io/sal0-apps/sal0-karaoke:12.7.4
     container_name: karaoke-app
     ports:
       - "7885:7860"

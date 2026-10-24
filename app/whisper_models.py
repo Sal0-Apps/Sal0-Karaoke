@@ -8,7 +8,7 @@ import re
 logger = logging.getLogger("karaoke")
 
 MODEL_REPOSITORIES = {
-    "large-v3-turbo": "deepdml/faster-whisper-large-v3-turbo",
+    "large-v3-turbo": "deepdml/faster-whisper-large-v3-turbo-ct2",
     "large-v3": "Systran/faster-whisper-large-v3",
     "large-v2": "Systran/faster-whisper-large-v2",
     "medium": "Systran/faster-whisper-medium",

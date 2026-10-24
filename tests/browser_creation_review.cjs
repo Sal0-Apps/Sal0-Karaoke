@@ -137,9 +137,9 @@ for (const script of HTML.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/g)) new 
         assert.equal(await page.locator('#lyricsTiming').inputValue(), 'acoustic');
         assert.equal(await page.locator('#easyLyricsTiming').inputValue(), 'acoustic');
         const guidePolicy = await page.locator('#easyLyricsPolicy').textContent();
-        assert(guidePolicy.includes('A guia ajuda a conferir palavras parecidas com a voz'));
-        assert(guidePolicy.includes('Os versos permanecem completos'));
-        assert(guidePolicy.includes('os tempos seguem a gravação'));
+        assert(guidePolicy.includes('Use a letra completa, incluindo os refrões'));
+        assert(guidePolicy.includes('recupera palavras omitidas'));
+        assert(guidePolicy.includes('os tempos seguem esta gravação'));
         assert.equal(await page.evaluate(() => friendlyStageName('Verifying lyrics with Whisper')), 'Conferindo palavras pela voz');
         reviewCache = true;
         serverStatus = 'waiting_for_user_correction';

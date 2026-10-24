@@ -8,6 +8,7 @@ three words in appended digital silence. This measures alignment, not ASR WER.
 import csv
 import io
 import json
+import os
 from pathlib import Path
 import tempfile
 import time
@@ -16,6 +17,8 @@ import numpy as np
 import requests
 
 from lyric_alignment import refine_lyrics, MMSAligner, supports_deletion
+from full_guide_alignment import align_guide_with_whisper
+from karaoke_generator import insert_instrumental_breaks
 from whisper_audio import load_whisper_audio
 
 DATASET='https://raw.githubusercontent.com/f90/jamendolyrics/f093b7a74e034deac21eb5ea3fc40769b29c35b0/'
@@ -25,6 +28,55 @@ STEM='Cortez_-_Feel__Stripped_'
 def get(path):
     response=requests.get(DATASET+path,timeout=(15,90));response.raise_for_status()
     return response
+
+
+def validate_guide_recovery(source, text, rows, whole, root):
+    """Real singing with a whole omitted line and a later sung repetition."""
+    first, last = 2, 40
+    left = float(rows[first]['word_start'])-.7
+    right = float(rows[last-1]['word_end'])+.7
+    clip = whole[int(left*16000):int(right*16000)]
+    phrase_left, phrase_right = float(rows[2]['word_start'])-.3, float(rows[6]['word_end'])+.3
+    phrase = whole[int(phrase_left*16000):int(phrase_right*16000)]
+    repeat_start = len(clip)/16000+7.
+    audio = np.concatenate((clip, np.zeros(7*16000, np.float32), phrase, np.zeros(3*16000, np.float32)))
+    lines, line, truth, baseline = [], [], [], []
+    for index in range(first, last):
+        start, end = float(rows[index]['word_start'])-left, float(rows[index]['word_end'])-left
+        truth.append(start); line.append(text[index])
+        if rows[index]['line_end'] != 'nan':
+            lines.append(' '.join(line)); line = []
+        if index not in set(range(7, 14)) | {17, 25}:
+            baseline.append(dict(word=' '+text[index], start=start, end=end, probability=.9))
+    lines.append(' '.join(text[2:7]))
+    for index in range(2, 7):
+        start, end = repeat_start+float(rows[index]['word_start'])-phrase_left, repeat_start+float(rows[index]['word_end'])-phrase_left
+        truth.append(start)
+        if index in (2, 6):
+            baseline.append(dict(word=' '+text[index], start=start, end=end, probability=.9))
+    folder = root/'complete-guide'; folder.mkdir()
+    guide = '\n'.join(lines)
+    segments = [dict(start=baseline[0]['start'], end=baseline[-1]['end'], words=baseline)]
+    guided, guide_report = align_guide_with_whisper(source, segments, guide, folder,
+        os.getenv('KARAOKE_SMOKE_WHISPER_MODEL', 'medium'), decode=lambda _: audio,
+        progress=lambda percent, detail: print(f'guide {percent}% {detail}', flush=True))
+    assert guide_report['status'] == 'aligned', guide_report
+    result, report = refine_lyrics(source, guided, guide, folder, decode=lambda _: audio)
+    output = [word for segment in result for word in segment['words']]
+    assert len(output) == len(truth), (len(output), len(truth), report)
+    assert [word['word'].strip() for word in output] == ' '.join(lines).split()
+    errors = [abs(word['start']-target) for word, target in zip(output, truth)]
+    assert float(np.median(errors)) < .35, errors
+    assert output[-5]['start'] >= repeat_start-.3, 'A sung repeat cannot begin in the preceding silence'
+    assert not any(len(clip)/16000+.3 < word['start'] < repeat_start-.3 for word in output)
+    assert guide_report['recovered_words'] >= 7, guide_report
+    regions = json.loads((folder/'aligned_lyrics.json').read_text())['voice_regions']
+    cues = insert_instrumental_breaks(result, len(audio)/16000, voice_regions=regions)
+    rest_middle = (len(clip)/16000+repeat_start)/2
+    assert any(cue.get('instrumental') and cue['start'] <= rest_middle < cue['end'] for cue in cues)
+    return dict(complete_guide_words=len(output), whole_omitted_line_recovered=True,
+        repeated_phrase_recovered=True, long_silence_preserved=True,
+        complete_guide_median_seconds=round(float(np.median(errors)), 4))
 
 
 def main():
@@ -78,11 +130,12 @@ def main():
             assert not repeat_prefers_deletion, 'An actually sung repeat must remain'
         finally:
             aligner.close()
+        complete_guide = validate_guide_recovery(source, text, rows, whole, root)
         print(json.dumps(dict(engine='MMS CTC CPU',recording='Cortez - Feel (Stripped), CC BY',
             words=len(output),controlled_before_median_seconds=.4,after_median_seconds=round(float(np.median(errors)),4),
             corrected_guide_changes=report['guide_changes'],silent_words_removed=report['silent_or_invalid_words'],
             unsupported_repeat_rejected=single_prefers_deletion,real_sung_repeat_preserved=not repeat_prefers_deletion,
-            elapsed_seconds=round(time.monotonic()-started,2))),flush=True)
+            elapsed_seconds=round(time.monotonic()-started,2), **complete_guide)),flush=True)
 
 
 if __name__=='__main__':main()
