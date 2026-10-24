@@ -30,3 +30,8 @@ words, then repeats the recorded phrase after seven seconds of digital silence.
 It uses the installed Whisper model for known-text alignment and MMS to refine
 clocks while preserving confirmed text. The complete-guide test has 43 words;
 its timing error is measured against the same independent annotations.
+
+For confirmed complete guides, nonblank phone posterior mass and vocal energy
+also provide supporting activity near sung verses. This prevents speech-VAD
+misses on sustained vowels from generating instrumental notices; it does not
+create word text or word timestamps.

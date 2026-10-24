@@ -24,7 +24,7 @@ from karaoke_generator import split_and_wrap_segments
 from whisper_audio import load_whisper_audio
 import process_manager as pm
 from runtime_resources import available_cpu_threads, release_cached_whisper
-from full_guide_alignment import alignment_lines, refine_confirmed_clocks, mark_confirmed_lines
+from full_guide_alignment import alignment_lines, refine_confirmed_clocks, mark_confirmed_lines, singing_activity
 
 logger = logging.getLogger('karaoke')
 QUALITY_VERSION = 7
@@ -583,6 +583,10 @@ def refine_lyrics(audio_path, segments, guide, cache_dir, context=None, progress
                     report['retryable_failures'] = report.get('retryable_failures', 0)+1
         if confirmed:
             refined, report['ctc_refined_words'] = refine_confirmed_clocks(segments, guide_alignment)
+            if song_emission is not None:
+                supporting = singing_activity(song_emission, evidence, refined)
+                voice_regions = list(voice_regions or [])+supporting
+                report['singing_activity_regions'] = len(supporting)
             result = [word for segment in refined for word in segment['words']]
             report['aligned_words'] = len(result)
             # Whisper has independently aligned this complete transcript. A

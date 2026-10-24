@@ -373,7 +373,9 @@ def generate_ass_karaoke(
     for idx in range(len(segments) - 1):
         curr = segments[idx]
         nxt = segments[idx + 1]
-        if (not curr.get("synced_line") and not nxt.get('instrumental')
+        confirmed_tail = (nxt.get('instrumental') and voice_regions
+                          and curr.get('words') and all(word.get('guide_audio_confirmed') for word in curr['words']))
+        if (not curr.get("synced_line") and (not nxt.get('instrumental') or confirmed_tail)
                 and not curr.get('instrumental')):
             # ASR word clocks can overlap slightly. Only the display interval
             # is bounded here; original word clocks and LRC intervals stay intact.

@@ -244,6 +244,35 @@ def mark_confirmed_lines(segments):
     return result
 
 
+def singing_activity(emission, evidence, segments):
+    """Support instrumental decisions with quiet sung phones, including held notes.
+
+    MMS can favor blank while retaining a small nonblank posterior throughout a
+    sung vowel. Speech VAD often misses those frames. This supporting map never
+    supplies text or word clocks, and is bounded around confirmed sung verses.
+    Instrumental leakage with an all-blank posterior is not vocal evidence.
+    """
+    values, edges = emission
+    centers = (edges[:-1]+edges[1:])/2
+    mass = -np.expm1(np.asarray(values[:, 0], dtype=np.float64))
+    indices = np.minimum((centers*evidence.rate/evidence.hop).astype(int), len(evidence.rms)-1)
+    supported = np.zeros(len(centers), dtype=bool)
+    for segment in segments:
+        supported |= (centers >= segment['start']-.2) & (centers <= segment['end']+5.)
+    active = (supported & (mass >= .01)
+              & (evidence.rms[indices] > max(1e-8, evidence.reference*.03)))
+    selected = np.flatnonzero(active)
+    regions = []
+    for index in selected:
+        left, right = float(edges[index]), float(edges[index+1])
+        if regions and left-regions[-1][1] <= .16:
+            regions[-1][1] = right
+        else:
+            regions.append([left, right])
+    return [(max(0., left-.08), min(evidence.duration, right+.08))
+            for left, right in regions if right-left >= .08]
+
+
 def alignment_lines(guide, roman):
     lines = [[word for word in line.split() if normalize_word(word)]
              for line in prepare_lyrics_guide(guide).splitlines()]

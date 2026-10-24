@@ -9,9 +9,9 @@ from unittest.mock import Mock, patch
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).parents[1]/'app'))
-from full_guide_alignment import align_guide_with_whisper, alignment_lines, refine_confirmed_clocks
-from lyric_alignment import refine_lyrics, roman_word
-from karaoke_generator import generate_ass_karaoke
+from full_guide_alignment import align_guide_with_whisper, alignment_lines, refine_confirmed_clocks, singing_activity, mark_confirmed_lines
+from lyric_alignment import refine_lyrics, roman_word, AudioEvidence
+from karaoke_generator import generate_ass_karaoke, insert_instrumental_breaks
 
 
 def verse(text, start):
@@ -192,6 +192,33 @@ class CompleteGuideTests(unittest.TestCase):
             result, _ = refine_lyrics(self.source, confirmed, '\n'.join(lines), self.root,
                                      decode=lambda _: self.audio)
         self.assertEqual([segment['text'] for segment in result], lines)
+
+    def test_held_sung_note_prevents_instrumental_notice_and_preserves_its_verse(self):
+        from test_guided_silence_render import events
+        frames = 800
+        edges = np.linspace(0, 16, frames+1); centers = (edges[:-1]+edges[1:])/2
+        values = np.full((frames, 28), -30., dtype=np.float32); values[:, 0] = 0.
+        values[(centers >= 1)&(centers < 5.6), 0] = np.log(.97)
+        words = [dict(word=' Luz', start=1., end=2., guide_audio_confirmed=True)]
+        source = [dict(start=1., end=2., text='Luz', words=words),
+                  dict(start=13., end=14., text='Voltei', words=[dict(word=' Voltei', start=13., end=14.)])]
+        source = mark_confirmed_lines(source)
+        regions = singing_activity((values, edges), AudioEvidence(self.audio), source)
+        cues = insert_instrumental_breaks(source, media_duration=16, voice_regions=regions)
+        self.assertFalse(any(s.get('instrumental') and s['start'] < 5.5 and s['end'] > 2 for s in cues))
+        self.assertTrue(any(s.get('instrumental') and s['start'] <= 8 < s['end'] for s in cues))
+        target = self.root/'held-note.ass'
+        generate_ass_karaoke(source, str(target), show_instrumental=True, media_duration=16, voice_regions=regions)
+        rendered = events(target)
+        verse = next(event for event in rendered if event['text'] == 'Luz')
+        self.assertGreaterEqual(verse['end'], 5.5)
+        self.assertLess(verse['end'], 6.)
+
+    def test_instrumental_leakage_without_phone_posterior_does_not_hide_a_real_rest(self):
+        edges = np.linspace(0, 16, 801)
+        values = np.full((800, 28), -30., dtype=np.float32); values[:, 0] = 0.
+        source = [dict(start=1., end=14., words=[])]
+        self.assertEqual(singing_activity((values, edges), AudioEvidence(self.audio), source), [])
 
 
 if __name__ == '__main__':

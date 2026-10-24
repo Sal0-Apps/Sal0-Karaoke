@@ -18,6 +18,7 @@ import requests
 
 from lyric_alignment import refine_lyrics, MMSAligner, supports_deletion
 from full_guide_alignment import align_guide_with_whisper
+from karaoke_generator import insert_instrumental_breaks
 from whisper_audio import load_whisper_audio
 
 DATASET='https://raw.githubusercontent.com/f90/jamendolyrics/f093b7a74e034deac21eb5ea3fc40769b29c35b0/'
@@ -69,6 +70,10 @@ def validate_guide_recovery(source, text, rows, whole, root):
     assert output[-5]['start'] >= repeat_start-.3, 'A sung repeat cannot begin in the preceding silence'
     assert not any(len(clip)/16000+.3 < word['start'] < repeat_start-.3 for word in output)
     assert guide_report['recovered_words'] >= 7, guide_report
+    regions = json.loads((folder/'aligned_lyrics.json').read_text())['voice_regions']
+    cues = insert_instrumental_breaks(result, len(audio)/16000, voice_regions=regions)
+    rest_middle = (len(clip)/16000+repeat_start)/2
+    assert any(cue.get('instrumental') and cue['start'] <= rest_middle < cue['end'] for cue in cues)
     return dict(complete_guide_words=len(output), whole_omitted_line_recovered=True,
         repeated_phrase_recovered=True, long_silence_preserved=True,
         complete_guide_median_seconds=round(float(np.median(errors)), 4))
