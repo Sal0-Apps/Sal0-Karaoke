@@ -1,3 +1,12 @@
+# 12.7.6
+
+- Quando a faixa de vídeo original termina antes do áudio, o fundo mantém o último quadro até o fim da música. Essa extensão acontece antes de desenhar as legendas, permitindo que os últimos versos continuem avançando.
+- Áudio extraído, stems do Demucs e backing vocals passam a ter a duração conferida antes do reaproveitamento. Cache parcial é refeito, preservando a origem, a letra guia e as revisões manuais.
+- O vídeo final só substitui o arquivo anterior depois de conferir as faixas de áudio e vídeo, incluindo os três segundos da capa. Arquivos temporários incompletos não viram resultados publicados, mesmo se o FFmpeg encerrar sem erro.
+- Vídeos SRT mantêm o fim da imagem quando a faixa de áudio termina antes. A checagem de duração acontece antes da substituição do resultado.
+- Downloads do YouTube não pulam fragmentos indisponíveis. Quando há duração nos metadados, ela é comparada ao arquivo recebido; falhas e cancelamentos limpam a entrada parcial, mantendo guia e fundo.
+- Regressões com FFmpeg real cobrem fim antecipado de vídeo e áudio, legenda tardia, recuperação do cache e proteção de resultados anteriores. [Detalhes e limites](docs/ATUALIZACAO_12_7_6.md).
+
 # 12.7.5
 
 - Links e configurações sem arquivos passam a usar formulário simples. Uploads continuam com envio multipart e confirmação pelo mesmo identificador, sem duplicar tarefas nas tentativas.

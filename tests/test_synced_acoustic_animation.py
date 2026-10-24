@@ -77,7 +77,8 @@ class SyncedAcousticAnimationTests(unittest.TestCase):
                                  source.index('            def publish_render_progress', source.index('# Passo 2:'))]
             preserve = Mock(return_value=('isolated-lead.wav', 'instrumental-with-backing.wav'))
             scope.update(keep_backing_vocals=backing_enabled, backing_vocals_volume=backing_volume,
-                         instrumental_wav='clean-instrumental.wav', preserve_backing_vocals=preserve)
+                         instrumental_wav='clean-instrumental.wav', preserve_backing_vocals=preserve,
+                         source_duration=30, require_duration=Mock())
             exec(compile(textwrap.dedent(preparation), 'voice-source-stage', 'exec'), scope)
             scope['notify_targets'].reset_mock()
             exec(compile(textwrap.dedent(stage), 'transcription-stage', 'exec'), scope)

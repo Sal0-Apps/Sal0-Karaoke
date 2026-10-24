@@ -51,6 +51,7 @@ class BackingVocalsTests(unittest.TestCase):
 
     def test_valid_cached_stems_are_reused_and_volume_is_recomputed(self):
         with tempfile.TemporaryDirectory() as folder:
+            source = Path(folder)/'source.wav'; tone(source, 440)
             for name in ("lead_vocals.wav", "backing_vocals.wav"):
                 tone(Path(folder) / name, 800)
             (Path(folder) / "backing_model_version.txt").write_text(backing.BACKING_MODEL_VERSION)
@@ -59,16 +60,43 @@ class BackingVocalsTests(unittest.TestCase):
                 self.assertEqual(gain, 0.3)
                 tone(Path(output), 800)
             with patch.object(backing, "run_cancellable") as runner, patch.object(backing, "mix_backing", side_effect=mix):
-                lead, output = backing.preserve_backing_vocals("all-voices.wav", "clean-instrumental.wav", folder, 0.3)
+                lead, output = backing.preserve_backing_vocals(str(source), "clean-instrumental.wav", folder, 0.3)
                 runner.assert_not_called()
                 self.assertEqual(Path(lead).name, "lead_vocals.wav")
                 self.assertTrue(Path(output).is_file())
 
+    def test_partial_backing_cache_is_recomputed_despite_a_valid_version_marker(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder); source=root/'source.wav'; tone(source,440,seconds=2)
+            for name in ('lead_vocals.wav','backing_vocals.wav'):tone(root/name,800)
+            (root/'backing_model_version.txt').write_text(backing.BACKING_MODEL_VERSION)
+            def infer(command, **kwargs):
+                for name in ('lead_vocals.wav','backing_vocals.wav'):tone(Path(command[3])/name,800,seconds=2)
+            with patch.object(backing,'run_cancellable',side_effect=infer) as runner, patch.object(backing,'mix_backing',
+                    side_effect=lambda original,voices,output,gain:tone(Path(output),800,seconds=2)):
+                lead,output=backing.preserve_backing_vocals(str(source),'instrumental.wav',folder)
+                self.assertEqual(runner.call_count,1)
+                self.assertEqual(backing.media_durations(lead)['audio'],2)
+                self.assertEqual(backing.media_durations(output)['audio'],2)
+
+    def test_partial_model_output_cannot_be_committed_as_a_complete_stem_pair(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder);source=root/'source.wav';tone(source,440,seconds=2)
+            def infer(command, **kwargs):
+                tone(Path(command[3])/'lead_vocals.wav',800,seconds=2)
+                tone(Path(command[3])/'backing_vocals.wav',800)
+            with patch.object(backing,'run_cancellable',side_effect=infer):
+                with self.assertRaisesRegex(RuntimeError,'Resultado incompleto'):
+                    backing.preserve_backing_vocals(str(source),'instrumental.wav',folder)
+            self.assertFalse((root/'backing_model_version.txt').exists())
+            self.assertFalse((root/'lead_vocals.wav').exists())
+
     def test_failed_model_does_not_create_a_cache_marker(self):
         with tempfile.TemporaryDirectory() as folder:
+            source = Path(folder)/'source.wav'; tone(source, 440)
             with patch.object(backing, "run_cancellable", side_effect=RuntimeError("failed")) as runner:
                 with self.assertRaises(RuntimeError):
-                    backing.preserve_backing_vocals("all-voices.wav", "clean-instrumental.wav", folder)
+                    backing.preserve_backing_vocals(str(source), "clean-instrumental.wav", folder)
                 self.assertEqual(runner.call_args.kwargs["env"]["CUDA_VISIBLE_DEVICES"], "-1")
             self.assertFalse((Path(folder) / "backing_model_version.txt").exists())
             self.assertFalse((Path(folder) / "instrumental_with_backing.wav").exists())
@@ -93,6 +121,7 @@ class BackingVocalsTests(unittest.TestCase):
     def test_stage_percentage_matches_inference_logs_before_separate_mix_stage(self):
         callback = Mock()
         with tempfile.TemporaryDirectory() as folder:
+            source = Path(folder)/'source.wav'; tone(source, 440)
             def infer(command, **kwargs):
                 for percent in (0, 25, 75, 100):
                     kwargs["progress_callback"](percent)
@@ -101,7 +130,7 @@ class BackingVocalsTests(unittest.TestCase):
             def mix(original, voices, output, gain):
                 tone(Path(output), 800)
             with patch.object(backing, "run_cancellable", side_effect=infer), patch.object(backing, "mix_backing", side_effect=mix):
-                backing.preserve_backing_vocals("vocals.wav", "instrumental.wav", folder, update_callback=callback)
+                backing.preserve_backing_vocals(str(source), "instrumental.wav", folder, update_callback=callback)
         inference = [call.kwargs["stage_progress"] for call in callback.call_args_list
                      if call.args[1] == "Separando backing vocals"]
         self.assertEqual(inference, [0, 0, 25, 75, 100])
@@ -112,6 +141,7 @@ class BackingVocalsTests(unittest.TestCase):
     def test_preparation_one_hundred_does_not_hold_inference_at_one_hundred(self):
         callback = Mock()
         with tempfile.TemporaryDirectory() as folder:
+            source = Path(folder)/'source.wav'; tone(source, 440)
             def infer(command, **kwargs):
                 for phase,percent in [('preparing_audio',100),('preparing_windows',100),
                                       ('inference',0),('inference',50),('inference',100),('reconstructing',None)]:
@@ -120,7 +150,7 @@ class BackingVocalsTests(unittest.TestCase):
                     tone(Path(command[3])/name,800)
             with patch.object(backing,'run_cancellable',side_effect=infer), patch.object(backing,'mix_backing',
                     side_effect=lambda original,voices,output,gain:tone(Path(output),800)):
-                backing.preserve_backing_vocals('voices.wav','music.wav',folder,update_callback=callback)
+                backing.preserve_backing_vocals(str(source),'music.wav',folder,update_callback=callback)
         analysis = [c.kwargs['stage_progress'] for c in callback.call_args_list
                     if c.args[1]=='Separando backing vocals']
         self.assertEqual(analysis,[0,0,50,100])
