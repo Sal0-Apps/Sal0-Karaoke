@@ -1,3 +1,11 @@
+# 12.7.7
+
+- Restaurada a base de processamento da **12.7.5**, conforme solicitado. As alterações de duração da 12.7.6 não fazem parte desta revisão; o corte informado foi associado a uma queda de energia. A tentativa posterior não publicada foi descartada.
+- Corrigido o apagão na troca dos versos: a frase permanece legível desde o primeiro frame, sem o fade de opacidade que fazia a próxima linha sumir ao virar a linha ativa. Mantidos texto, tempos e posições.
+- Animações: varredura clássica, suave, pulso luminoso, contorno colorido e preenchimento instantâneo. Os novos efeitos seguem os mesmos tempos medidos, sem mudar a transcrição.
+- Instrumental: texto clássico, barra, três pontos de progresso e contagem em destaque. Aviso personalizável, tamanho entre 60% e 150% e contagem de 0 a 5 segundos; 0 desativa os números sem esconder a prévia.
+- Fonte CJK para o nome da artista no título de abertura, evitando os quadrados observados no exemplo de Bonnie & Clyde. Configurações anteriores continuam compatíveis. [Validação e limites](docs/ATUALIZACAO_12_7_7.md).
+
 # 12.7.6
 
 - Quando a faixa de vídeo original termina antes do áudio, o fundo mantém o último quadro até o fim da música. Essa extensão acontece antes de desenhar as legendas, permitindo que os últimos versos continuem avançando.
