@@ -5,6 +5,7 @@ import subprocess
 import tempfile
 import textwrap
 import threading
+import unicodedata
 from pathlib import Path
 
 THUMBNAIL_ROOT = Path('/data/cache/thumbnails')
@@ -31,7 +32,13 @@ def create_video_cover(source, title, destination, runner):
             command += ['-i', str(source)]
         else:
             command += ['-f', 'lavfi', '-i', 'color=c=0x071522:s=1280x720:r=1']
-        fonts = [Path('/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf'),
+        # drawtext does not substitute missing glyphs inside a fixed fontfile.
+        # Noto CJK also covers Latin titles, so mixed artist names stay intact.
+        needs_cjk = any(unicodedata.east_asian_width(char) in 'WF' and not char.isspace()
+                        for char in str(title))
+        fonts = ([Path('/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc'),
+                  Path(os.environ.get('WINDIR', 'C:/Windows')) / 'Fonts/msyhbd.ttc']
+                 if needs_cjk else []) + [Path('/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf'),
                  Path(os.environ.get('WINDIR', 'C:/Windows')) / 'Fonts/arialbd.ttf']
         font = next((path for path in fonts if path.is_file()), None)
         font_option = f"fontfile='{filter_path(font)}'" if font else "font='DejaVu Sans'"

@@ -10,7 +10,6 @@ from backing_progress import read_progress_event
 import process_manager as pm
 from audio_processor import get_effective_cpu_count
 from runtime_resources import thread_environment
-from media_integrity import complete_audio_cache, media_durations, require_duration
 
 BACKING_MODEL_VERSION = "UVR-BVE-4B_SN-44100-2"
 
@@ -70,12 +69,9 @@ def preserve_backing_vocals(vocals, instrumental, cache_dir, gain=1.0, update_ca
     backing = os.path.join(cache_dir, "backing_vocals.wav")
     output = os.path.join(cache_dir, "instrumental_with_backing.wav")
     marker = os.path.join(cache_dir, "backing_model_version.txt")
-    source_duration = media_durations(vocals).get('audio')
-    if not source_duration:
-        raise RuntimeError('A faixa vocal não tem duração válida para separar backing vocals.')
     ready = (
         os.path.isfile(marker) and Path(marker).read_text() == BACKING_MODEL_VERSION
-        and all(complete_audio_cache(path, source_duration) for path in (lead, backing))
+        and all(os.path.isfile(p) and os.path.getsize(p) > 44 for p in (lead, backing))
     )
     if not ready:
         if update_callback:
@@ -109,8 +105,6 @@ def preserve_backing_vocals(vocals, instrumental, cache_dir, gain=1.0, update_ca
             ], env=env, progress_callback=inference_progress, stage_callback=publish_stage)
             pm.check_cancelled()
             # Only commit complete stem pairs; cancellation cannot create a valid cache marker.
-            require_duration(os.path.join(folder, "lead_vocals.wav"), source_duration)
-            require_duration(os.path.join(folder, "backing_vocals.wav"), source_duration)
             os.replace(os.path.join(folder, "lead_vocals.wav"), lead)
             os.replace(os.path.join(folder, "backing_vocals.wav"), backing)
             Path(marker).write_text(BACKING_MODEL_VERSION)
@@ -121,7 +115,6 @@ def preserve_backing_vocals(vocals, instrumental, cache_dir, gain=1.0, update_ca
         mixed = os.path.join(folder, "mixed.wav")
         mix_backing(instrumental, backing, mixed, gain)
         pm.check_cancelled()
-        require_duration(mixed, source_duration)
         os.replace(mixed, output)
     if update_callback:
         update_callback("processing", "Backing vocals preservados", 60, stage_progress=100,

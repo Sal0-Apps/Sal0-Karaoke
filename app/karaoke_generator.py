@@ -176,16 +176,19 @@ def insert_instrumental_breaks(segments: list[dict], media_duration=None, visual
         for start, end in intervals:
             output.append({**segment, 'start': start, 'end': end})
     for start, end, singing_follows in gaps:
+        label = settings['instrumental_text']
         count = min(settings['countdown_seconds'], int(end - start)) if singing_follows else 0
         # Avoid flashing a label for only a few frames before the countdown.
         if count and 0 < end - start - count < .35:
             count -= 1
         if end - count > start:
-            output.append(dict(start=start, end=end-count, text='Instrumental', words=[], instrumental=True,
+            output.append(dict(start=start, end=end-count, text=label, words=[], instrumental=True,
                                rest_start=start, rest_end=end))
         for number in range(count, 0, -1):
+            text = (f'{number:02d} · {label}' if settings['instrumental_style'] == 'countdown'
+                    else f'{label} ({number})')
             output.append(dict(start=end-number, end=end-number+1,
-                               text=f'Instrumental ({number})', words=[], instrumental=True,
+                               text=text, words=[], instrumental=True,
                                rest_start=start, rest_end=end))
     return sorted(output, key=lambda segment: segment['start'])
 
@@ -234,7 +237,13 @@ def synced_animation_text(segment, normal_color, highlight_color, line_breaks=()
             if end_cs > start_cs and span['end'] > span['start']:
                 # libass >= 0.17 supports an absolute karaoke start (\kt).
                 # Pauses need no invisible characters that could shift or wrap text.
-                if subtitle_mode == 'word':
+                if settings['animation_style'] == 'outline':
+                    onset, finish = start_cs * 10, end_cs * 10
+                    tags = (f'\\1c{normal_color}\\2c{normal_color}\\k0\\3c&H00000000\\bord3\\blur0\\shad0'
+                            f'\\t({onset},{min(onset+90,finish)},\\3c{highlight_color})')
+                elif settings['animation_style'] == 'instant':
+                    tags = f'\\1c{highlight_color}\\2c{normal_color}\\kt{start_cs}\\k{end_cs-start_cs}'
+                elif subtitle_mode == 'word':
                     # Fade the whole word at its real onset, without a hard
                     # color switch or any change to the recognition clocks.
                     fade_end_ms = start_cs * 10 + min(30 if span.get('alignment_chars') else 120, (end_cs - start_cs) * 10)
@@ -243,14 +252,16 @@ def synced_animation_text(segment, normal_color, highlight_color, line_breaks=()
                 else:
                     # ASS sweeps from secondary (pending) to primary (sung).
                     tags = f"\\1c{highlight_color}\\2c{normal_color}\\kt{start_cs}\\kf{end_cs - start_cs}"
-                if settings['animation_style'] == 'smooth':
+                if settings['animation_style'] in {'smooth', 'pulse'}:
                     # A gentle border glow follows the same onset, never a lead-in.
                     tags += r'\3c&H00000000\bord3\blur0.4\shad0'
                     if settings['highlight_glow']:
                         onset, finish = start_cs * 10, end_cs * 10
                         peak = min(onset + 90, finish)
-                        tags += (f'\\t({onset},{peak},\\3c{highlight_color}\\bord3.5)'
-                                 f'\\t({peak},{max(peak+1,finish)},\\3c&H00000000\\bord3)')
+                        border = 5 if settings['animation_style'] == 'pulse' else 3.5
+                        blur = 1 if settings['animation_style'] == 'pulse' else .4
+                        tags += (f'\\t({onset},{peak},\\3c{highlight_color}\\bord{border}\\blur{blur})'
+                                 f'\\t({peak},{max(peak+1,finish)},\\3c&H00000000\\bord3\\blur0.4)')
         word = span['word']
         # Visual wrapping never changes the source text or its timing data.
         for boundary in sorted((b for b in line_breaks if offset <= b < offset + len(word)), reverse=True):
@@ -329,6 +340,43 @@ def synced_display_positions(current, preview, text_position, reserve_preview=Fa
         active = f"{{\\an{alignment}\\pos(640,{y})\\q2\\fs{current['font_size']}}}"
         following = ''
     return active, following
+
+
+def instrumental_graphics(segment, active_pos, active_layout, settings):
+    """Small vector indicators share the measured rest clock across countdowns."""
+    style = settings['instrumental_style']
+    if style not in {'progress', 'dots'}:
+        return []
+    color = html_color_to_ass(settings['instrumental_color'])
+    baseline = int(re.search(r'\\pos\(640,(\d+)\)', active_pos)[1])
+    if r'\an8' in active_pos:
+        baseline += active_layout['height']
+    elif r'\an5' in active_pos:
+        baseline += active_layout['height'] // 2
+    y = min(700, baseline + 12)
+    duration = segment['rest_end'] - segment['rest_start']
+    initial = 100 * (segment['start'] - segment['rest_start']) / duration
+    final = 100 * (segment['end'] - segment['rest_start']) / duration
+    clock = max(1, round((segment['end'] - segment['start']) * 1000))
+    if style == 'progress':
+        common = f'\\an7\\pos(440,{y})\\p1\\bord0\\shad0\\1c{color}'
+        shape = 'm 0 0 l 400 0 400 4 0 4'
+        return ['{' + common + r'\1a&HB0&}' + shape,
+                '{' + common + f'\\fscx{initial:.4f}\\t(0,{clock},\\fscx{final:.4f})' + '}' + shape]
+    result = []
+    shape = 'm 0 -5 b 3 -5 5 -3 5 0 b 5 3 3 5 0 5 b -3 5 -5 3 -5 0 b -5 -3 -3 -5 0 -5'
+    for index, x in enumerate((620, 640, 660)):
+        threshold = (index + 1) * 100 / 3
+        tags = f'\\an7\\pos({x},{y})\\p1\\bord0\\shad0\\1c{color}'
+        if threshold <= initial:
+            tags += r'\1a&H00&'
+        else:
+            tags += r'\1a&H90&'
+            if threshold <= final:
+                at = round((segment['rest_start'] + duration * threshold / 100 - segment['start']) * 1000)
+                tags += f'\\t({max(0,at-120)},{max(1,at)},\\1a&H00&)'
+        result.append('{' + tags + '}' + shape)
+    return result
 
 def generate_ass_karaoke(
     segments: list[dict], 
@@ -437,7 +485,8 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
     instrumental_layout = None
     if persistent_intro:
         if show_instrumental and any(seg.get('instrumental') and seg['start'] < first_lyrics_seg['start'] for seg in segments):
-            instrumental_layout = synced_display_layout('Instrumental (3)', font_size, words_per_line, max_chars_line)
+            instrumental_layout = synced_display_layout(visual_settings['instrumental_text'] + ' (5)',
+                round(font_size * visual_settings['instrumental_size'] / 100), words_per_line, max_chars_line)
             intro_preview_layout = synced_display_layout(first_lyrics_seg['text'], int(font_size * .85),
                                                          words_per_line, max_chars_line, height_limit=170)
             _, intro_pos = synced_display_positions(instrumental_layout, intro_preview_layout, text_position)
@@ -457,14 +506,17 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         if show_next_line_preview and seg.get('instrumental'):
             upcoming = next((candidate for candidate in segments[idx + 1:]
                              if not candidate.get('instrumental')), None)
-            if upcoming and seg['start'] >= upcoming['start'] - visual_settings['countdown_seconds']:
+            if upcoming and (visual_settings['countdown_seconds'] == 0
+                             or seg['start'] >= upcoming['start'] - visual_settings['countdown_seconds']):
                 preview_seg = upcoming
         intro_instrumental = bool(persistent_intro and intro_preview_layout and
                                   seg['start'] < first_lyrics_seg['start'])
         if intro_instrumental:
             # One persistent first verse, shared with the entire countdown.
             preview_seg = first_lyrics_seg
-        active_layout = synced_display_layout(seg['text'], font_size, words_per_line, max_chars_line)
+        active_size = (round(font_size * visual_settings['instrumental_size'] / 100)
+                       if seg.get('instrumental') else font_size)
+        active_layout = synced_display_layout(seg['text'], active_size, words_per_line, max_chars_line)
         preview_layout = (synced_display_layout(preview_seg['text'], int(font_size * .85),
                           words_per_line, max_chars_line, height_limit=170) if preview_seg else None)
         if intro_instrumental:
@@ -475,30 +527,17 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                                      active_layout['breaks'], subtitle_mode, visual_settings)
         if seg.get('instrumental'):
             color = html_color_to_ass(visual_settings['instrumental_color'])
-            text = f'{{\\1c{color}\\2c{color}}}' + seg['text']
-        if seg.get('instrumental') and visual_settings['instrumental_style'] == 'progress':
-            color = html_color_to_ass(visual_settings['instrumental_color'])
-            text = f'{{\\1c{color}\\2c{color}\\fsp2\\bord2\\shad0\\blur0.4}}' + seg['text']
-            # Vector graphics keep the meter crisp at any output resolution.
-            baseline = int(re.search(r'\\pos\(640,(\d+)\)', active_pos)[1])
-            if r'\an8' in active_pos:
-                baseline += active_layout['height']
-            elif r'\an5' in active_pos:
-                baseline += active_layout['height'] // 2
-            y = min(710, baseline + 12)
-            duration = seg['rest_end'] - seg['rest_start']
-            initial = 100 * (seg['start'] - seg['rest_start']) / duration
-            final = 100 * (seg['end'] - seg['rest_start']) / duration
-            clock = max(1, round((seg['end'] - seg['start']) * 1000))
-            common = f'\\an7\\pos(440,{y})\\p1\\bord0\\shad0\\1c{color}'
-            shape = 'm 0 0 l 400 0 400 4 0 4'
-            background = '{' + common + r'\1a&HB0&}' + shape
-            foreground = ('{' + common + f'\\fscx{initial:.4f}\\t(0,{clock},\\fscx{final:.4f})' + '}' + shape)
-            for meter in (background, foreground):
+            label = seg['text']
+            for boundary in reversed(active_layout['breaks']):
+                label = label[:boundary] + r'\N' + label[boundary:]
+            finish = (r'\fsp2\bord2\shad0\blur0.4' if visual_settings['instrumental_style'] == 'progress'
+                      else '' if visual_settings['instrumental_style'] == 'classic' else r'\bord2\shad0')
+            text = f'{{\\1c{color}\\2c{color}{finish}}}' + label
+            for meter in instrumental_graphics(seg, active_pos, active_layout, visual_settings):
                 lines.append(f'Dialogue: 0,{start_time_str},{end_time_str},Default,,0,0,0,,{meter}\n')
-        fade = (r'{\fad(80,0)}' if not seg.get('synced_line') and subtitle_mode in {'word', 'syllable'}
-                and not seg.get('instrumental') else '')
-        lines.append(f"Dialogue: 0,{start_time_str},{end_time_str},Default,,0,0,0,,{active_pos}{fade}{text}\n")
+        # Keep the verse readable at the very first frame. A per-verse opacity
+        # fade made the preview disappear as it became the current lyric.
+        lines.append(f"Dialogue: 0,{start_time_str},{end_time_str},Default,,0,0,0,,{active_pos}{text}\n")
         if preview_seg and not intro_instrumental:
             preview_text = synced_animation_text({'text': preview_seg['text'], 'start': 0, 'end': 1},
                                                  ass_dimmed_color, ass_dimmed_color,

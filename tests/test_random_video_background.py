@@ -28,7 +28,7 @@ class RandomBackgroundTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             bg=Path(directory)/'bg.mp4';bg.touch()
             commands=[]
-            with patch('video_renderer.get_file_duration', side_effect=lambda path: 100 if Path(path)==bg else 30), patch('video_renderer.check_has_video', return_value=True), patch('video_renderer.random.uniform', side_effect=[12,45]), patch('video_renderer.run_ffmpeg_with_logging', side_effect=lambda cmd, **_: commands.append(cmd)), patch('video_renderer.require_duration'):
+            with patch('video_renderer.get_file_duration', side_effect=lambda path: 100 if Path(path)==bg else 30), patch('video_renderer.check_has_video', return_value=True), patch('video_renderer.random.uniform', side_effect=[12,45]), patch('video_renderer.run_ffmpeg_with_logging', side_effect=lambda cmd, **_: commands.append(cmd)):
                 for _ in range(2):
                     render_karaoke_video('audio.wav', None, str(Path(directory)/'out.mp4'), background_image_path=str(bg))
                 render_karaoke_video('audio.wav', None, str(Path(directory)/'original.mp4'), original_video_path=str(bg), background_mode='original_video')

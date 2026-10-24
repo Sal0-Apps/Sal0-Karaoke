@@ -266,7 +266,7 @@ class EngineRecoveryTests(unittest.TestCase):
                 return {'title':'Música'}
             function=load('download_youtube',{'yt_dlp_operation_lock':threading.RLock(),'load_yt_dlp':Mock(),
                 'youtube_download_options':lambda *args:{},'extract_youtube_info':extract,
-                'find_downloaded_file':lambda *args:'source.mp4','media_durations':lambda path:{'audio':1}})
+                'find_downloaded_file':lambda *args:'source.mp4'})
             self.assertEqual(function('https://youtu.be/abcdefghijk',folder,progress,cancel),('source.mp4','Música'))
             self.assertEqual([call.args[0] for call in progress.call_args_list],[45,100])
             self.assertEqual(cancel.call_count,3)
