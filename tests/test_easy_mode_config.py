@@ -50,7 +50,7 @@ def load_random_background_stager(owner_library: Path, user_library: Path):
         "logger": logging.getLogger("test"),
         "user_from_username": lambda username: {"username": username, "role": "admin"} if username == "admin" else None,
         "is_admin": lambda user: user.get("role") == "admin",
-        "get_user_paths": lambda user: {
+        "get_user_paths": lambda user, **kwargs: {
             "library": str(owner_library if user.get("role") == "admin" else user_library)
         },
     }

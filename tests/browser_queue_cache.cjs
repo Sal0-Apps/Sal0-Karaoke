@@ -123,7 +123,8 @@ for (const match of HTML.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/g)) new F
   await page.locator('#easyYoutubeExtraList').getByLabel('Extras 2').check();
   await page.locator('#easySubmitBtn').click();
   await page.waitForFunction(()=>!window.cachedRevisionId);
-  const value=(body,name)=>body.match(new RegExp('name="'+name+'"\\r?\\n\\r?\\n([^\\r\\n]*)'))?.[1];
+  const value=(body,name)=>body.startsWith('--') ? body.match(new RegExp('name="'+name+'"\\r?\\n\\r?\\n([^\\r\\n]*)'))?.[1]
+   : new URLSearchParams(body).get(name);
   assert.equal(value(submissions[0],'cache_job_id'),'A');assert.equal(value(submissions[0],'easy_mode'),'true');
   assert.equal(value(submissions[0],'youtube_replace_previous'),'true');
   assert.equal(value(submissions[0],'font_size'),'41');assert.equal(value(submissions[0],'text_color'),'#123456');

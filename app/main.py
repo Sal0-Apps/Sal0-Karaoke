@@ -47,7 +47,8 @@ from subtitle_video import media_has_motion_video, render_subtitle_video
 from subtitle_settings import normalize_subtitle_settings, load_subtitle_settings, save_subtitle_settings
 from lyric_drafts import read_draft, write_draft, clear_draft
 from lyrics_search import split_search_identity, lyrics_match_score, relevant_lyrics_results, select_automatic_lyrics
-from reprocess_cache import copy_reusable_inputs, youtube_identity, file_fingerprint
+from reprocess_cache import youtube_identity, file_fingerprint
+from submission_logging import SubmissionLoggingMiddleware
 from media_covers import video_thumbnail
 from youtube_engine_runtime import EngineRuntime
 from telegram_delivery import TelegramDelivery
@@ -89,6 +90,7 @@ except Exception:
     pass
 
 app = FastAPI(title="Sal0 Karaokê", description="Criação local de karaokês e legendagem de vídeos com Whisper")
+app.add_middleware(SubmissionLoggingMiddleware, logger=logger)
 
 # Diretório para templates
 templates = Jinja2Templates(directory="templates")
@@ -362,7 +364,7 @@ def user_storage_key(username: str) -> str:
     return hashlib.sha256((username or "user").encode("utf-8")).hexdigest()[:24]
 
 
-def get_user_paths(user: dict) -> dict:
+def get_user_paths(user: dict, *, recover_cache: bool = True) -> dict:
     """Mantém os dados legados com o admin e isola cada usuário comum."""
     if is_admin(user):
         paths = {
@@ -381,7 +383,7 @@ def get_user_paths(user: dict) -> dict:
     for section in ("videos", "photos", "history"):
         os.makedirs(os.path.join(paths["library"], section), exist_ok=True)
     previous_cache = paths["cache"] + ".previous"
-    if os.path.isdir(previous_cache) or not os.path.isdir(paths["cache"]):
+    if recover_cache and (os.path.isdir(previous_cache) or not os.path.isdir(paths["cache"])):
         with legacy_cache_promotion_lock:
             if os.path.isdir(previous_cache) and (not os.path.exists(paths["cache"]) or not os.listdir(paths["cache"])):
                 if os.path.isdir(paths["cache"]):
@@ -1864,7 +1866,7 @@ def stage_quick_random_background(config: dict, current_user: dict) -> tuple[str
     if not owner or not is_admin(owner):
         return None, None
 
-    owner_photos = os.path.join(get_user_paths(owner)["library"], "photos")
+    owner_photos = os.path.join(get_user_paths(owner, recover_cache=False)["library"], "photos")
     candidates = [
         filename for filename in config.get("random_backgrounds", [])
         if os.path.isfile(os.path.join(owner_photos, filename))
@@ -1874,7 +1876,7 @@ def stage_quick_random_background(config: dict, current_user: dict) -> tuple[str
 
     selected = random.choice(candidates)
     source_path = os.path.join(owner_photos, selected)
-    target_dir = os.path.join(get_user_paths(current_user)["library"], "photos")
+    target_dir = os.path.join(get_user_paths(current_user, recover_cache=False)["library"], "photos")
     extension = os.path.splitext(selected)[1].lower()
     staged_name = f"{QUICK_BACKGROUND_STAGE_PREFIX}{extension}"
     staged_path = os.path.join(target_dir, staged_name)
@@ -4137,9 +4139,10 @@ def process_karaoke(
     Recebe os arquivos enviados, valida a concorrência e inicia o pipeline em segundo plano.
     """
     submission_owner = current_user.get("username")
+    if submission_id and not queue_submissions.valid_id(submission_id):
+        raise HTTPException(status_code=400, detail="Identificador de inclusão inválido.")
+    logger.info("Inclusão %s: pedido recebido para preparação da fila.", submission_id or "sem identificador")
     if submission_id:
-        if not queue_submissions.valid_id(submission_id):
-            raise HTTPException(status_code=400, detail="Identificador de inclusão inválido.")
         with processing_queue_lock:
             receipt = queue_submissions.receipt(processing_queue, submission_owner, submission_id)
         if receipt:
@@ -4253,7 +4256,7 @@ def process_karaoke(
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
 
-    user_paths = get_user_paths(current_user)
+    user_paths = get_user_paths(current_user, recover_cache=not has_source)
     job_id = uuid.uuid4().hex
     cache_dir = os.path.join(PROCESSING_QUEUE_ROOT, job_id, "cache")
     library_dir = user_paths["library"]
@@ -4278,14 +4281,13 @@ def process_karaoke(
                     raise HTTPException(status_code=400, detail="O canal mudou. Publique sem substituir ou reconecte o canal anterior.")
                 publication_options["replaces_video_id"] = previous["video_id"]
                 publication_options["privacy"] = previous.get("actual_privacy") or previous["privacy"]
-    elif not has_new_source or (youtube_url and not library_audio and not (audio_file and audio_file.filename)):
+    elif not has_new_source:
         legacy_cache_dir = user_paths["cache"]
         with legacy_cache_promotion_lock:
             if os.path.isdir(legacy_cache_dir):
-                if not has_new_source:
-                    queue_cache.copy_revision_cache(legacy_cache_dir, cache_dir)
-                else:
-                    copy_reusable_inputs(legacy_cache_dir, cache_dir, youtube_url=youtube_url)
+                queue_cache.copy_revision_cache(legacy_cache_dir, cache_dir)
+    # New links start in their private cache. Reusing the legacy cache here can
+    # wait for a multi-GB promotion/copy before the job has a durable receipt.
 
     if quick_random_background_requested:
         library_bg, quick_background_title = stage_quick_random_background(easy_config, current_user)
@@ -4724,6 +4726,7 @@ def process_karaoke(
     except Exception:
         remove_finished_queue_cache(cache_dir)
         raise
+    logger.info("Inclusão %s confirmada na fila: %s.", submission_id or "sem identificador", job_id)
     return {"status": "queued", "job_id": job_id, "position": position, "title": orig_name}
 
 def compress_video_for_telegram(source_path: str, destination_path: str, target_bytes: int, max_video_kbps: int = None, progress_callback=None) -> bool:

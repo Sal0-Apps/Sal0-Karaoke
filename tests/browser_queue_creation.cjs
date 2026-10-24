@@ -29,8 +29,10 @@ const activeJob = () => ({id: 'active', status: 'processing', title: 'Música em
             const fulfill = data => route.fulfill({contentType: 'application/json', body: JSON.stringify(data)});
             if (url.pathname === '/api/process') {
                 assert.equal(request.method(), 'POST');
+                const encoded = request.headers()['content-type']?.startsWith('application/x-www-form-urlencoded');
+                const fields = encoded ? Object.fromEntries(new URLSearchParams(request.postData())) : {};
                 const entry = {filename: request.postData().match(/name="audio_file"; filename="([^"]+)"/)?.[1] || 'link', body: request.postData(),
-                    submissionId: request.postData().match(/name="submission_id"\r\n\r\n([^\r\n]+)/)?.[1]};
+                    fields, encoded, submissionId: fields.submission_id || request.postData().match(/name="submission_id"\r\n\r\n([^\r\n]+)/)?.[1]};
                 assert.match(entry.submissionId, /^[a-f0-9]{32}$/);
                 assert.equal(request.headers()['x-session-token'], 'test-session');
                 pending.push(async (status = 200, body, failure = '') => {
@@ -45,7 +47,8 @@ const activeJob = () => ({id: 'active', status: 'processing', title: 'Música em
                         }
                     }
                     if (failure === 'after') return route.abort('failed');
-                    await route.fulfill({status, contentType: 'application/json', body: JSON.stringify(body)});
+                    await route.fulfill({status, contentType: typeof body === 'string' ? 'text/html' : 'application/json',
+                        body: typeof body === 'string' ? body : JSON.stringify(body)});
                 });
                 submissions.push(entry);
                 waiters.filter(waiter => submissions.length >= waiter.count).forEach(waiter => waiter.resolve());
@@ -244,8 +247,9 @@ const activeJob = () => ({id: 'active', status: 'processing', title: 'Música em
             if (mode === 'subtitle') confirmationFailures=1;
             await page.locator('#'+button).click();
             await untilSubmitted(baseline + 1); await loadingVisible();
-            assert(submissions[baseline].body.includes('name="youtube_url"'));
-            assert(submissions[baseline].body.includes('name="source_title"'), mode+' source title must be submitted');
+            assert(submissions[baseline].encoded, mode+' link must use regular form encoding');
+            assert.equal(submissions[baseline].fields.youtube_url, 'https://youtu.be/abcdefghijk');
+            assert(submissions[baseline].fields.source_title, mode+' source title must be submitted');
             await pending.shift()(200, undefined, failure);
             if (mode !== 'easy') {
                 await untilSubmitted(baseline + 2);
@@ -283,6 +287,22 @@ const activeJob = () => ({id: 'active', status: 'processing', title: 'Música em
         await page.waitForFunction(() => Boolean(window.metadataRecoveryResult));
         assert.equal(submissions[baseline].submissionId,submissions[baseline+2].submissionId);
         assert.equal(jobs.length,beforeMetadataRetry+1);
+
+        // Proxy/server errors must identify the real HTTP response, while preserving a safe retry.
+        await startNew('easy'); baseline = submissions.length;
+        await page.locator('#easyAudioFile').setInputFiles(file('server-error.wav'));
+        await page.locator('#easySubmitBtn').click();
+        await untilSubmitted(baseline+1); await pending.shift()(502, '<h1>Bad Gateway</h1>');
+        await untilSubmitted(baseline+2); await pending.shift()(502, '<h1>Bad Gateway</h1>');
+        await page.waitForFunction(() => document.getElementById('creationFeedback').textContent.includes('HTTP 502'));
+        await editorVisible('easy');
+        assert(!await page.locator('#easySubmitBtn').isDisabled());
+        assert(!(await page.locator('#creationFeedback').textContent()).includes('conexão com o servidor caiu'));
+        assert.equal(await page.locator('#easyAudioFile').evaluate(input => input.files[0].name), 'server-error.wav');
+        await page.locator('#easySubmitBtn').click();
+        await untilSubmitted(baseline+3); await pending.shift()();
+        assert.equal(submissions[baseline].submissionId, submissions[baseline+2].submissionId);
+        await page.waitForFunction(() => !clientPreparationInProgress && !queueCreationExpanded);
 
         // When the previous job finishes, the accepted next item has its own waiting view.
         await startNew('easy'); baseline = submissions.length;
