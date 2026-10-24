@@ -36,6 +36,7 @@ jobs:
           python -m compileall -q app
           python -m unittest discover -s tests -p test_queue_cache.py -v
           python -m unittest discover -s tests -p test_submission_logging.py -v
+          python -m unittest discover -s tests -p test_complete_song.py -v
           python -m unittest discover -s tests -p test_youtube_creation_flow.py -v
           python -m unittest discover -s tests -p test_youtube_revisions.py -v
           python -m unittest discover -s tests -p test_web_stack_compatibility.py -v

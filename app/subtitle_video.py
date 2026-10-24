@@ -5,6 +5,7 @@ import os
 import shutil
 import subprocess
 import tempfile
+from media_integrity import require_duration
 from pathlib import Path
 from subtitle_settings import normalize_subtitle_settings
 from media_covers import filter_path
@@ -64,9 +65,10 @@ def render_subtitle_video(source, subtitles, output, duration, runner=None, prog
             ])
             command += ['-vf', f"{base_filter},subtitles='{filter_path(caption_file)}':force_style='{style}'",
                 '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23', '-pix_fmt', 'yuv420p',
-                '-c:a', 'aac', '-b:a', '320k', '-t', str(duration), '-shortest', '-movflags', '+faststart', temporary_output]
+                '-af', 'apad', '-c:a', 'aac', '-b:a', '320k', '-t', str(duration), '-movflags', '+faststart', temporary_output]
             if not runner(command, progress_callback=progress_callback, total_duration=duration):
                 raise RuntimeError('Não foi possível criar o vídeo legendado. O SRT permanece na Biblioteca.')
+            require_duration(temporary_output, duration, kinds=('audio','video'))
             os.replace(temporary_output, output)
     finally:
         if os.path.exists(temporary_output): os.remove(temporary_output)

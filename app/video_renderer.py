@@ -8,6 +8,7 @@ from collections import deque
 from runtime_resources import available_cpu_threads, thread_environment
 from media_covers import create_video_cover, add_cover_to_command, filter_path
 from audio_processor import get_file_duration
+from media_integrity import require_duration
 
 logger = logging.getLogger("karaoke")
 
@@ -203,6 +204,9 @@ def render_karaoke_video(
 
     if use_original_video:
         logger.info(f"Configurando vídeo original como fundo: {original_video_path}")
+        # A recording can have a shorter video stream than its audio. Keep the
+        # last frame visible through the real end instead of ending the track.
+        video_filters = f"tpad=stop_mode=clone:stop_duration={duration:.3f},trim=duration={duration:.3f},setpts=PTS-STARTPTS," + video_filters
         cmd = [
             "ffmpeg",
             "-y",
@@ -280,6 +284,11 @@ def render_karaoke_video(
             output_mp4_path
         ])
         
+    output_directory = os.path.dirname(os.path.abspath(output_mp4_path))
+    temporary_output = tempfile.NamedTemporaryFile(prefix=".karaoke-", suffix=".mp4", dir=output_directory, delete=False)
+    staged_path = temporary_output.name
+    temporary_output.close()
+    cmd[-1] = staged_path
     try:
         if cover_title:
             with tempfile.TemporaryDirectory(prefix="sal0-render-cover-") as cover_dir:
@@ -290,7 +299,12 @@ def render_karaoke_video(
                 run_ffmpeg_with_logging(cmd, progress_callback=progress_callback, total_duration=duration + 3)
         else:
             run_ffmpeg_with_logging(cmd, progress_callback=progress_callback, total_duration=duration)
-        logger.info("Renderização do vídeo concluída com sucesso.")
+        require_duration(staged_path, duration + (3 if cover_title else 0), kinds=('audio', 'video'))
+        os.replace(staged_path, output_mp4_path)
+        logger.info("Renderização completa conferida: áudio e vídeo até o fim da música.")
         return output_mp4_path
     except Exception as e:
         raise RuntimeError(f"FFmpeg falhou ao renderizar o vídeo: {e}")
+    finally:
+        if os.path.exists(staged_path):
+            os.remove(staged_path)
