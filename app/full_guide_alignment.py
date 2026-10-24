@@ -231,6 +231,19 @@ def refine_confirmed_clocks(segments, aligned):
     return output, changed
 
 
+def mark_confirmed_lines(segments):
+    """Keep the complete guide's exact verse boundaries through CTC regrouping."""
+    result = copy.deepcopy(segments)
+    for index, segment in enumerate(result):
+        words = segment.get('words', [])
+        for word in words:
+            word.pop('lyric_line_start', None); word.pop('lyric_line_break', None)
+            word['lyric_line_id'] = f'known-guide:{index}'
+        if words:
+            words[0]['lyric_line_start'] = True; words[-1]['lyric_line_break'] = True
+    return result
+
+
 def alignment_lines(guide, roman):
     lines = [[word for word in line.split() if normalize_word(word)]
              for line in prepare_lyrics_guide(guide).splitlines()]

@@ -17,8 +17,8 @@ o texto e o tempo medido pelo Whisper. A ausência de uma palavra na transcriç�
 inicial deixa de impedir sua recuperação.
 
 Guias incompatíveis, versos sem confirmação ou repetições reconhecidas fora de
-uma guia incompleta mantêm o caminho de reconhecimento. Na ausência total de
-âncoras, a recuperação pelo Whisper fica limitada a gravações de até 29 segundos.
+uma guia incompleta mantêm o caminho de reconhecimento. Com menos da metade da guia reconhecida como
+âncoras, a recuperação direta pelo Whisper fica limitada a gravações de até 29 segundos.
 Confirmação humana continua acima das análises automáticas.
 
 Os caches automáticos são independentes da transcrição bruta. A política de
@@ -45,3 +45,9 @@ Atualize o servidor para `ghcr.io/sal0-apps/sal0-karaoke:12.7.4`, preservando o
 volume `/data`, portas e recursos. Use **Refazer** para recalcular resultados
 antigos. Os clientes Android e Windows atuais continuam compatíveis. A imagem
 `12.7.3` permanece disponível para retorno.
+
+Validação desta versão: 656 testes Python locais; o ensaio ampliado recuperou
+43 palavras, incluindo um verso inteiro omitido e uma repetição após sete
+segundos de silêncio, com erro mediano de início de 0,1141 s frente às anotações.
+No original de Over, foram preservadas as 290 palavras e os 56 versos da guia.
+Esses resultados descrevem os dois ensaios, sem promessa geral de precisão.

@@ -4,7 +4,7 @@ from pathlib import Path
 import sys
 import tempfile
 import unittest
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 import numpy as np
 
@@ -177,6 +177,21 @@ class CompleteGuideTests(unittest.TestCase):
         ctc[0].update(start=12., end=12.3)
         result, _ = refine_confirmed_clocks(confirmed, ctc)
         self.assertEqual(result[0]['words'][0]['start'], 1.)
+
+    def test_complete_verse_is_not_split_by_other_short_lines_in_the_same_guide(self):
+        lines = ['Luz acesa', 'Luz acesa quando eu voltar', 'quando eu voltar']
+        confirmed = []
+        offset = 0
+        for index, line in enumerate(lines):
+            words = verse(line, 1+index*4)
+            for word in words:
+                word.update(guide_token_index=offset, guide_audio_confirmed=True); offset += 1
+            confirmed.append(dict(start=words[0]['start'], end=words[-1]['end'], words=words,
+                                  guide_audio_confirmed=True))
+        with patch.dict('os.environ', {'KARAOKE_ALIGNMENT': 'off'}):
+            result, _ = refine_lyrics(self.source, confirmed, '\n'.join(lines), self.root,
+                                     decode=lambda _: self.audio)
+        self.assertEqual([segment['text'] for segment in result], lines)
 
 
 if __name__ == '__main__':

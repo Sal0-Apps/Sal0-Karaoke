@@ -24,7 +24,7 @@ from karaoke_generator import split_and_wrap_segments
 from whisper_audio import load_whisper_audio
 import process_manager as pm
 from runtime_resources import available_cpu_threads, release_cached_whisper
-from full_guide_alignment import alignment_lines, refine_confirmed_clocks
+from full_guide_alignment import alignment_lines, refine_confirmed_clocks, mark_confirmed_lines
 
 logger = logging.getLogger('karaoke')
 QUALITY_VERSION = 7
@@ -550,6 +550,8 @@ def refine_lyrics(audio_path, segments, guide, cache_dir, context=None, progress
     audio=(decode or load_whisper_audio)(audio_path)
     evidence=AudioEvidence(audio)
     confirmed = bool(segments) and all(segment.get('guide_audio_confirmed') for segment in segments)
+    if confirmed:
+        segments = mark_confirmed_lines(segments)
     cleaned,report=clean_segments(segments,evidence)
     cleaned=coalesce_repetition_windows(cleaned, guide)
     # Regrouping is an acoustic/memory boundary, not a boundary in the lyrics.
@@ -673,7 +675,10 @@ def refine_lyrics(audio_path, segments, guide, cache_dir, context=None, progress
     # Missing/quiet voice can yield an empty result; never restore hallucinated text.
     report['discarded_words']=report['silent_or_invalid_words']+report['unsupported_voice_words']+report['repeated_words']
     if guide:
-        final, report['guide_verses'] = apply_guide_boundaries(guide, final)
+        if confirmed:
+            report['guide_verses'] = len(segments)
+        else:
+            final, report['guide_verses'] = apply_guide_boundaries(guide, final)
         final = split_and_wrap_segments(final)
     temporary=target.with_suffix('.json.tmp')
     try:

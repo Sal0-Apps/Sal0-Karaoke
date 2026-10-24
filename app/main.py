@@ -6107,7 +6107,7 @@ def run_pipeline(
                     timing=(f'{quality_report["aligned_words"]} palavras alinhadas · {quality_report.get("discarded_words", 0)} sem apoio removidas' if quality_report["aligned_words"] else "Tempos do Whisper · silêncio conferido"))
                 if quality_report.get("guide_aligned_words"):
                     update_process_summary(lyrics=(f'Guia + voz · {quality_report["guide_aligned_words"]} palavras da guia alinhadas'
-                        f' · {quality_report["recovered_words"]} palavras recuperadas'),
+                        + (f' · {quality_report["recovered_words"]} palavras recuperadas' if quality_report["recovered_words"] else '')),
                         lyrics_review={"status": "aligned", **{key: quality_report[key] for key in
                             ("guide_total_words", "guide_aligned_words", "recovered_words", "guide_rejected_lines")}})
                 if quality_report["status"] == "fallback":
