@@ -62,7 +62,8 @@ const srtDefaults = {text_color:'#FFFFFF',box_color:'#000000',box_opacity:65,fon
         await page.goto('http://karaoke.test');
         await page.waitForFunction(()=>currentUser?.username==='owner'&&Boolean(window.attachLyricDraft));
         await page.locator('#processCard').waitFor({state:'visible'});
-        const field=(body,name)=>body.match(new RegExp('name="'+name+'"\\r?\\n\\r?\\n([^\\r\\n]*)'))?.[1]||'';
+        const field=(body,name)=>body.startsWith('--') ? body.match(new RegExp('name="'+name+'"\\r?\\n\\r?\\n([^\\r\\n]*)'))?.[1]||''
+            : new URLSearchParams(body).get(name)||'';
         const newItem=async mode=>{
             await page.locator('#btnToggleQueueCreation').click();
             await page.locator('#btnCreator'+({advanced:'Advanced',easy:'Easy',subtitle:'Subtitle'})[mode]).click();

@@ -1,3 +1,11 @@
+# 12.7.5
+
+- Links e configurações sem arquivos passam a usar formulário simples. Uploads continuam com envio multipart e confirmação pelo mesmo identificador, sem duplicar tarefas nas tentativas.
+- Novas origens entram no cache privado da tarefa sem esperar a recuperação ou a cópia do cache legado. O download acontece no worker após a confirmação persistente da fila. Use **Refazer** para reaproveitar uma execução anterior.
+- Falhas HTTP, respostas sem confirmação e tempo esgotado deixam de aparecer como a mesma queda de conexão. As escolhas e o identificador da tentativa ficam disponíveis para repetir o envio.
+- Os registros mostram a chegada de cada pedido antes da leitura do formulário, a preparação, a confirmação e o status HTTP, sem incluir sessão, endereço do vídeo ou letra.
+- Testes em navegador real e servidor HTTP cobrem primeira música em fila vazia, primeira após excluir a fila, cache ocupado, guia com repetições e nova tentativa sem duplicação. [Detalhes e limites](docs/ATUALIZACAO_12_7_5.md).
+
 # 12.7.4
 
 - A letra completa passa a ser alvo do alinhamento de áudio/texto do Whisper escolhido. Recupera palavras e versos omitidos, mantendo cada ocorrência dos refrões, com tempos medidos nesta gravação.

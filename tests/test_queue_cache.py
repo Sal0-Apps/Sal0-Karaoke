@@ -75,7 +75,7 @@ class QueueCacheTests(unittest.TestCase):
         self.client=TestClient(app);self.addCleanup(self.client.close)
         self.queue=self.scope['processing_queue']
 
-    def paths(self,user):
+    def paths(self,user, **kwargs):
         base=self.root/user['username'];paths={key:str(base/key) for key in ('cache','library','output')}
         for path in paths.values(): Path(path).mkdir(parents=True,exist_ok=True)
         for name in ('history','videos','photos'): (base/'library'/name).mkdir(exist_ok=True)
@@ -409,6 +409,32 @@ class QueueCacheTests(unittest.TestCase):
         a=self.job('A');options=self.client.get('/api/queue-cache/A').json()['options']
         self.assertEqual(options['lyrics_mode'],'manual');self.assertEqual(options['lyrics_text'],'Guia A')
         self.assertFalse(any(key.endswith('_dir') or key in {'owner_user','input_audio_path'} for key in options))
+
+    def test_new_youtube_link_does_not_wait_for_another_jobs_cache_promotion(self):
+        self.job('active', 'processing')
+        self.scope.update(USER_DATA_ROOT=str(self.root), user_storage_key=lambda name: name)
+        tree = ast.parse((ROOT/'app/main.py').read_text())
+        paths = next(node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name == 'get_user_paths')
+        exec(compile(ast.Module(body=[paths], type_ignores=[]), 'user-paths', 'exec'), self.scope)
+        # The old directory may have been renamed while a promotion owns the lock.
+        legacy = self.root/'alice'/'cache'
+        previous = Path(str(legacy) + '.previous')
+        legacy.rename(previous)
+        legacy_lock = self.scope['legacy_cache_promotion_lock']
+        data = {'youtube_url': 'https://youtu.be/abcdefghijk', 'submission_id': 'b'*32}
+        with self.client, ThreadPoolExecutor(max_workers=1) as pool:
+            legacy_lock.acquire()
+            try:
+                request = pool.submit(self.client.post, '/api/process', data=data)
+                response = request.result(timeout=1)
+                self.assertEqual(response.status_code, 200, response.text)
+                receipt = self.client.get('/api/queue/submissions/' + 'b'*32)
+                self.assertEqual(receipt.status_code, 200, receipt.text)
+                self.assertEqual(receipt.json()['job_id'], response.json()['job_id'])
+                self.assertFalse(legacy.exists(), 'A fresh source must not interfere with the cache swap')
+                self.assertTrue(previous.is_dir())
+            finally:
+                legacy_lock.release()
 
     def test_youtube_submission_is_persisted_without_downloading_or_notifying(self):
         self.scope['download_youtube'] = Mock(side_effect=AssertionError('The request must not download'))

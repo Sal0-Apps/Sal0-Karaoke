@@ -3014,7 +3014,7 @@
                 </ol>
                 <p>A API tem cota gratuita e pode limitar projetos sem auditoria a vídeos privados. Guarde a autorização como uma senha. Backing vocals e vídeo do modo SRT mostram porcentagem da etapa e avisam o avanço no Telegram; o LibreTranslate informa apenas início e término.</p>
             </details>
-            <p class="compact-note">Versão do servidor: 12.7.4. A transcrição é local; fontes, modelos e integrações podem acessar serviços externos. Use conteúdo autorizado.</p>
+            <p class="compact-note">Versão do servidor: 12.7.5. A transcrição é local; fontes, modelos e integrações podem acessar serviços externos. Use conteúdo autorizado.</p>
             <p class="compact-note">Use o servidor pela rede local ou VPN. A busca/importação do YouTube não concede direitos sobre a mídia. OAuth autoriza o acesso ao canal, não o uso de músicas. Confira as permissões do conteúdo e os termos do YouTube antes de importar ou publicar. Não listado permite acesso a quem tiver o link; resultados SRT nunca vão ao YouTube.</p>
             <p class="compact-note"><a href="https://www.youtube.com/static?template=terms" target="_blank" rel="noopener noreferrer">Termos do YouTube</a> · <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer">Privacidade do Google</a> · <a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener noreferrer">Revogar acesso ao canal</a></p>
         </div>
@@ -4470,8 +4470,25 @@
 
         const pendingProcessSubmissions = new Map();
 
+        function processRequestOptions(formData) {
+            // A link and its settings have no binary payload. Use the regular
+            // form encoding; only actual uploads need multipart boundaries.
+            const entries = Array.from(formData.entries());
+            const hasUploads = entries.some(([, value]) => value instanceof File && (value.name || value.size));
+            const body = hasUploads ? formData : new URLSearchParams(entries.filter(([, value]) => !(value instanceof File)));
+            return {method: 'POST', body, headers: {'x-submission-id': formData.get('submission_id') || ''}};
+        }
+
+        function processResponseDetail(response, result) {
+            const detail = typeof result.detail === 'string' ? result.detail : Array.isArray(result.detail)
+                ? result.detail.map(item => item.msg).filter(Boolean).join('; ') : '';
+            if (!response.ok) return detail || `O servidor recusou a inclusão (HTTP ${response.status}). Tente novamente; se persistir, consulte os registros do servidor.`;
+            return 'O servidor respondeu sem confirmar a inclusão na fila.';
+        }
+
         async function submitProcessWithConfirmation(formData) {
-            const signature = JSON.stringify([currentUser?.username, Array.from(formData.entries()).filter(([key]) => !['submission_id', 'source_title'].includes(key))
+            const signature = JSON.stringify([currentUser?.username, Array.from(formData.entries()).filter(([key, value]) => !['submission_id', 'source_title'].includes(key)
+                && !(value instanceof File && !value.name && !value.size))
                 .map(([key, value]) => [key, value instanceof File
                     ? [value.name, value.size, value.lastModified] : value])]);
             let submissionId = pendingProcessSubmissions.get(signature);
@@ -4485,12 +4502,12 @@
             let failureDetail = '';
             for (let attempt = 0; attempt < 2; attempt++) {
                 try {
-                    const response = await timedAuthFetch('/api/process', {method: 'POST', body: formData}, timeoutMs);
-                    const result = await response.json().catch(() => ({}));
-                    if (!response.ok) failureDetail = result.detail || '';
+                    const response = await timedAuthFetch('/api/process', processRequestOptions(formData), timeoutMs);
+                    const result = (await response.json().catch(() => null)) || {};
+                    failureDetail = processResponseDetail(response, result);
                     if (!response.ok && response.status < 500) {
                         pendingProcessSubmissions.delete(signature);
-                        const error = new Error(result.detail || 'Não foi possível adicionar à fila.');
+                        const error = new Error(failureDetail);
                         error.confirmedFailure = true;
                         throw error;
                     }
@@ -4500,6 +4517,8 @@
                     }
                 } catch (error) {
                     if (error.confirmedFailure) throw error;
+                    failureDetail = error.name === 'AbortError' ? 'O servidor demorou para responder ao pedido de inclusão.'
+                        : 'A resposta ao pedido de inclusão não chegou ao app.';
                 }
                 document.getElementById('creationLoadingDetail').textContent = 'Reconectando e conferindo a inclusão na fila…';
                 try {
@@ -4511,7 +4530,7 @@
                     }
                 } catch (error) { /* Retry with the same identifier; the server accepts it only once. */ }
             }
-            throw new Error(failureDetail || 'A conexão com o servidor caiu e não foi possível confirmar a inclusão. Confira a fila. Ao tentar novamente com as mesmas escolhas, o item será confirmado sem duplicação.');
+            throw new Error(`${failureDetail} Ainda não foi possível confirmar a inclusão. Suas escolhas foram mantidas. Toque novamente no botão de criar para conferir e tentar com o mesmo identificador, sem duplicar o item.`);
         }
 
         async function submitProcessBatch(baseFormData, audioFiles = [], inputId = '') {

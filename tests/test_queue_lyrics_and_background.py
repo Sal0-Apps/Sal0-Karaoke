@@ -62,7 +62,7 @@ class QueueLyricsTests(unittest.TestCase):
         submit=load_function('process_karaoke', Form=lambda value:value, File=lambda value:value, UploadFile=object,
             youtube_publisher=SimpleNamespace(publication_options=lambda *args:None),ensure_processing_queue_access=Mock(),ensure_processing_queue_capacity=Mock(),
             normalize_translation_language=lambda x:x,SUPPORTED_TARGET_LANGUAGES={'original','pt-BR'},
-            get_user_paths=lambda _:paths,uuid=uuid,os=os,json=json,shutil=shutil,time=time,
+            get_user_paths=lambda _, **kwargs:paths,uuid=uuid,os=os,json=json,shutil=shutil,time=time,
             PROCESSING_QUEUE_ROOT=str(root/'jobs'),enqueue_processing_job=enqueue,
             load_easy_mode_config=lambda:normalize({'background_mode':'original'}),
             SUBTITLE_MODE_FILE=str(root/'srt.json'),load_subtitle_settings=load_subtitle_settings,
