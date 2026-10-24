@@ -4487,7 +4487,8 @@
         }
 
         async function submitProcessWithConfirmation(formData) {
-            const signature = JSON.stringify([currentUser?.username, Array.from(formData.entries()).filter(([key]) => !['submission_id', 'source_title'].includes(key))
+            const signature = JSON.stringify([currentUser?.username, Array.from(formData.entries()).filter(([key, value]) => !['submission_id', 'source_title'].includes(key)
+                && !(value instanceof File && !value.name && !value.size))
                 .map(([key, value]) => [key, value instanceof File
                     ? [value.name, value.size, value.lastModified] : value])]);
             let submissionId = pendingProcessSubmissions.get(signature);

@@ -266,12 +266,13 @@ const activeJob = () => ({id: 'active', status: 'processing', title: 'Música em
         }
         serverStatus=processing();await refresh();
 
-        // A title arriving after an uncertain response is display metadata, not a different creation.
+        // A late title or a new empty file placeholder must not create a different submission.
         baseline=submissions.length;
         const beforeMetadataRetry=jobs.length;
         confirmationFailures=2;
         await page.evaluate(() => {
             const form=new FormData();form.set('youtube_url','https://youtu.be/abcdefghijk');form.set('source_title','Video do YouTube');
+            form.set('bg_file',new File([], '', {lastModified:1}));
             window.metadataRecoveryError='';
             submitProcessWithConfirmation(form).catch(error => {window.metadataRecoveryError=error.message;});
         });
@@ -280,6 +281,7 @@ const activeJob = () => ({id: 'active', status: 'processing', title: 'Música em
         await page.waitForFunction(() => Boolean(window.metadataRecoveryError));
         await page.evaluate(() => {
             const form=new FormData();form.set('youtube_url','https://youtu.be/abcdefghijk');form.set('source_title','Artista - Titulo identificado');
+            form.set('bg_file',new File([], '', {lastModified:2}));
             window.metadataRecoveryResult=null;
             submitProcessWithConfirmation(form).then(result => {window.metadataRecoveryResult=result;});
         });
