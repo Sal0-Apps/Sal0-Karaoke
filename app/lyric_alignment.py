@@ -24,9 +24,10 @@ from karaoke_generator import split_and_wrap_segments
 from whisper_audio import load_whisper_audio
 import process_manager as pm
 from runtime_resources import available_cpu_threads, release_cached_whisper
+from full_guide_alignment import alignment_lines, refine_confirmed_clocks
 
 logger = logging.getLogger('karaoke')
-QUALITY_VERSION = 6
+QUALITY_VERSION = 7
 SAMPLE_RATE = 16000
 MODEL_URL = 'https://dl.fbaipublicfiles.com/mms/torchaudio/ctc_alignment_mling_uroman/model.pt'
 MODEL_DIR = '/data/output/models/lyric_alignment'
@@ -374,13 +375,69 @@ class MMSAligner:
         self.cancel()
         return emission[0].cpu(),len(audio)/SAMPLE_RATE
 
+    def full_emission(self, audio, progress):
+        """Infer bounded windows, retaining each frame's original media clock.
+
+        Attention sees at most 18 seconds, even for a complete song. One second
+        of context on either side avoids treating a window edge as a vocal gap.
+        Only the small posterior matrices survive between inference windows.
+        """
+        frames, centers = [], []
+        core, margin = 16*SAMPLE_RATE, SAMPLE_RATE
+        for start in range(0, len(audio), core):
+            self.cancel()
+            end = min(start + core, len(audio))
+            left, right = max(0, start-margin), min(len(audio), end+margin)
+            values, duration = self.emission(audio[left:right])
+            ratio = duration / values.size(0)
+            clocks = (np.arange(values.size(0)) + .5)*ratio + left/SAMPLE_RATE
+            selected = (clocks >= start/SAMPLE_RATE) & (clocks < end/SAMPLE_RATE)
+            frames.append(values[selected])
+            centers.extend(clocks[selected])
+            progress(round(end/max(1, len(audio))*75),
+                     f'Analisando a letra completa na voz: {end/SAMPLE_RATE:.0f} de {len(audio)/SAMPLE_RATE:.0f} s…')
+        values = self.torch.cat(frames)
+        centers = np.asarray(centers)
+        edges = np.concatenate(([0.], (centers[:-1]+centers[1:])/2, [len(audio)/SAMPLE_RATE]))
+        return values, edges
+
     def align(self, emission, words):
-        values,duration=emission
+        values,timeline=emission
         normalized=[roman_word(word) for word in words]
         if any(not word for word in normalized):
             return None
         spans=self.aligner(values,self.tokenizer(normalized))
-        ratio=duration/values.size(0);aligned=[]
+        return self._words_from_spans(words, spans, values.size(0), timeline)
+
+    def align_guide(self, emission, lines):
+        """Align every printed occurrence, allowing untranscribed audio between lines."""
+        values, timeline = emission
+        tokens, visible, words = [[values.size(1)]], [], []
+        for line in lines:
+            normalized = [roman_word(word) for word in line]
+            if any(not word for word in normalized):
+                return None
+            for word, encoded in zip(line, self.tokenizer(normalized)):
+                visible.append(len(tokens)); tokens.append(encoded); words.append(word)
+            tokens.append([values.size(1)])
+        flattened = [token for word in tokens for token in word]
+        minimum_frames = len(flattened)+sum(a == b for a, b in zip(flattened, flattened[1:]))
+        if minimum_frames > values.size(0) or len(flattened)*values.size(0) > 120_000_000:
+            return None  # Bound the CTC backtracking allocation as well as attention.
+        self.cancel()
+        with self.torch.inference_mode():
+            scores = self.torch.cat((values, values.new_zeros((values.size(0), 1))), dim=1)
+            spans = self.aligner(scores, tokens)
+        self.cancel()
+        return self._words_from_spans(words, [spans[i] for i in visible], values.size(0), timeline)
+
+    @staticmethod
+    def _words_from_spans(words, spans, frame_count, timeline):
+        if np.isscalar(timeline):
+            clock = lambda frame: frame*float(timeline)/frame_count
+        else:
+            clock = lambda frame: float(timeline[frame])
+        aligned=[]
         for text,tokens in zip(words,spans):
             if not tokens:return None
             score=sum(float(t.score)*len(t) for t in tokens)/sum(len(t) for t in tokens)
@@ -392,10 +449,10 @@ class MMSAligner:
                     chars.append(dict(text=char));continue
                 count=len(encoded);selected=tokens[cursor:cursor+count];cursor+=count
                 if len(selected)!=count:return None
-                chars.append(dict(text=char,start=selected[0].start*ratio,end=selected[-1].end*ratio))
+                chars.append(dict(text=char,start=clock(selected[0].start),end=clock(selected[-1].end)))
             if cursor!=len(tokens):return None
-            aligned.append(dict(word=' '+str(text).strip(),start=tokens[0].start*ratio,
-                                end=tokens[-1].end*ratio,alignment_score=score,alignment_chars=chars))
+            aligned.append(dict(word=' '+str(text).strip(),start=clock(tokens[0].start),
+                                end=clock(tokens[-1].end),alignment_score=score,alignment_chars=chars))
         return aligned
 
     def sequence_score(self, emission, words):
@@ -492,6 +549,7 @@ def refine_lyrics(audio_path, segments, guide, cache_dir, context=None, progress
     progress(0,'Verificando voz e silêncio sem cortar a linha do tempo…')
     audio=(decode or load_whisper_audio)(audio_path)
     evidence=AudioEvidence(audio)
+    confirmed = bool(segments) and all(segment.get('guide_audio_confirmed') for segment in segments)
     cleaned,report=clean_segments(segments,evidence)
     cleaned=coalesce_repetition_windows(cleaned, guide)
     # Regrouping is an acoustic/memory boundary, not a boundary in the lyrics.
@@ -503,13 +561,31 @@ def refine_lyrics(audio_path, segments, guide, cache_dir, context=None, progress
     report.update(version=QUALITY_VERSION,status='cleaned',aligned_words=0,guide_changes=0,unsupported_voice_words=0,
                   repeated_words=0,guide_verses=0,
                   rejected_groups=0,source=os.path.basename(str(audio_path)))
-    backend=None;result=[]
+    backend=None;result=[];song_emission=None;guide_alignment=None
+    complete_lines = alignment_lines(guide, roman_word)
     try:
         eligible=any(segment['end']-segment['start']<=19.1 and all(roman_word(w['word']) for w in segment['words']) for segment in cleaned)
         if eligible and os.getenv('KARAOKE_ALIGNMENT','mms').lower() not in {'off','0','false'}:
             backend=(backend_factory or MMSAligner)(progress,cancel)
             if voice_regions is None and backend_factory is None:
                 voice_regions=detect_voice_regions(audio)
+            if confirmed and complete_lines and callable(getattr(backend, 'full_emission', None)):
+                try:
+                    song_emission = backend.full_emission(audio, progress)
+                    progress(76, 'Localizando todos os versos e refrões da letra-guia no canto…')
+                    guide_alignment = backend.align_guide(song_emission, complete_lines)
+                except InterruptedError:
+                    raise
+                except Exception:
+                    logger.exception('A análise da guia completa falhou; mantendo o alinhamento local.')
+                    report['retryable_failures'] = report.get('retryable_failures', 0)+1
+        if confirmed:
+            refined, report['ctc_refined_words'] = refine_confirmed_clocks(segments, guide_alignment)
+            result = [word for segment in refined for word in segment['words']]
+            report['aligned_words'] = len(result)
+            # Whisper has independently aligned this complete transcript. A
+            # speech VAD miss or a weak singing phoneme cannot delete its text.
+            cleaned = []
         for index,segment in enumerate(cleaned):
             cancel();original=segment['words'];selected=copy.deepcopy(original)
             candidate = contextual_candidate[word_offset:word_offset+len(original)] if contextual_candidate else None

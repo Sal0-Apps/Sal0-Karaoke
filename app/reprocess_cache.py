@@ -48,7 +48,7 @@ def copy_reusable_inputs(source, destination, youtube_url=None):
     allowed = {'aligned_lyrics.json', 'display_segments.json', 'cache_meta.json', 'original_converted.wav', 'vocals.wav',
                'instrumental.wav', 'transcribed_segments.json', 'lead_vocals.wav',
                'backing_vocals.wav', 'backing_model_version.txt',
-               'synced_acoustic_segments.json', 'whisper_cache_meta.json', 'lyrics_guide_cache.json',
+               'synced_acoustic_segments.json', 'whisper_cache_meta.json', 'lyrics_guide_cache.json', 'guided_whisper_lyrics.json',
                'subtitle_segments_original.json', 'subtitle_info_original.json'}
     os.makedirs(destination, exist_ok=True)
     for name in os.listdir(source):

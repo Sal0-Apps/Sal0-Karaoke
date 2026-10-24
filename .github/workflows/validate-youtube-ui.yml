@@ -45,6 +45,7 @@ jobs:
           python -m unittest discover -s tests -p test_lyric_pipeline_recovery.py -v
           python -m unittest discover -s tests -p test_guided_silence_render.py -v
           python -m unittest discover -s tests -p test_lyric_alignment.py -v
+          python -m unittest discover -s tests -p test_full_guide_alignment.py -v
           python -m unittest discover -s tests -p test_youtube_connection_feedback.py -v
           python -m unittest discover -s tests -p test_youtube_publisher.py -v
           python -m unittest discover -s tests -p test_youtube_device_auth.py -v

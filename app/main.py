@@ -63,6 +63,7 @@ from processing_validation import validate_processing_options, validate_review_s
 import queue_cache
 import queue_submissions
 from lyric_alignment import refine_lyrics, acoustic_baseline
+from full_guide_alignment import align_guide_with_whisper
 
 # Configurar logs
 logging.basicConfig(
@@ -6026,9 +6027,11 @@ def run_pipeline(
 
             pm.check_cancelled()
 
-            if not segments:
-                raise ValueError("Nenhum vocal detectado ou transcrição vazia. A letra-guia não substitui a análise da voz.")
-            require_acoustic_word_timing(segments)
+            if not segments and not lyrics_text:
+                raise ValueError("Nenhum vocal detectado ou transcrição vazia. Confira a fonte de voz ou forneça a letra-guia completa.")
+            segments = segments or []
+            if segments:
+                require_acoustic_word_timing(segments)
             save_stage_checkpoint(cache_dir, "transcription_ready", "transcrição do Whisper concluída", 74)
 
             draft = queue_cache.read_draft(cache_dir)
@@ -6039,7 +6042,7 @@ def run_pipeline(
                     if isinstance(reviewed, list) and reviewed:
                         draft = reviewed
 
-            if lyrics_text and not draft:
+            if lyrics_text and segments and not draft:
                 update_state("processing", "Checking lyrics guide", 74, stage_progress=0,
                              stage_detail="Conferindo todas as palavras reconhecidas com a letra-guia")
 
@@ -6069,11 +6072,11 @@ def run_pipeline(
                     for key in ("status", "checked_words", "verified_words", "corrected_words",
                                 "unmatched_words", "missing_guide_words", "retry_attempted", "retry_selected")})
                 update_state("processing", "Checking lyrics guide", 74, stage_progress=100, stage_detail=detail)
-                logger.info("Conferência da letra-guia: %s. Todos os tempos vêm do Whisper.", detail)
+                logger.info("Conferência inicial da letra-guia: %s. A voz será alinhada com a guia completa.", detail)
             pm.check_cancelled()
 
             if not draft:
-                if lyrics_text:
+                if lyrics_text and segments:
                     segments = acoustic_baseline(segments, guide_report["checks"])
                 def publish_alignment_progress(percent, detail):
                     phase = ("Downloading timing model" if detail.startswith("Baixando alinhador") else
@@ -6081,11 +6084,32 @@ def run_pipeline(
                     overall = 74 if phase != "Aligning lyrics with voice" else 74 + round(percent*.03)
                     update_state("processing", phase, overall,
                                  stage_progress=percent, stage_detail=detail)
+                guided_report = {}
+                if lyrics_text:
+                    try:
+                        guided_segments, guided_report = align_guide_with_whisper(transcribe_audio,
+                            segments, lyrics_text, cache_dir, whisper_model,
+                            context={key: cached_meta.get(key) for key in ("audio_hash", "transcribe_source")},
+                            progress=publish_alignment_progress, cancel=pm.check_cancelled)
+                        if guided_report.get("status") == "aligned":
+                            segments = guided_segments
+                    except InterruptedError:
+                        raise
+                    except Exception:
+                        logger.exception("A conferência da guia pelo Whisper falhou; mantendo a análise acústica disponível.")
                 segments, quality_report = refine_lyrics(vocals_wav, segments, lyrics_text, cache_dir,
                     context={key: cached_meta.get(key) for key in ("audio_hash", "vocal_source", "lyrics_clock_hash")},
                     progress=publish_alignment_progress, cancel=pm.check_cancelled)
+                if guided_report.get("status") == "aligned":
+                    quality_report.update({key: guided_report[key] for key in
+                        ("guide_total_words", "guide_aligned_words", "recovered_words", "guide_rejected_lines")})
                 update_process_summary(lyric_quality=quality_report,
                     timing=(f'{quality_report["aligned_words"]} palavras alinhadas · {quality_report.get("discarded_words", 0)} sem apoio removidas' if quality_report["aligned_words"] else "Tempos do Whisper · silêncio conferido"))
+                if quality_report.get("guide_aligned_words"):
+                    update_process_summary(lyrics=(f'Guia + voz · {quality_report["guide_aligned_words"]} palavras da guia alinhadas'
+                        f' · {quality_report["recovered_words"]} palavras recuperadas'),
+                        lyrics_review={"status": "aligned", **{key: quality_report[key] for key in
+                            ("guide_total_words", "guide_aligned_words", "recovered_words", "guide_rejected_lines")}})
                 if quality_report["status"] == "fallback":
                     update_process_summary(timing="Alinhador indisponível · tempos do Whisper e silêncio conferido")
                 if not segments:

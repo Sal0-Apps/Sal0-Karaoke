@@ -27,7 +27,7 @@ from lyric_alignment import acoustic_baseline
 
 
 class SyncedAcousticAnimationTests(unittest.TestCase):
-    def run_stage(self, cache_version=None, verses=None, voice=None, reprocess=False, timing="auto", source_mode="vocals", backing_enabled=False, backing_volume=100, audio_cache_version=4, reviewed=None):
+    def run_stage(self, cache_version=None, verses=None, voice=None, reprocess=False, timing="auto", source_mode="vocals", backing_enabled=False, backing_volume=100, audio_cache_version=4, reviewed=None, aligned=None):
         source = (ROOT / 'app/main.py').read_text()
         stage = source[source.index('            segments = None\n', source.index('# Passo 3: Transcrever vocais')):
                        source.index('            # --- NOVO: Passo de Pausa')]
@@ -52,7 +52,8 @@ class SyncedAcousticAnimationTests(unittest.TestCase):
                         lyrics_hint_hash=hashlib.sha256(' '.join(lyric_text.split()).encode()).hexdigest())
             transcriber = Mock(return_value=acoustic)
             scope = dict(acoustic_baseline=acoustic_baseline,
-                refine_lyrics=Mock(side_effect=lambda audio,segments,*args,**kwargs:(segments,{'status':'cleaned','aligned_words':0})),
+                align_guide_with_whisper=Mock(side_effect=lambda audio,segments,*args,**kwargs:(segments,{'status':'unconfirmed'})),
+                refine_lyrics=Mock(side_effect=lambda audio,segments,*args,**kwargs:(aligned if aligned is not None else segments,{'status':'cleaned','aligned_words':0})),
                 queue_cache=__import__("queue_cache"), os=os, hashlib=hashlib, json=json, synced_segments=lrc,
                 lyrics_text=lyric_text, cache_dir=folder, cached_meta=meta,
                 prepare_lyrics_guide=prepare_lyrics_guide, review_lyrics_with_whisper=review_lyrics_with_whisper,
@@ -174,9 +175,17 @@ class SyncedAcousticAnimationTests(unittest.TestCase):
                 self.assertTrue(scope['guide_report']['retry_attempted'])
                 self.assertNotIn('lindo', output)
 
-    def test_empty_local_recognition_cannot_render_the_guide_instead(self):
-        with self.assertRaisesRegex(ValueError, 'Nenhum vocal detectado'):
+    def test_empty_recognition_and_no_acoustic_recovery_cannot_render_the_guide(self):
+        with self.assertRaisesRegex(ValueError, 'Nenhuma palavra com apoio no áudio'):
             self.run_stage(voice=[])
+
+    def test_empty_whisper_can_use_guide_words_with_measured_acoustic_clocks(self):
+        recovered = [dict(start=10.2, end=12.5, text='Olá mundo', words=[
+            dict(word=' Olá', start=10.2, end=10.5), dict(word=' mundo', start=11.6, end=12.5)])]
+        scope, transcriber = self.run_stage(voice=[], aligned=recovered)
+        transcriber.assert_called_once()
+        self.assertEqual(scope['refine_lyrics'].call_args.args[1:3], ([], 'Olá mundo'))
+        self.assertEqual(scope['segments'], recovered)
 
     def test_original_source_is_respected_with_backing_enabled_at_any_gain(self):
         for gain in (0, 100):

@@ -1838,8 +1838,8 @@
 
                         <div class="quick-extra-audio">
                             <label for="easyLyricsTiming">Como sincronizar a letra</label>
-                            <select id="easyLyricsTiming" class="select-input" disabled aria-describedby="easyLyricsPolicy"><option value="acoustic">Letra-guia para conferência</option></select>
-                            <p id="easyLyricsPolicy" class="compact-note">A guia ajuda a conferir palavras parecidas com a voz. Os versos permanecem completos e os tempos seguem a gravação; diferenças incertas ficam disponíveis para revisão.</p>
+                            <select id="easyLyricsTiming" class="select-input" disabled aria-describedby="easyLyricsPolicy"><option value="acoustic">Alinhar a letra com a voz</option></select>
+                            <p id="easyLyricsPolicy" class="compact-note">Use a letra completa, incluindo os refrões. O alinhamento busca os versos na voz e recupera palavras omitidas; os tempos seguem esta gravação.</p>
                             <label for="easyKeepBackingVocals">Vozes de apoio</label>
                             <select id="easyKeepBackingVocals" class="select-input"><option value="true">Manter vozes de apoio; retirar a voz principal</option><option value="false">Retirar todas as vozes</option></select>
                             <label for="easyBackingVolume">Volume das vozes de apoio (%)</label>
@@ -2035,9 +2035,9 @@
                             </div>
                             <label for="lyricsTiming" class="compact-note">Fonte da letra e sincronização</label>
                             <select id="lyricsTiming" name="lyrics_timing" class="select-input" disabled>
-                                <option value="acoustic">Letra-guia para conferência</option>
+                                <option value="acoustic">Alinhar a letra com a voz</option>
                             </select>
-                            <p class="compact-note">A guia confere palavras parecidas no contexto. Substituições exigem apoio no áudio; diferenças incertas ficam para revisão, preservando a frase. Os horários da LRC não deslocam a gravação.</p>
+                            <p class="compact-note">Use a letra completa, incluindo todas as repetições. O alinhamento busca os versos no áudio, recupera palavras omitidas e confere os tempos com a voz. Os horários da LRC não deslocam a gravação.</p>
                             <p id="lyricsSourceLabel" class="compact-note" aria-live="polite">Selecione a música para vincular uma letra.</p>
                             <p id="lyricsModeHint" style="font-size: 0.7rem; color: var(--text-muted); margin: 0.35rem 0 0.45rem;">A letra é uma guia. Texto manual sempre tem prioridade.</p>
                             <textarea id="lyricsText" name="lyrics_text" placeholder="Cole ou edite a letra aqui..." class="input-text" style="height: 72px; resize: vertical; background: var(--input-bg); border: 1px solid var(--glass-border);"></textarea>
@@ -2924,7 +2924,7 @@
                     <li>Abra <strong>Letra</strong> para buscar ou colar uma letra-guia. O texto manual tem prioridade; se não houver letra, a transcrição usa o Whisper.</li>
                     <li>Defina o fundo e a animação: sílabas, palavras, linhas ou frase estática.</li>
                     <li>Em <strong>Vozes de apoio</strong>, mantenha ou desative os backing vocals e ajuste seu volume. A opção usa uma segunda separação local da voz principal.</li>
-                    <li>A letra-guia confere palavras e frases parecidas. Substituições são confrontadas com o áudio; divergências incertas ficam para revisão, preservando o trecho reconhecido. Horários de LRC não posicionam o canto.</li>
+                    <li>A letra completa é alinhada com a voz pelo Whisper escolhido. Inclua os refrões e repetições; palavras e versos omitidos podem ser recuperados. Uma guia incompatível mantém a análise do reconhecimento. Horários de LRC não posicionam o canto.</li>
                     <li>Em <strong>Mais ajustes</strong>, altere cor, tamanho, posição, limites dos versos, prévia da próxima frase, VAD e fonte da transcrição. Você também pode salvar um perfil e habilitar somente a remoção de vocais.</li>
                     <li>Ative a revisão para conferir diferenças e corrigir texto e tempos antes de finalizar. Os versos mantêm a exibição contínua da 12.7; pequenas pausas entre palavras não fazem a legenda piscar.</li>
                 </ol>
@@ -3014,7 +3014,7 @@
                 </ol>
                 <p>A API tem cota gratuita e pode limitar projetos sem auditoria a vídeos privados. Guarde a autorização como uma senha. Backing vocals e vídeo do modo SRT mostram porcentagem da etapa e avisam o avanço no Telegram; o LibreTranslate informa apenas início e término.</p>
             </details>
-            <p class="compact-note">Versão do servidor: 12.7.3. A transcrição é local; fontes, modelos e integrações podem acessar serviços externos. Use conteúdo autorizado.</p>
+            <p class="compact-note">Versão do servidor: 12.7.4. A transcrição é local; fontes, modelos e integrações podem acessar serviços externos. Use conteúdo autorizado.</p>
             <p class="compact-note">Use o servidor pela rede local ou VPN. A busca/importação do YouTube não concede direitos sobre a mídia. OAuth autoriza o acesso ao canal, não o uso de músicas. Confira as permissões do conteúdo e os termos do YouTube antes de importar ou publicar. Não listado permite acesso a quem tiver o link; resultados SRT nunca vão ao YouTube.</p>
             <p class="compact-note"><a href="https://www.youtube.com/static?template=terms" target="_blank" rel="noopener noreferrer">Termos do YouTube</a> · <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer">Privacidade do Google</a> · <a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener noreferrer">Revogar acesso ao canal</a></p>
         </div>

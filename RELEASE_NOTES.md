@@ -1,3 +1,12 @@
+# 12.7.4
+
+- A letra completa passa a ser alvo do alinhamento de áudio/texto do Whisper escolhido. Recupera palavras e versos omitidos, mantendo cada ocorrência dos refrões, com tempos medidos nesta gravação.
+- Correspondência por sequência mínima de edições evita confundir refrões parcialmente reconhecidos. Janelas com contexto preservam a ordem; horários de LRC continuam ignorados.
+- O CTC refina tempos dentro dos versos confirmados, sem eliminar texto porque um detector de fala não identificou canto. Isso corrige omissões de refrões e frases presas sobre pausas instrumentais.
+- Guias incompatíveis, incompletas ou sem confirmação mantêm o caminho de reconhecimento. Revisões manuais continuam prioritárias. Cache separado, cancelamento e reconstrução das legendas e vídeos derivados ao refazer.
+- Corrigido o endereço de download do modelo large-v3-turbo da DeepDML para o checkpoint CTranslate2 publicado com sufixo `-ct2`; instalações que já possuem o modelo continuam usando o cache local.
+- Novos testes de omissão de verso inteiro, refrões, VAD sem canto detectado, silêncio, cache e erros. Validação de canto real ampliada para recuperação de texto e repetição após uma pausa. Atualização somente do servidor; clientes Android e Windows atuais continuam compatíveis.
+
 # 12.7.3
 
 - A Biblioteca permite baixar vídeos do YouTube durante outro processamento. Cada importação tem pasta temporária, arquivo final e progresso próprios, preservando o cache da música em execução. O arquivo só aparece depois da gravação completa; erros de salvamento ficam visíveis.
