@@ -57,7 +57,7 @@ class AudioSubtitleVideoTests(unittest.TestCase):
                 def save_video(path,*args,**kwargs):
                     self.assertEqual(kwargs.get("result_kind"), "subtitle_video");shutil.copy2(path,library/'history'/'video.mp4');return 'video.mp4'
                 state=Mock();documents=Mock();videos=Mock();metadata=Mock()
-                ns={'refine_lyrics':lambda audio,segments,*args,**kwargs:(segments,{'status':'cleaned','aligned_words':0}),
+                ns={'refine_lyrics':Mock(side_effect=AssertionError('SRT must not run acoustic review')),
                     'queue_cache':__import__('queue_cache'),'os':os,'json':json,'shutil':shutil,'logger':logging.getLogger('test'),
                     'get_file_duration':lambda path:1,'stage_checkpoint':lambda *args:{},'save_stage_checkpoint':Mock(),
                     'notify_targets':Mock(),'telegram_notice':lambda *parts:' '.join(parts),'telegram_escape':str,

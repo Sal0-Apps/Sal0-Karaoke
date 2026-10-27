@@ -1,6 +1,6 @@
 services:
   karaoke-app:
-    image: ghcr.io/sal0-apps/sal0-karaoke:12.7.7
+    image: ghcr.io/sal0-apps/sal0-karaoke:12.7.8
     container_name: karaoke-app
     labels:
       icon: "https://raw.githubusercontent.com/Sal0-Apps/Sal0-Karaoke/main/app/templates/app-icon-v8.png?v=12.5.1"

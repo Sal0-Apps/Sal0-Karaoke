@@ -5073,22 +5073,6 @@ def run_subtitle_srt_pipeline(
     if not original_segments:
         raise ValueError("Nenhuma fala foi detectada na mídia enviada.")
 
-    if not queue_cache.read_draft(cache_dir) and not stage_checkpoint(cache_dir, "subtitle_transcription_reviewed"):
-        def publish_speech_alignment(percent, detail):
-            phase = ("Downloading timing model" if detail.startswith("Baixando alinhador") else
-                     "Loading timing model" if detail.startswith("Carregando o modelo") else "Aligning speech with audio")
-            update_state("processing", phase, 69,
-                         stage_progress=percent, stage_detail=detail)
-        original_segments, quality_report = refine_lyrics(transcription_source, original_segments, "", cache_dir,
-            context=cache_signature, progress=publish_speech_alignment, cancel=pm.check_cancelled)
-        update_process_summary(lyric_quality=quality_report,
-            timing=("Alinhador indisponível · silêncio conferido" if quality_report["status"] == "fallback" else
-                    f'{quality_report["aligned_words"]} palavras alinhadas · {quality_report.get("discarded_words", 0)} sem apoio removidas'))
-        with open(os.path.join(cache_dir, "display_segments.json"), "w", encoding="utf-8") as file:
-            json.dump(original_segments, file, ensure_ascii=False, indent=2)
-        if not original_segments:
-            raise ValueError("Nenhuma fala com apoio no áudio foi encontrada; legendas em silêncio foram descartadas.")
-
     save_stage_checkpoint(cache_dir, "subtitle_transcription_ready", "transcrição do Whisper concluída", 69)
 
     pm.check_cancelled()
@@ -6094,7 +6078,7 @@ def run_pipeline(
                             segments, lyrics_text, cache_dir, whisper_model,
                             context={key: cached_meta.get(key) for key in ("audio_hash", "transcribe_source")},
                             progress=publish_alignment_progress, cancel=pm.check_cancelled)
-                        if guided_report.get("status") == "aligned":
+                        if guided_report.get("guide_aligned_words"):
                             segments = guided_segments
                     except InterruptedError:
                         raise
@@ -6102,16 +6086,28 @@ def run_pipeline(
                         logger.exception("A conferência da guia pelo Whisper falhou; mantendo a análise acústica disponível.")
                 segments, quality_report = refine_lyrics(vocals_wav, segments, lyrics_text, cache_dir,
                     context={key: cached_meta.get(key) for key in ("audio_hash", "vocal_source", "lyrics_clock_hash")},
-                    progress=publish_alignment_progress, cancel=pm.check_cancelled)
-                if guided_report.get("status") == "aligned":
+                    progress=publish_alignment_progress, cancel=pm.check_cancelled,
+                    guide_candidates=guided_report.get('guide_line_candidates'))
+                if guided_report.get("guide_aligned_words"):
                     quality_report.update({key: guided_report[key] for key in
                         ("guide_total_words", "guide_aligned_words", "recovered_words", "guide_rejected_lines")})
+                    quality_report['guide_aligned_words'] = sum(bool(word.get('guide_audio_confirmed'))
+                        for segment in segments for word in segment.get('words',[]))
+                    quality_report['guide_rejected_lines'] = max(0,guided_report['guide_rejected_lines']
+                        - quality_report.get('guide_ctc_recovered_lines',0))
+                    quality_report['recovered_words'] += quality_report.get('guide_ctc_recovered_unanchored_words',0)
+                    quality_report['guide_status'] = ('aligned' if quality_report['guide_aligned_words'] == guided_report['guide_total_words']
+                        and not quality_report['guide_rejected_lines'] else guided_report['status'])
+                    quality_report['guide_unconfirmed_asr_words'] = sum(not bool(word.get('guide_audio_confirmed'))
+                        for segment in segments for word in segment.get('words',[]))
                 update_process_summary(lyric_quality=quality_report,
                     timing=(f'{quality_report["aligned_words"]} palavras alinhadas · {quality_report.get("discarded_words", 0)} sem apoio removidas' if quality_report["aligned_words"] else "Tempos do Whisper · silêncio conferido"))
                 if quality_report.get("guide_aligned_words"):
                     update_process_summary(lyrics=(f'Guia + voz · {quality_report["guide_aligned_words"]} palavras da guia alinhadas'
-                        + (f' · {quality_report["recovered_words"]} palavras recuperadas' if quality_report["recovered_words"] else '')),
-                        lyrics_review={"status": "aligned", **{key: quality_report[key] for key in
+                        + (f' · {quality_report["recovered_words"]} palavras recuperadas' if quality_report["recovered_words"] else '')
+                        + (f' · {quality_report["guide_rejected_lines"]} versos ainda sem confirmação' if quality_report['guide_rejected_lines'] else '')
+                        + (f' · {quality_report["guide_unconfirmed_asr_words"]} palavras ainda do reconhecimento' if quality_report.get('guide_unconfirmed_asr_words') else '')),
+                        lyrics_review={"status": quality_report['guide_status'], **{key: quality_report[key] for key in
                             ("guide_total_words", "guide_aligned_words", "recovered_words", "guide_rejected_lines")}})
                 if quality_report["status"] == "fallback":
                     update_process_summary(timing="Alinhador indisponível · tempos do Whisper e silêncio conferido")

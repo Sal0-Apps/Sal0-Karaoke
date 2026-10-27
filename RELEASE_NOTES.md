@@ -1,3 +1,14 @@
+# 12.7.8
+
+- Corrigido o descarte da guia inteira quando apenas um verso não recebia confirmação. Versos confirmados continuam usando o texto e os tempos medidos; reconhecimento bruto é mantido somente nos trechos ainda incertos ou não cobertos.
+- Busca em janelas independentes e limitadas para finais não reconhecidos e versos após pausas longas. As estimativas escolhem onde analisar o áudio; nenhum tempo é preenchido por interpolação.
+- Versos incertos também podem ser recuperados quando Whisper e MMS concordam no contexto local. Finais recebem novas análises de áudio com contexto, sem aceitar um encaixe no instrumental distante.
+- Validação de ordem entre palavras e versos impede que uma repetição volte ao refrão anterior ou que um refinamento coloque a última palavra antes da precedente.
+- Palavras confirmadas na gravação original são preservadas quando a voz separada atenua seus finais. Trechos confirmados não passam novamente por correção lexical ou redução de repetições.
+- SRT e Legendar vídeo seguem diretamente da transcrição para revisão manual, geração e tradução, sem a conferência acústica adicional do karaokê. A regra vale para transcrições novas e retomadas.
+- O resumo distingue a cobertura da guia dos versos e palavras ainda dependentes do reconhecimento. Cache automático atualizado ao refazer, preservando mídias, reconhecimento bruto, revisões manuais, animações e integrações da 12.7.7.
+- Novos testes de finais de verso, guia parcial, refrões, janelas após pausas e canto real. [Detalhes, validação e limites](docs/ATUALIZACAO_12_7_8.md).
+
 # 12.7.7
 
 - Restaurada a base de processamento da **12.7.5**, conforme solicitado. As alterações de duração da 12.7.6 não fazem parte desta revisão; o corte informado foi associado a uma queda de energia. A tentativa posterior não publicada foi descartada.
