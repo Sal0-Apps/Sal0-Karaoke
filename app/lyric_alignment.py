@@ -24,10 +24,11 @@ from karaoke_generator import split_and_wrap_segments
 from whisper_audio import load_whisper_audio
 import process_manager as pm
 from runtime_resources import available_cpu_threads, release_cached_whisper
-from full_guide_alignment import alignment_lines, refine_confirmed_clocks, mark_confirmed_lines, singing_activity
+from full_guide_alignment import (alignment_lines, refine_confirmed_clocks, mark_confirmed_lines,
+                                 singing_activity, local_candidate_alignments, recover_unconfirmed_lines)
 
 logger = logging.getLogger('karaoke')
-QUALITY_VERSION = 7
+QUALITY_VERSION = 8
 SAMPLE_RATE = 16000
 MODEL_URL = 'https://dl.fbaipublicfiles.com/mms/torchaudio/ctc_alignment_mling_uroman/model.pt'
 MODEL_DIR = '/data/output/models/lyric_alignment'
@@ -122,6 +123,8 @@ def remove_overlapping_phrases(words):
     for index in range(len(words) - 2):
         if not all(kept[index:index+3]):
             continue
+        if any(word.get('guide_audio_confirmed') for word in words[index:index+3]):
+            continue
         key = tuple(normalized[index:index+3])
         if not all(key):
             continue
@@ -179,6 +182,7 @@ def coalesce_repetition_windows(segments, guide):
             previous = result[-1]
             combined = previous['words'] + segment['words']
             if (segment['end'] - previous['start'] <= 19.1
+                    and not any(word.get('guide_audio_confirmed') for word in combined)
                     and repetition_candidates(combined, guide)):
                 result[-1] = dict(start=previous['start'], end=segment['end'],
                     text=''.join(word['word'] for word in combined).strip(), words=combined)
@@ -274,6 +278,12 @@ def clean_segments(segments, evidence, voice_regions=None):
             if not math.isfinite(start+end) or end<=start or end<=0 or start>=evidence.duration or not str(source.get('word','')).strip():
                 removed+=1;continue
             start,end=max(0.,start),min(evidence.duration,end)
+            if source.get('guide_audio_confirmed'):
+                # This word was independently measured on the original recording.
+                # Demucs can suppress quiet verse endings in the separate stem;
+                # that absence cannot invalidate the original audio evidence.
+                words.append({**copy.deepcopy(source),'start':start,'end':end})
+                continue
             if voice_regions:
                 supported = [max(start, left) for left, right in voice_regions
                              if min(end, right) > max(start, left)]
@@ -316,7 +326,8 @@ def clean_segments(segments, evidence, voice_regions=None):
 def regroup(words):
     groups=[];current=[]
     for word in words:
-        if current and (word['start']-current[-1]['end']>=.65 or word['end']-current[0]['start']>11 or len(current)>=24):
+        if current and (word['start']-current[-1]['end']>=.65 or word['end']-current[0]['start']>11 or len(current)>=24
+                        or bool(word.get('guide_audio_confirmed')) != bool(current[-1].get('guide_audio_confirmed'))):
             groups.append(current);current=[]
         current.append(word)
     if current:groups.append(current)
@@ -529,14 +540,14 @@ def accept_alignment(aligned, original, window_duration, window_start=None):
 
 
 def refine_lyrics(audio_path, segments, guide, cache_dir, context=None, progress=None,
-                  cancel=None, backend_factory=None, decode=None, voice_regions=None):
+                  cancel=None, backend_factory=None, decode=None, voice_regions=None, guide_candidates=None):
     """A second pass: use guide text only when supported by acoustic alignment."""
     cancel=cancel or pm.check_cancelled;progress=progress or (lambda percent,detail:None)
     cancel()
     info=os.stat(audio_path)
     signature=hashlib.sha256(json.dumps(dict(version=QUALITY_VERSION,segments=segments,
         guide=prepare_lyrics_guide(guide),source=dict(size=info.st_size,mtime=info.st_mtime_ns),
-        context=context or {},engine=os.getenv('KARAOKE_ALIGNMENT','mms')),
+        context=context or {},engine=os.getenv('KARAOKE_ALIGNMENT','mms'),guide_candidates=guide_candidates or []),
         sort_keys=True,ensure_ascii=False).encode()).hexdigest()
     target=Path(cache_dir)/'aligned_lyrics.json'
     try:
@@ -550,7 +561,8 @@ def refine_lyrics(audio_path, segments, guide, cache_dir, context=None, progress
     audio=(decode or load_whisper_audio)(audio_path)
     evidence=AudioEvidence(audio)
     confirmed = bool(segments) and all(segment.get('guide_audio_confirmed') for segment in segments)
-    if confirmed:
+    protected = confirmed or any(word.get('guide_audio_confirmed') for segment in segments for word in segment.get('words', []))
+    if protected:
         segments = mark_confirmed_lines(segments)
     cleaned,report=clean_segments(segments,evidence)
     cleaned=coalesce_repetition_windows(cleaned, guide)
@@ -571,7 +583,7 @@ def refine_lyrics(audio_path, segments, guide, cache_dir, context=None, progress
             backend=(backend_factory or MMSAligner)(progress,cancel)
             if voice_regions is None and backend_factory is None:
                 voice_regions=detect_voice_regions(audio)
-            if confirmed and complete_lines and callable(getattr(backend, 'full_emission', None)):
+            if protected and complete_lines and callable(getattr(backend, 'full_emission', None)):
                 try:
                     song_emission = backend.full_emission(audio, progress)
                     progress(76, 'Localizando todos os versos e refrões da letra-guia no canto…')
@@ -581,21 +593,54 @@ def refine_lyrics(audio_path, segments, guide, cache_dir, context=None, progress
                 except Exception:
                     logger.exception('A análise da guia completa falhou; mantendo o alinhamento local.')
                     report['retryable_failures'] = report.get('retryable_failures', 0)+1
-        if confirmed:
+        if protected:
             refined, report['ctc_refined_words'] = refine_confirmed_clocks(segments, guide_alignment)
+            if song_emission is not None and guide_candidates:
+                localized,local_clocks=local_candidate_alignments(backend,song_emission,refined,complete_lines,guide_candidates)
+                refined,recovery=recover_unconfirmed_lines(refined,complete_lines,localized,guide_candidates,evidence)
+                report.update(recovery)
+                if recovery['guide_ctc_recovered_lines']:
+                    refined,changed=refine_confirmed_clocks(refined,local_clocks)
+                    report['ctc_refined_words']+=changed
+                for margin in (5.,4.):
+                    pending=[candidate for candidate in guide_candidates
+                             if candidate['line'] not in report['guide_ctc_recovered_line_indexes']]
+                    if not pending:break
+                    localized,local_clocks=local_candidate_alignments(backend,song_emission,refined,complete_lines,pending,
+                                                                     audio=audio,tail_margin=margin)
+                    refined,retried=recover_unconfirmed_lines(refined,complete_lines,localized,pending,evidence)
+                    for key in ('guide_ctc_recovered_lines','guide_ctc_recovered_words','guide_ctc_recovered_unanchored_words'):
+                        report[key]+=retried[key]
+                    report['guide_ctc_recovered_line_indexes']+=retried['guide_ctc_recovered_line_indexes']
+                    if retried['guide_ctc_recovered_lines']:
+                        refined,changed=refine_confirmed_clocks(refined,local_clocks)
+                        report['ctc_refined_words']+=changed
+                refined=mark_confirmed_lines(refined)
             if song_emission is not None:
                 supporting = singing_activity(song_emission, evidence, refined)
                 voice_regions = list(voice_regions or [])+supporting
                 report['singing_activity_regions'] = len(supporting)
-            result = [word for segment in refined for word in segment['words']]
-            report['aligned_words'] = len(result)
-            # Whisper has independently aligned this complete transcript. A
-            # speech VAD miss or a weak singing phoneme cannot delete its text.
-            cleaned = []
+            if confirmed:
+                result = [word for segment in refined for word in segment['words']]
+                report['aligned_words'] = len(result)
+                # A speech VAD miss or weak phoneme cannot undo original audio.
+                cleaned = []
+            else:
+                cleaned, _ = clean_segments(refined,evidence)
+                cleaned = coalesce_repetition_windows(cleaned,guide)
+                context_words=[word for segment in cleaned for word in segment['words']]
+                contextual_candidate=guide_correction_candidate(guide,context_words,allow_distant=True)
         for index,segment in enumerate(cleaned):
             cancel();original=segment['words'];selected=copy.deepcopy(original)
+            confirmed_group = all(word.get('guide_audio_confirmed') for word in original)
             candidate = contextual_candidate[word_offset:word_offset+len(original)] if contextual_candidate else None
+            if confirmed_group:
+                candidate = None
             word_offset += len(original)
+            if confirmed_group and guide_alignment is not None:
+                result.extend(selected)
+                report['aligned_words'] += len(selected)
+                continue
             start=max(0.,segment['start']-.45);end=min(evidence.duration,segment['end']+.45)
             try:
                 if backend and end-start<=20 and all(roman_word(w['word']) for w in original):
@@ -620,7 +665,7 @@ def refine_lyrics(audio_path, segments, guide, cache_dir, context=None, progress
                     # Use corrected tokens when available so a mistyped second
                     # occurrence can be compared with the first on the audio.
                     loop_words = chosen if chosen is not baseline else original
-                    if loop_words:
+                    if loop_words and not confirmed_group:
                         loop_texts = [str(word['word']).strip() for word in loop_words]
                         best_loop = None
                         best_score = -math.inf
@@ -637,7 +682,7 @@ def refine_lyrics(audio_path, segments, guide, cache_dir, context=None, progress
                             chosen = best_loop
                             report['repeated_words'] += len(texts) - len(best_loop)
                     unsupported = set()
-                    if chosen and len(chosen)==len(original):
+                    if chosen and len(chosen)==len(original) and not confirmed_group:
                         unsupported={i for i,word in enumerate(chosen)
                             if word.get('alignment_score',1.)<.08
                             and not has_voice(word['start']+start,word['end']+start,voice_regions)
@@ -648,6 +693,17 @@ def refine_lyrics(audio_path, segments, guide, cache_dir, context=None, progress
                             word['start']+=start;word['end']+=start
                             for char in word.get('alignment_chars',[]):
                                 if 'start' in char:char['start']+=start;char['end']+=start
+                        if confirmed_group:
+                            local = copy.deepcopy(original)
+                            for position, word in enumerate(local):
+                                word['guide_token_index'] = position
+                            bounded, changed = refine_confirmed_clocks([dict(start=segment['start'],
+                                end=segment['end'],words=local)],selected)
+                            selected = bounded[0]['words']
+                            report['ctc_refined_words'] = report.get('ctc_refined_words',0)+changed
+                            for word, source in zip(selected, original):
+                                word.update({key:copy.deepcopy(value) for key,value in source.items()
+                                    if key not in {'start','end','alignment_score','alignment_chars'}})
                         report['aligned_words']+=len(selected)
                     else:
                         report['rejected_groups']+=1
@@ -681,6 +737,16 @@ def refine_lyrics(audio_path, segments, guide, cache_dir, context=None, progress
     if guide:
         if confirmed:
             report['guide_verses'] = len(segments)
+        elif protected:
+            groups=[]
+            for segment in final:
+                if all(word.get('guide_audio_confirmed') for word in segment['words']):
+                    groups.append(segment)
+                    report['guide_verses'] += sum(bool(word.get('lyric_line_start')) for word in segment['words'])
+                else:
+                    bounded, count = apply_guide_boundaries(guide, [segment])
+                    groups.extend(bounded); report['guide_verses'] += count
+            final = groups
         else:
             final, report['guide_verses'] = apply_guide_boundaries(guide, final)
         final = split_and_wrap_segments(final)

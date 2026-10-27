@@ -52,7 +52,7 @@ def validate_guide_recovery(source, text, rows, whole, root):
     for index in range(2, 7):
         start, end = repeat_start+float(rows[index]['word_start'])-phrase_left, repeat_start+float(rows[index]['word_end'])-phrase_left
         truth.append(start)
-        if index in (2, 6):
+        if index == 2:
             baseline.append(dict(word=' '+text[index], start=start, end=end, probability=.9))
     folder = root/'complete-guide'; folder.mkdir()
     guide = '\n'.join(lines)
@@ -70,12 +70,14 @@ def validate_guide_recovery(source, text, rows, whole, root):
     assert output[-5]['start'] >= repeat_start-.3, 'A sung repeat cannot begin in the preceding silence'
     assert not any(len(clip)/16000+.3 < word['start'] < repeat_start-.3 for word in output)
     assert guide_report['recovered_words'] >= 7, guide_report
+    assert output[-1]['word'].strip() == text[6], 'The final sung word must be recovered as well'
     regions = json.loads((folder/'aligned_lyrics.json').read_text())['voice_regions']
     cues = insert_instrumental_breaks(result, len(audio)/16000, voice_regions=regions)
     rest_middle = (len(clip)/16000+repeat_start)/2
     assert any(cue.get('instrumental') and cue['start'] <= rest_middle < cue['end'] for cue in cues)
     return dict(complete_guide_words=len(output), whole_omitted_line_recovered=True,
         repeated_phrase_recovered=True, long_silence_preserved=True,
+        omitted_verse_ending_recovered=True,
         complete_guide_median_seconds=round(float(np.median(errors)), 4))
 
 

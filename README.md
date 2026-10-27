@@ -8,6 +8,8 @@ O código original é software livre sob a [licença MIT](LICENSE). Dependência
 
 O Sal0 Karaokê é destinado a uma instalação pessoal, acessada pela rede local ou por VPN, como ZeroTier. O repositório aberto disponibiliza o código e os pacotes; o projeto não opera um serviço público de processamento nem coleta centralmente as mídias das instalações. Não é necessário expor a porta do app à internet. O processamento principal é local, mas as integrações escolhidas podem se comunicar com serviços externos.
 
+Na **12.7.8**, a guia do karaokê é conferida por verso sem descartar os trechos confirmados por causa de uma falha isolada. Finais de verso recebem busca acústica mais ampla; refrões não podem voltar a uma ocorrência anterior, e a limpeza da voz separada preserva palavras já confirmadas na gravação. SRT e Legendar vídeo não passam por essa conferência adicional. [Detalhes e validação](docs/ATUALIZACAO_12_7_8.md).
+
 Na **12.7.7**, a base de processamento permanece a **12.7.5**. A atualização se concentra na apresentação: troca de versos sem apagão, cinco animações para a letra, quatro estilos de instrumental, aviso personalizado, tamanho e contagem opcional. Nomes com caracteres CJK ganham fonte adequada na abertura. [Detalhes e validação](docs/ATUALIZACAO_12_7_7.md).
 
 Na **12.7.5**, links são enviados por formulário simples e novas músicas não esperam a cópia do cache anterior para entrar na fila. A primeira inclusão em fila vazia ou recém-excluída é verificada por navegador e servidor HTTP reais; falhas passam a mostrar a resposta HTTP e as etapas do pedido nos registros. [Detalhes e limites](docs/ATUALIZACAO_12_7_5.md).
@@ -152,14 +154,14 @@ Em **Playlist de cada usuário**, a administração define uma playlist válida 
 
 ## Início rápido com Docker
 
-A versão de distribuição desta documentação é **12.7.7**. O título e o rodapé da página mostram apenas o nome da aplicação. A versão do servidor pode ser consultada no Manual; a versão do APK aparece nas configurações nativas.
+A versão de distribuição desta documentação é **12.7.8**. O título e o rodapé da página mostram apenas o nome da aplicação. A versão do servidor pode ser consultada no Manual; a versão do APK aparece nas configurações nativas.
 
 Crie um arquivo `compose.yaml`:
 
 ```yaml
 services:
   karaoke-app:
-    image: ghcr.io/sal0-apps/sal0-karaoke:12.7.7
+    image: ghcr.io/sal0-apps/sal0-karaoke:12.7.8
     container_name: karaoke-app
     ports:
       - "7885:7860"

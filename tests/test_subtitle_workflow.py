@@ -56,7 +56,8 @@ class SubtitleSettingsTests(unittest.TestCase):
 
 
 class SubtitlePipelineTests(unittest.TestCase):
-    def run_pipeline(self, preference='translated', target='pt-BR', failed=False, checkpoint=False):
+    def run_pipeline(self, preference='translated', target='pt-BR', failed=False, checkpoint=False,
+                     fresh=False, draft=False, reviewed=False):
         directory = tempfile.TemporaryDirectory()
         self.addCleanup(directory.cleanup)
         root = Path(directory.name)
@@ -69,6 +70,11 @@ class SubtitlePipelineTests(unittest.TestCase):
             {'whisper_model':'medium','enable_vad':True,'transcription_preset':'difficult',
              'whisper_audio_version':4,'whisper_quality_mode':'max_quality'}}))
         checkpoints = {}
+        if fresh:
+            (cache / 'subtitle_segments_original.json').unlink()
+            (cache / 'subtitle_info_original.json').unlink()
+        if reviewed:
+            checkpoints['subtitle_transcription_reviewed'] = {'progress':70}
         if checkpoint:
             (history / 'own.srt').write_text('My own original')
             (output / 'final_subtitles_original.srt').write_text('Other task subtitles')
@@ -85,8 +91,12 @@ class SubtitlePipelineTests(unittest.TestCase):
             rendered.append((Path(subtitles).read_text(), kwargs))
             Path(result).write_bytes(b'mp4')
         state = Mock(); delivery = Mock()
+        acoustic_review = Mock(side_effect=AssertionError('SRT must not run karaoke acoustic review'))
+        transcribe = Mock(return_value=(segments, {'language':'en'}))
+        edited = [{'start':.3,'end':.7,'text':'My reviewed words'}]
         pipeline = load_function('run_subtitle_srt_pipeline', os=os, json=json, shutil=shutil,
-            refine_lyrics=lambda audio,segments,*args,**kwargs:(segments,{'status':'cleaned','aligned_words':0}),
+            refine_lyrics=acoustic_review, transcribe_vocals=transcribe,
+            queue_cache=Mock(read_draft=Mock(return_value=edited if draft else None)),
             normalize_subtitle_settings=normalize_subtitle_settings, get_file_duration=lambda _:1,
             stage_checkpoint=lambda _, stage:checkpoints.get(stage,{}), save_stage_checkpoint=Mock(),
             update_state=state, update_process_summary=Mock(), notify_targets=Mock(),
@@ -100,9 +110,19 @@ class SubtitlePipelineTests(unittest.TestCase):
             save_result_metadata=Mock(), send_video_to_targets=delivery,
             send_documents_to_targets=Mock())
         with patch('process_manager.check_cancelled'):
-            pipeline('source.mp4','Lecture','medium',True,'difficult',False,target,{'username':'owner'},
+            pipeline('source.mp4','Lecture','medium',True,'difficult',reviewed,target,{'username':'owner'},
                      str(cache),str(output),str(root / 'library'),[],subtitle_settings={'video_subtitle_source':preference})
+        acoustic_review.assert_not_called()
         return rendered, state.call_args.kwargs, delivery, pipeline.__globals__
+
+    def test_srt_bypasses_acoustic_review_for_fresh_cached_draft_and_reviewed_transcripts(self):
+        for options in ({'fresh':True}, {}, {'draft':True}, {'reviewed':True}):
+            with self.subTest(options=options):
+                rendered, _, _, scope = self.run_pipeline(target='original', **options)
+                expected = 'My reviewed words' if options.get('draft') else 'Hello world'
+                self.assertEqual(rendered[0][0], expected)
+                self.assertEqual(scope['transcribe_vocals'].call_count, int(bool(options.get('fresh'))))
+                scope['refine_lyrics'].assert_not_called()
 
     def test_translated_subtitles_are_burned_by_default(self):
         rendered, state, delivery, _ = self.run_pipeline()
