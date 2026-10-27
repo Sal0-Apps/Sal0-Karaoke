@@ -8,6 +8,7 @@ import re
 CONFIG_PATH = Path('/data/output/karaoke_animation.json')
 DEFAULTS = dict(animation_style='smooth', highlight_glow=True,
                 instrumental_style='progress', instrumental_color='#38BDF8',
+                instrumental_text='Instrumental', instrumental_size=100,
                 min_instrumental_gap=2.0, countdown_seconds=3)
 
 
@@ -17,20 +18,28 @@ def normalize_visuals(value=None):
     if not isinstance(value, dict) or set(value) - set(DEFAULTS):
         raise ValueError('Configuração de animação inválida.')
     result = {**DEFAULTS, **value}
-    if not isinstance(result['animation_style'], str) or result['animation_style'] not in {'classic', 'smooth'}:
+    if not isinstance(result['animation_style'], str) or result['animation_style'] not in {'classic', 'smooth', 'pulse', 'outline', 'instant'}:
         raise ValueError('Escolha uma animação válida.')
     if not isinstance(result['highlight_glow'], bool):
         raise ValueError('Escolha se o brilho está ativado.')
-    if not isinstance(result['instrumental_style'], str) or result['instrumental_style'] not in {'classic', 'progress'}:
+    if not isinstance(result['instrumental_style'], str) or result['instrumental_style'] not in {'classic', 'progress', 'dots', 'countdown'}:
         raise ValueError('Escolha um estilo de instrumental válido.')
     if not isinstance(result['instrumental_color'], str) or not re.fullmatch(r'#[0-9a-fA-F]{6}', result['instrumental_color']):
         raise ValueError('Escolha uma cor válida para o instrumental.')
+    label = result['instrumental_text']
+    if (not isinstance(label, str) or not 1 <= len(label.strip()) <= 40
+            or any(ord(char) < 32 or ord(char) == 127 or char in '{}\\' for char in label)):
+        raise ValueError('Use de 1 a 40 caracteres no aviso, sem quebras de linha, chaves ou barras invertidas.')
+    result['instrumental_text'] = label.strip()
+    size = result['instrumental_size']
+    if isinstance(size, bool) or not isinstance(size, int) or not 60 <= size <= 150:
+        raise ValueError('O tamanho do aviso deve ficar entre 60% e 150%.')
     gap = result['min_instrumental_gap']
     if isinstance(gap, bool) or not isinstance(gap, (int, float)) or not math.isfinite(gap) or not 1.5 <= gap <= 10:
         raise ValueError('O intervalo mínimo deve ficar entre 1,5 e 10 segundos.')
     countdown = result['countdown_seconds']
-    if isinstance(countdown, bool) or not isinstance(countdown, int) or not 1 <= countdown <= 5:
-        raise ValueError('A contagem deve ficar entre 1 e 5 segundos.')
+    if isinstance(countdown, bool) or not isinstance(countdown, int) or not 0 <= countdown <= 5:
+        raise ValueError('A contagem deve ficar entre 0 e 5 segundos; use 0 para desativar.')
     return result
 
 

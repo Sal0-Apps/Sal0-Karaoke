@@ -171,7 +171,7 @@ class SubtitleRenderingTests(unittest.TestCase):
                 self.assertEqual(maps,['1:v:0','0:a:0'])
                 Path(command[-1]).write_bytes(b'mp4')
                 return True
-            with patch('subtitle_video.media_has_motion_video',side_effect=[False,True]), patch('subtitle_video.require_duration'):
+            with patch('subtitle_video.media_has_motion_video',side_effect=[False,True]):
                 render_subtitle_video('speech.wav',srt,root/'result.mp4',2,runner=runner,background=background)
 
 

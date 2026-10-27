@@ -49,7 +49,6 @@ from lyric_drafts import read_draft, write_draft, clear_draft
 from lyrics_search import split_search_identity, lyrics_match_score, relevant_lyrics_results, select_automatic_lyrics
 from reprocess_cache import youtube_identity, file_fingerprint
 from submission_logging import SubmissionLoggingMiddleware
-from media_integrity import complete_audio_cache, invalidate_audio_derivatives, media_durations, require_duration
 from media_covers import video_thumbnail
 from youtube_engine_runtime import EngineRuntime
 from telegram_delivery import TelegramDelivery
@@ -208,7 +207,6 @@ def youtube_download_options(outtmpl: str | None = None) -> dict:
         "socket_timeout": 30,
         "retries": 10,
         "fragment_retries": 10,
-        "skip_unavailable_fragments": False,
         "extractor_retries": 5,
         "file_access_retries": 3,
         "concurrent_fragment_downloads": 4,
@@ -239,13 +237,13 @@ def download_youtube(url: str, cache_dir: str, progress_callback=None, cancel_ca
     with yt_dlp_operation_lock:
         yt_dlp = load_yt_dlp()
 
-        def discard_partial_inputs():
-            for filename in os.listdir(cache_dir):
-                if filename.startswith("original_input."):
-                    try:
-                        os.remove(os.path.join(cache_dir, filename))
-                    except OSError:
-                        pass
+        # Expurgo prévio obrigatório para impedir o reaproveitamento de download incompleto.
+        for filename in os.listdir(cache_dir):
+            if filename.startswith("original_input."):
+                try:
+                    os.remove(os.path.join(cache_dir, filename))
+                except OSError:
+                    pass
 
         def download_progress(info):
             if cancel_callback:
@@ -275,20 +273,11 @@ def download_youtube(url: str, cache_dir: str, progress_callback=None, cancel_ca
             try:
                 if cancel_callback:
                     cancel_callback()
-                discard_partial_inputs()
                 logger.info("Download do YouTube: tentativa %s de %s.", attempt, len(formats))
                 info = extract_youtube_info(yt_dlp, url, options)
                 title = str((info or {}).get("title") or title)
-                media_path = find_downloaded_file(cache_dir, "original_input")
-                if not media_durations(media_path).get("audio"):
-                    raise RuntimeError("O download do YouTube não contém uma faixa de áudio legível.")
-                expected_duration = (info or {}).get("duration")
-                if expected_duration:
-                    # Metadata durations can be rounded to a whole second.
-                    require_duration(media_path, float(expected_duration), kinds=("container",), extra_tolerance=1.25)
-                return media_path, title
+                return find_downloaded_file(cache_dir, "original_input"), title
             except InterruptedError:
-                discard_partial_inputs()
                 raise
             except Exception as exc:
                 last_error = exc
@@ -296,7 +285,6 @@ def download_youtube(url: str, cache_dir: str, progress_callback=None, cancel_ca
                 if isinstance(exc, DownloadAccessError) and exc.recovery in {"renew_cookies", "check_video"}:
                     break
 
-        discard_partial_inputs()
         raise RuntimeError(f"Não foi possível baixar o vídeo do YouTube: {last_error}")
 
 def get_current_user(
@@ -5737,15 +5725,11 @@ def run_pipeline(
             logger.info(f"Diretório de trabalho temporário criado: {tmpdir}")
 
             # Passo 1: Extrair / Converter áudio para WAV PCM
-            source_duration = media_durations(input_audio_path).get("audio")
-            if not source_duration:
-                raise RuntimeError("A mídia original não tem uma faixa de áudio completa e legível.")
             converted_wav = os.path.join(cache_dir, "original_converted.wav")
-            if complete_audio_cache(converted_wav, source_duration):
+            if os.path.exists(converted_wav):
                 logger.info("Aproveitando áudio extraído do cache.")
                 update_state("processing", "Extracting audio (cached)", 15)
             else:
-                invalidate_audio_derivatives(cache_dir, extraction=True)
                 pm.check_cancelled()
                 update_state("processing", "Extracting audio", 15)
                 notify_targets(
@@ -5758,7 +5742,6 @@ def run_pipeline(
                     ),
                 )
                 extract_audio(input_audio_path, converted_wav)
-                require_duration(converted_wav, source_duration)
 
             pm.check_cancelled()
             save_stage_checkpoint(cache_dir, "audio_extracted", "áudio extraído", 15)
@@ -5767,7 +5750,7 @@ def run_pipeline(
             vocals_wav = os.path.join(cache_dir, "vocals.wav")
             instrumental_wav = os.path.join(cache_dir, "instrumental.wav")
 
-            if all(complete_audio_cache(path, source_duration) for path in (vocals_wav, instrumental_wav)):
+            if os.path.exists(vocals_wav) and os.path.exists(instrumental_wav):
                 logger.info("Aproveitando áudio separado pelo Demucs do cache.")
                 update_state(
                     "processing",
@@ -5777,7 +5760,6 @@ def run_pipeline(
                     stage_detail="Separação já disponível no cache"
                 )
             else:
-                invalidate_audio_derivatives(cache_dir)
                 pm.check_cancelled()
                 update_state(
                     "processing",
@@ -5797,8 +5779,6 @@ def run_pipeline(
                 )
                 with tempfile.TemporaryDirectory() as demucs_tmp:
                     v_tmp, i_tmp = separate_vocals(converted_wav, demucs_tmp, update_callback=update_state)
-                    require_duration(v_tmp, source_duration)
-                    require_duration(i_tmp, source_duration)
                     shutil.move(v_tmp, vocals_wav)
                     shutil.move(i_tmp, instrumental_wav)
 
@@ -5812,8 +5792,6 @@ def run_pipeline(
                     vocals_wav, instrumental_wav, cache_dir,
                     gain=backing_vocals_volume / 100, update_callback=update_state,
                 )
-                require_duration(vocals_wav, source_duration)
-                require_duration(instrumental_wav, source_duration)
             # Backing preservation changes the rendered instrumental, not the
             # chosen recording for recognition. Original bypasses every stem.
             vocal_source = ("original" if transcribe_source == "original" else
@@ -5833,11 +5811,6 @@ def run_pipeline(
             if only_remove_vocals:
                 pm.check_cancelled()
                 rendered_checkpoint = stage_checkpoint(cache_dir, "video_rendered")
-                if rendered_checkpoint and os.path.isfile(final_mp4_path):
-                    try:
-                        require_duration(final_mp4_path, source_duration + 3, kinds=("audio", "video"))
-                    except RuntimeError:
-                        rendered_checkpoint = None
                 if not rendered_checkpoint or not os.path.isfile(final_mp4_path):
                     update_state("processing", "Rendering final video", 95)
                     notify_targets(
@@ -6250,11 +6223,6 @@ def run_pipeline(
 
             # Passo 5: Renderizar o vídeo final
             rendered_checkpoint = stage_checkpoint(cache_dir, "video_rendered")
-            if rendered_checkpoint and os.path.isfile(final_mp4_path):
-                try:
-                    require_duration(final_mp4_path, source_duration + 3, kinds=("audio", "video"))
-                except RuntimeError:
-                    rendered_checkpoint = None
             if not rendered_checkpoint or not os.path.isfile(final_mp4_path):
                 update_state("processing", "Rendering final video", 95)
                 notify_targets(

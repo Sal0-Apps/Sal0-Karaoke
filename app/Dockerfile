@@ -2,7 +2,7 @@ FROM python:3.12-slim
 
 LABEL org.opencontainers.image.title="Sal0 Karaokê" \
       org.opencontainers.image.description="Servidor auto-hospedado para criação local de karaokê e legendas" \
-      org.opencontainers.image.version="12.7.6" \
+      org.opencontainers.image.version="12.7.7" \
       org.opencontainers.image.source="https://github.com/Sal0-Apps/Sal0-Karaoke" \
       org.opencontainers.image.licenses="MIT"
 
@@ -48,6 +48,10 @@ RUN pip install --no-cache-dir --upgrade pip && \
 RUN python -c "from audio_separator.separator import Separator"
 COPY download_models.py .
 RUN python download_models.py && rm download_models.py
+
+# Cobertura de nomes e letras em chinês, japonês e coreano, inclusive nas capas.
+RUN apt-get update && apt-get install -y --no-install-recommends fonts-noto-cjk \
+    && rm -rf /var/lib/apt/lists/*
 
 # Copiar código-fonte da aplicação
 COPY . .
