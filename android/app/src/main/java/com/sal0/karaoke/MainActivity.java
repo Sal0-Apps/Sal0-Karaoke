@@ -135,6 +135,10 @@ public class MainActivity extends ComponentActivity {
 
         root = new FrameLayout(this);
         root.setBackgroundColor(COLOR_BACKGROUND);
+        // Keep parent-view Force Dark from recoloring the native web surface.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            root.setForceDarkAllowed(false);
+        }
         root.setOnApplyWindowInsetsListener((view, insets) -> {
             view.setPadding(
                 0,
