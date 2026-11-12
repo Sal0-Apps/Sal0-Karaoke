@@ -13,6 +13,13 @@ O mínimo configurado pelo projeto é Android 8.0 (API 26). O suporte real à re
 
 Atualizações sobre um APK já instalado exigem a mesma assinatura. Se o Android recusar por assinatura incompatível, confira a origem do APK e preserve as configurações antes de considerar uma reinstalação. Não desinstale supondo que as preferências e a sessão serão preservadas.
 
+**Migração do APK público 10.4 para 12.7.9:** os certificados dos dois arquivos
+publicados são diferentes. Anote SSID, endereço local e externo em
+**Configurações do app** antes de reinstalar o cliente. A reinstalação remove
+as preferências e a sessão locais; os trabalhos e os dados do servidor Docker
+continuam no servidor. A nova publicação reutiliza a chave de instalação direta
+enquanto ela estiver disponível no cache protegido do CI.
+
 ## Primeira conexão
 
 Preencha:
