@@ -1,5 +1,6 @@
 import ast
 import os
+import re
 import subprocess
 import unittest
 from pathlib import Path
@@ -95,8 +96,12 @@ class VersionEightQueueTests(unittest.TestCase):
         self.assertIn(f"Versão do servidor: {version}", HTML)
         self.assertIn("<title>Sal0 Karaokê</title>", HTML)
         self.assertEqual(HTML.split("<footer>")[1].split("</footer>")[0].strip(), "Sal0 Karaokê")
-        major, minor, patch = map(int, version.split("."))
-        self.assertIn(f'.orElse("{version}")', ANDROID_BUILD)
+        # The native client keeps its own version across server-only releases.
+        android_version = re.search(r'val appVersionName[^\n]*\.orElse\("([0-9.]+)"\)', ANDROID_BUILD)
+        self.assertIsNotNone(android_version)
+        parts = [int(part) for part in android_version.group(1).split('.')]
+        self.assertIn(len(parts), (2, 3))
+        major, minor, patch = (parts + [0])[:3]
         self.assertIn(f'.orElse("{major * 10000 + minor * 100 + patch}")', ANDROID_BUILD)
         self.assertIn("-PVERSION_CODE=${{ env.VERSION_CODE }}", WORKFLOW)
         self.assertIn(f"sal0-karaoke:{version}", COMPOSE)

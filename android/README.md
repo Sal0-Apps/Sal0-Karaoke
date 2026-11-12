@@ -4,7 +4,7 @@ O APK acessa o servidor Sal0 Karaokê. Demucs, Whisper, tradução e renderizaç
 
 ## Instalar
 
-1. Baixe o APK na [Release da versão](https://github.com/Sal0-Apps/Sal0-Karaoke/releases/tag/v10.4).
+1. Baixe o APK na [Release da versão](https://github.com/Sal0-Apps/Sal0-Karaoke/releases/tag/v12.7.9).
 2. No Android, permita a instalação pela origem que abriu o arquivo, se o sistema solicitar.
 3. Instale e abra o Sal0 Karaokê.
 4. Configure a conexão e entre com a conta da instalação.
@@ -49,6 +49,13 @@ A interface contém os modos Rápido, Detalhado e Gerar SRT, fila, progresso, re
 
 Mudanças de HTML, CSS e JavaScript chegam quando o servidor é atualizado. Alterações na conexão nativa, permissões, downloads ou interface Android exigem um novo APK.
 
+Na versão 12.7.9, Force Dark e escurecimento algorítmico ficam desativados no
+WebView para preservar os temas nativos e seus ícones. Atualize também o servidor
+para usar Cristal, Aurora, Wall e **Tema antigo**, com modos claro/escuro.
+Ao abrir pelo Samsung Internet, o filtro próprio do navegador pode continuar
+alterando cores: desative **Forçar modo escuro para conteúdo da web** no menu de
+modo escuro do navegador e escolha a aparência no Sal0.
+
 ## Arquivos, downloads e reprodução
 
 - O seletor do Android permite fornecer arquivos aos formulários, inclusive vários quando o campo aceita.
@@ -76,7 +83,7 @@ A configuração atual utiliza JDK 17, Android SDK Platform 36, Android Gradle P
 No diretório `android`, com SDK e ferramentas configurados:
 
 ```bash
-gradle --no-daemon :app:testDebugUnitTest :app:lintRelease :app:assembleRelease -PVERSION_NAME=10.4 -PVERSION_CODE=100400
+gradle --no-daemon :app:testDebugUnitTest :app:lintRelease :app:assembleRelease -PVERSION_NAME=12.7.9 -PVERSION_CODE=120709
 ```
 
 O APK de saída fica em `app/build/outputs/apk/release/app-release.apk`.
@@ -95,7 +102,7 @@ Carregue os valores por um cofre de segredos ou ambiente protegido. Não inclua 
 Com essas variáveis definidas, o auxiliar PowerShell pode ser usado:
 
 ```powershell
-.\build-release.ps1 -VersionName 10.4 -VersionCode 100400
+.\build-release.ps1 -VersionName 12.7.9 -VersionCode 120709
 ```
 
 Ele executa testes, lint e build e copia o resultado para `android/Sal0-Karaoke-Android.apk`, ignorado pelo Git.
