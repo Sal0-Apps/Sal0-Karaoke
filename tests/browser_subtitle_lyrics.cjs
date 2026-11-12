@@ -185,6 +185,8 @@ const srtDefaults = {text_color:'#FFFFFF',box_color:'#000000',box_opacity:65,fon
         await page.setViewportSize({width:1440,height:1000});
         await page.locator('#subtitleModeSettingsSection').screenshot({path:'subtitle-admin-desktop.png'});
         await page.locator('#btnToggleTheme').click();
+        await page.locator('[data-sal0-mode-choice=light]').click();
+        await page.locator('[data-sal0-close]').click();
         assert.equal(await page.locator('html').getAttribute('data-theme'),'light');
         await page.locator('#subtitleModeSettingsSection').screenshot({path:'subtitle-admin-light.png'});
         await page.locator('#btnToggleSubtitleSettings').click();

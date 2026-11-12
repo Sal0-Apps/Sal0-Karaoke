@@ -1,6 +1,6 @@
 # Aparência Sal0
 
-O botão **Temas**, ao lado do alternador claro/escuro, oferece Cristal,
+O único botão **Temas** do cabeçalho reúne os modos claro/escuro, Cristal,
 Aurora, Wall e **Tema antigo**. Esta última opção usa os estilos originais
 do próprio aplicativo nos dois modos de cor. A escolha fica neste navegador.
 
@@ -20,3 +20,5 @@ no WebView. Filtros externos que ignorem essas opções podem interferir.
 
 Os controles, APIs, filas, autenticação e processamento continuam usando
 a implementação existente do aplicativo.
+
+O SVG do fundo tem geometria fixa. Somente suas camadas se movem por transformações do compositor, em trajetórias alternadas sem salto de retorno. A página e o cabeçalho não recebem transformações de animação.

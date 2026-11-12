@@ -116,6 +116,14 @@ jobs:
           /tmp/sal0-browser/node_modules/.bin/playwright install --with-deps chromium
           NODE_PATH=/tmp/sal0-browser/node_modules node tests/appearance_smoke.cjs
 
+      - name: Keep web appearance screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sal0-web-appearance
+          path: test-artifacts/appearance/
+          if-no-files-found: ignore
+
       - name: Build Docker image
         uses: docker/build-push-action@v5
         with:

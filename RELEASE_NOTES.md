@@ -1,3 +1,10 @@
+## 12.7.10 — Correções somente na web
+
+- Um único botão **Temas**, com texto visível, tamanho consistente e modos claro/escuro dentro do menu.
+- Fundo em camadas estáveis, com movimento alternado contínuo e SVG sem deformação por quadro, reduzindo repinturas no WebView.
+- Tema antigo, transparência, escolha de cores e preferência de movimento preservados.
+- Nenhuma alteração ou nova compilação de APK.
+
 ## Aparência Sal0: vidro e movimento contínuo
 
 - Temas Cristal, Aurora e Wall, com modos claro e escuro e transparência ajustável.
