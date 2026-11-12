@@ -105,6 +105,11 @@ jobs:
           echo "VERSION_TAG=$VERSION_TAG" >> "$GITHUB_ENV"
           echo "VERSION_CODE=$VERSION_CODE" >> "$GITHUB_ENV"
 
+      - name: Validate release metadata before building the image
+        run: |
+          python -m unittest discover -s tests -p test_v8_queue_and_admin_results.py -v
+          python -m unittest discover -s tests -p test_release_client_changes.py -v
+
       - name: Validate native themes and stable scrolling
         run: |
           npm install --prefix /tmp/sal0-browser playwright@1.55.0
