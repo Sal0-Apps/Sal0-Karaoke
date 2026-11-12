@@ -5,6 +5,7 @@
 - Fundo com ondas fluidas que mantém tamanho e continuidade durante a rolagem.
 - Pausa das ondas em abas ocultas, no tema antigo e com movimento reduzido.
 - Proteções de tema nativo no navegador; WebViews Android atualizados quando disponíveis.
+- Download do mesmo modelo de alinhamento pelo endpoint regional HTTPS do próprio bucket da Meta, contornando o certificado vencido do endereço anterior sem desativar a verificação TLS.
 
 # 12.7.8
 

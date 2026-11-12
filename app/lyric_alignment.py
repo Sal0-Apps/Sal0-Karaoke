@@ -30,7 +30,9 @@ from full_guide_alignment import (alignment_lines, refine_confirmed_clocks, mark
 logger = logging.getLogger('karaoke')
 QUALITY_VERSION = 8
 SAMPLE_RATE = 16000
-MODEL_URL = 'https://dl.fbaipublicfiles.com/mms/torchaudio/ctc_alignment_mling_uroman/model.pt'
+# The same official Meta object, through the bucket's regional HTTPS endpoint.
+# The vanity hostname currently serves an expired certificate. Keep TLS checks.
+MODEL_URL = 'https://s3.us-west-2.amazonaws.com/dl.fbaipublicfiles.com/mms/torchaudio/ctc_alignment_mling_uroman/model.pt'
 MODEL_DIR = '/data/output/models/lyric_alignment'
 
 

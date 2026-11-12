@@ -10,6 +10,11 @@ repository or its image. Model reference and attribution:
 - https://docs.pytorch.org/audio/2.6.0/generated/torchaudio.pipelines.MMS_FA.html
 - https://github.com/facebookresearch/fairseq/tree/main/examples/mms#license
 
+The downloader uses the regional HTTPS endpoint of Meta's own
+`dl.fbaipublicfiles.com` S3 bucket for the identical checkpoint object. This
+avoids the expired certificate on the vanity hostname while preserving TLS
+verification, the model, the license and the existing persistent cache.
+
 The CPU regression script downloads *Cortez — Feel (Stripped)*, identified as
 **CC BY** in the JamendoLyrics dataset metadata, with its independently annotated
 word times. The recording/lyrics are used only during validation, not shipped as

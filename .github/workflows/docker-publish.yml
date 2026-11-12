@@ -143,6 +143,7 @@ jobs:
 
       - name: Test real singing alignment on CPU
         timeout-minutes: 8
+        # Download the original Meta checkpoint over its verified regional HTTPS endpoint.
         run: docker run --rm --entrypoint python "${{ env.IMAGE_TAG }}:${{ env.VERSION_TAG }}" smoke_lyric_alignment.py
 
       - name: Set up Java for Android build
