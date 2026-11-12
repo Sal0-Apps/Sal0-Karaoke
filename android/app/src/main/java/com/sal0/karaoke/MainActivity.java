@@ -433,6 +433,14 @@ public class MainActivity extends ComponentActivity {
     @SuppressLint("SetJavaScriptEnabled")
     private void configureWebView(WebView target) {
         WebSettings settings = target.getSettings();
+        // Preserve the server's native themes; never recolor its glass surfaces.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            settings.setForceDark(WebSettings.FORCE_DARK_OFF);
+            target.setForceDarkAllowed(false);
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            settings.setAlgorithmicDarkeningAllowed(false);
+        }
         settings.setJavaScriptEnabled(true);
         settings.setDomStorageEnabled(true);
         settings.setDatabaseEnabled(true);
