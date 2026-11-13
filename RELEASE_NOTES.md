@@ -1,3 +1,12 @@
+## 12.7.15 — Playlist por vídeo para o administrador
+
+- O administrador pode escolher uma única playlist diferente da padrão nos modos
+  Rápido e Detalhado, sem acrescentar automaticamente a playlist do perfil.
+- A escolha é mantida ao atualizar opções e rever uma execução; uma nova criação
+  volta ao padrão. Playlists adicionais continuam sendo escolhas explícitas.
+- A API e o envio continuam restringindo contas comuns à playlist atribuída.
+- Atualização do servidor, sem alterações nos APKs.
+
 ## 12.7.14 — Ajuste visual
 
 - Remove os quadros extras de prévia do palco e resumo da biblioteca. Mantém os ícones estilizados nos controles existentes.

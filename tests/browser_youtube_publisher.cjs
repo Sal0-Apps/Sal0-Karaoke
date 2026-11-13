@@ -4,7 +4,7 @@ for(const match of HTML.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/g)) new Fu
 (async()=>{
 const browser=await chromium.launch({headless:true});const page=await browser.newPage();
 const errors=[];page.on('pageerror',e=>errors.push(e.message));
-let connected=false,failImport=true,failPlaylists=false,saved=null,srtDone=false,srtRendering=false;
+let connected=false,failImport=true,failPlaylists=false,saved=null,srtDone=false,srtRendering=false,canChoosePlaylist=true;
 let htmlPlaylists=0,htmlStatus=false,holdStatus=false,heldStatus=null,statusRequests=0,notifyHeldStatus;
 await page.route('**/*',async route=>{
  const request=route.request(),u=new URL(request.url());if(u.hostname==='i.ytimg.com')return route.fulfill({contentType:'image/png',body:Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGMQkFD/DwAB2gFPHkSsgQAAAABJRU5ErkJggg==','base64')});if(u.hostname!=='karaoke.test')return route.abort();
@@ -15,7 +15,7 @@ await page.route('**/*',async route=>{
  if(u.pathname==='/api/youtube/search')data={results:[{title:'Artist - Song',uploader:'Channel',duration:180,url:'https://www.youtube.com/watch?v=abcdefghijk'}]};
  if(u.pathname==='/api/youtube-metadata')data={title:'Artist - Song'};
  if(u.pathname==='/api/easy-mode')data={enabled:true,whisper_model:'medium',background_mode:'random_library',random_backgrounds:[],lyrics_mode:'auto'};
- if(u.pathname==='/api/youtube/publication-options')data={enabled:connected,can_publish:!!saved?.playlist_id,can_choose_playlist:true,playlists:[{id:'PL-one',title:'Playlist Alice'},{id:'PL-two',title:'Playlist Bob'}],default_publish:connected && !!saved?.playlist_id,playlist_id:saved?.playlist_id || '',privacy:'unlisted',channel_title:'Canal teste'};
+ if(u.pathname==='/api/youtube/publication-options')data={enabled:connected,can_publish:!!saved?.playlist_id,can_choose_playlist:canChoosePlaylist,playlists:[{id:'PL-one',title:'Playlist Alice'},{id:'PL-two',title:'Playlist Bob'}],default_publish:connected && !!saved?.playlist_id,playlist_id:saved?.playlist_id || '',privacy:'unlisted',channel_title:'Canal teste'};
  if(u.pathname==='/api/users')data=[{username:'owner',role:'admin'},{username:'alice',role:'user'},{username:'bob',role:'user'}];
  if(u.pathname==='/api/admin/results')data={results:[{kind:'video',filename:'karaoke.mp4',owner:'owner',owner_key:'__admin__',youtube_eligible:true},{kind:'video',filename:'srt-result.mp4',owner:'owner',owner_key:'__admin__',youtube_eligible:false},{kind:'video',filename:'unknown.mp4',owner:'owner',owner_key:'__admin__'}]};
  if(u.pathname==='/api/library')data={audio:[],backgrounds:[],history:[],videos:[],photos:[]};
@@ -119,10 +119,24 @@ await page.waitForFunction(()=>document.getElementById('ytPublishChannel').datas
 assert.equal(await page.locator('#ytDefaultPlaylist').inputValue(),'PL-two');
 await page.locator('#tabBtnCreate').click();
 await page.locator('#btnCreatorEasy').click();
-assert.equal(await page.locator('#easyYoutubePlaylist').isDisabled(),true);
+assert.equal(await page.locator('#easyYoutubePlaylist').isDisabled(),false);
 assert.equal(await page.locator('#easyYoutubePlaylist').inputValue(),'PL-two');
 assert.equal(await page.locator('#easyYoutubeExtras').isChecked(),false);
 assert.equal(await page.locator('#easyYoutubePlaylist option[value=""]').count(),0);
+await page.locator('#easyYoutubePlaylist').selectOption('PL-one');
+await page.evaluate(()=>loadYoutubePublicationOptions());
+assert.equal(await page.locator('#easyYoutubePlaylist').inputValue(),'PL-one');
+assert.equal(await page.locator('#ytDefaultPlaylist').inputValue(),'PL-two');
+await page.locator('#btnCreatorAdvanced').click();
+assert.equal(await page.locator('#fullYoutubePlaylist').isDisabled(),false);
+await page.locator('#fullYoutubePlaylist').selectOption('PL-one');
+assert.equal(await page.locator('#ytDefaultPlaylist').inputValue(),'PL-two');
+canChoosePlaylist=false;
+await page.evaluate(()=>loadYoutubePublicationOptions());
+assert.equal(await page.locator('#easyYoutubePlaylist').isDisabled(),true);
+assert.equal(await page.locator('#fullYoutubePlaylist').isDisabled(),true);
+assert.equal(await page.locator('#easyYoutubePlaylist').inputValue(),'PL-two');
+assert.equal(await page.locator('#fullYoutubePlaylist').inputValue(),'PL-two');
 
 await page.locator('#btnCreatorSubtitle').click();
 await page.locator('#subtitleYoutubeUrlSearch').fill('Artist Song');

@@ -793,13 +793,14 @@ class YouTubePublisher:
             if not user:
                 raise PublicationError('A conta que solicitou a publicação não está mais disponível.')
             self.publication_options(user, True, job['playlist_id'], job['title'])
-            profile_playlist = self.validate_profile_playlist(user)
+            primary_playlist = self.validate_profile_playlist(user, job['playlist_id'])
         if not requester:
             self.validate_profile_playlist({'role':'admin'}, job['playlist_id'])
-            profile_playlist = self.validate_profile_playlist({'role':'admin'})
+            primary_playlist = self.validate_profile_playlist({'role':'admin'}, job['playlist_id'])
         if self.token()['channel_id'] != job['channel_id']:
             raise PublicationError('O canal conectado mudou. A publicação foi interrompida.')
-        targets = list(dict.fromkeys([profile_playlist, *(job.get('playlist_ids') or [job['playlist_id']])]))
+        # A chosen primary replaces the profile default; only explicit extras add destinations.
+        targets = list(dict.fromkeys([primary_playlist, *(job.get('playlist_ids') or [job['playlist_id']])]))
         completed = list(job.get('completed_playlists') or ([job['playlist_id']] if job.get('playlist_done') else []))
         if any(playlist not in completed for playlist in targets):
             available_playlists = {p['id'] for p in self.playlists()}

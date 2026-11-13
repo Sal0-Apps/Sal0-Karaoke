@@ -101,6 +101,12 @@ function resetYoutubeExtras() {
         const checkbox = document.getElementById(prefix + 'YoutubeExtras');
         if (checkbox) { checkbox.checked = false; document.getElementById(prefix + 'YoutubeExtraList').hidden = true; }
         document.querySelectorAll(`#${prefix}YoutubeExtraList input`).forEach(input => input.checked = false);
+        const primary = document.getElementById(prefix + 'YoutubePlaylist');
+        if (primary) {
+            primary.value = cachedYoutubeOptions.playlist_id || '';
+            primary.onchange?.();
+            delete primary.dataset.playlistChoice;
+        }
     }
 }
 function closeCachedEditor() {
@@ -211,6 +217,11 @@ async function openCacheSettings(id, quick = false) {
     for (const prefix of ['easy','full']) {
         document.getElementById(prefix + 'YoutubePublish').checked = Boolean(options.youtube_publish);
         document.getElementById(prefix + 'YoutubeTitle').value = options.youtube_title || '';
+        const primary = document.getElementById(prefix + 'YoutubePlaylist');
+        if (cachedYoutubeOptions.can_choose_playlist && options.youtube_playlist_id && Array.from(primary.options).some(item => item.value === options.youtube_playlist_id)) {
+            primary.value = options.youtube_playlist_id;
+            primary.onchange?.();
+        }
         if (options.youtube_extra_playlists) {
             await loadAdditionalPlaylists();
             const checkbox = document.getElementById(prefix + 'YoutubeExtras'); checkbox.checked = true;
@@ -260,7 +271,7 @@ function renderExtraPlaylistList(prefix, selected = null) {
     selected = selected ?? cachedExtraSelections.get(prefix) ?? [];
     cachedExtraSelections.set(prefix, selected);
     for (const playlist of cachedPlaylistChoices) {
-        if (playlist.id === cachedYoutubeOptions.playlist_id) continue;
+        if (playlist.id === (document.getElementById(prefix + 'YoutubePlaylist').value || cachedYoutubeOptions.playlist_id)) continue;
         const label = document.createElement('label'); const input = document.createElement('input'); input.type='checkbox';input.value=playlist.id;input.checked=selected.includes(playlist.id);
         input.onchange = () => cachedExtraSelections.set(prefix, Array.from(list.querySelectorAll('input:checked')).map(item => item.value));
         label.append(input, document.createTextNode(playlist.title)); list.append(label);

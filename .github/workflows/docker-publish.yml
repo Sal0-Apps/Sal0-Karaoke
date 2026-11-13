@@ -120,6 +120,8 @@ jobs:
           npm install --prefix /tmp/sal0-browser playwright@1.55.0
           /tmp/sal0-browser/node_modules/.bin/playwright install --with-deps chromium
           NODE_PATH=/tmp/sal0-browser/node_modules node tests/appearance_smoke.cjs
+          NODE_PATH=/tmp/sal0-browser/node_modules node tests/browser_youtube_publisher.cjs
+          NODE_PATH=/tmp/sal0-browser/node_modules node tests/browser_queue_cache.cjs
 
       - name: Keep web appearance screenshots
         if: always()

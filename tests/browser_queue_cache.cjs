@@ -115,7 +115,7 @@ for (const match of HTML.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/g)) new F
   await page.waitForTimeout(50);
   assert.equal(await page.locator('#previewBgImage').getAttribute('src'),null);
   assert.equal(await page.locator('#cachedReplaceYoutube').isChecked(),true);
-  assert.equal(await page.locator('#easyYoutubePlaylist').isDisabled(),true);
+  assert.equal(await page.locator('#easyYoutubePlaylist').isDisabled(),false);
   assert.equal(await page.locator('#easyYoutubePlaylist').inputValue(),'PL-profile');
   assert.equal(await page.locator('#easyYoutubeExtras').isChecked(),false);
   await page.locator('#easyYoutubeExtras').check();
@@ -139,12 +139,18 @@ for (const match of HTML.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/g)) new F
   assert.equal(await page.locator('#lyricsText').inputValue(),'Guia A');
   assert((await page.locator('#bgTextName').textContent()).includes('Fundo A.png'));
   await page.locator('#lyricsText').fill('Guia corrigida no detalhado');
+  await page.locator('#fullYoutubePlaylist').selectOption('PL-extra1');
+  assert.equal(await page.locator('#fullYoutubeExtraList input[value="PL-extra1"]').count(),0);
+  assert.equal(await page.locator('#fullYoutubeExtras').isChecked(),false);
   if(!await page.locator('#advancedContent').isVisible())await page.locator('#btnToggleAdvanced').click();
   await page.locator('[name="font_size"]').fill('48');
   await page.locator('#btnSubmit').click();
   await page.waitForFunction(()=>!window.cachedRevisionId);
   assert.equal(value(submissions[1],'cache_job_id'),'A');assert.equal(value(submissions[1],'font_size'),'48');
   assert.equal(value(submissions[1],'youtube_extra_playlists'),'false');
+  assert.equal(value(submissions[1],'youtube_playlist_id'),'PL-extra1');
+  assert.deepEqual(JSON.parse(value(submissions[1],'youtube_additional_playlists')),[]);
+  assert.equal(publicationOptions.playlist_id,'PL-profile');
   assert.equal(value(submissions[1],'lyrics_text'),'Guia corrigida no detalhado');
   await page.locator('[data-cache-id="S"]').locator('[data-queue-action=detail]').click();
   await page.waitForFunction(()=>window.cachedRevisionId==='S'&&!document.getElementById('cachedSubtitleStyle').hidden);

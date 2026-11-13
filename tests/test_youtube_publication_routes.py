@@ -47,6 +47,7 @@ class PublicationRouteTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         result = response.json()
         self.assertTrue(result['default_publish'])
+        self.assertFalse(result['can_choose_playlist'])
         self.assertEqual(result['playlists'], [{'id': 'playlist-one', 'title': 'Minha playlist'}])
         self.assertNotIn('secret', response.text)
         self.assertNotIn('playlist-other', response.text)

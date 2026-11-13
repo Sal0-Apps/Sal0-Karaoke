@@ -3266,12 +3266,12 @@ html:not([data-sal0-look=legacy]) .header-actions .sal0-icon-button{padding-inli
                     <li>Em <strong>Ajustes → Canal e publicação no YouTube → Conexão do canal</strong>, configure uma vez uma credencial Google do tipo <strong>TVs e dispositivos com entrada limitada</strong>, pelo navegador do celular. Ative a YouTube Data API v3 no mesmo projeto.</li>
                     <li>Toque em <strong>Reconectar canal pelo celular</strong>, copie o código e abra <strong>google.com/device</strong> no navegador. Escolha sua conta e permita o acesso. Volte ao app e confira o nome do canal. Funciona pela rede local ou externa; não precisa de um PC ou retorno HTTPS. Projetos em Teste podem exigir nova aprovação em sete dias.</li>
                     <li>Em <strong>Playlist de cada usuário</strong>, defina uma playlist válida de cada conta. O envio fica bloqueado enquanto o perfil não tiver playlist. Para o administrador, abra <strong>Padrões de publicação do administrador → Playlist padrão do administrador</strong>. O envio começa marcado para todas as contas. A privacidade automática é <strong>Não listado</strong>. Salve e confira a confirmação.</li>
-                    <li>No modo Rápido ou Detalhado, marque <strong>Publicar no YouTube</strong> somente quando quiser enviar esse vídeo. Desmarcado, não há publicação. Uma playlist no perfil é obrigatória; sem ela, o vídeo não é enviado. O administrador pode trocar o destino por vídeo no modo rápido.</li>
+                    <li>No modo Rápido ou Detalhado, marque <strong>Publicar no YouTube</strong> somente quando quiser enviar esse vídeo. Desmarcado, não há publicação. Uma playlist no perfil é obrigatória; sem ela, o vídeo não é enviado. Somente o administrador pode escolher outra playlist principal por vídeo, nos modos Rápido e Detalhado; sem playlists adicionais, o vídeo entra apenas no destino escolhido.</li>
                     <li>Use <strong>Publicar um vídeo já pronto</strong> para revisar título, capa, playlist e privacidade de um resultado existente. Acompanhe erros e links no histórico de publicações.</li>
                 </ol>
                 <p>A API tem cota gratuita e pode limitar projetos sem auditoria a vídeos privados. Guarde a autorização como uma senha. Backing vocals e vídeo do modo SRT mostram porcentagem da etapa e avisam o avanço no Telegram; o LibreTranslate informa apenas início e término.</p>
             </details>
-            <p class="compact-note">Versão do servidor: 12.7.14. A transcrição é local; fontes, modelos e integrações podem acessar serviços externos. Use conteúdo autorizado.</p>
+            <p class="compact-note">Versão do servidor: 12.7.15. A transcrição é local; fontes, modelos e integrações podem acessar serviços externos. Use conteúdo autorizado.</p>
             <p class="compact-note">Use o servidor pela rede local ou VPN. A busca/importação do YouTube não concede direitos sobre a mídia. OAuth autoriza o acesso ao canal, não o uso de músicas. Confira as permissões do conteúdo e os termos do YouTube antes de importar ou publicar. Não listado permite acesso a quem tiver o link; resultados SRT nunca vão ao YouTube.</p>
             <p class="compact-note"><a href="https://www.youtube.com/static?template=terms" target="_blank" rel="noopener noreferrer">Termos do YouTube</a> · <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer">Privacidade do Google</a> · <a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener noreferrer">Revogar acesso ao canal</a></p>
         </div>
@@ -8027,15 +8027,21 @@ html:not([data-sal0-look=legacy]) .header-actions .sal0-icon-button{padding-inli
                     if (!window.cachedRevisionId && !checkbox.dataset.userChoice) checkbox.checked = options.enabled && options.can_publish && options.default_publish;
                     checkbox.disabled = !options.can_publish;
                     const select = ytElement(prefix + 'YoutubePlaylist');
+                    const requested = select.dataset.playlistChoice || (window.cachedRevisionId ? window.cachedRevisionOptions?.youtube_playlist_id : '');
                     select.replaceChildren();
                     if (!options.playlist_id) select.add(new Option('Defina uma playlist no perfil', ''));
                     for (const playlist of options.playlists || []) select.add(new Option(playlist.title, playlist.id));
-                    select.value = options.playlist_id || '';
-                    select.disabled = true;
-                    const updateNote = () => ytElement(prefix + 'YoutubePublicationNote').textContent = `Canal: ${options.channel_title} · ${({'private':'Privado','unlisted':'Não listado','public':'Público'})[options.privacy] || options.privacy} · ${options.playlists?.find(playlist => playlist.id === select.value)?.title || 'Playlist não definida'}.`;
+                    select.value = options.can_choose_playlist && options.playlists?.some(playlist => playlist.id === requested)
+                        ? requested : options.playlist_id || '';
+                    select.disabled = !options.can_choose_playlist || !options.can_publish;
+                    const updateNote = () => ytElement(prefix + 'YoutubePublicationNote').textContent = `Canal: ${options.channel_title} · ${({'private':'Privado','unlisted':'Não listado','public':'Público'})[options.privacy] || options.privacy} · ${options.playlists?.find(playlist => playlist.id === select.value)?.title || 'Playlist não definida'}.${options.can_choose_playlist ? ' A escolha vale só para este vídeo; o padrão do perfil não muda.' : ''}`;
                     if (!options.can_publish) ytElement(prefix + 'YoutubePublicationNote').textContent = 'Publicação bloqueada: o administrador precisa definir uma playlist no perfil desta conta.';
                     else updateNote();
-                    select.onchange = updateNote;
+                    select.onchange = () => {
+                        select.dataset.playlistChoice = select.value;
+                        updateNote();
+                        renderExtraPlaylistList(prefix);
+                    };
                 }
                 renderYoutubeExtras(options);
             } catch (error) { console.warn(error.message); }

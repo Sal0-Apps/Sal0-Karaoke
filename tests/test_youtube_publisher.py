@@ -177,6 +177,38 @@ class PublisherTests(unittest.TestCase):
             upload.assert_not_called()
         with self.assertRaises(PublicationError): self.publisher.enqueue(self.video, 'Title', playlist_id='playlist-two')
 
+    def test_admin_single_override_does_not_add_the_profile_playlist(self):
+        admin = {'username': 'admin', 'role': 'admin'}
+        self.publisher.user_lookup = lambda username: admin if username == 'admin' else None
+        options = self.publisher.publication_options(admin, True, 'playlist-two')
+        with patch.object(self.publisher, 'start'):
+            queued = self.publisher.enqueue(self.video, 'Title', playlist_id=options['playlist_id'],
+                thumbnail=self.cover.read_bytes(), requester=admin, automatic=True)
+        job = next(item for item in self.publisher.read('jobs.json', []) if item['id'] == queued['id'])
+        inserted = []
+        def api(method, path, **kwargs):
+            if path == '/playlistItems':
+                if method == 'POST': inserted.append(kwargs['json']['snippet']['playlistId'])
+                return {'items': []} if method == 'GET' else {'id': 'added'}
+            return {'status': {'privacyStatus': 'unlisted'}}
+        with patch.object(self.publisher, 'playlists', return_value=[{'id':'playlist-one'},{'id':'playlist-two'}]), \
+             patch.object(self.publisher, 'upload_video', return_value='abcdefghijk'), \
+             patch.object(self.publisher, 'upload_request', return_value=response()), \
+             patch.object(self.publisher, 'api', side_effect=api):
+            self.publisher.publish(job)
+        self.assertEqual(job['playlist_ids'], ['playlist-two'])
+        self.assertEqual(inserted, ['playlist-two'])
+        self.assertEqual(job['completed_playlists'], ['playlist-two'])
+        self.assertEqual(self.publisher.settings('admin')['playlist_id'], 'playlist-one')
+
+    def test_former_admin_cannot_keep_an_override_after_role_change(self):
+        self.configure_user()
+        self.job.update(requester={'username':'alice','role':'admin'},
+                        playlist_id='playlist-two',playlist_ids=['playlist-two'])
+        with patch.object(self.publisher, 'upload_video') as upload:
+            with self.assertRaises(PublicationError): self.publisher.publish(self.job)
+            upload.assert_not_called()
+
     def test_legacy_job_without_playlist_never_uploads(self):
         self.job['playlist_id'] = ''
         with patch.object(self.publisher, 'upload_video') as upload:

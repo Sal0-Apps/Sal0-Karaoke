@@ -4165,7 +4165,7 @@ def process_karaoke(
         additional = json.loads(youtube_additional_playlists) if youtube_extra_playlists else []
     except (ValueError, TypeError):
         raise HTTPException(status_code=400, detail="Escolha playlists adicionais válidas.")
-    youtube_playlist_id = ""  # Automatic creation always includes the assigned profile playlist.
+    # Preserve the per-video target; the publisher checks the authenticated role.
     try:
         publication_options = None if subtitle_only else youtube_publisher.publication_options(
             current_user, None if youtube_use_profile_default else youtube_publish, youtube_playlist_id, youtube_title,

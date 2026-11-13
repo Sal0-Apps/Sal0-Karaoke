@@ -96,6 +96,33 @@ class QueueCacheTests(unittest.TestCase):
                   process_summary={'mode':'Legendar vídeo' if subtitle else 'Modo Detalhado'})
         self.queue.append(item);return item
 
+    def test_admin_creation_preserves_a_single_alternate_playlist(self):
+        from youtube_publisher import YouTubePublisher
+        publisher = YouTubePublisher(self.root/'youtube')
+        publisher.save('token.json', {'channel_id':'channel','refresh_token':'refresh'})
+        publisher.save('settings.json', {'defaults':{'playlist_id':'PL-profile'}})
+        self.scope['youtube_publisher'] = publisher
+        self.user['role'] = 'admin'
+        response = self.client.post('/api/process', data={'youtube_url':'https://youtu.be/abcdefghijk',
+            'youtube_publish':'true','youtube_playlist_id':'PL-alternate'})
+        self.assertEqual(response.status_code, 200, response.text)
+        publication = self.queue[-1]['pipeline']['youtube_publish_options']
+        self.assertEqual(publication['playlist_id'], 'PL-alternate')
+        self.assertEqual(publication['additional_playlists'], [])
+        self.assertEqual(publisher.settings('alice')['playlist_id'], 'PL-profile')
+
+    def test_user_cannot_override_assigned_playlist_through_creation_api(self):
+        from youtube_publisher import YouTubePublisher
+        publisher = YouTubePublisher(self.root/'youtube')
+        publisher.save('token.json', {'channel_id':'channel','refresh_token':'refresh'})
+        publisher.save('settings.json', {'user_assignments':{'alice':{'playlist_id':'PL-assigned'}}})
+        self.scope['youtube_publisher'] = publisher
+        response = self.client.post('/api/process', data={'youtube_url':'https://youtu.be/abcdefghijk',
+            'youtube_publish':'true','youtube_playlist_id':'PL-alternate'})
+        self.assertEqual(response.status_code, 400, response.text)
+        self.assertIn('playlist atribuída', response.json()['detail'])
+        self.assertEqual(self.queue, [])
+
     def test_clear_entire_exhausted_queue_preserves_results_and_other_profiles(self):
         owned = [self.job(name, status) for name,status in [('A','done'),('E','error'),('C','cancelled'),('R','removed'),('V','replaced')]]
         bob = self.job('BOB','processing',owner='bob')
