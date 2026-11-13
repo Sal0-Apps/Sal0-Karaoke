@@ -1,3 +1,8 @@
+## 12.7.14 — Ajuste visual
+
+- Remove os quadros extras de prévia do palco e resumo da biblioteca. Mantém os ícones estilizados nos controles existentes.
+- Atualização web, sem alterações nos APKs.
+
 ## 12.7.13 — Componentes completos da referência visual
 
 - Corrige alinhamento de ícones, textos e ilustrações em telas estreitas.

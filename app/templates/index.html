@@ -3271,7 +3271,7 @@ html:not([data-sal0-look=legacy]) .header-actions .sal0-icon-button{padding-inli
                 </ol>
                 <p>A API tem cota gratuita e pode limitar projetos sem auditoria a vídeos privados. Guarde a autorização como uma senha. Backing vocals e vídeo do modo SRT mostram porcentagem da etapa e avisam o avanço no Telegram; o LibreTranslate informa apenas início e término.</p>
             </details>
-            <p class="compact-note">Versão do servidor: 12.7.13. A transcrição é local; fontes, modelos e integrações podem acessar serviços externos. Use conteúdo autorizado.</p>
+            <p class="compact-note">Versão do servidor: 12.7.14. A transcrição é local; fontes, modelos e integrações podem acessar serviços externos. Use conteúdo autorizado.</p>
             <p class="compact-note">Use o servidor pela rede local ou VPN. A busca/importação do YouTube não concede direitos sobre a mídia. OAuth autoriza o acesso ao canal, não o uso de músicas. Confira as permissões do conteúdo e os termos do YouTube antes de importar ou publicar. Não listado permite acesso a quem tiver o link; resultados SRT nunca vão ao YouTube.</p>
             <p class="compact-note"><a href="https://www.youtube.com/static?template=terms" target="_blank" rel="noopener noreferrer">Termos do YouTube</a> · <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer">Privacidade do Google</a> · <a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener noreferrer">Revogar acesso ao canal</a></p>
         </div>
@@ -8579,93 +8579,12 @@ html:not([data-sal0-look=legacy]) .header-actions .sal0-icon-button{padding-inli
   const extra=app==='autostart'?'<i class="sal0-power-orbit"></i>':app==='tower'?'<i class="sal0-radar-scan"></i>':app==='block'?'<span class="sal0-skip-track"><i></i></span>':bars;
   img.insertAdjacentHTML('afterend','<span class="sal0-brand-mark sal0-mark-'+app+'" aria-hidden="true"><i class="sal0-reference-halo"></i>'+icon(name)+extra+'</span>');
  }
- // Reference components live in the layout, rather than behind form text.
- let live={};const boundPlayers=new WeakSet();
- const byId=id=>document.getElementById(id);
- function text(el,value){if(el&&el.textContent!==String(value))el.textContent=value;}
- function wave(n=26,mini=false){return '<span class="sal0-wave'+(mini?' sal0-wave-mini':'')+'" aria-hidden="true">'+Array.from({length:n},(_,i)=>'<i class="sal0-wave-bar-'+i+'"></i>').join('')+'</span>';}
- function dial(){return '<span class="sal0-dial" aria-hidden="true"><svg viewBox="0 0 96 96"><circle class="sal0-dial-back" cx="48" cy="48" r="39"/><circle class="sal0-dial-value" cx="48" cy="48" r="39" pathLength="100" stroke-dasharray="0 100" transform="rotate(-90 48 48)"/></svg><strong>—</strong></span>';}
- function updateDial(host,percent){if(!host)return;const n=Number.isFinite(percent)?Math.max(0,Math.min(100,percent)):null;const circle=host.querySelector('.sal0-dial-value'),value=(n??0)+' 100';if(circle.getAttribute('stroke-dasharray')!==value)circle.setAttribute('stroke-dasharray',value);text(host.querySelector('strong'),n===null?'…':Math.round(n)+'%');}
- function art(host){
-  if(host.querySelector(':scope>.sal0-app-art'))return;
-  const name={voz:'voice',autostart:'power',block:'shield',tower:'tower'}[app];
-  const extra=app==='autostart'?'<i class="sal0-power-orbit"></i>':app==='tower'?'<i class="sal0-radar-scan"></i>':app==='voz'?wave(30):'';
-  host.classList.add('sal0-reference-art-host');
-  host.insertAdjacentHTML('beforeend','<div class="sal0-app-art sal0-component" aria-hidden="true"><span class="sal0-brand-mark sal0-mark-'+app+'"><i class="sal0-reference-halo"></i>'+icon(name)+extra+'</span></div>');
- }
- function karaokeStage(){
-  const host=byId('createTabContent');if(!host||byId('sal0-stage-preview'))return;
-  const box=document.createElement('section');box.id='sal0-stage-preview';box.className='card sal0-component sal0-stage-panel';
-  box.setAttribute('aria-labelledby','sal0-stage-title');
-  box.innerHTML='<div class="sal0-component-heading"><div><h2 id="sal0-stage-title">Uma prévia do palco</h2><p>O azul acompanha cada palavra.</p></div><button type="button" class="btn-secondary sal0-stage-pause" aria-label="Pausar prévia" aria-pressed="false">'+icon('pause')+'<span>Pausar</span></button></div><div class="sal0-karaoke-stage" data-sweep="true" data-glow="false" data-fluid="false"><span class="sal0-stage-top">SAL0 KARAOKÊ</span><span class="sal0-stage-fluid" aria-hidden="true"></span><div class="sal0-karaoke-copy">Sua letra aparece aqui</div><span class="sal0-stage-note">O ritmo encontra a imagem.</span>'+wave(26)+'<div class="sal0-stage-track" aria-hidden="true"><i></i></div></div><div class="sal0-stage-chips" role="group" aria-label="Efeitos da prévia"><button type="button" data-stage-effect="sweep" aria-pressed="true">Varredura</button><button type="button" data-stage-effect="glow" aria-pressed="false">Brilho azul</button><button type="button" data-stage-effect="fluid" aria-pressed="false">Fundo fluido</button></div><p class="sal0-component-note">Prévia visual. As opções de criação do vídeo ficam nos ajustes da música.</p>';
-  const form=byId('karaokêForm');if(form&&form.parentElement===host)form.after(box);else host.append(box);
-  box.addEventListener('click',event=>{const button=event.target.closest('button');if(!button)return;const stage=box.querySelector('.sal0-karaoke-stage');if(button.dataset.stageEffect){const on=button.getAttribute('aria-pressed')!=='true';button.setAttribute('aria-pressed',String(on));stage.dataset[button.dataset.stageEffect]=String(on);}else if(button.classList.contains('sal0-stage-pause')){const paused=box.dataset.localPaused!=='true';box.dataset.localPaused=String(paused);button.setAttribute('aria-pressed',String(paused));button.setAttribute('aria-label',paused?'Animar prévia':'Pausar prévia');button.innerHTML=icon(paused?'play':'pause')+'<span>'+(paused?'Animar':'Pausar')+'</span>';}});
-  const update=()=>{const line=(byId('lyricsText')?.value||'').split(/\r?\n/).find(x=>x.trim()&&!/^\s*\[.*\]\s*$/.test(x));text(box.querySelector('.sal0-karaoke-copy'),line?line.trim().slice(0,180):'Sua letra aparece aqui');};
-  byId('lyricsText')?.addEventListener('input',update);update();
- }
- function voiceComponents(){
-  const editor=byId('creation-editor');
-  if(editor&&!byId('sal0-voice-intro')){const intro=document.createElement('section');intro.id='sal0-voice-intro';intro.className='sal0-component sal0-voice-intro';intro.innerHTML='<div><p class="sal0-component-eyebrow">CADA PALAVRA TEM UMA VOZ.</p><h2>Dê vida a cada palavra.</h2><p>Sua referência, sua interpretação. Um espaço para criar, ouvir e ajustar.</p></div>';editor.before(intro);art(intro);}
-  const picker=document.querySelector('.voice-picker');
-  if(picker&&!byId('sal0-voice-choice')){const box=document.createElement('div');box.id='sal0-voice-choice';box.className='sal0-component sal0-voice-choice';box.innerHTML='<span class="sal0-voice-avatar" aria-hidden="true">'+icon('mic')+'</span><div class="sal0-voice-copy"><strong>Voz de referência</strong><small>Escolha uma voz ou envie uma gravação.</small></div>'+wave(14,true)+'<button type="button" class="secondary sal0-reference-play" aria-label="Ouvir voz de referência" disabled>'+icon('play')+'</button>';picker.after(box);box.querySelector('button').onclick=()=>{const audio=byId('selected-voice-audio');if(!audio?.getAttribute('src'))return;const details=byId('selected-voice');details.open=true;if(audio.paused)audio.play().catch(()=>{});else audio.pause();};}
-  const box=byId('sal0-voice-choice'),player=byId('selected-voice-audio');
-  if(box){text(box.querySelector('strong'),live.voiceName||'Voz de referência');text(box.querySelector('small'),live.voiceName?'Sua gravação · pronta para ouvir':'Escolha uma voz ou envie uma gravação.');const disabled=!player?.getAttribute('src');if(box.querySelector('button').disabled!==disabled)box.querySelector('button').disabled=disabled;}
-  document.querySelectorAll('#selected-voice-audio,#current-result audio,#current-result video,#result-list audio,#result-list video').forEach(audio=>{
-   if(boundPlayers.has(audio))return;boundPlayers.add(audio);
-   let view=audio.previousElementSibling;if(!view?.classList.contains('sal0-audio-wave')){view=document.createElement('div');view.className='sal0-component sal0-audio-wave';view.dataset.playing='false';view.innerHTML=wave(28);audio.before(view);}
-   const sync=()=>{const playing=!audio.paused&&!audio.ended;view.dataset.playing=String(playing);if(audio.id==='selected-voice-audio'){const button=byId('sal0-voice-choice')?.querySelector('button');if(button){button.setAttribute('aria-label',playing?'Pausar voz de referência':'Ouvir voz de referência');button.innerHTML=icon(playing?'pause':'play');}}};['play','pause','ended','emptied'].forEach(name=>audio.addEventListener(name,sync));sync();
-  });
-  const heading=document.querySelector('#current-result .result-heading');
-  if(heading&&!heading.querySelector('.sal0-dial')){heading.classList.add('sal0-process-heading');heading.insertAdjacentHTML('afterbegin','<span class="sal0-component">'+dial()+'</span>');}
-  updateDial(heading?.querySelector('.sal0-dial'),live.jobPercent);
- }
- function blockComponents(){
-  document.querySelectorAll('.device-card').forEach(card=>{
-   const box=card.querySelector('.device-icon');if(!box||box.querySelector('.sal0-tv-art'))return;
-   box.insertAdjacentHTML('beforeend','<div class="sal0-component sal0-tv-art" aria-hidden="true">'+icon('play')+'<span class="sal0-tv-status">VINCULADA</span><span class="sal0-tv-track"><i></i></span></div>');
-  });
-  document.querySelectorAll('.sal0-tv-art').forEach(tv=>{const enabled=live.engine==='running';if(tv.dataset.active!==String(enabled))tv.dataset.active=String(enabled);});
- }
- function autoStartComponents(){
-  const strip=byId('monitor-strip');if(!strip)return;
-  let panel=byId('sal0-recovery-progress');if(!panel){panel=document.createElement('section');panel.id='sal0-recovery-progress';panel.className='card sal0-component sal0-live-panel';panel.setAttribute('aria-labelledby','sal0-recovery-title');panel.innerHTML='<div class="sal0-component-heading"><div><h2 id="sal0-recovery-title">Acontecendo agora</h2><p>Recuperação dos aplicativos selecionados.</p></div></div><div class="sal0-process">'+dial()+'<div><h3>Discos e serviços</h3><p class="sal0-recovery-count">Aguardando o servidor…</p></div></div><div class="sal0-live-timeline"></div>';strip.after(panel);}
-  if(!live.recovery)return;
-  const r=live.recovery;updateDial(panel.querySelector('.sal0-dial'),r.total>0?100*r.ready/r.total:null);text(panel.querySelector('.sal0-recovery-count'),r.total?r.ready+' de '+r.total+' aplicativos em execução':'Nenhum aplicativo selecionado para recuperação.');
-  const timeline=panel.querySelector('.sal0-live-timeline'),events=r.events||[];const key=JSON.stringify(events);if(timeline.dataset.events!==key){timeline.dataset.events=key;timeline.replaceChildren();for(const e of events){const row=document.createElement('div');row.className='sal0-live-event';const plate=document.createElement('span');plate.className='sal0-event-symbol';plate.innerHTML=icon(e.level==='error'?'info':e.level==='warning'?'clock':'check');const copy=document.createElement('span');copy.textContent=e.message;const stamp=document.createElement('time');const date=new Date(e.time*1000);stamp.textContent=date.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});stamp.dateTime=date.toISOString();row.append(plate,copy,stamp);timeline.append(row);}}
- }
- function towerComponents(){
-  const hero=document.querySelector('.hero');if(hero&&live.jobRunning!==undefined)hero.dataset.scanning=String(live.jobRunning);
-  const banner=byId('job-banner');if(!banner||banner.hidden)return;
-  if(!banner.querySelector('.sal0-scan-wave'))banner.insertAdjacentHTML('beforeend','<span class="sal0-component sal0-scan-wave" aria-hidden="true">'+wave(18,true)+'<span class="sal0-scan-track"><i></i></span></span>');
- }
- function referenceLinks(){
-  if(app==='karaoke'||app==='voz'){
-   const host=byId(app==='karaoke'?'createTabContent':'view-create');
-   if(host&&!byId('sal0-library-summary')){const card=document.createElement('section');card.id='sal0-library-summary';card.className='card sal0-component sal0-reference-summary';card.innerHTML='<h2>'+(app==='voz'?'Minhas vozes e criações':'Sua biblioteca')+'</h2><p>Resultados, referências e projetos sempre por perto.</p><button type="button" class="sal0-reference-link">'+icon('folder')+'<span>Explorar biblioteca</span></button>';card.querySelector('button').onclick=()=>byId(app==='karaoke'?'tabBtnLibrary':'tab-library')?.click();host.append(card);}
-  }
-  if(app==='voz'){
-   const form=byId('project-form');if(form&&!byId('sal0-interpretation-shortcuts')){const card=document.createElement('section');card.id='sal0-interpretation-shortcuts';card.className='sal0-component sal0-reference-summary';card.innerHTML='<h2>Interpretação</h2><p>Encontre o tom da sua voz.</p><div class="sal0-interpretation-actions"><button type="button" data-voice-option="voice-style">Tom da voz</button><button type="button" data-voice-option="expressiveness">Expressividade</button><button type="button" data-voice-option="rate">Ritmo</button></div>';const submission=byId('generate-step');submission.before(card);card.addEventListener('click',event=>{const button=event.target.closest('[data-voice-option]');if(!button)return;const target=byId(button.dataset.voiceOption),parent=target?.closest('[hidden]');if(!target||parent)return;byId('personalization').open=true;target.focus();target.scrollIntoView({block:'center',behavior:root.dataset.sal0Paused==='true'?'auto':'smooth'});});}
-   const card=byId('sal0-interpretation-shortcuts');if(card){card.querySelectorAll('[data-voice-option]').forEach(button=>{const target=byId(button.dataset.voiceOption);button.hidden=!target||!!target.closest('[hidden]');});card.hidden=Array.from(card.querySelectorAll('button')).every(button=>button.hidden);}
-  }
-  if(app==='autostart'){
-   const panel=byId('sal0-recovery-progress');if(panel&&!panel.querySelector('.sal0-reference-link')){const button=document.createElement('button');button.type='button';button.className='sal0-reference-link';button.innerHTML=icon('sliders')+'<span>Configurar recuperação automática</span>';button.onclick=()=>document.querySelector('button[data-view=settings]')?.click();panel.append(button);}
-  }
-  if(app==='block'){
-   const host=byId('view-devices');if(host&&!byId('sal0-block-activity')){const card=document.createElement('section');card.id='sal0-block-activity';card.className='card sal0-component sal0-reference-summary';card.innerHTML='<h2>O conteúdo fluiu</h2><p>Atividade recente da proteção.</p><div class="sal0-block-events"></div><button type="button" class="sal0-reference-link">'+icon('skip')+'<span>Ver atividade e controlar proteção</span></button>';card.querySelector('button').onclick=()=>byId('tab-activity')?.click();host.append(card);}
-   const list=document.querySelector('.sal0-block-events');if(list&&live.events){const key=JSON.stringify(live.events);if(list.dataset.events!==key){list.dataset.events=key;list.replaceChildren();for(const e of live.events){const row=document.createElement('p');row.textContent=e.message;list.append(row);}if(!live.events.length){const row=document.createElement('p');row.textContent='Os próximos eventos aparecerão aqui.';list.append(row);}}}
-  }
- }
- function components(){if(legacy())return;if(app==='karaoke')karaokeStage();else if(app==='voz')voiceComponents();else if(app==='block')blockComponents();else if(app==='autostart')autoStartComponents();else if(app==='tower')towerComponents();referenceLinks();}
- function setState(value){live={...live,...value};components();}
  function each(scope,selector,fn){if(scope.matches(selector))fn(scope);scope.querySelectorAll(selector).forEach(fn);}
  function decorate(scope){
   if(legacy()||scope.closest('.sal0-scene,.sal0-brand-mark,#sal0-theme-dialog'))return;
   each(scope,'.brand>img,.brand .logo>img,.auth-brand .logo>img,.logo-area>.logo-img',mark);
   each(scope,'svg',svg=>{if(svg.querySelector('use'))replaceGlyph(svg);});
   each(scope,'button',decorateButton);
-  if(app==='autostart')each(scope,'#overview-view>.page-head',art);
-  else if(app==='block'||app==='tower')each(scope,'.hero',art);
-  components();
  }
  function restore(){
   document.querySelectorAll('[data-sal0-icon-replaced]').forEach(svg=>{const original=originalSvg.get(svg);if(original!==undefined)svg.innerHTML=original;});
@@ -8676,15 +8595,14 @@ html:not([data-sal0-look=legacy]) .header-actions .sal0-icon-button{padding-inli
   const pending=new Set();let frame=0;
   new MutationObserver(records=>{
    for(const record of records){
-    if(record.type==='attributes'){if(['voice-style-settings','expression-settings','rate-label'].includes(record.target.id))pending.add(record.target);continue;}
     if(record.target.nodeType===1&&record.target.closest('.sal0-component,.sal0-ui-icon,.sal0-brand-mark,.sal0-scene,[data-sal0-icon-replaced],#sal0-theme-dialog'))continue;
     for(const node of record.addedNodes){const el=node.nodeType===1?node:node.parentElement;if(el&&!el.closest('.sal0-component,.sal0-ui-icon,.sal0-brand-mark,.sal0-scene,#sal0-theme-dialog'))pending.add(el);}
    }
    if(pending.size&&!frame)frame=requestAnimationFrame(()=>{frame=0;const nodes=Array.from(pending);pending.clear();nodes.forEach(el=>{if(el.isConnected)decorate(el);});});
-  }).observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:['hidden']});
+  }).observe(document.body,{childList:true,subtree:true});
   new MutationObserver(()=>{if(legacy())restore();else decorate(document.body);}).observe(root,{attributes:true,attributeFilter:['data-sal0-look']});
  }
- window.Sal0Reference=Object.freeze({icon,wave,state:setState});
+ window.Sal0Reference=Object.freeze({icon});
  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',mount,{once:true});else mount();
 })();
 

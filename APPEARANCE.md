@@ -20,7 +20,7 @@ Tema antigo também pausam as animações. A restauração volta ao Cristal escu
 
 | Aplicativo | Integração |
 | --- | --- |
-| Karaokê | Palco com letra, varredura de 7 s, brilho azul, fundo fluido, equalizador, pausa e atalho da biblioteca. A primeira linha da letra digitada alimenta a prévia. Os controles existentes continuam responsáveis pela criação do vídeo. |
+| Karaokê | Ícones estilizados nos controles e na marca; os temas não criam quadros de palco ou de resumo da biblioteca. A interface de criação e a aba Biblioteca usam os controles próprios do aplicativo. |
 | Voz | Ondas de 1,6 s no cabeçalho de criação, voz escolhida e players; botão para ouvir/pausar a gravação real; atalhos para os controles de interpretação disponíveis no modelo; indicador circular com o progresso do servidor e acesso à biblioteca. |
 | AutoStart | Órbita de 18 s, indicador circular de aplicativos selecionados em execução, eventos reais do monitor e acesso à configuração da recuperação. Início, pausa e seleção continuam nos controles do monitor. |
 | Block | Tela de TV para cada dispositivo vinculado, animação de salto de 9 s, estado ligado ao motor, edição/remoção existentes, últimos eventos e acesso ao controle da proteção. Vinculada não significa que a TV esteja online. |
