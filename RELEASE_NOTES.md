@@ -1,3 +1,11 @@
+## 12.7.12 — Animações e ícones da referência aprovada
+
+- Restauradas as quatro ondas SVG com a mesma deformação contínua e iluminação do HTML de exemplo.
+- Ícones vetoriais da galeria nos controles e na identidade do app; equalizador, ondas de voz, órbita, salto e radar conforme cada aplicativo.
+- Controle de movimento mostra a preferência efetiva e permite ativação manual mesmo quando o aparelho sugere movimento reduzido.
+- Fundo com altura estável durante a rolagem; gráficos decorativos não recriam o conteúdo nem alteram os dados de tarefas.
+- Modos claro/escuro e Tema antigo preservados. Atualização da interface web, recebida pelos clientes atuais.
+
 ## 12.7.11 — Conexão discreta e fundo estável
 
 - Verificações de rede em segundo plano, sem mostrar a barra de progresso nem redimensionar uma página já aberta.

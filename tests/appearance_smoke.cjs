@@ -46,10 +46,13 @@ const files={'/':[html,'text/html'],'/appearance.js':[js,'text/javascript'],'/ap
    });
    return {morphs:scene.querySelectorAll('animate,animateTransform').length,results,before,after:[rect(card),rect(header)]};
   });
-  assert.equal(cycle.morphs,0);assert(cycle.results.length>=2);assert.deepEqual(cycle.before,cycle.after);
-  for(const item of cycle.results){assert.equal(item.direction,'alternate');assert(item.backgroundOnly);assert(item.jump<.01,'Cycle boundary must be continuous');}
+  const morph=await page.evaluate(()=>{const svg=document.querySelector('#sal0-scene svg'),path=svg.querySelector('path');svg.pauseAnimations();svg.setCurrentTime(0);const first=path.getTotalLength();svg.setCurrentTime(15.25);const second=path.getTotalLength();svg.setCurrentTime(0);svg.unpauseAnimations();return {first,second,visible:getComputedStyle(document.querySelector('#sal0-scene')).zIndex};});
+  assert(Math.abs(morph.first-morph.second)>1,'Reference paths must actually morph');assert.equal(morph.visible,'0');
+  assert.equal(cycle.morphs,4);assert(cycle.results.length>=2);assert.deepEqual(cycle.before,cycle.after);
+  for(const item of cycle.results){assert.equal(item.direction,'normal');assert(item.backgroundOnly);assert(item.jump<.01,'Cycle boundary must be continuous');}
   await page.evaluate(()=>window.appearanceScene=document.querySelector('#sal0-scene'));const before=await page.locator('#sal0-scene').boundingBox();await page.evaluate(()=>scrollTo(0,1000));await page.waitForFunction(()=>scrollY>0);const after=await page.locator('#sal0-scene').boundingBox();assert.equal(after.y,0);assert.equal(before.height,after.height);assert(await page.evaluate(()=>appearanceScene===document.querySelector('#sal0-scene')));
   await page.reload();await page.waitForSelector('#sal0-scene');assert.equal(await page.locator('html').getAttribute('data-sal0-look'),'wall');assert.equal(await page.locator('html').getAttribute('data-sal0-mode'),'light');await page.screenshot({path:path.join(screenshots,'mobile-light.png')});assert.deepEqual(errors,[]);
+  await page.emulateMedia({reducedMotion:'reduce'});await page.evaluate(()=>localStorage.removeItem('sal0.appearance.v1'));await page.reload();await page.waitForSelector('#sal0-scene[data-paused=true]');await page.getByRole('button',{name:'Escolher tema visual',exact:true}).click();assert(!(await page.getByRole('switch',{name:'Animações suaves',exact:false}).isChecked()));await page.getByRole('switch',{name:'Animações suaves',exact:false}).check();assert.equal(await page.locator('#sal0-scene').getAttribute('data-paused'),'false');assert(await page.evaluate(()=>!document.querySelector('#sal0-scene svg').animationsPaused()));
   console.log('Appearance OK: single labeled header control, native modes, legacy, persistence, motion boundaries, fixed content and stable scrolling under CSP.');
  }finally{if(browser)await browser.close();await new Promise(resolve=>server.close(resolve));}
 })().catch(e=>{console.error(e);process.exitCode=1;});
