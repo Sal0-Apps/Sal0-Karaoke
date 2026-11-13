@@ -1,3 +1,12 @@
+## 12.7.13 — Componentes completos da referência visual
+
+- Corrige alinhamento de ícones, textos e ilustrações em telas estreitas.
+- Integra TVs com salto, ondas de voz, palco de legenda, indicadores circulares,
+  programação e atividade aos controles e dados reais de cada aplicativo.
+- Completa os temas com fundo sólido, imagem própria e restauração da aparência.
+- Mantém Tema antigo, modos nativos, movimento opcional e fundo estável ao rolar.
+- Atualização web; sem mudanças nos APKs ou no processamento.
+
 ## 12.7.12 — Animações e ícones da referência aprovada
 
 - Restauradas as quatro ondas SVG com a mesma deformação contínua e iluminação do HTML de exemplo.
