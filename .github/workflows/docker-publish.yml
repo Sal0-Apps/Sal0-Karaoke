@@ -3,7 +3,12 @@ name: Build, Publish and Release
 on:
   push:
     branches: [main]
-    paths: [VERSION, '.github/workflows/docker-publish.yml']
+    paths:
+      - VERSION
+      - 'app/**'
+      - 'tests/**'
+      - '.github/scripts/**'
+      - '.github/workflows/docker-publish.yml'
     tags:
       - 'v*'
   workflow_dispatch: # Dispara quando tags começando com v são criadas, ex: v1.0
