@@ -1717,7 +1717,7 @@ html[data-sal0-look=legacy] .sal0-theme-dialog{--sal0-glass-alpha:.97}
 @media(max-width:600px){.sal0-liquid-haze.second{display:none}.sal0-ribbons{inset:-12%;width:124%;height:124%}}
 
 /* lvh is stable when mobile address bars collapse. No scroll handler, no vh/vmax. */
-.sal0-scene{position:fixed;inset:auto;top:0;left:0;width:100%;height:100%;height:100lvh;z-index:-1;pointer-events:none;overflow:hidden;contain:strict;transform:translate3d(0,0,0);backface-visibility:hidden}
+.sal0-scene{position:fixed;inset:auto;top:0;left:0;width:100%;height:100%;height:100lvh;z-index:0;pointer-events:none;overflow:hidden;contain:strict;transform:translate3d(0,0,0);backface-visibility:hidden}
 .sal0-scene .sal0-ribbons{max-width:none;max-height:none;pointer-events:none}
 .sal0-scene .sal0-liquid-haze{width:1100px;height:1000px;max-width:none}
 .sal0-scene .sal0-liquid-haze.second{width:1350px;height:1100px}
@@ -1731,6 +1731,7 @@ html[data-sal0-look=legacy] .sal0-theme-dialog{--sal0-glass-alpha:.97}
 .sal0-ribbons,.sal0-liquid-haze{backface-visibility:hidden}
 .header-actions .sal0-theme-launcher{gap:6px;min-height:44px;justify-content:center;white-space:nowrap}
 .header-actions>button{min-height:44px}
+body>.container{position:relative;z-index:1}
 </style>
 </head>
 <body>
@@ -3093,7 +3094,7 @@ html[data-sal0-look=legacy] .sal0-theme-dialog{--sal0-glass-alpha:.97}
                 </ol>
                 <p>A API tem cota gratuita e pode limitar projetos sem auditoria a vídeos privados. Guarde a autorização como uma senha. Backing vocals e vídeo do modo SRT mostram porcentagem da etapa e avisam o avanço no Telegram; o LibreTranslate informa apenas início e término.</p>
             </details>
-            <p class="compact-note">Versão do servidor: 12.7.10. A transcrição é local; fontes, modelos e integrações podem acessar serviços externos. Use conteúdo autorizado.</p>
+            <p class="compact-note">Versão do servidor: 12.7.11. A transcrição é local; fontes, modelos e integrações podem acessar serviços externos. Use conteúdo autorizado.</p>
             <p class="compact-note">Use o servidor pela rede local ou VPN. A busca/importação do YouTube não concede direitos sobre a mídia. OAuth autoriza o acesso ao canal, não o uso de músicas. Confira as permissões do conteúdo e os termos do YouTube antes de importar ou publicar. Não listado permite acesso a quem tiver o link; resultados SRT nunca vão ao YouTube.</p>
             <p class="compact-note"><a href="https://www.youtube.com/static?template=terms" target="_blank" rel="noopener noreferrer">Termos do YouTube</a> · <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer">Privacidade do Google</a> · <a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener noreferrer">Revogar acesso ao canal</a></p>
         </div>

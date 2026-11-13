@@ -32,7 +32,7 @@ const files={'/':[html,'text/html'],'/appearance.js':[js,'text/javascript'],'/ap
   await page.setViewportSize({width:390,height:844});await page.screenshot({path:path.join(screenshots,'mobile-dark.png')});
   await page.getByRole('button',{name:'Escolher tema visual',exact:true}).click();
   assert.equal(await page.locator('html').getAttribute('data-sal0-mode'),'dark','Opening the menu must not toggle the native color mode');
-  await page.getByRole('radio',{name:'Tema antigo',exact:false}).click();assert.equal(await page.locator('#sal0-scene').evaluate(e=>getComputedStyle(e).display),'none');assert.equal(await page.locator('.card').evaluate(e=>getComputedStyle(e).backgroundColor),'rgb(22, 33, 44)');
+  await page.getByRole('radio',{name:'Tema antigo',exact:false}).click();assert.equal(await page.locator('#sal0-scene').evaluate(e=>getComputedStyle(e).display),'none');await page.waitForFunction(()=>getComputedStyle(document.querySelector('.card')).backgroundColor==='rgb(22, 33, 44)');
   for(const name of ['Cristal','Aurora','Wall']){await page.getByRole('radio',{name,exact:false}).click();assert(await page.locator('#sal0-scene').isVisible());}
   await page.getByRole('button',{name:'Claro',exact:true}).click();assert.equal(await page.locator('html').getAttribute('data-sal0-mode'),'light');assert.equal(await page.locator('meta[name="color-scheme"]').getAttribute('content'),'only light');
   assert.equal(await page.locator('#'+config.button+' span').innerText(),'Temas');

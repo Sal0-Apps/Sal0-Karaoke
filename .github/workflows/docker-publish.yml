@@ -110,7 +110,7 @@ jobs:
           python -m unittest discover -s tests -p test_v8_queue_and_admin_results.py -v
           python -m unittest discover -s tests -p test_release_client_changes.py -v
 
-      - name: Validate native themes and stable scrolling
+      - name: Validate web theme button and animation boundaries
         run: |
           npm install --prefix /tmp/sal0-browser playwright@1.55.0
           /tmp/sal0-browser/node_modules/.bin/playwright install --with-deps chromium

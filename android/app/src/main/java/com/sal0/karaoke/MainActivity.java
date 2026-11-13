@@ -93,6 +93,8 @@ public class MainActivity extends ComponentActivity {
     private TextView offlineMessage;
     private ServerConfig config;
     private String currentBaseUrl;
+    private boolean mainFrameFailed;
+    private int pendingRouteSwitch;
     private ConnectionRouter.Route currentRoute;
     private boolean browserVisible;
     private boolean networkCallbackRegistered;
@@ -481,13 +483,14 @@ public class MainActivity extends ComponentActivity {
 
             @Override
             public void onPageStarted(WebView view, String url, android.graphics.Bitmap favicon) {
+                mainFrameFailed = false;
                 pageProgress.setVisibility(View.VISIBLE);
             }
 
             @Override
             public void onPageFinished(WebView view, String url) {
                 pageProgress.setVisibility(View.GONE);
-                if (config != null && config.ownsUrl(url)) {
+                if (!mainFrameFailed && config != null && config.ownsUrl(url)) {
                     hideOffline();
                 }
             }
@@ -499,8 +502,11 @@ public class MainActivity extends ComponentActivity {
                 WebResourceError error
             ) {
                 if (request.isForMainFrame()) {
+                    mainFrameFailed = true;
+                    pageProgress.setVisibility(View.GONE);
                     showOffline("A conexão com o servidor caiu. Tentando outro endereço…");
-                    mainHandler.postDelayed(() -> reevaluateRoute(true), 700);
+                    mainHandler.removeCallbacks(networkChangeRunnable);
+                    mainHandler.postDelayed(networkChangeRunnable, 3000);
                 }
             }
 
@@ -570,13 +576,26 @@ public class MainActivity extends ComponentActivity {
         final List<ConnectionRouter.Route> priority =
             ConnectionRouter.priority(wifiConnected, ssid, config.wifiSsid);
 
-        setRouteBadge("● Conectando", COLOR_MUTED, COLOR_SURFACE_ALT);
-        pageProgress.setVisibility(View.VISIBLE);
+        // Probes must not resize, cover or reload a working document.
+        final String activeBase = currentBaseUrl;
+        final ConnectionRouter.Route activeRoute = currentRoute;
+        final boolean hasPage = activeBase != null && webView.getUrl() != null;
+        if (forceReload) {
+            setRouteBadge("● Conectando", COLOR_MUTED, COLOR_SURFACE_ALT);
+            pageProgress.setVisibility(View.VISIBLE);
+        }
 
         networkExecutor.execute(() -> {
             ConnectionRouter.Route resolvedRoute = null;
             String resolvedBase = null;
+            // Prefer the already open server while reachable; Wi-Fi callbacks
+            // and SSID changes alone must not navigate away from the user's work.
+            if (activeBase != null && activeRoute != null && probe(activeBase)) {
+                resolvedRoute = activeRoute;
+                resolvedBase = activeBase;
+            }
             for (ConnectionRouter.Route route : priority) {
+                if (resolvedBase != null) break;
                 if (generation != routeGeneration.get()) {
                     return;
                 }
@@ -594,6 +613,11 @@ public class MainActivity extends ComponentActivity {
                     return;
                 }
                 if (route == null || base == null) {
+                    if (hasPage && !mainFrameFailed && !forceReload) {
+                        mainHandler.removeCallbacks(networkChangeRunnable);
+                        mainHandler.postDelayed(networkChangeRunnable, 3000);
+                        return;
+                    }
                     pageProgress.setVisibility(View.GONE);
                     setRouteBadge("● Sem conexão", Color.rgb(248, 113, 113), COLOR_SURFACE_ALT);
                     String networkDescription = wifiConnected
@@ -606,14 +630,23 @@ public class MainActivity extends ComponentActivity {
                     showOffline(
                         "Nenhum dos dois endereços respondeu.\n\n" + networkDescription
                     );
+                    mainHandler.removeCallbacks(networkChangeRunnable);
+                    mainHandler.postDelayed(networkChangeRunnable, 3000);
                     return;
                 }
 
                 boolean changed = !base.equals(currentBaseUrl);
+                if (changed && hasPage && !mainFrameFailed && !forceReload
+                    && ++pendingRouteSwitch < 2) {
+                    mainHandler.removeCallbacks(networkChangeRunnable);
+                    mainHandler.postDelayed(networkChangeRunnable, 3000);
+                    return;
+                }
+                pendingRouteSwitch = 0;
                 currentBaseUrl = base;
                 currentRoute = route;
                 updateRouteBadge(route, ssid);
-                if (forceReload || changed || webView.getUrl() == null) {
+                if (forceReload || changed || webView.getUrl() == null || mainFrameFailed) {
                     loadServer(base);
                 } else {
                     pageProgress.setVisibility(View.GONE);

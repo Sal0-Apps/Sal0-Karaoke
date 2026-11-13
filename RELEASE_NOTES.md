@@ -1,3 +1,10 @@
+## 12.7.11 — Conexão discreta e fundo estável
+
+- Verificações de rede em segundo plano, sem mostrar a barra de progresso nem redimensionar uma página já aberta.
+- Mantém o servidor atual enquanto responde; troca de rota somente quando necessária. Recarregar manualmente continua disponível.
+- Falhas de navegação usam nova verificação com intervalo, sem forçar recargas sucessivas de uma página saudável.
+- Camada de fundo visível e separada do conteúdo, com animação do Voz preservada.
+
 ## 12.7.10 — Correções somente na web
 
 - Um único botão **Temas**, com texto visível, tamanho consistente e modos claro/escuro dentro do menu.
