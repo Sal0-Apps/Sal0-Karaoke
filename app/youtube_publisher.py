@@ -595,7 +595,7 @@ class YouTubePublisher:
                 'title_template': settings['title_template'], 'connection_message': error,
                 'needs_reconnection': bool(token.get('auth_error') or (error and not enabled))}
 
-    def enqueue(self, video, title, privacy='unlisted', playlist_id='', thumbnail=None, channel_id=None, requester=None, automatic=False, additional_playlists=None, replaces_video_id=None):
+    def enqueue(self, video, title, privacy='unlisted', playlist_id='', thumbnail=None, channel_id=None, requester=None, automatic=False, additional_playlists=None, replaces_video_id=None, notification_mode=None):
         video = Path(video).resolve()
         title = str(title).strip()
         if not youtube_eligible(video):
@@ -638,8 +638,10 @@ class YouTubePublisher:
                 binding = next((item for item in bindings if item['video'] == str(video)), None)
                 if binding:
                     binding['automatic'] = bool(binding.get('automatic')) and automatic
+                    if notification_mode:
+                        binding['notification_mode'] = notification_mode
                 else:
-                    bindings.append({'video': str(video), 'automatic': automatic})
+                    bindings.append({'video': str(video), 'automatic': automatic, 'notification_mode': notification_mode})
                 existing['telegram_link_enabled'] = True
                 self.save('jobs.json', jobs)
                 if existing.get('status') == 'done':
@@ -663,7 +665,7 @@ class YouTubePublisher:
                    'title': title, 'privacy': privacy, 'playlist_id': playlist_id, 'channel_id': token['channel_id'],
                    'status': 'queued', 'progress': 0, 'created_at': time.time(), 'requester': requester,
                    'automatic': automatic, 'telegram_link_enabled': True,
-                   'telegram_results': [{'video': str(video), 'automatic': automatic}],
+                   'telegram_results': [{'video': str(video), 'automatic': automatic, 'notification_mode': notification_mode}],
                    'playlist_ids': [playlist_id, *additional_playlists], 'replaces_video_id': replaces_video_id}
             if previous:
                 for binding in previous.get('telegram_results') or [{'video': previous['video']}]:
@@ -678,7 +680,7 @@ class YouTubePublisher:
         title = options.get('title_override') or options['title_template'].replace('{title}', original_title)[:100]
         if not options.get('title_override'):
             title = re.sub(r'[\x00-\x1f<>]', '', title).strip() or 'Sal0 Karaokê'
-        return self.enqueue(video, title, options['privacy'], options.get('playlist_id', ''), channel_id=options['channel_id'], requester=options.get('requester'), automatic=True, additional_playlists=options.get('additional_playlists'), replaces_video_id=options.get('replaces_video_id'))
+        return self.enqueue(video, title, options['privacy'], options.get('playlist_id', ''), channel_id=options['channel_id'], requester=options.get('requester'), automatic=True, additional_playlists=options.get('additional_playlists'), replaces_video_id=options.get('replaces_video_id'), notification_mode=options.get('notification_mode'))
 
     @staticmethod
     def public_job(job):

@@ -29,6 +29,8 @@ def plan_enqueue(jobs, job):
     source = next((item for item in owned if item.get("id") == source_id), None)
     retired = []
     if source_id and source_id != "legacy":
+        if not source and job.get("cache_source_archived"):
+            source = {"id":source_id, "status":"done", "batch_id":job.get("cache_source_batch") or source_id}
         if not source:
             raise ValueError("Essa execução não está mais no cache da fila.")
         if source.get("status") == "processing":

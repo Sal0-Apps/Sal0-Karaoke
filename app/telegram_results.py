@@ -63,9 +63,9 @@ class ResultNotifications:
                 return key, receipt
         return target, None
 
-    def _send(self, video, token, chat, markup, attachment=None, cancelled=None):
+    def _send(self, video, token, chat, markup, attachment=None, cancelled=None, allow_youtube=True):
         with self.lock:
-            video_id = self._read(video).get('youtube_id')
+            video_id = self._read(video).get('youtube_id') if allow_youtube else None
         decorated = youtube_link(markup, video_id)
         if attachment:
             result = self.delivery.send_video(token, chat, attachment, decorated, cancelled=cancelled)
@@ -79,25 +79,25 @@ class ResultNotifications:
                 record = self._read(video)
                 record.setdefault('receipts', {})[target] = {
                     'message_id': result.data['message_id'], 'video': bool(attachment),
-                    'markup': markup, 'youtube_id': video_id, 'chat_id': str(actual_chat),
+                    'markup': markup, 'youtube_id': video_id, 'chat_id': str(actual_chat), 'allow_youtube':allow_youtube,
                 }
                 self._save(video, record)
             # Publication may have completed while this message was being sent.
             self._update(video, token, chat)
         return result
 
-    def send_video(self, video, token, chat, attachment, caption, cancelled=None):
-        return self._send(video, token, chat, caption, attachment, cancelled)
+    def send_video(self, video, token, chat, attachment, caption, cancelled=None, allow_youtube=True):
+        return self._send(video, token, chat, caption, attachment, cancelled, allow_youtube)
 
-    def send_message(self, video, token, chat, message):
-        return self._send(video, token, chat, message)
+    def send_message(self, video, token, chat, message, allow_youtube=True):
+        return self._send(video, token, chat, message, allow_youtube=allow_youtube)
 
     def _update(self, video, token, chat):
         with self.lock:
             record = self._read(video)
             target, receipt = self._receipt(record, token, chat)
             video_id = record.get('youtube_id')
-            if not receipt or not video_id or receipt.get('youtube_id') == video_id:
+            if not receipt or not receipt.get('allow_youtube',True) or not video_id or receipt.get('youtube_id') == video_id:
                 return True
         actual_chat = receipt.get('chat_id', chat)
         result = self.delivery.edit_message(token, actual_chat, receipt['message_id'],
@@ -114,7 +114,7 @@ class ResultNotifications:
             return self._notify_once(video, token, actual_chat)
         return False
 
-    def _notify_once(self, video, token, chat):
+    def _notify_once(self, video, token, chat, custom_text=None):
         target = self._target(token, chat)
         with self.lock:
             record = self._read(video)
@@ -125,7 +125,7 @@ class ResultNotifications:
             # A timeout can mean the message arrived. Never repeat this write blindly.
             record.setdefault('announced', []).append(attempt)
             self._save(video, record)
-        message = youtube_link('✅ <b>Vídeo publicado no YouTube</b>\n\n🎵 <b>' +
+        message = custom_text or youtube_link('✅ <b>Vídeo publicado no YouTube</b>\n\n🎵 <b>' +
             html.escape(str(record.get('title') or Path(video).stem)[:100]) + '</b>', video_id)
         result = self.delivery.send_message(token, chat, message)
         return result.ok or result.kind == 'network_error'
@@ -144,6 +144,8 @@ class ResultNotifications:
                 _, has_receipt = self._receipt(self._read(video), token, chat)
             if has_receipt:
                 success = self._update(video, token, chat) and success
-            elif not automatic:
+            if target.get('publication_text'):
+                success = self._notify_once(video,token,chat,target['publication_text']) and success
+            elif not has_receipt and not automatic:
                 success = self._notify_once(video, token, chat) and success
         return success

@@ -42,8 +42,10 @@ def load_function(name, **values):
                  prepare_lyrics_guide=prepare_lyrics_guide, verify_lyrics_guide=verify_lyrics_guide,
                  validate_review_segments=validate_review_segments,
                  validate_processing_options=validate_processing_options, **values)
-    import queue_cache, threading
+    import queue_cache, result_projects, telegram_preferences, threading
     scope.setdefault("queue_cache", queue_cache)
+    scope.setdefault("result_projects", result_projects)
+    scope.setdefault("telegram_preferences", telegram_preferences)
     scope.setdefault("canonical_review_segments", canonical_review_segments)
     scope.setdefault("ACTIVE_QUEUE_STATUSES", {"queued", "processing"})
     scope.setdefault("processing_queue_lock", threading.RLock())

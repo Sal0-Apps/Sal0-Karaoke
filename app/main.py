@@ -63,6 +63,8 @@ from backing_vocals import preserve_backing_vocals
 from processing_validation import validate_processing_options, validate_review_segments, canonical_review_segments
 import queue_cache
 import queue_submissions
+import result_projects
+import telegram_preferences
 from lyric_alignment import refine_lyrics, acoustic_baseline
 from full_guide_alignment import align_guide_with_whisper
 
@@ -847,6 +849,11 @@ def enqueue_processing_job(job: dict) -> int:
 
 def retire_queue_batch(jobs, owner):
     for job in jobs:
+        try:
+            result_projects.capture(job, PROCESSING_QUEUE_ROOT)
+        except OSError:
+            logger.exception("O projeto do resultado foi preservado; o vínculo será conferido na próxima edição.")
+            continue
         remove_finished_queue_cache((job.get("pipeline") or {}).get("cache_dir"))
     with legacy_cache_promotion_lock:
         legacy = get_user_paths(owner)["cache"]
@@ -889,6 +896,8 @@ def cached_queue_job(job_id: str, current_user: dict, unlocked: bool = False) ->
     def lookup():
         job = next((item for item in processing_queue if item.get("id") == job_id), None)
         if not job:
+            job = result_projects.lookup_job(job_id, PROCESSING_QUEUE_ROOT, current_user, is_admin(current_user))
+        if not job:
             raise HTTPException(status_code=404, detail="Essa execução não está mais no cache da fila.")
         if not (is_admin(current_user) or job.get("owner_username") == current_user.get("username")):
             raise HTTPException(status_code=403, detail="Esta execução pertence a outra conta.")
@@ -911,7 +920,7 @@ def queue_cache_dir_for_user(current_user: dict, job_id: str = "") -> str | None
 
 
 def remove_finished_queue_cache(cache_dir: str | None):
-    if not cache_dir:
+    if not cache_dir or result_projects.protected(cache_dir, PROCESSING_QUEUE_ROOT):
         return
     queue_root = os.path.abspath(PROCESSING_QUEUE_ROOT)
     job_root = os.path.abspath(os.path.dirname(cache_dir))
@@ -1031,6 +1040,10 @@ def processing_queue_worker():
                 if queue_status == "done":
                     job["history_filename"] = final_history_filename
                     job["subtitle_filename"] = final_subtitle_filename
+                    try:
+                        result_projects.capture(job, PROCESSING_QUEUE_ROOT)
+                    except OSError:
+                        logger.exception("O vídeo foi salvo, mas o vínculo do projeto não pôde ser gravado.")
                 save_processing_queue_unlocked()
             processing_queue_event.set()
 
@@ -1365,12 +1378,10 @@ def startup_event():
                         json.dump(state, sf, indent=4)
 
                     owner = user_from_username(saved_state.get("owner_username", ""))
-                    for target in get_notification_targets(owner):
-                        send_telegram_notification(
-                            target["telegram_token"],
-                            target["telegram_chat_id"],
-                            f"⚠️ <b>Sal0 Karaokê</b>: O servidor foi reiniciado inesperadamente ou ficou sem memória RAM (OOM) enquanto processava <b>{orig_name}</b>!"
-                        )
+                    mode = "subtitle" if saved_state.get("subtitle_only") else "quick" if saved_state.get("easy_mode") else "detailed"
+                    targets = telegram_preferences.contextualize(get_notification_targets(owner), mode, orig_name)
+                    notify_targets(targets, telegram_notice("⚠️", "Processamento interrompido",
+                        f"O servidor reiniciou enquanto processava <b>{telegram_escape(orig_name)}</b>."), event="errors")
                 else:
                     state.update(saved_state)
         except Exception as e:
@@ -1515,6 +1526,7 @@ telegram_config_lock = threading.RLock()
 class TelegramModel(BaseModel):
     telegram_token: str
     telegram_chat_id: str
+    notification_policy: dict | None = None
 
 def telegram_file_for_user(user: dict) -> str:
     return TELEGRAM_FILE if is_admin(user) else config_path(user, "telegram.json")
@@ -1534,7 +1546,8 @@ def load_telegram_config(user: dict = None) -> dict:
         if not isinstance(data, dict):
             raise ValueError("invalid configuration")
         return {"telegram_token": str(data.get("telegram_token") or "").strip(),
-                "telegram_chat_id": str(data.get("telegram_chat_id") or "").strip()}
+                "telegram_chat_id": str(data.get("telegram_chat_id") or "").strip(),
+                "notification_policy": telegram_preferences.normalize(data.get("notification_policy"))}
     except Exception:
         logger.error("Não foi possível ler a configuração pessoal do Telegram.")
         return {**empty, "config_error": "Não foi possível ler a configuração. Salve novamente o token e o Chat ID."}
@@ -1565,7 +1578,7 @@ def persist_telegram_chat_migration(token: str, old_chat: str, new_chat: str):
             config = load_telegram_config(owner)
             if config["telegram_token"] == token and config["telegram_chat_id"] == old_chat:
                 try:
-                    write_telegram_config(path, {"telegram_token": token, "telegram_chat_id": new_chat})
+                    write_telegram_config(path, {**config, "telegram_token": token, "telegram_chat_id": new_chat})
                 except OSError:
                     logger.warning("Chat atualizado no envio; não foi possível salvar o novo destino do Telegram.")
 
@@ -1595,13 +1608,21 @@ def get_notification_targets(owner: dict | None) -> list[dict]:
         key = (token, chat_id)
         if token and chat_id and key not in seen:
             seen.add(key)
-            targets.append({"telegram_token": token, "telegram_chat_id": chat_id})
+            targets.append({"telegram_token": token, "telegram_chat_id": chat_id,
+                            "notification_policy": config.get("notification_policy"), "_user": dict(target_user)})
     return targets
 
 
-def notify_targets(targets: list[dict], message: str):
-    for target in targets:
-        send_telegram_notification(target["telegram_token"], target["telegram_chat_id"], message)
+def resolve_notification_target(target: dict):
+    return {**target, **load_telegram_config(target["_user"])} if target.get("_user") else dict(target)
+
+
+def notify_targets(targets: list[dict], message: str, event: str = "transcription"):
+    for item in targets:
+        target = resolve_notification_target(item)
+        text = telegram_preferences.message(target, event, message, progress=state.get("progress", ""))
+        if text is not None:
+            send_telegram_notification(target["telegram_token"], target["telegram_chat_id"], text)
 
 
 @app.get("/api/telegram")
@@ -1612,7 +1633,8 @@ def get_telegram_config(current_user: dict = Depends(get_current_user)):
     if config.get("config_error"):
         delivery = {"state": "config_error", "detail": config["config_error"], "pending": 0}
     return {"telegram_token": masked_telegram_token(token), "telegram_chat_id": config["telegram_chat_id"],
-            "configured": bool(token and config["telegram_chat_id"]), "delivery": delivery}
+            "configured": bool(token and config["telegram_chat_id"]), "delivery": delivery,
+            **telegram_preferences.metadata(config.get("notification_policy"))}
 
 
 @app.get("/api/telegram/status")
@@ -1637,7 +1659,11 @@ def save_telegram_config(config: TelegramModel, current_user: dict = Depends(get
         if bool(token) != bool(chat):
             raise HTTPException(status_code=400, detail="Informe o token e o Chat ID juntos, ou deixe ambos vazios para desativar.")
         try:
-            write_telegram_config(telegram_file_for_user(current_user), {"telegram_token": token, "telegram_chat_id": chat})
+            notifications = telegram_preferences.normalize(config.notification_policy) if config.notification_policy is not None else telegram_preferences.normalize(previous.get("notification_policy"))
+            write_telegram_config(telegram_file_for_user(current_user), {"telegram_token": token, "telegram_chat_id": chat,
+                                                                        "notification_policy": notifications})
+        except ValueError as error:
+            raise HTTPException(status_code=400, detail=str(error))
         except OSError:
             raise HTTPException(status_code=500, detail="Não foi possível salvar a configuração do Telegram. Confira o volume do servidor e tente novamente.")
     return {"status": "success", "detail": "Configuração salva. Verifique a conexão ou envie uma mensagem de teste."}
@@ -3329,6 +3355,40 @@ def library_request_user(current_user: dict, owner: str = "") -> dict:
     return {**target, "_library_exact_owner": True}
 
 
+@app.get("/api/result-cache/settings")
+def get_result_cache_settings(current_user: dict = Depends(get_current_user)):
+    return {"keep_individual_results": result_projects.enabled(get_user_paths(current_user, recover_cache=False)["output"])}
+
+
+@app.post("/api/result-cache/settings")
+def save_result_cache_settings(config: dict, current_user: dict = Depends(get_current_user)):
+    try:
+        result_projects.save_settings(get_user_paths(current_user, recover_cache=False)["output"], config.get("keep_individual_results"))
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error))
+    return {"status":"saved", **get_result_cache_settings(current_user)}
+
+
+@app.get("/api/library/history/{filename}/project")
+def get_result_project(filename: str, owner: str = "", current_user: dict = Depends(get_current_user)):
+    target = library_request_user(current_user, owner)
+    resolved = resolve_library_file(target, "history", filename)
+    if not resolved:
+        raise HTTPException(status_code=404, detail="Resultado não encontrado.")
+    video = resolved[0]
+    project = result_projects.lookup_video(video, PROCESSING_QUEUE_ROOT, current_user, is_admin(current_user))
+    if not project:
+        with processing_queue_lock:
+            candidate = next((dict(job) for job in processing_queue if job.get("history_filename") == filename
+                and os.path.realpath(os.path.join((job.get("pipeline") or {}).get("library_dir", "/missing"), "history", filename)) == os.path.realpath(video)), None)
+            if candidate and os.path.isdir((candidate.get("pipeline") or {}).get("cache_dir", "")):
+                result_projects.capture(candidate, PROCESSING_QUEUE_ROOT)
+                project = candidate
+    if not project:
+        raise HTTPException(status_code=409, detail="O original e o cache deste resultado antigo não foram preservados. Não é possível recuperar os ajustes já apagados. Os novos resultados com a preservação ativada mantêm seu projeto individual até excluir o vídeo.")
+    return {"job_id":project["id"], "filename":filename}
+
+
 @app.get("/api/library/thumbnail/{section}/{filename}")
 def get_library_thumbnail(section: str, filename: str, owner: str = "",
                           current_user: dict = Depends(get_current_user)):
@@ -3539,6 +3599,8 @@ def rename_library_file(
 
     try:
         os.rename(src_path, dst_path)
+        if section == "history":
+            result_projects.rename_video(src_path, dst_path, PROCESSING_QUEUE_ROOT)
         logger.info(f"Arquivo renomeado de '{old_file}' para '{safe_name}' na seção '{section}'")
         return {"status": "success", "new_name": safe_name}
     except Exception as e:
@@ -3559,7 +3621,10 @@ def delete_from_library(section: str, filename: str, owner: str = "", current_us
 
     if os.path.exists(file_path):
         try:
-            os.remove(file_path)
+            with processing_queue_lock:
+                os.remove(file_path)
+                if section == "history":
+                    result_projects.remove_video(file_path, PROCESSING_QUEUE_ROOT)
             logger.info(f"Arquivo {safe_filename} excluído da biblioteca {section}.")
             return {"status": "success"}
         except Exception as e:
@@ -3877,7 +3942,9 @@ def clear_queue_cache(current_user: dict = Depends(get_current_user)):
             root = os.path.join(queue_root, job_id)
             if not job_id or job_id in {".", ".."} or os.path.basename(job_id) != job_id or os.path.dirname(root) != queue_root:
                 raise HTTPException(status_code=409, detail="Os arquivos da fila precisam ser conferidos antes da limpeza.")
-            roots.append(root)
+            result_projects.capture(job, PROCESSING_QUEUE_ROOT)
+            if not result_projects.protected(os.path.join(root, "cache"), PROCESSING_QUEUE_ROOT):
+                roots.append(root)
         previous = list(processing_queue)
         with legacy_cache_promotion_lock:
             processing_queue[:] = [job for job in previous if job.get("owner_username") != username]
@@ -4713,7 +4780,10 @@ def process_karaoke(
         "app_base_url": (app_base_url or "").strip(),
         "subtitle_only": subtitle_only,
         "translation_language": translation_language,
+        "telegram_mode": "subtitle" if subtitle_only else "quick" if easy_mode else "detailed",
     }
+    if publication_options:
+        publication_options["notification_mode"] = pipeline["telegram_mode"]
     job = {
         "id": job_id,
         "submission_id": submission_id,
@@ -4728,6 +4798,9 @@ def process_karaoke(
         "finished_at": None,
         "process_summary": process_summary,
         "cache_source_id": cache_job_id or ("legacy" if not has_new_source else ""),
+        "cache_source_archived": bool(source_job and source_job.get("_archived_result")),
+        "cache_source_batch": (source_job or {}).get("batch_id"),
+        "retain_result_cache": result_projects.enabled(user_paths["output"]),
         "creation_options": {"save_to_library": save_to_library, "pause_for_editing": pause_for_editing},
         "pipeline": pipeline,
     }
@@ -4809,6 +4882,9 @@ def send_telegram_video_flow(
     embedded_subtitle: str = "",
     prepared_preview: str = None,
     result_video: str = "",
+    notification_target: dict = None,
+    allow_attachment: bool = True,
+    allow_completion: bool = True,
 ):
     """Envia um único vídeo com todos os links antes de liberar a tarefa."""
     if not token or not chat_id:
@@ -4816,7 +4892,8 @@ def send_telegram_video_flow(
 
     def send_result_notice(message):
         if result_video:
-            return TELEGRAM_RESULTS.send_message(result_video, token, chat_id, message).ok
+            return TELEGRAM_RESULTS.send_message(result_video, token, chat_id, message,
+                allow_youtube=telegram_preferences.allowed(notification_target or {}, "youtube")).ok
         return _send_telegram_notification_worker(token, chat_id, message)
 
     limit_50mb = 50 * 1024 * 1024
@@ -4849,6 +4926,20 @@ def send_telegram_video_flow(
         return "\n".join(links)
 
     download_block = build_download_links()
+    if notification_target:
+        download_block = telegram_preferences.message(notification_target, "links", download_block,
+            elapsed=processing_seconds, links=download_block) or ""
+
+    def completion_text():
+        original = telegram_notice("✅", "Vídeo legendado concluído" if subtitle_downloads is not None else "Karaokê concluído",
+            f"🎵 <b>{telegram_escape(str(orig_name)[:100])}</b>",
+            f"⏱ Tempo total de processamento: <b>{telegram_escape(duration_text)}</b>", download_block)
+        return telegram_preferences.message(notification_target, "completed", original, progress=100,
+            elapsed=processing_seconds, links=download_block) if notification_target else original
+
+    if not allow_attachment:
+        text = completion_text() if allow_completion else None
+        return send_result_notice(text) if text else False
     try:
         file_size = os.path.getsize(video_path)
         success = False
@@ -4891,10 +4982,19 @@ def send_telegram_video_flow(
                     update_state("processing", "Sending subtitle video to Telegram", 99,
                                  stage_detail="Aguardando confirmação de entrega antes do próximo item")
                 completion_caption = telegram_notice("✅", "Vídeo legendado concluído" if subtitle_downloads is not None else "Karaokê concluído", *caption_lines)
+                if notification_target:
+                    settings = telegram_preferences.normalize(notification_target.get("notification_policy"))
+                    mode = notification_target.get("_mode", "detailed")
+                    event = "video" if settings["templates"][mode]["video"] or not allow_completion else "completed"
+                    if not allow_completion:
+                        completion_caption = f"<b>{telegram_escape(str(orig_name)[:100])}</b>" + ("\n"+download_block if download_block else "")
+                    completion_caption = telegram_preferences.message(notification_target, event, completion_caption,
+                        progress=100, elapsed=processing_seconds, links=download_block) or ""
                 import process_manager as pm
                 if result_video:
                     sent = TELEGRAM_RESULTS.send_video(result_video, token, chat_id, upload_path,
-                                                       completion_caption, cancelled=pm.check_cancelled)
+                                                       completion_caption, cancelled=pm.check_cancelled,
+                                                       allow_youtube=telegram_preferences.allowed(notification_target or {}, "youtube"))
                 else:
                     sent = TELEGRAM_DELIVERY.send_video(token, chat_id, upload_path, completion_caption,
                                                         cancelled=pm.check_cancelled)
@@ -4903,61 +5003,53 @@ def send_telegram_video_flow(
         if success:
             return True
 
-        fallback_lines = [
-            f"🎵 <b>{telegram_escape(str(orig_name)[:100])}</b>",
-            "⚠️ Não foi possível anexar a prévia, mas o original está salvo na Biblioteca.",
-            f"⏱ Tempo total de processamento: <b>{telegram_escape(duration_text)}</b>",
-        ]
-        if download_block:
-            fallback_lines.extend(["", "📥 <b>Download do arquivo original sem compressão</b>", download_block])
-        return send_result_notice(
-            telegram_notice("✅", "Vídeo legendado concluído" if subtitle_downloads is not None else "Karaokê concluído", *fallback_lines),
-        )
+        text = completion_text() if allow_completion else None
+        return send_result_notice(text) if text else False
     except InterruptedError:
         raise
     except Exception as exc:
         logger.error("Erro ao concluir a entrega ao Telegram (%s).", type(exc).__name__)
-        return send_result_notice(
-            telegram_notice(
-                "⚠️",
-                "Resultado salvo; envio pendente",
-                f"{'🎞️' if subtitle_downloads is not None else '🎵'} <b>{telegram_escape(str(orig_name)[:100])}</b>",
-                "O resultado permanece disponível na Biblioteca.",
-                download_block,
-            ),
-        )
+        text = completion_text() if allow_completion else None
+        return send_result_notice(text) if text else False
+
 
 
 def send_video_to_targets(
-    targets: list[dict],
-    video_path: str,
-    orig_name: str,
-    history_filename: str,
-    public_download_token: str,
-    base_url: str,
-    external_url: str,
-    processing_seconds: float = 0,
-    subtitle_downloads: list[dict] = None,
-    embedded_subtitle: str = "",
-    result_video: str = "",
+    targets: list[dict], video_path: str, orig_name: str, history_filename: str,
+    public_download_token: str, base_url: str, external_url: str,
+    processing_seconds: float = 0, subtitle_downloads: list[dict] = None,
+    embedded_subtitle: str = "", result_video: str = "",
 ):
-    """Entrega o resultado a todos os bots antes de liberar o próximo item da fila."""
-    if not targets:
+    """Do not encode or upload when this destination only requests a text/link."""
+    selected = []
+    for item in targets:
+        target = resolve_notification_target(item)
+        if telegram_preferences.allowed(target, "completed") or telegram_preferences.allowed(target, "video"):
+            selected.append(target)
+    if not selected:
         return
-    def deliver(preview=None):
-        for target in targets:
-            send_telegram_video_flow(
-                token=target["telegram_token"], chat_id=target["telegram_chat_id"],
-                video_path=video_path, orig_name=orig_name, history_filename=history_filename,
-                public_download_token=public_download_token, base_url=base_url, external_url=external_url,
-                processing_seconds=processing_seconds, subtitle_downloads=subtitle_downloads,
-                embedded_subtitle=embedded_subtitle, prepared_preview=preview,
-                result_video=result_video,
-            )
+
+    def deliver(target, preview=None):
+        return send_telegram_video_flow(
+            token=target["telegram_token"], chat_id=target["telegram_chat_id"],
+            video_path=video_path, orig_name=orig_name, history_filename=history_filename,
+            public_download_token=public_download_token, base_url=base_url, external_url=external_url,
+            processing_seconds=processing_seconds, subtitle_downloads=subtitle_downloads,
+            embedded_subtitle=embedded_subtitle, prepared_preview=preview, result_video=result_video,
+            notification_target=target, allow_attachment=telegram_preferences.allowed(target, "video"),
+            allow_completion=telegram_preferences.allowed(target, "completed"))
+
+    attachments = []
+    for target in selected:
+        if telegram_preferences.allowed(target, "video"):
+            attachments.append(target)
+        else:
+            deliver(target)
     if subtitle_downloads is None:
-        deliver()
+        for target in attachments: deliver(target)
         return
-    # The owner and administrator share the same preview; encoding is done once per job.
+    if not attachments:
+        return
     with tempfile.TemporaryDirectory(prefix="sal0-caption-preview-") as folder:
         preview = os.path.join(folder, "video_legendado_telegram.mp4")
         def publish(percent):
@@ -4966,7 +5058,7 @@ def send_video_to_targets(
         publish(0)
         ready = compress_video_for_telegram(video_path, preview, 46 * 1024 * 1024,
                                            max_video_kbps=1800, progress_callback=publish)
-        deliver(preview if ready else "")
+        for target in attachments: deliver(target, preview if ready else "")
 
 
 def run_subtitle_srt_pipeline(
@@ -5050,7 +5142,7 @@ def run_subtitle_srt_pipeline(
                 "🎧 O áudio completo será usado para gerar o SRT.",
                 "📊 Progresso geral inicial: <b>45%</b> · etapa atual: <b>0%</b>",
             ),
-        )
+        event='transcription')
         def publish_subtitle_whisper_progress(percent: int, elapsed: float, total: float):
             remaining = max(0.0, total - elapsed)
             detail = f"Whisper {percent}%"
@@ -5181,7 +5273,7 @@ def run_subtitle_srt_pipeline(
             notify_targets(telegram_targets, telegram_notice("🌍", "Tradução do SRT",
                 f"🎞️ <b>{telegram_escape(orig_name)}</b>",
                 "📊 Progresso geral: <b>80%</b>",
-                "Aguardando o LibreTranslate; a API não informa a porcentagem interna."))
+                "Aguardando o LibreTranslate; a API não informa a porcentagem interna."), event='translation')
             def translation_progress(completed: int, total: int):
                 percent = round((completed / max(total, 1)) * 100)
                 update_state(
@@ -5206,7 +5298,7 @@ def run_subtitle_srt_pipeline(
             )
             notify_targets(telegram_targets, telegram_notice("🌍", "SRT traduzido concluído",
                 f"🎞️ <b>{telegram_escape(orig_name)}</b>",
-                "📊 Progresso geral: <b>95%</b> · etapa atual: <b>100%</b>"))
+                "📊 Progresso geral: <b>95%</b> · etapa atual: <b>100%</b>"), event='translation')
         except InterruptedError:
             raise
         except Exception as exc:
@@ -5220,7 +5312,7 @@ def run_subtitle_srt_pipeline(
                     f"🎞️ <b>{telegram_escape(orig_name)}</b>",
                     "✅ O SRT original foi preservado e continua disponível.",
                 ),
-            )
+            event='errors')
     save_stage_checkpoint(
         cache_dir,
         "subtitle_translation_finished",
@@ -5246,7 +5338,7 @@ def run_subtitle_srt_pipeline(
     notify_targets(telegram_targets, telegram_notice("🎬", "Criando vídeo legendado",
         f"🎞️ <b>{telegram_escape(orig_name)}</b>",
         f"Legenda embutida: <b>{telegram_escape(embedded_label)}</b>",
-        "📊 Progresso geral: <b>96%</b> · etapa atual: <b>0%</b>"))
+        "📊 Progresso geral: <b>96%</b> · etapa atual: <b>0%</b>"), event='render')
     def publish_subtitle_video_progress(percent):
         update_state("processing", "Rendering subtitle video", 96 + min(2, int(percent * 2 / 100)),
                      stage_progress=percent, stage_detail="Embutindo legendas no vídeo com o áudio original completo")
@@ -5321,6 +5413,7 @@ def run_pipeline(
     subtitle_only: bool = False,
     translation_language: str = "pt-BR",
     save_to_library: bool = False,
+    telegram_mode: str = "detailed",
 ):
     """Pipeline principal de processamento sequencial."""
     if not subtitle_only:
@@ -5344,6 +5437,8 @@ def run_pipeline(
         load_stage_checkpoints(cache_dir).get("active_processing_seconds") or 0
     )
     active_run_started = time.monotonic()
+    telegram_targets = telegram_preferences.contextualize(telegram_targets, "subtitle" if subtitle_only else telegram_mode,
+        state.get("original_filename", "Vídeo"), previous_processing_seconds)
 
     def persist_total_processing_seconds() -> float:
         elapsed = previous_processing_seconds + (time.monotonic() - active_run_started)
@@ -5370,7 +5465,7 @@ def run_pipeline(
                 f"{'🎞️' if subtitle_only else '🎵'} <b>{telegram_escape(orig_name)}</b>",
                 "⏳ Preparando a primeira etapa.",
             ),
-        )
+        event='started')
 
         # Pasta de saída mapeada via volume docker-compose
         os.makedirs(output_dir, exist_ok=True)
@@ -5451,7 +5546,7 @@ def run_pipeline(
                         "⏳ Iniciando a transferência da mídia.",
                         "📊 Progresso geral: <b>5%</b>",
                     ),
-                )
+                event='download')
 
                 try:
                     last_download_update = [0.0]
@@ -5485,7 +5580,7 @@ def run_pipeline(
                             f"🎵 <b>{telegram_escape(orig_name)}</b>",
                             "➡️ Próxima etapa: preparação do áudio.",
                         ),
-                    )
+                    event='download')
                 except InterruptedError:
                     raise
                 except Exception as e:
@@ -5562,7 +5657,7 @@ def run_pipeline(
             update_state("processing", "Searching lyrics online", 10, original_filename=orig_name,
                          stage_progress=0, stage_detail="Consultando letras; aguardando resposta do provedor")
             notify_targets(telegram_targets, telegram_notice("🔎", "Busca de letra",
-                f"🎵 <b>{telegram_escape(orig_name)}</b>", "📊 Progresso geral: <b>10%</b>"))
+                f"🎵 <b>{telegram_escape(orig_name)}</b>", "📊 Progresso geral: <b>10%</b>"), event='lyrics')
             media_duration = get_file_duration(input_audio_path)
             auto_lyrics, auto_match = find_lyrics_automatically(orig_name, media_duration)
             update_state("processing", "Searching lyrics online", 10,
@@ -5579,7 +5674,7 @@ def run_pipeline(
                         f"🎵 <b>{telegram_escape(orig_name)}</b>",
                         "✅ Conferência das palavras com a guia; texto e tempos produzidos pelo Whisper.",
                     ),
-                )
+                event='lyrics')
                 cached_meta["lyrics_text"] = auto_lyrics
                 try:
                     with open(cache_meta_file, "w", encoding="utf-8") as f:
@@ -5603,7 +5698,7 @@ def run_pipeline(
                         f"🎵 <b>{telegram_escape(orig_name)}</b>",
                         "➡️ O processamento seguirá normalmente somente com o Whisper.",
                     ),
-                )
+                event='lyrics')
                 logger.info("Seguindo sem letra guia automática para '%s'.", orig_name)
         elif lyrics_text:
             notify_targets(
@@ -5614,7 +5709,7 @@ def run_pipeline(
                     f"🎵 <b>{telegram_escape(orig_name)}</b>",
                     "✅ O texto será usado para orientar a grafia do Whisper.",
                 ),
-            )
+            event='lyrics')
         else:
             notify_targets(
                 telegram_targets,
@@ -5624,7 +5719,7 @@ def run_pipeline(
                     f"🎵 <b>{telegram_escape(orig_name)}</b>",
                     "➡️ A transcrição será produzida somente pelo Whisper.",
                 ),
-            )
+            event='lyrics')
 
         # Invalidação Inteligente de Cache: comparar o hash/tamanho do arquivo de entrada atual com o cache
         new_audio_hash = None
@@ -5737,7 +5832,7 @@ def run_pipeline(
                         "🎧 Preparando a faixa para o processamento local.",
                         "📊 Progresso geral: <b>15%</b>",
                     ),
-                )
+                event='separation')
                 extract_audio(input_audio_path, converted_wav)
 
             pm.check_cancelled()
@@ -5773,7 +5868,7 @@ def run_pipeline(
                         "⚙️ Iniciando quatro análises de alta precisão com o Demucs.",
                         "📊 Progresso geral inicial: <b>20%</b>",
                     ),
-                )
+                event='separation')
                 with tempfile.TemporaryDirectory() as demucs_tmp:
                     v_tmp, i_tmp = separate_vocals(converted_wav, demucs_tmp, update_callback=update_state)
                     shutil.move(v_tmp, vocals_wav)
@@ -5784,7 +5879,7 @@ def run_pipeline(
             if keep_backing_vocals:
                 notify_targets(telegram_targets, telegram_notice("🎤", "Preservando backing vocals",
                     f"🎵 <b>{telegram_escape(orig_name)}</b>",
-                    "Separando a voz principal e preservando as vozes de apoio."))
+                    "Separando a voz principal e preservando as vozes de apoio."), event='separation')
                 vocals_wav, instrumental_wav = preserve_backing_vocals(
                     vocals_wav, instrumental_wav, cache_dir,
                     gain=backing_vocals_volume / 100, update_callback=update_state,
@@ -5818,7 +5913,7 @@ def run_pipeline(
                             "🎧 Criando o resultado sem a voz do cantor.",
                             "📊 Progresso geral: <b>95%</b>",
                         ),
-                    )
+                    event='render')
 
                     # Forçar o uso do vídeo original enviado
                     render_karaoke_video(
@@ -5957,7 +6052,7 @@ def run_pipeline(
                          "🎤 Vocais separados, conforme a fonte escolhida."),
                         "📊 Progresso geral inicial: <b>65%</b>",
                     ),
-                )
+                event='transcription')
 
                 logger.info(f"Fonte de transcrição escolhida: {transcribe_audio} (Modo: {transcribe_source})")
 
@@ -6153,7 +6248,7 @@ def run_pipeline(
                         "✍️ A transcrição está pronta para correção.",
                         "➡️ Abra o aplicativo para revisar e continuar a renderização.",
                     )
-                )
+                , event='review')
 
                 logger.info("Aguardando o usuário corrigir as legendas na interface web...")
                 # Bloqueia a thread até o usuário enviar as correções pelo endpoint /api/continue_process
@@ -6206,7 +6301,7 @@ def run_pipeline(
                         "⏱ Criando e sincronizando o texto do karaokê.",
                         "📊 Progresso geral: <b>80%</b>",
                     ),
-                )
+                event='render')
                 generate_ass_karaoke(
                     segments=segments,
                     output_ass_path=ass_path,
@@ -6242,7 +6337,7 @@ def run_pipeline(
                         "🎞 Combinando áudio, fundo e legenda no vídeo.",
                         "📊 Progresso geral: <b>95%</b>",
                     ),
-                )
+                event='render')
                 bg_mode_param = "original_video" if (background_mode in ["original", "original_video"]) else background_mode
                 render_karaoke_video(
                     instrumental_path=instrumental_wav,
@@ -6316,7 +6411,7 @@ def run_pipeline(
                 f"💾 Checkpoint salvo após: <b>{telegram_escape(pause.label)}</b>",
                 f"⏱ Tempo processado: <b>{telegram_escape(format_processing_duration(elapsed_seconds))}</b>",
             ),
-        )
+        event='paused')
         raise
     except Exception as e:
         logger.exception("Ocorreu um erro catastrófico durante o processamento do pipeline.")
@@ -6333,7 +6428,7 @@ def run_pipeline(
                     f"🎵 <b>{telegram_escape(orig_name)}</b>",
                     f"Detalhes: {telegram_escape(e)}",
                 ),
-            )
+            event='errors')
 
         # Preservamos os arquivos de entrada no cache mesmo após erro
         logger.info("Preservando arquivos de entrada no cache após erro para permitir repetições.")
@@ -6463,8 +6558,21 @@ def notify_youtube_publication(job):
             break
     if not owner:
         return True
+    mode = job.get("notification_mode")
+    if mode not in dict(telegram_preferences.MODES):
+        project = result_projects.lookup_video(video, PROCESSING_QUEUE_ROOT, owner)
+        mode = (project or {}).get("pipeline", {}).get("telegram_mode", "detailed")
+    targets = []
+    for target in telegram_preferences.contextualize(get_notification_targets(owner), mode, job.get("title") or video.stem):
+        if not telegram_preferences.allowed(target, "youtube"):
+            continue
+        template = telegram_preferences.normalize(target.get("notification_policy"))["templates"][target["_mode"]]["youtube"]
+        if template:
+            link = "https://www.youtube.com/watch?v=" + job["video_id"]
+            target["publication_text"] = telegram_preferences.message(target, "youtube", "Vídeo publicado no YouTube", link=link)
+        targets.append(target)
     return TELEGRAM_RESULTS.published(str(video), job["video_id"], job.get("title", ""),
-        get_notification_targets(owner), automatic=bool(job.get("automatic")))
+        targets, automatic=bool(job.get("automatic")))
 
 
 def notify_youtube_authorization_required(event):
@@ -6481,7 +6589,13 @@ def notify_youtube_authorization_required(event):
     )
     delivered = True
     for target in targets:
-        result = TELEGRAM_DELIVERY.send_message(target["telegram_token"], target["telegram_chat_id"], message)
+        mode = next((mode for mode, _ in telegram_preferences.MODES
+            if telegram_preferences.allowed({**target, "_mode": mode}, "errors")), None)
+        if mode is None:
+            continue
+        target = telegram_preferences.contextualize([target], mode, event.get("channel_title") or "Canal conectado")[0]
+        text = telegram_preferences.message(target, "errors", message)
+        result = TELEGRAM_DELIVERY.send_message(target["telegram_token"], target["telegram_chat_id"], text)
         delivered = result.ok and delivered
     return delivered
 

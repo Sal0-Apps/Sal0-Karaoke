@@ -27,6 +27,7 @@ ROOT = Path(__file__).parents[1]
 sys.path.insert(0, str(ROOT / 'app'))
 import queue_cache
 import queue_submissions
+import result_projects
 from processing_validation import validate_processing_options, validate_review_segments, canonical_review_segments
 from reprocess_cache import copy_reusable_inputs, youtube_identity
 from subtitle_settings import load_subtitle_settings, normalize_subtitle_settings
@@ -47,7 +48,7 @@ class QueueCacheTests(unittest.TestCase):
         self.scope=dict(app=app, BaseModel=BaseModel, Depends=Depends, File=File, Form=Form, UploadFile=UploadFile,
             HTTPException=HTTPException, FileResponse=FileResponse, Response=Response,
             get_current_user=user, is_admin=lambda u:u.get('role')=='admin',
-            get_user_paths=self.paths, queue_cache=queue_cache, queue_submissions=queue_submissions, canonical_review_segments=canonical_review_segments,
+            library_request_user=lambda current, owner="": current, resolve_library_file=lambda user,section,filename: (str(Path(self.paths(user)["library"])/section/filename),user) if (Path(self.paths(user)["library"])/section/filename).is_file() else None, get_user_paths=self.paths, queue_cache=queue_cache, queue_submissions=queue_submissions, result_projects=result_projects, canonical_review_segments=canonical_review_segments,
             validate_processing_options=validate_processing_options,validate_review_segments=validate_review_segments,
             os=os,json=json,shutil=shutil,time=time,uuid=uuid,mimetypes=mimetypes,
             logger=logging.getLogger('queue-cache-tests'),
@@ -66,7 +67,7 @@ class QueueCacheTests(unittest.TestCase):
         names={'get_process_submission','update_queued_source','save_processing_queue_unlocked','load_processing_queue','public_queue_job','enqueue_processing_job',
             'retire_queue_batch','ensure_processing_queue_capacity','active_queue_pipeline_for_user','cached_queue_job',
             'queue_cache_dir_for_user','remove_finished_queue_cache','get_processing_queue','remove_queued_job',
-            'get_cache_info','get_cached_background','get_cached_audio','get_queue_cache','public_cached_queue_job','get_queue_cache_job','get_queue_cache_segments',
+            'get_result_cache_settings','save_result_cache_settings','get_result_project','get_cache_info','get_cached_background','get_cached_audio','get_queue_cache','public_cached_queue_job','get_queue_cache_job','get_queue_cache_segments',
             'save_queue_cache_segments','reprocess_queue_cache_job','clear_queue_cache','process_karaoke','processing_queue_worker'}
         tree=ast.parse((ROOT/'app/main.py').read_text())
         nodes=[n for n in tree.body if isinstance(n,ast.ClassDef) and n.name in {'EditWordModel','EditSegmentModel','ContinueProcessModel'}

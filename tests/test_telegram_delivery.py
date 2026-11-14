@@ -20,6 +20,7 @@ import requests
 
 ROOT = Path(__file__).parents[1]
 sys.path.insert(0, str(ROOT / "app"))
+import telegram_preferences
 from telegram_delivery import TelegramDelivery, formatted_parts, units
 
 
@@ -270,7 +271,7 @@ def settings_app(folder, sender, users):
     tree = ast.parse((ROOT / "app/main.py").read_text())
     nodes = [node for node in tree.body if isinstance(node, (ast.FunctionDef, ast.ClassDef)) and (node.name in names or node.name == "TelegramModel")]
     scope = dict(app=app, Depends=Depends, HTTPException=HTTPException, BaseModel=BaseModel,
-        get_current_user=lambda: owner, is_admin=lambda user: user["role"] == "admin",
+        telegram_preferences=telegram_preferences, get_current_user=lambda: owner, is_admin=lambda user: user["role"] == "admin",
         config_path=lambda user, name: str(Path(folder) / user["username"] / name),
         TELEGRAM_FILE=str(Path(folder) / "admin" / "telegram.json"), TELEGRAM_DELIVERY=sender,
         telegram_config_lock=threading.RLock(), os=os, json=json, tempfile=tempfile, re=re, html=html,
@@ -320,7 +321,7 @@ class TelegramSettingsTests(unittest.TestCase):
         self.assertEqual(self.save("-100222", masked).status_code, 200)
         for chat, token in (("not a chat", self.token), ("123", "bogus***mask"), ("123", "invalid token")):
             self.assertEqual(self.save(chat, token).status_code, 400)
-        self.assertEqual(self.scope["load_telegram_config"](self.owner), {"telegram_token": self.token, "telegram_chat_id": "-100222"})
+        self.assertEqual({key:self.scope["load_telegram_config"](self.owner)[key] for key in ("telegram_token","telegram_chat_id")}, {"telegram_token": self.token, "telegram_chat_id": "-100222"})
 
     def test_migration_is_saved_only_for_matching_credentials_and_chat(self):
         self.save("-123")
@@ -329,6 +330,21 @@ class TelegramSettingsTests(unittest.TestCase):
         self.scope["persist_telegram_chat_migration"](self.token, "-123", "-100123")
         self.assertEqual(self.scope["load_telegram_config"](self.owner)["telegram_chat_id"], "-100123")
         self.assertEqual(self.scope["load_telegram_config"](bob)["telegram_chat_id"], "-123")
+
+    def test_preferences_survive_masked_credentials_and_migration_without_crossing_profiles(self):
+        self.save("-123")
+        policy = telegram_preferences.normalize()
+        policy['modes']['quick']['video'] = False
+        policy['templates']['subtitle']['completed'] = 'Legenda pronta: {titulo}'
+        masked = self.client.get('/api/telegram').json()['telegram_token']
+        response = self.client.post('/api/telegram', json={'telegram_token':masked,
+            'telegram_chat_id':'-123','notification_policy':policy})
+        self.assertEqual(response.status_code, 200, response.text)
+        self.scope['persist_telegram_chat_migration'](self.token,'-123','-100123')
+        self.assertEqual(self.client.get('/api/telegram').json()['notification_policy'],policy)
+        self.owner.update(username='bob')
+        self.assertTrue(self.client.get('/api/telegram').json()['notification_policy']['modes']['quick']['video'])
+        self.assertEqual(self.client.get('/api/telegram').json()['notification_policy']['templates']['subtitle']['completed'],'')
 
     def test_legacy_numeric_id_and_broken_configuration_never_break_processing(self):
         path = Path(self.folder.name) / "alice/telegram.json"; path.parent.mkdir(parents=True)

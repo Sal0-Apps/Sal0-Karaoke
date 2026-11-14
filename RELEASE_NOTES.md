@@ -1,3 +1,15 @@
+## 12.8.0 — Projetos por resultado e mensagens editáveis
+
+- Telegram: escolhas independentes para Rápido, Detalhado e Só legendar, com
+  textos padrão personalizáveis em menus que começam fechados. Avisos de etapa,
+  conclusão, anexos, links e publicação respeitam a preferência de cada destino.
+- Resultados: Editar restaura a origem, letra, tempos, fundo e ajustes do vídeo;
+  criar outra fila ou limpar a lista preserva o projeto individual até excluir
+  o resultado. A opção vem ativada e pode ser alterada em Ajustes.
+- Vídeos antigos dependem de o cache original ainda existir. Um vídeo já
+  renderizado não é apresentado como substituto da mídia original perdida.
+- Atualização da web e servidor; clientes Android e Windows permanecem iguais.
+
 ## 12.7.16 — Confirmação da fila durante a preparação
 
 - A interface acompanha automaticamente a inclusão enquanto o servidor prepara

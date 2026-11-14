@@ -206,7 +206,7 @@ class SubtitleTelegramTests(unittest.TestCase):
             self.assertEqual(Path(path).read_bytes(),b'preview')
             delivered.append(path)
         delivery=load_function('send_video_to_targets',tempfile=tempfile,os=os,update_state=Mock(),
-            compress_video_for_telegram=encode,send_telegram_video_flow=send)
+            compress_video_for_telegram=encode,send_telegram_video_flow=send,resolve_notification_target=lambda target:dict(target))
         delivery([{'telegram_token':'one','telegram_chat_id':'owner'},
                   {'telegram_token':'two','telegram_chat_id':'admin'}], 'original.mp4','Speech','Speech.mp4',
                  'token','http://local','https://remote',subtitle_downloads=[])

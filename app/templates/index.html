@@ -1909,6 +1909,8 @@ html:not([data-sal0-look=legacy]) .header-actions .sal0-icon-button{padding-inli
 [data-sal0-paused=true] .sal0-component *::after,[data-sal0-paused=true] .sal0-component *::before,[data-local-paused=true] *::after{animation-play-state:paused!important}
 @media(prefers-reduced-motion:reduce){html:not([data-sal0-motion-override=on]) .sal0-theme-dialog[open]{animation:none}html:not([data-sal0-motion-override=on]) .sal0-component *::after,html:not([data-sal0-motion-override=on]) .sal0-component *::before{animation-play-state:paused!important}}
 @keyframes sal0-reference-signal{0%,100%{opacity:.55}50%{opacity:1;box-shadow:0 0 11px currentColor}}@keyframes sal0-reference-shine{0%,40%{transform:translateX(-100%)}80%,100%{transform:translateX(100%)}}@keyframes sal0-reference-enter{from{opacity:0;transform:translateY(9px)}to{opacity:1;transform:none}}
+
+.telegram-options .check{display:flex;align-items:center;gap:.65rem;margin:.7rem 0}.telegram-options input[type=checkbox]{width:18px;height:18px;flex:none;accent-color:var(--accent)}.telegram-options .option-group{padding:.75rem 0;border-bottom:1px solid var(--border)}.telegram-options details{margin:.7rem 0}.telegram-options summary{cursor:pointer}.telegram-options textarea{display:block;width:100%;min-height:6rem;margin-top:.7rem;resize:vertical}
 </style>
 </head>
 <body>
@@ -2976,6 +2978,7 @@ html:not([data-sal0-look=legacy]) .header-actions .sal0-icon-button{padding-inli
                         <span class="label">Telegram Chat ID</span>
                         <input type="text" id="telegramChatIdInput" placeholder="Ex: 987654321" class="input-text">
                     </div>
+                    <details class="telegram-options" style="grid-column:1 / -1;"><summary>Editar mensagens e textos padrão por modo</summary><div id="telegram-preferences"></div></details>
                     <div style="grid-column: 1 / -1;">
                         <button type="button" id="btnSaveTelegram" class="btn-primary"><svg class="sal0-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#sal0-save"></use></svg> Salvar Telegram</button>
                     </div>
@@ -2988,6 +2991,13 @@ html:not([data-sal0-look=legacy]) .header-actions .sal0-icon-button{padding-inli
                 <div id="telegramDeliveryStatus" class="compact-note" role="status" aria-live="polite" style="overflow-wrap:anywhere;"></div>
                 <div id="telegramFeedback" role="status" aria-live="polite" style="overflow-wrap:anywhere;"></div>
             </div>
+            </details>
+
+            <details class="card settings-panel" id="resultCacheSection">
+                <summary class="settings-panel-summary" aria-expanded="false" aria-controls="resultCacheSectionBody"><span class="settings-panel-heading"><span class="card-title">Projetos dos resultados</span><span class="settings-panel-trigger"><span data-panel-label data-closed-label="Editar opções">Editar opções</span></span></span><span class="settings-panel-overview">Cache individual para voltar à edição de cada vídeo.</span></summary>
+                <div class="settings-panel-body" id="resultCacheSectionBody"><label class="checkbox-group"><input type="checkbox" id="keepIndividualResults" checked> Guardar um projeto individual por vídeo</label>
+                <p class="compact-note">Mantém mídia original, letra, tempos, ajustes e checkpoints até excluir o vídeo do resultado. Começar outra fila ou limpar a lista não apaga esses projetos. Resultados antigos dependem de o cache original ainda existir.</p>
+                <button type="button" id="saveResultCache" class="btn-primary">Salvar opção</button><p id="resultCacheFeedback" class="compact-note" role="status"></p></div>
             </details>
 
             <!-- IP Externo / Acesso Remoto -->
@@ -3271,7 +3281,7 @@ html:not([data-sal0-look=legacy]) .header-actions .sal0-icon-button{padding-inli
                 </ol>
                 <p>A API tem cota gratuita e pode limitar projetos sem auditoria a vídeos privados. Guarde a autorização como uma senha. Backing vocals e vídeo do modo SRT mostram porcentagem da etapa e avisam o avanço no Telegram; o LibreTranslate informa apenas início e término.</p>
             </details>
-            <p class="compact-note">Versão do servidor: 12.7.16. A transcrição é local; fontes, modelos e integrações podem acessar serviços externos. Use conteúdo autorizado.</p>
+            <p class="compact-note">Versão do servidor: 12.8.0. A transcrição é local; fontes, modelos e integrações podem acessar serviços externos. Use conteúdo autorizado.</p>
             <p class="compact-note">Use o servidor pela rede local ou VPN. A busca/importação do YouTube não concede direitos sobre a mídia. OAuth autoriza o acesso ao canal, não o uso de músicas. Confira as permissões do conteúdo e os termos do YouTube antes de importar ou publicar. Não listado permite acesso a quem tiver o link; resultados SRT nunca vão ao YouTube.</p>
             <p class="compact-note"><a href="https://www.youtube.com/static?template=terms" target="_blank" rel="noopener noreferrer">Termos do YouTube</a> · <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer">Privacidade do Google</a> · <a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener noreferrer">Revogar acesso ao canal</a></p>
         </div>
@@ -4879,10 +4889,55 @@ html:not([data-sal0-look=legacy]) .header-actions .sal0-icon-button{padding-inli
             return `${(value / (1024 * 1024)).toFixed(1)} MB`;
         }
 
+function renderTelegramPreferences(cfg){
+  const wrap=document.getElementById("telegram-preferences");if(!wrap)return;wrap.replaceChildren();
+  const policy=cfg.notification_policy;if(!policy)return;
+  const master=document.createElement('label');master.className='check';
+  const enabled=document.createElement('input');enabled.type='checkbox';enabled.id='telegram-messages-enabled';enabled.checked=policy.enabled;
+  master.append(enabled,document.createTextNode('Ativar as mensagens selecionadas'));wrap.append(master);
+  const variables=document.createElement('p');variables.className='hint';variables.textContent='Texto simples. Variáveis: '+(cfg.notification_variables||[]).map(key=>'{'+key+'}').join(', ')+'. O campo vazio usa a mensagem padrão.';wrap.append(variables);
+  for(const [mode,title] of cfg.notification_modes||[]){
+    const section=document.createElement('details');section.className='compact-details';const summary=document.createElement('summary');summary.textContent=title;section.append(summary);
+    for(const [event,label] of cfg.notification_events||[]){
+      const row=document.createElement('div');row.className='option-group';
+      const check=document.createElement('label');check.className='check';const input=document.createElement('input');input.type='checkbox';input.dataset.telegramMode=mode;input.dataset.telegramEvent=event;input.checked=!!policy.modes[mode]?.[event];check.append(input,document.createTextNode(label));row.append(check);
+      const edit=document.createElement('details');edit.className='compact-details';const heading=document.createElement('summary');heading.textContent='Editar texto padrão';const textarea=document.createElement('textarea');textarea.className='input-text';textarea.rows=4;textarea.maxLength=3500;textarea.dataset.telegramTextMode=mode;textarea.dataset.telegramTextEvent=event;textarea.dataset.default=cfg.notification_defaults?.[event]||'{mensagem}';textarea.value=policy.templates?.[mode]?.[event]||textarea.dataset.default;textarea.setAttribute('aria-label','Mensagem de '+label+' em '+title);edit.append(heading,textarea);row.append(edit);section.append(row);
+    }wrap.append(section);
+  }
+}
+function telegramPreferences(){
+  const enabled=document.getElementById("telegram-messages-enabled");if(!enabled)return undefined;
+  const policy={enabled:enabled.checked,modes:{},templates:{}};
+  document.querySelectorAll('[data-telegram-mode]').forEach(input=>{(policy.modes[input.dataset.telegramMode]??={})[input.dataset.telegramEvent]=input.checked;});
+  document.querySelectorAll('[data-telegram-text-mode]').forEach(input=>{(policy.templates[input.dataset.telegramTextMode]??={})[input.dataset.telegramTextEvent]=input.value.trim()===input.dataset.default?'':input.value;});
+  return policy;
+}
+
         let telegramRequestPending = false;
         let telegramStatusPending = false;
         let telegramEditing = false;
         let telegramConfigured = false;
+
+        document.getElementById('resultCacheSection').addEventListener('toggle', async event => {
+            if (!event.target.open) return;
+            try {
+                const response = await authFetch('/api/result-cache/settings');
+                const data = await response.json();
+                if (!response.ok) throw new Error(data.detail || 'Não foi possível ler a opção.');
+                document.getElementById('keepIndividualResults').checked = data.keep_individual_results !== false;
+            } catch (error) { document.getElementById('resultCacheFeedback').textContent = error.message; }
+        });
+        document.getElementById('saveResultCache').onclick = async () => {
+            const button = document.getElementById('saveResultCache'); button.disabled = true;
+            try {
+                const response = await authFetch('/api/result-cache/settings', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({keep_individual_results:document.getElementById('keepIndividualResults').checked})});
+                const data = await response.json();
+                if (!response.ok) throw new Error(data.detail || 'Não foi possível salvar a opção.');
+                document.getElementById('resultCacheFeedback').textContent = 'Opção salva. Os projetos já preservados continuam ligados aos seus resultados.';
+            } catch (error) { document.getElementById('resultCacheFeedback').textContent = error.message; }
+            finally { button.disabled = false; }
+        };
+
 
         function telegramFeedback(message, error = false) {
             const element = document.getElementById('telegramFeedback');
@@ -4928,6 +4983,7 @@ html:not([data-sal0-look=legacy]) .header-actions .sal0-icon-button{padding-inli
                 telegramConfigured = !!(data.telegram_token && data.telegram_chat_id);
                 if (!telegramEditing) {
                     document.getElementById('telegramTokenInput').value = data.telegram_token || '';
+                    renderTelegramPreferences(data);
                     document.getElementById('telegramChatIdInput').value = data.telegram_chat_id || '';
                     document.getElementById('telegramConfiguredBadge').style.display = telegramConfigured ? 'flex' : 'none';
                     document.getElementById('telegramInputsDiv').style.display = telegramConfigured ? 'none' : 'grid';
@@ -5125,6 +5181,16 @@ html:not([data-sal0-look=legacy]) .header-actions .sal0-icon-button{padding-inli
             return state;
         }
 
+        async function editResultProject(filename, owner) {
+            try {
+                const response = await authFetch(`/api/library/history/${encodeURIComponent(filename)}/project?owner=${encodeURIComponent(owner || '')}`);
+                const data = await response.json().catch(() => ({}));
+                if (!response.ok) throw new Error(data.detail || 'Não foi possível abrir o projeto deste resultado.');
+                document.getElementById('tabBtnCreate').click();
+                await openCacheSettings(data.job_id, false);
+            } catch (error) { alert(error.message); }
+        }
+
         function renderLibrarySection(container, section, files, icon, emptyText) {
             if (!container) return;
             const signature = JSON.stringify({files, role: currentUser?.role, username: currentUser?.username});
@@ -5186,6 +5252,7 @@ html:not([data-sal0-look=legacy]) .header-actions .sal0-icon-button{padding-inli
                     actions.appendChild(makeLibraryButton('[[sal0:play]] Ver', 'btn-secondary', () => openMediaPreview(section, file, owner)));
                 }
                 if (section === 'history') {
+                    if (ext === 'mp4') actions.appendChild(makeLibraryButton('[[sal0:edit]] Editar', 'btn-secondary', () => editResultProject(file, owner)));
                     row.classList.add('result-card');
                     const cover = document.createElement('div');
                     cover.className = 'result-cover';
@@ -6825,7 +6892,7 @@ html:not([data-sal0-look=legacy]) .header-actions .sal0-icon-button{padding-inli
                 try {
                     const data = await telegramRequest('', {method:'POST', headers:{'Content-Type':'application/json'},
                         body:JSON.stringify({telegram_token:document.getElementById('telegramTokenInput').value.trim(),
-                                             telegram_chat_id:document.getElementById('telegramChatIdInput').value.trim()})});
+                                             telegram_chat_id:document.getElementById('telegramChatIdInput').value.trim(),notification_policy:telegramPreferences()})});
                     telegramEditing = false;
                     setUiText(editTelegram, '[[sal0:edit]] Editar');
                     await fetchTelegramConfig();

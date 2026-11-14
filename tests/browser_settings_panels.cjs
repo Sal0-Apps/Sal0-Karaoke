@@ -34,7 +34,7 @@ const HTML = require('./load_html.cjs')();
         await page.waitForFunction(() => currentUser?.role === 'admin');
         await page.locator('#tabBtnSettings').click();
         const panels = page.locator('.settings-grid > .settings-panel');
-        assert.equal(await panels.count(),11);
+        assert.equal(await panels.count(),12);
         assert.equal(await page.locator('.settings-grid details[open]').count(),0);
         for (const panel of await panels.all()) {
             assert(await panel.isVisible());

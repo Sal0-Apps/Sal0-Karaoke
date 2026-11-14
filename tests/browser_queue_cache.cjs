@@ -6,6 +6,7 @@ for (const match of HTML.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/g)) new F
  try {
   const page = await browser.newPage({viewport:{width:390,height:900},isMobile:true,hasTouch:true});
   const errors=[], requests=[], submissions=[], confirmations=[];
+  let archivedVisible=false;
   let acceptClear=false, failClear=false, holdNextQueue=false, releaseHeldQueue, notifyHeldQueue;
   const heldQueueReady=new Promise(resolve=>notifyHeldQueue=resolve);
   page.on('pageerror',e=>errors.push(e.message));
@@ -46,9 +47,10 @@ for (const match of HTML.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/g)) new F
    }
    if(u.pathname.match(/^\/api\/queue-cache\/[ABS]$/)){
     assert.equal(u.searchParams.get('include_segments'),'false');
-    const id=u.pathname.split('/').at(-1),job=jobs.find(j=>j.id===id);
+    const id=u.pathname.split('/').at(-1),job=jobs.find(j=>j.id===id)||{id,title:'Canção arquivada',can_reprocess:true,status:'done'};
     return fulfill({...job,options:id==='S'?{...options,subtitle_only:true,translation_language:'original',subtitle_settings:{font_size:24,text_color:'#FFFFFF',box_color:'#000000',box_opacity:65,text_position:'bottom',video_subtitle_source:'original',background_color:'#101827'}}:options,publication:id==='A'?{video_id:'oldVideo001',url:'https://youtu.be/oldVideo001'}:null});
    }
+   if(u.pathname==='/api/library/history/Finished.mp4/project')return fulfill({job_id:'A'});
    if(u.pathname==='/api/queue-cache/A/segments'){
     if(req.method()==='GET'){await segmentsGate;return fulfill({title:'Canção A',can_reprocess:true,segments:saved});}
     saved=JSON.parse(req.postData()).segments;return fulfill({status:'saved',segments:saved});
@@ -61,7 +63,7 @@ for (const match of HTML.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/g)) new F
    if(u.pathname==='/api/easy-mode'){await configGate;return fulfill({enabled:true,whisper_model:'tiny',font_size:50,background_mode:'random_library',lyrics_mode:'auto',keep_backing_vocals:true});}
    if(u.pathname==='/api/profiles'){await configGate;return fulfill({'Karaokê equilibrado':{whisper_model:'tiny',font_size:50,background_mode:'color',lyrics_mode:'auto'}});}
    if(u.pathname==='/api/subtitle-mode')return fulfill({font_size:24,text_color:'#FFFFFF',box_color:'#000000',box_opacity:65,text_position:'bottom',video_subtitle_source:'translated',background_color:'#101827'});
-   if(u.pathname==='/api/library')return fulfill({videos:[],photos:[],history:[],audio:[],backgrounds:[]});
+   if(u.pathname==='/api/library')return fulfill({videos:[],photos:[],history:archivedVisible?['Finished.mp4']:[],audio:[],backgrounds:[]});
    return fulfill({});
   });
   await page.goto('http://karaoke.test');
@@ -224,6 +226,16 @@ for (const match of HTML.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/g)) new F
   assert.equal(await page.locator('#processingQueueList .queue-item').count(),1);
   assert.equal(await page.locator('[data-cache-id="A"]').count(),0);
   assert(await page.locator('[data-cache-id="NEXT"]').isVisible());
+  // Results reopen the saved source even after their queue row has rotated out.
+  serverStatus={status:'idle',progress:0};
+  archivedVisible=true;
+  await page.evaluate(()=>fetchStatus());
+  await page.locator('#tabBtnLibrary').click();
+  await page.locator('#libHistoryList').getByRole('button',{name:'Editar',exact:true}).click();
+  await page.waitForFunction(()=>window.cachedRevisionId==='A');
+  assert(await page.locator('#createTabContent').isVisible());
+  assert.equal(await page.locator('#lyricsText').inputValue(),'Guia A');
+  assert(requests.some(r=>r.path==='/api/library/history/Finished.mp4/project'));
   assert.deepEqual(errors,[]);
   console.log('Single queue list, finished-item retention, compact actions, stable focus, batch rotation and all revision flows passed.');
  } finally {await browser.close();}

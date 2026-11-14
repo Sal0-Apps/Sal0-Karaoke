@@ -7,6 +7,8 @@ for(const match of HTML.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/g)) new Fu
   const page=await browser.newPage({viewport:{width:390,height:900},isMobile:true,hasTouch:true});
   const errors=[],writes=[],tests=[],verifications=[];
   let token='123456***oken',chat='-100123',testKind='failure',heldTest=null,holdTest=false,badSave=false;
+  const modes=[['quick','Modo Rápido'],['detailed','Modo Detalhado'],['subtitle','Só legendar']],events=[['completed','Conclusão'],['video','Vídeo']];
+  let policy={enabled:true,modes:Object.fromEntries(modes.map(([mode])=>[mode,{completed:true,video:true}])),templates:{}};
   let delivery={state:'network_error',detail:'O servidor não consegue conectar ao Telegram. Confira a internet e o DNS do servidor.',last_delivery:{ok:false,detail:'O servidor não consegue conectar ao Telegram.',at:1791560000},last_success_at:1791559000,pending:0};
   page.on('pageerror',error=>errors.push(error.message));
   await page.addInitScript(()=>{localStorage.setItem('karaoke_token','session');window.alert=()=>{};});
@@ -32,11 +34,11 @@ for(const match of HTML.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/g)) new Fu
     if(request.method()==='POST'){
      writes.push(request.postDataJSON());
      if(badSave)return reply({detail:'Confira o Chat ID numérico completo.'},400);
-     ({telegram_token:token,telegram_chat_id:chat}=request.postDataJSON());
+     ({telegram_token:token,telegram_chat_id:chat,notification_policy:policy}=request.postDataJSON());
      token='123456***oken';delivery={state:'unverified',detail:'Configuração salva. Verifique a conexão ou envie uma mensagem de teste.',pending:0};
      return reply({status:'success',detail:delivery.detail});
     }
-    return reply({telegram_token:token,telegram_chat_id:chat,configured:true,delivery});
+    return reply({telegram_token:token,telegram_chat_id:chat,configured:true,delivery,notification_policy:policy,notification_modes:modes,notification_events:events,notification_defaults:{completed:'Pronto: {titulo}',video:'{mensagem}'},notification_variables:['titulo','mensagem']});
    }
    if(path==='/api/telegram/status')return reply(delivery);
    if(path==='/api/telegram/verify'){
@@ -84,6 +86,13 @@ await page.locator('#telegramSection > summary').click();
   assert((await page.locator('#telegramDeliveryStatus').textContent()).includes('não confirmado'));
   await page.locator('#telegramSection').screenshot({path:'telegram-delivery-error.png'});
   await page.locator('#btnEditTelegram').click();
+  assert.equal(await page.locator('.telegram-options').evaluate(el=>el.open),false);
+  await page.locator('.telegram-options > summary').click();
+  assert.equal(await page.locator('#telegram-preferences details[open]').count(),0);
+  await page.locator('#telegram-preferences > details').first().locator(':scope > summary').click();
+  await page.locator('#telegram-preferences > details').first().locator('details').first().locator('summary').click();
+  await page.locator('[data-telegram-text-mode="quick"][data-telegram-text-event="completed"]').fill('Concluído: {titulo}');
+  await page.locator('[data-telegram-mode="quick"][data-telegram-event="video"]').uncheck();
   await page.locator('#telegramChatIdInput').fill('-100999');
   await page.locator('#telegramTokenInput').focus();
   await page.locator('#telegramTokenInput').evaluate(element=>element.setSelectionRange(1,4));
@@ -100,6 +109,9 @@ await page.locator('#telegramSection > summary').click();
   badSave=false;await page.locator('#btnSaveTelegram').click();
   await page.waitForFunction(()=>document.getElementById('telegramInputsDiv').style.display==='none');
   assert.strictEqual(writes.at(-1).telegram_chat_id,'-100999');
+  assert.equal(writes.at(-1).notification_policy.templates.quick.completed,'Concluído: {titulo}');
+  assert.equal(writes.at(-1).notification_policy.modes.quick.video,false);
+  assert.equal(writes.at(-1).notification_policy.modes.subtitle.video,true);
   testKind='proxy';await page.locator('#btnTestTelegram').click();
   await page.waitForFunction(()=>document.getElementById('telegramFeedback').textContent.includes('503'));
   assert(!(await page.locator('#telegramFeedback').textContent()).includes('private proxy body'));

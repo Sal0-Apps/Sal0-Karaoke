@@ -16,6 +16,7 @@ ROOT = Path(__file__).parents[1]
 HTML = (ROOT / "app" / "templates" / "index.html").read_text(encoding="utf-8")
 MAIN = (ROOT / "app" / "main.py").read_text(encoding="utf-8")
 sys.path.insert(0, str(ROOT / 'app'))
+import telegram_preferences
 from reprocess_cache import youtube_identity
 import process_manager
 
@@ -78,7 +79,7 @@ class QueuedYouTubePipelineTests(unittest.TestCase):
             return str(media),self.title
         self.download=Mock(side_effect=download);self.subtitle=Mock()
         self.scope=dict(os=os,json=json,shutil=shutil,time=time,logger=logging.getLogger('youtube-queue-test'),
-            processing_lock=threading.Lock(),state_lock=threading.Lock(),state=self.state,
+            telegram_preferences=telegram_preferences, processing_lock=threading.Lock(),state_lock=threading.Lock(),state=self.state,
             get_user_paths=lambda _:dict(cache=str(self.cache),output=str(self.output),library=str(self.library)),
             get_notification_targets=lambda _:[],load_stage_checkpoints=lambda _:dict(completed_stages={}),
             persist_active_processing_seconds=lambda _,value:value,

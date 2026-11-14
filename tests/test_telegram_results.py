@@ -14,6 +14,8 @@ from telegram_delivery import TelegramDelivery, units
 from telegram_results import ResultNotifications
 from youtube_publisher import YouTubePublisher
 from result_publication import record_result_kind
+import telegram_preferences
+import result_projects
 
 
 class TelegramResultTests(unittest.TestCase):
@@ -65,6 +67,20 @@ class TelegramResultTests(unittest.TestCase):
         self.send()
         self.assertEqual([m for m, _ in self.calls], ['sendVideo'])
         self.assertIn('Assistir no YouTube', self.calls[0][1]['caption'])
+
+    def test_disabled_youtube_delivery_never_decorates_or_updates_the_result(self):
+        self.publish(targets=[])
+        self.notifications.send_video(str(self.video),'private-token','-1001',str(self.video),self.caption,allow_youtube=False)
+        self.publish(targets=[])
+        self.assertEqual([method for method, _ in self.calls], ['sendVideo'])
+        self.assertNotIn('YouTube', self.calls[0][1]['caption'])
+
+    def test_custom_publication_text_is_delivered_only_once(self):
+        targets=[{**self.targets[0],'publication_text':'Meu vídeo: https://www.youtube.com/watch?v=abcdefghijk'}]
+        self.publish(targets=targets)
+        self.publish(targets=targets)
+        self.assertEqual([method for method, _ in self.calls], ['sendMessage'])
+        self.assertEqual(self.calls[0][1]['text'], targets[0]['publication_text'])
 
     def test_upload_completing_during_send_updates_the_same_message(self):
         def during(method, _):
@@ -151,6 +167,7 @@ class TelegramResultTests(unittest.TestCase):
         node = next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == 'notify_youtube_publication')
         service = Mock()
         scope = {'Path': Path, 're': re, 'TELEGRAM_RESULTS': service,
+                 'telegram_preferences':telegram_preferences,'result_projects':result_projects,'PROCESSING_QUEUE_ROOT':str(self.root/'projects'),
                  'load_users': lambda: {'alice': {'role': 'user'}, 'admin': {'role': 'admin'}},
                  'get_user_paths': lambda user: {'library': str(self.root / user['username'])},
                  'get_notification_targets': lambda user: [{'owner': user['username']}, {'owner': 'admin'}]}
@@ -158,7 +175,7 @@ class TelegramResultTests(unittest.TestCase):
         job = {'video': str(self.root / 'alice/history/song.mp4'), 'video_id': 'abcdefghijk', 'status': 'done',
                'title': 'Música', 'requester': {'username': 'admin', 'role': 'admin'}}
         scope['notify_youtube_publication'](job)
-        self.assertEqual(service.published.call_args.args[3], [{'owner': 'alice'}, {'owner': 'admin'}])
+        self.assertEqual([target['owner'] for target in service.published.call_args.args[3]], ['alice', 'admin'])
         service.reset_mock()
         job['status'] = 'finalizing'
         self.assertFalse(scope['notify_youtube_publication'](job))
