@@ -82,6 +82,13 @@ class TelegramResultTests(unittest.TestCase):
         self.assertEqual([method for method, _ in self.calls], ['sendMessage'])
         self.assertEqual(self.calls[0][1]['text'], targets[0]['publication_text'])
 
+    def test_only_youtube_selection_sends_automatic_notice_without_an_attachment_receipt(self):
+        targets=[{**self.targets[0],'standalone_publication':True}]
+        self.publish(targets=targets)
+        self.publish(targets=targets)
+        self.assertEqual([method for method, _ in self.calls], ['sendMessage'])
+        self.assertIn('https://www.youtube.com/watch?v=abcdefghijk',json.dumps(self.calls))
+
     def test_upload_completing_during_send_updates_the_same_message(self):
         def during(method, _):
             if method == 'sendVideo':
@@ -176,6 +183,11 @@ class TelegramResultTests(unittest.TestCase):
                'title': 'Música', 'requester': {'username': 'admin', 'role': 'admin'}}
         scope['notify_youtube_publication'](job)
         self.assertEqual([target['owner'] for target in service.published.call_args.args[3]], ['alice', 'admin'])
+        policy=telegram_preferences.normalize()
+        policy['modes']['quick'].update(completed=False,video=False)
+        scope['get_notification_targets']=lambda user:[{'owner':user['username'],'notification_policy':policy}]
+        scope['notify_youtube_publication']({**job,'notification_mode':'quick'})
+        self.assertTrue(service.published.call_args.args[3][0]['standalone_publication'])
         service.reset_mock()
         job['status'] = 'finalizing'
         self.assertFalse(scope['notify_youtube_publication'](job))

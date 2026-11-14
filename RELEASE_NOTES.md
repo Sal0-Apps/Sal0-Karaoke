@@ -1,3 +1,10 @@
+## 12.8.1 — Avisos independentes do YouTube
+
+- A escolha de receber apenas a publicação no YouTube funciona mesmo quando
+  o texto de conclusão e o anexo do resultado estão desligados.
+- A fila desativa a edição quando o vídeo e seu projeto já foram excluídos.
+- Mantém as novidades 12.8.0 e os clientes nativos existentes.
+
 ## 12.8.0 — Projetos por resultado e mensagens editáveis
 
 - Telegram: escolhas independentes para Rápido, Detalhado e Só legendar, com

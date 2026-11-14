@@ -83,3 +83,12 @@ class ResultEditingRoutesTests(unittest.TestCase):
         response=self.client.get('/api/library/history/Antigo.mp4/project')
         self.assertEqual(response.status_code,409,response.text)
         self.assertIn('não foram preservados',response.json()['detail'])
+
+    def test_deleting_result_disables_its_old_queue_editor_even_with_a_youtube_url(self):
+        job=self.job(uuid.uuid4().hex)
+        job['pipeline']['youtube_url']='https://youtu.be/abcdefghijk'
+        video=Path(job['pipeline']['library_dir'])/'history'/'Deleted.mp4';video.write_bytes(b'video')
+        job['history_filename']=video.name
+        result_projects.capture(job,self.scope['PROCESSING_QUEUE_ROOT'])
+        video.unlink();result_projects.remove_video(video,self.scope['PROCESSING_QUEUE_ROOT'])
+        self.assertFalse(self.scope['public_cached_queue_job'](job)['can_reprocess'])

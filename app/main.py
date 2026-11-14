@@ -3910,7 +3910,7 @@ def public_cached_queue_job(job: dict, waiting_position: int | None = None) -> d
     if not source_path:
         meta = queue_cache.read_json(os.path.join(cache_dir, "cache_meta.json"), {})
         source_path = os.path.join(cache_dir, "original_input" + str(meta.get("input_ext", "")))
-    has_source = os.path.isfile(source_path) or bool(youtube_identity(pipeline.get("youtube_url")))
+    has_source = os.path.isdir(cache_dir) and (os.path.isfile(source_path) or bool(youtube_identity(pipeline.get("youtube_url"))))
     return {**public_queue_job(job, waiting_position), "batch_id": job.get("batch_id"),
         "revision_of": job.get("revision_of"), "subtitle_only": bool(pipeline.get("subtitle_only")),
         "cancel_requested": bool(job.get("cancel_requested")),
@@ -6566,6 +6566,8 @@ def notify_youtube_publication(job):
     for target in telegram_preferences.contextualize(get_notification_targets(owner), mode, job.get("title") or video.stem):
         if not telegram_preferences.allowed(target, "youtube"):
             continue
+        if not any(telegram_preferences.allowed(target, event) for event in ("completed", "video")):
+            target["standalone_publication"] = True
         template = telegram_preferences.normalize(target.get("notification_policy"))["templates"][target["_mode"]]["youtube"]
         if template:
             link = "https://www.youtube.com/watch?v=" + job["video_id"]

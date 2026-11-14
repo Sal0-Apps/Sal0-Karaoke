@@ -146,6 +146,6 @@ class ResultNotifications:
                 success = self._update(video, token, chat) and success
             if target.get('publication_text'):
                 success = self._notify_once(video,token,chat,target['publication_text']) and success
-            elif not has_receipt and not automatic:
+            elif not has_receipt and (not automatic or target.get('standalone_publication')):
                 success = self._notify_once(video, token, chat) and success
         return success
