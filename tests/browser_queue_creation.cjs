@@ -317,7 +317,10 @@ const activeJob = () => ({id: 'active', status: 'processing', title: 'Música em
         await page.waitForFunction(() => !clientPreparationInProgress && !queueCreationExpanded);
         await page.locator('#processCard').waitFor({state: 'visible'});
         assert.equal((await page.locator('#processStatusTitle').textContent()).trim(), 'Aguardando');
-        assert.equal(await page.locator('#processStatusTitle svg use').getAttribute('href'), '#sal0-clock');
+        await page.waitForFunction(() => {
+            const svg = document.querySelector('#processStatusTitle svg');
+            return svg?.dataset.sal0IconReplaced === 'clock' || svg?.querySelector('use')?.getAttribute('href') === '#sal0-clock';
+        });
         assert(!await page.locator('#easyModeForm').isVisible());
         assert(!await page.locator('#downloadBox').isVisible());
         assert.equal(await page.locator('#queueCountBadge').textContent(), '1 aguardando');
