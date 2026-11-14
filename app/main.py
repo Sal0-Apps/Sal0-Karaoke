@@ -5020,7 +5020,7 @@ def send_video_to_targets(
     processing_seconds: float = 0, subtitle_downloads: list[dict] = None,
     embedded_subtitle: str = "", result_video: str = "",
 ):
-    """Do not encode or upload when this destination only requests a text/link."""
+    """Finaliza os envios selecionados antes de liberar o próximo item da fila."""
     selected = []
     for item in targets:
         target = resolve_notification_target(item)
