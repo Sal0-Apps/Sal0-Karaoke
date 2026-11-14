@@ -498,19 +498,72 @@ class QueueCacheTests(unittest.TestCase):
         self.user={'username':'bob','role':'admin'}
         self.assertEqual(self.client.get('/api/queue/submissions/'+'a'*32).status_code,404)
 
-    def test_concurrent_retries_accept_once_and_remove_the_unused_staging_cache(self):
-        enqueue=self.scope['enqueue_processing_job'];barrier=threading.Barrier(2)
-        def enqueue_together(job):
-            barrier.wait(timeout=5)
-            return enqueue(job)
-        self.scope['enqueue_processing_job']=enqueue_together
-        data={'youtube_url':'https://youtu.be/abcdefghijk','submission_id':'a'*32}
-        with ThreadPoolExecutor(max_workers=2) as pool:
-            results=list(pool.map(lambda _:self.client.post('/api/process',data=data),range(2)))
-        self.assertTrue(all(result.status_code==200 for result in results),[r.text for r in results])
-        self.assertEqual(results[0].json()['job_id'],results[1].json()['job_id'])
-        self.assertEqual(len(self.queue),1);self.assertEqual(len(list((self.root/'jobs').iterdir())),1)
-        self.assertEqual(len(json.loads((self.root/'queue.json').read_text())),1)
+    def test_slow_preparation_is_visible_and_concurrent_retries_do_not_repeat_it(self):
+        ready, release = threading.Event(), threading.Event()
+        paths = self.scope['get_user_paths']
+        def slow_paths(*args, **kwargs):
+            ready.set()
+            if not release.wait(5): raise AssertionError('Preparation was not released')
+            return paths(*args, **kwargs)
+        self.scope['get_user_paths'] = Mock(side_effect=slow_paths)
+        data = {'youtube_url':'https://youtu.be/abcdefghijk','submission_id':'a'*32}
+        with ThreadPoolExecutor(max_workers=1) as pool:
+            first = pool.submit(self.client.post, '/api/process', data=data)
+            try:
+                self.assertTrue(ready.wait(5))
+                status = self.client.get('/api/queue/submissions/'+'a'*32)
+                self.assertEqual(status.status_code, 200, status.text)
+                self.assertEqual(status.json()['status'], 'preparing')
+                duplicate = self.client.post('/api/process', data=data)
+                self.assertEqual(duplicate.json()['status'], 'preparing')
+                self.assertEqual(self.scope['get_user_paths'].call_count, 1)
+                self.assertEqual(self.queue, [])
+            finally:
+                release.set()
+            accepted = first.result(timeout=5)
+        self.assertEqual(accepted.status_code, 200, accepted.text)
+        again = self.client.post('/api/process', data=data)
+        self.assertEqual(again.json()['job_id'], accepted.json()['job_id'])
+        self.assertEqual(len(self.queue), 1)
+        self.assertEqual(len(list((self.root/'jobs').iterdir())), 1)
+        self.assertEqual(len(json.loads((self.root/'queue.json').read_text())), 1)
+
+    def test_pending_confirmation_does_not_wait_for_the_queue_lock(self):
+        identifier = 'c'*32
+        progress = self.scope['process_karaoke'].submissions
+        progress.begin('alice', identifier)
+        with self.scope['processing_queue_lock']:
+            with ThreadPoolExecutor(max_workers=1) as pool:
+                response = pool.submit(self.client.get, '/api/queue/submissions/'+identifier).result(timeout=1)
+        self.assertEqual(response.json(), {'status':'preparing','submission_id':identifier})
+        self.user = {'username':'bob','role':'admin'}
+        self.assertEqual(self.client.get('/api/queue/submissions/'+identifier).status_code, 404)
+
+    def test_failed_preparation_is_reported_and_can_be_retried(self):
+        paths = self.scope['get_user_paths']
+        self.scope['get_user_paths'] = Mock(side_effect=OSError('private server path'))
+        data = {'youtube_url':'https://youtu.be/abcdefghijk','submission_id':'d'*32}
+        with TestClient(self.scope['app'], raise_server_exceptions=False) as client:
+            self.assertEqual(client.post('/api/process', data=data).status_code, 500)
+            status = client.get('/api/queue/submissions/'+'d'*32)
+        self.assertEqual(status.json()['status'], 'rejected')
+        self.assertEqual(status.json()['http_status'], 500)
+        self.assertNotIn('private', status.text)
+        self.scope['get_user_paths'] = paths
+        accepted = self.client.post('/api/process', data=data)
+        self.assertEqual(accepted.status_code, 200, accepted.text)
+        self.assertEqual(accepted.json()['status'], 'queued')
+        self.assertEqual(len(self.queue), 1)
+
+    def test_confirmed_receipt_does_not_wait_for_another_jobs_file_copy(self):
+        identifier = 'e'*32
+        accepted = self.client.post('/api/process', data={
+            'youtube_url':'https://youtu.be/abcdefghijk','submission_id':identifier}).json()
+        with self.scope['processing_queue_lock']:
+            with ThreadPoolExecutor(max_workers=1) as pool:
+                status = pool.submit(self.client.get, '/api/queue/submissions/'+identifier).result(timeout=1)
+        self.assertEqual(status.json()['status'], 'queued')
+        self.assertEqual(status.json()['job_id'], accepted['job_id'])
 
     def test_same_identifier_belongs_to_the_submitting_profile(self):
         data={'youtube_url':'https://youtu.be/abcdefghijk','submission_id':'a'*32}

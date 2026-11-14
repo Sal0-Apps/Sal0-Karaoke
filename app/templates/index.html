@@ -3271,7 +3271,7 @@ html:not([data-sal0-look=legacy]) .header-actions .sal0-icon-button{padding-inli
                 </ol>
                 <p>A API tem cota gratuita e pode limitar projetos sem auditoria a vídeos privados. Guarde a autorização como uma senha. Backing vocals e vídeo do modo SRT mostram porcentagem da etapa e avisam o avanço no Telegram; o LibreTranslate informa apenas início e término.</p>
             </details>
-            <p class="compact-note">Versão do servidor: 12.7.15. A transcrição é local; fontes, modelos e integrações podem acessar serviços externos. Use conteúdo autorizado.</p>
+            <p class="compact-note">Versão do servidor: 12.7.16. A transcrição é local; fontes, modelos e integrações podem acessar serviços externos. Use conteúdo autorizado.</p>
             <p class="compact-note">Use o servidor pela rede local ou VPN. A busca/importação do YouTube não concede direitos sobre a mídia. OAuth autoriza o acesso ao canal, não o uso de músicas. Confira as permissões do conteúdo e os termos do YouTube antes de importar ou publicar. Não listado permite acesso a quem tiver o link; resultados SRT nunca vão ao YouTube.</p>
             <p class="compact-note"><a href="https://www.youtube.com/static?template=terms" target="_blank" rel="noopener noreferrer">Termos do YouTube</a> · <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer">Privacidade do Google</a> · <a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener noreferrer">Revogar acesso ao canal</a></p>
         </div>
@@ -4759,39 +4759,72 @@ html:not([data-sal0-look=legacy]) .header-actions .sal0-icon-button{padding-inli
             }
             formData.set('submission_id', submissionId);
             const uploadBytes = Array.from(formData.values()).reduce((total, value) => total + (value instanceof File ? value.size : 0), 0);
-            const timeoutMs = uploadBytes ? Math.max(120000, Math.min(1800000, 60000 + uploadBytes / 100)) : 20000;
-            let failureDetail = '';
-            for (let attempt = 0; attempt < 2; attempt++) {
+            const timeoutMs = uploadBytes ? Math.max(120000, Math.min(1800000, 60000 + uploadBytes / 100)) : 120000;
+            const deadline = performance.now() + Math.max(timeoutMs + 30000, 300000);
+            const pause = () => new Promise(resolve => setTimeout(() => resolve({source: 'poll'}), 3000));
+            const read = async (url, options, timeout, source) => {
                 try {
-                    const response = await timedAuthFetch('/api/process', processRequestOptions(formData), timeoutMs);
+                    const response = await timedAuthFetch(url, options, timeout);
                     const result = (await response.json().catch(() => null)) || {};
-                    failureDetail = processResponseDetail(response, result);
-                    if (!response.ok && response.status < 500) {
-                        pendingProcessSubmissions.delete(signature);
-                        const error = new Error(failureDetail);
-                        error.confirmedFailure = true;
-                        throw error;
-                    }
-                    if (response.ok && result.status === 'queued' && result.job_id) {
-                        pendingProcessSubmissions.delete(signature);
-                        return result;
-                    }
-                } catch (error) {
-                    if (error.confirmedFailure) throw error;
-                    failureDetail = error.name === 'AbortError' ? 'O servidor demorou para responder ao pedido de inclusão.'
-                        : 'A resposta ao pedido de inclusão não chegou ao app.';
+                    return {source, response, result};
+                } catch (error) { return {source, error}; }
+            };
+            const confirmed = event => {
+                const result = event.result || {};
+                if (event.response?.ok && result.status === 'queued' && result.job_id) {
+                    pendingProcessSubmissions.delete(signature);
+                    return result;
                 }
-                document.getElementById('creationLoadingDetail').textContent = 'Reconectando e conferindo a inclusão na fila…';
-                try {
-                    const response = await timedAuthFetch(`/api/queue/submissions/${submissionId}`, {cache: 'no-store'}, 8000);
-                    const result = await response.json().catch(() => ({}));
-                    if (response.ok && result.status === 'queued' && result.job_id) {
-                        pendingProcessSubmissions.delete(signature);
-                        return result;
-                    }
-                } catch (error) { /* Retry with the same identifier; the server accepts it only once. */ }
+                if ((event.source === 'post' && event.response && !event.response.ok && event.response.status < 500)
+                        || result.status === 'rejected') {
+                    const status = result.http_status || event.response.status;
+                    if (status < 500) pendingProcessSubmissions.delete(signature);
+                    const error = new Error(result.status === 'rejected' ? result.detail : processResponseDetail(event.response, result));
+                    error.confirmedFailure = status < 500;
+                    throw error;
+                }
+                return null;
+            };
+            let attempts = 0, requestPending = false, preparing = false, failureDetail = '';
+            const idle = new Promise(() => {});
+            let request = idle;
+            const post = () => {
+                attempts++;
+                requestPending = true;
+                request = read('/api/process', processRequestOptions(formData), timeoutMs, 'post');
+            };
+            const observe = event => {
+                if (event.source === 'post') {
+                    requestPending = false;
+                    request = idle;
+                    failureDetail = event.error
+                        ? (event.error.name === 'AbortError' ? 'O servidor demorou para responder ao pedido de inclusão.' : 'A resposta ao pedido de inclusão não chegou ao app.')
+                        : processResponseDetail(event.response, event.result);
+                }
+                if (event.result?.status === 'preparing') preparing = true;
+                else if (event.source === 'receipt' && event.response?.status === 404) preparing = false;
+            };
+            post();
+            while (performance.now() < deadline) {
+                let event = await Promise.race([request, pause()]);
+                let result = confirmed(event);
+                if (result) return result;
+                observe(event);
+                document.getElementById('creationLoadingDetail').textContent = preparing
+                    ? 'O servidor está preparando os arquivos. A inclusão está sendo acompanhada automaticamente…'
+                    : 'Conferindo a inclusão na fila automaticamente…';
+                event = await Promise.race([request,
+                    read(`/api/queue/submissions/${submissionId}`, {cache: 'no-store'}, 8000, 'receipt')]);
+                result = confirmed(event);
+                if (result) return result;
+                observe(event);
+                // Never resend while the original POST or its server-side preparation is active.
+                if (!requestPending && !preparing) {
+                    if (attempts >= 2) break;
+                    post();
+                }
             }
-            throw new Error(`${failureDetail} Ainda não foi possível confirmar a inclusão. Suas escolhas foram mantidas. Toque novamente no botão de criar para conferir e tentar com o mesmo identificador, sem duplicar o item.`);
+            throw new Error(`${failureDetail || 'A confirmação do servidor ainda não chegou.'} Ainda não foi possível confirmar a inclusão. Suas escolhas foram mantidas. Toque novamente no botão de criar para conferir e tentar com o mesmo identificador, sem duplicar o item.`);
         }
 
         async function submitProcessBatch(baseFormData, audioFiles = [], inputId = '') {

@@ -565,7 +565,9 @@ class YouTubePublisher:
             raise PublicationError(token['auth_error'], 'auth_required')
         if len(title) > 100 or '<' in title or '>' in title:
             raise PublicationError('Título do YouTube inválido.')
-        additional_playlists = self.validate_additional_playlists(additional_playlists, playlist_id)
+        # Check the channel's playlists in the publication worker, never while
+        # accepting an audio job (the Google API can take longer than the proxy).
+        additional_playlists = self.validate_additional_playlists(additional_playlists, playlist_id, verify_remote=False)
         return {'privacy': settings['privacy'], 'title_template': settings['title_template'],
                 'additional_playlists': additional_playlists,
                 'playlist_id': playlist_id, 'channel_id': token['channel_id'],

@@ -1,3 +1,14 @@
+## 12.7.16 — Confirmação da fila durante a preparação
+
+- A interface acompanha automaticamente a inclusão enquanto o servidor prepara
+  os arquivos, sem interromper links após 20 segundos ou reenviar um pedido ativo.
+- Tentativas simultâneas com o mesmo identificador compartilham a preparação;
+  só uma confirmação persistida na fila libera a tela de criação.
+- A consulta de preparação dispensa o bloqueio da fila, e as verificações remotas
+  de playlists adicionais ficam na etapa de publicação do YouTube.
+- Revisões explícitas e fundos de legenda não aguardam a recuperação do cache legado.
+- Atualização do servidor e da interface web, sem alterações nos APKs.
+
 ## 12.7.15 — Playlist por vídeo para o administrador
 
 - O administrador pode escolher uma única playlist diferente da padrão nos modos

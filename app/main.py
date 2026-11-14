@@ -1046,8 +1046,20 @@ def start_processing_queue_worker():
 
 @app.get("/api/queue/submissions/{submission_id}")
 def get_process_submission(submission_id: str, current_user: dict = Depends(get_current_user)):
-    with processing_queue_lock:
-        receipt = queue_submissions.receipt(processing_queue, current_user.get("username"), submission_id)
+    if not queue_submissions.valid_id(submission_id):
+        raise HTTPException(status_code=400, detail="Identificador de inclusão inválido.")
+    progress = process_karaoke.submissions.get(current_user.get("username"), submission_id)
+    if progress:
+        if progress["status"] != "queued" or not processing_queue_lock.acquire(blocking=False):
+            return progress
+        try:
+            receipt = queue_submissions.receipt(processing_queue, current_user.get("username"), submission_id)
+        finally:
+            processing_queue_lock.release()
+    else:
+        with processing_queue_lock:
+            receipt = queue_submissions.receipt(processing_queue, current_user.get("username"), submission_id)
+    receipt = receipt or progress
     if not receipt:
         raise HTTPException(status_code=404, detail="Esta inclusão ainda não foi confirmada.")
     return receipt
@@ -1849,7 +1861,7 @@ def stage_subtitle_background(settings: dict, cache_dir: str):
     filename = settings.get("background_file", "")
     if not filename or not owner or not is_admin(owner):
         return None
-    source = os.path.join(get_user_paths(owner)["library"], "photos", filename)
+    source = os.path.join(get_user_paths(owner, recover_cache=False)["library"], "photos", filename)
     if not os.path.isfile(source):
         return None
     destination = os.path.join(cache_dir, "subtitle_background" + os.path.splitext(filename)[1])
@@ -4085,6 +4097,7 @@ def purge_audio_cache_directory(cache_dir: str):
 
 
 @app.post("/api/process")
+@queue_submissions.track_preparation
 def process_karaoke(
     current_user: dict = Depends(get_current_user),
     audio_file: UploadFile = File(None),
@@ -4256,7 +4269,7 @@ def process_karaoke(
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
 
-    user_paths = get_user_paths(current_user, recover_cache=not has_source)
+    user_paths = get_user_paths(current_user, recover_cache=not (has_source or source_job))
     job_id = uuid.uuid4().hex
     cache_dir = os.path.join(PROCESSING_QUEUE_ROOT, job_id, "cache")
     library_dir = user_paths["library"]

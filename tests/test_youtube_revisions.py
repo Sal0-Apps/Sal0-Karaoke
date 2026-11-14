@@ -58,6 +58,11 @@ class YouTubeRevisionsTests(unittest.TestCase):
         self.assertEqual(self.publisher.replacement_for(self.video)['video_id'],'newVideo001')
         self.assertFalse(self.publisher.read('jobs.json',[])[0]['telegram_link_enabled'])
 
+    def test_creation_options_do_not_wait_for_google_playlist_validation(self):
+        with patch.object(self.publisher, 'playlists', side_effect=AssertionError('No remote API during queue admission')):
+            options = self.publisher.publication_options({'role':'admin'}, True, additional_playlists=['playlist-two'])
+        self.assertEqual(options['additional_playlists'], ['playlist-two'])
+
     def test_playlist_failure_preserves_previous_video_and_retry_skips_confirmed_playlist(self):
         job=self.enqueue();calls,_,upload,api=self.backend(job,fail_playlist='playlist-two')
         with patch.object(self.publisher,'upload_video',side_effect=upload),patch.object(self.publisher,'upload_request',return_value=baseline.response()),patch.object(self.publisher,'api',side_effect=api):

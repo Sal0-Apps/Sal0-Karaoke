@@ -122,6 +122,8 @@ jobs:
           NODE_PATH=/tmp/sal0-browser/node_modules node tests/appearance_smoke.cjs
           NODE_PATH=/tmp/sal0-browser/node_modules node tests/browser_youtube_publisher.cjs
           NODE_PATH=/tmp/sal0-browser/node_modules node tests/browser_queue_cache.cjs
+          NODE_PATH=/tmp/sal0-browser/node_modules node tests/browser_submission_confirmation.cjs
+          NODE_PATH=/tmp/sal0-browser/node_modules node tests/browser_queue_creation.cjs
 
       - name: Keep web appearance screenshots
         if: always()
