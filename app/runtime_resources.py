@@ -85,6 +85,8 @@ def thread_environment(threads=None, env=None):
     result["MKL_DYNAMIC"] = "FALSE"
     # Sleeping workers leave the web server time to respond between tensor ops.
     result.setdefault("OMP_WAIT_POLICY", "PASSIVE")
+    result.setdefault("KMP_BLOCKTIME", "0")
+    result.setdefault("GOMP_SPINCOUNT", "0")
     return result
 
 
@@ -121,3 +123,42 @@ def whisper_runtime_options(quality_mode="standard", cpu_threads=None, device=No
         compute_type = configured_compute
     return dict(device=device, compute_type=compute_type,
                 cpu_threads=available_cpu_threads(cpu_threads), num_workers=1)
+
+
+def configure_idle_runtime():
+    """Set native waiting policy before importing numerical libraries."""
+    for key, value in {"OMP_WAIT_POLICY":"PASSIVE", "KMP_BLOCKTIME":"0", "GOMP_SPINCOUNT":"0"}.items():
+        os.environ.setdefault(key, value)
+    count = str(available_cpu_threads())
+    for key in ("OMP_NUM_THREADS", "MKL_NUM_THREADS", "OPENBLAS_NUM_THREADS", "NUMEXPR_NUM_THREADS"):
+        os.environ.setdefault(key, count)
+
+
+def release_idle_resources():
+    """Drop inference-only RAM after a job; persistent video caches stay on disk."""
+    import gc
+    try:
+        release_cached_whisper()
+        vad = sys.modules.get("faster_whisper.vad")
+        cached_vad = getattr(vad, "get_vad_model", None)
+        if callable(getattr(cached_vad, "cache_clear", None)):
+            cached_vad.cache_clear()
+        torch = sys.modules.get("torch")
+        if torch is not None:
+            torch.set_num_threads(1)
+            cuda = getattr(torch, "cuda", None)
+            if cuda is not None and cuda.is_initialized():
+                cuda.empty_cache()
+    except Exception:
+        logger.exception("Não foi possível liberar todos os recursos de inferência.")
+    finally:
+        gc.collect()
+        if sys.platform.startswith("linux"):
+            import ctypes
+            try:
+                trim = ctypes.CDLL(None).malloc_trim
+                trim.argtypes = [ctypes.c_size_t]
+                trim.restype = ctypes.c_int
+                trim(0)
+            except (AttributeError, OSError):
+                pass

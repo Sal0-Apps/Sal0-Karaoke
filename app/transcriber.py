@@ -3,8 +3,14 @@ import inspect
 import os
 import logging
 import threading
-from faster_whisper import WhisperModel
-from runtime_resources import whisper_runtime_options
+from runtime_resources import whisper_runtime_options, configure_idle_runtime
+configure_idle_runtime()
+
+def WhisperModel(*args, **kwargs):
+    """Keep the API server light until a transcription actually needs the runtime."""
+    from faster_whisper import WhisperModel as implementation
+    return implementation(*args, **kwargs)
+
 from whisper_models import get_model_local_dir, resolve_whisper_repo
 from whisper_audio import load_whisper_audio
 from whisperx_align import stabilize_word_timestamps

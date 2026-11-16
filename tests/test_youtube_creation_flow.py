@@ -79,7 +79,7 @@ class QueuedYouTubePipelineTests(unittest.TestCase):
             return str(media),self.title
         self.download=Mock(side_effect=download);self.subtitle=Mock()
         self.scope=dict(os=os,json=json,shutil=shutil,time=time,logger=logging.getLogger('youtube-queue-test'),
-            telegram_preferences=telegram_preferences, processing_lock=threading.Lock(),state_lock=threading.Lock(),state=self.state,
+            telegram_preferences=telegram_preferences, release_idle_resources=Mock(), processing_lock=threading.Lock(),state_lock=threading.Lock(),state=self.state,
             get_user_paths=lambda _:dict(cache=str(self.cache),output=str(self.output),library=str(self.library)),
             get_notification_targets=lambda _:[],load_stage_checkpoints=lambda _:dict(completed_stages={}),
             persist_active_processing_seconds=lambda _,value:value,
@@ -92,9 +92,11 @@ class QueuedYouTubePipelineTests(unittest.TestCase):
         self.addCleanup(process_manager.cancel_event.clear)
 
     def run_pipeline(self,save=True):
+        self.scope['release_idle_resources'].reset_mock()
         self.scope['run_pipeline'](input_audio_path=str(self.cache/'original_input.mp4'),
             youtube_url=self.url,owner_user={'username':'alice','role':'user'},subtitle_only=True,
             save_to_library=save,input_bg_path=str(self.cache/'original_bg.png'))
+        self.scope['release_idle_resources'].assert_called_once()
 
     def test_worker_downloads_then_preserves_inputs_saves_library_and_persists_real_path(self):
         self.run_pipeline()

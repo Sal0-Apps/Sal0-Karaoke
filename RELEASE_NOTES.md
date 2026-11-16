@@ -1,3 +1,9 @@
+## 12.8.2 — Menor consumo em repouso
+
+- Libera o Whisper, o VAD e buffers ao concluir, falhar ou pausar uma execução.
+- Carrega o runtime de transcrição sob demanda e usa espera passiva das threads numéricas.
+- A fila vazia espera novos pedidos por evento; preserva os caches individuais no disco.
+
 ## 12.8.1 — Avisos independentes do YouTube
 
 - A escolha de receber apenas a publicação no YouTube funciona mesmo quando

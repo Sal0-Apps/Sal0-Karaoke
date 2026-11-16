@@ -142,6 +142,7 @@ class WhisperAudioTests(unittest.TestCase):
         module = importlib.util.module_from_spec(spec)
         with patch.dict(sys.modules, {'faster_whisper': SimpleNamespace(WhisperModel=model)}):
             spec.loader.exec_module(module)
+        module.WhisperModel = model
         module.get_model_local_dir = lambda _: self.folder.name
         return module
 

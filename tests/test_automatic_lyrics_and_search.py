@@ -46,6 +46,8 @@ def load_function(name, **values):
     scope.setdefault("queue_cache", queue_cache)
     scope.setdefault("result_projects", result_projects)
     scope.setdefault("telegram_preferences", telegram_preferences)
+    from runtime_resources import release_idle_resources
+    scope.setdefault("release_idle_resources", release_idle_resources)
     scope.setdefault("canonical_review_segments", canonical_review_segments)
     scope.setdefault("ACTIVE_QUEUE_STATUSES", {"queued", "processing"})
     scope.setdefault("processing_queue_lock", threading.RLock())

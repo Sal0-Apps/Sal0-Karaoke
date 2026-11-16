@@ -38,6 +38,7 @@ class WhisperRefinementTests(unittest.TestCase):
         module = importlib.util.module_from_spec(spec)
         with patch.dict(sys.modules, {"faster_whisper": SimpleNamespace(WhisperModel=factory)}):
             spec.loader.exec_module(module)
+        module.WhisperModel = factory
         module.load_whisper_audio = Mock(return_value=self.audio)
         module.get_model_local_dir = Mock(return_value="/local/selected-whisper")
         module.whisper_runtime_options = Mock(side_effect=lambda quality_mode="standard", cpu_threads=None, device=None: {

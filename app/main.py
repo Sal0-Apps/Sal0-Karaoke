@@ -1,6 +1,8 @@
 import socket
 socket.setdefaulttimeout(120)  # Timeout de 120s para impedir travamentos de socket em downloads de IA
 import os
+from runtime_resources import configure_idle_runtime, release_idle_resources
+configure_idle_runtime()
 import sys
 import importlib
 import importlib.machinery
@@ -974,7 +976,7 @@ def cleanup_queue_cache_in_background(job_cache: str | None):
 
 def processing_queue_worker():
     while True:
-        processing_queue_event.wait(timeout=2)
+        processing_queue_event.wait()
         processing_queue_event.clear()
 
         while True:
@@ -6434,6 +6436,7 @@ def run_pipeline(
         logger.info("Preservando arquivos de entrada no cache após erro para permitir repetições.")
 
     finally:
+        release_idle_resources()
         # Liberar o processador de forma segura caso ainda esteja bloqueado
         if processing_lock.locked():
             try:

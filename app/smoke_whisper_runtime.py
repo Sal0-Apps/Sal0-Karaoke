@@ -19,3 +19,14 @@ with tempfile.TemporaryDirectory() as directory:
     assert isinstance(result, list) and info["language"]
     assert progress and progress[-1] == 100
 print("Whisper: áudio completo e reanálise com letra-guia validados em inferência real na CPU.")
+
+# The queue must release the actual native model after the result is saved.
+import time
+import transcriber
+from runtime_resources import release_idle_resources
+release_idle_resources()
+assert transcriber._cached_model is None
+assert get_model_local_dir("medium"), "Os pesos no disco devem ser preservados"
+idle_start = time.process_time()
+time.sleep(.5)
+print(f"Repouso após inferência: Whisper descarregado; CPU do processo em 0,5s = {time.process_time()-idle_start:.4f}s.")
